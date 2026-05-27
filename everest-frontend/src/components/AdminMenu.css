@@ -1,0 +1,56 @@
+.admin-menu {
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  width: 100%;
+}
+
+.admin-menu-header {
+  background-color: #000000;
+  padding: 1rem;
+  text-align: center;
+}
+
+.admin-menu-header h3 {
+  color: #FFD700; /* Golden text */
+  font-weight: 800;
+  margin: 0;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-menu-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0;
+}
+
+.admin-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  gap: 0.75rem;
+  color: var(--primary);
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.admin-menu-item:hover {
+  background-color: var(--background);
+  color: var(--secondary);
+}
+
+.admin-menu-icon {
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+}
