@@ -3,9 +3,10 @@ import PdfPreviewModal from './PdfPreviewModal';
 
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
-const AddCustomerModal = ({ onClose, onAddCustomer }) => {
+const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [step, setStep] = useState('form'); // 'form', 'confirm', 'success'
   const [showPdf, setShowPdf] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // 1. Initial Registration Data
   const [appDate, setAppDate] = useState(initialData?.appDate || new Date().toISOString().split('T')[0]);
@@ -278,7 +279,9 @@ const AddCustomerModal = ({ onClose, onAddCustomer }) => {
             <p className="text-slate-500 mb-6">Are you sure you want to submit this customer application?</p>
             <div className="flex gap-3">
               <button onClick={() => setStep('form')} className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">Back</button>
-              <button onClick={confirmSubmit} className="flex-1 py-3 bg-[#10a37f] text-white rounded-xl font-bold hover:bg-[#0e906f] shadow-md shadow-[#10a37f]/30">Yes, Submit</button>
+              <button onClick={confirmSubmit} disabled={isSubmitting} className={`flex-1 py-3 bg-[#10a37f] text-white rounded-xl font-bold hover:bg-[#0e906f] shadow-md shadow-[#10a37f]/30 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                {isSubmitting ? 'Submitting...' : 'Yes, Submit'}
+              </button>
             </div>
           </div>
         </div>

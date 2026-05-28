@@ -361,7 +361,6 @@ function App() {
           onClose={() => setIsAddCustomerOpen(false)} 
           onAddCustomer={(newCustomer) => {
             setCustomers(prev => [newCustomer, ...prev]);
-            setIsAddCustomerOpen(false);
           }}
         />
       )}
