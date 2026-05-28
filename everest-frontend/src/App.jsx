@@ -141,18 +141,16 @@ function App() {
     return filtered;
   }, [activeCategory, activeSort]);
 
-  // Aggregate Financials (Only Approved)
+  // Aggregate Financials (Dynamic Based on UI Stream)
   const { totalLoan, totalOutstanding } = useMemo(() => {
-    return customers.reduce((acc, curr) => {
-      if (curr.status === 'Approved') {
-        // Both Loan Amount and Outstanding use the Repayment Amount
-        const repay = parseFloat(curr.repayAmount) || 0;
-        acc.totalLoan += repay;
-        acc.totalOutstanding += repay;
-      }
+    const activeStream = processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled');
+    return activeStream.reduce((acc, curr) => {
+      const repay = parseFloat(curr.repayAmount) || 0;
+      acc.totalLoan += repay;
+      acc.totalOutstanding += repay;
       return acc;
     }, { totalLoan: 0, totalOutstanding: 0 });
-  }, [customers]);
+  }, [processedCustomers]);
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);

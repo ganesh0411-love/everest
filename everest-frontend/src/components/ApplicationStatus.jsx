@@ -93,61 +93,44 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp }) =
       </div>
 
       {/* Dynamic Data Table / List Cards */}
-      <div className="p-2">
-        <div className="overflow-x-auto pb-32">
-          <table className="w-full text-left whitespace-nowrap min-w-[800px]">
+      <div className="p-2 w-full overflow-hidden">
+        <div className="w-full pb-32">
+          <table className="w-full text-left whitespace-nowrap table-fixed">
             <thead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="p-2.5">Serial No</th>
-                <th className="p-2.5">Application Date</th>
-                <th className="p-2.5">Customer Name</th>
-                {activeTab !== 'Pending' && (
-                  <>
-                    <th className="p-2.5">Center</th>
-                    <th className="p-2.5">Staff Name</th>
-                    <th className="p-2.5">Loan Amount</th>
-                  </>
-                )}
-                <th className="p-2.5 text-center">Actions</th>
+                <th className="p-2 w-12 text-center">S.No</th>
+                <th className="p-2 w-24">App Date</th>
+                <th className="p-2 text-left truncate">Customer</th>
+                <th className="p-2 w-16 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentApps.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="p-6 text-center text-slate-500 text-sm">No applications in this status.</td>
+                  <td colSpan="4" className="p-6 text-center text-slate-500 text-sm">No applications in this status.</td>
                 </tr>
               ) : currentApps.map((app, index) => (
-                <tr key={app.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="p-2.5 font-bold text-slate-800 text-sm">{index + 1}</td>
-                  <td className="p-2.5 font-semibold text-slate-600 text-xs">{formatDate(app.appDate)}</td>
-                  <td className="p-2.5">
+                <tr key={app.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors w-full overflow-hidden">
+                  <td className="p-2 font-bold text-slate-800 text-sm text-center">{index + 1}</td>
+                  <td className="p-2 font-semibold text-slate-600 text-xs">{formatDate(app.appDate)}</td>
+                  <td className="p-2 truncate overflow-hidden">
                     <div className="flex items-center gap-2">
                       <img 
                         src={app.image} 
                         alt={app.customerName} 
-                        className={`w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm transition-transform ${activeTab === 'Rejected' ? '' : 'cursor-pointer hover:scale-105'}`}
+                        className={`w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm transition-transform flex-shrink-0 ${activeTab !== 'Pending' ? '' : 'cursor-pointer hover:scale-105'}`}
                         onClick={(e) => { 
-                          if (activeTab === 'Rejected') return;
+                          if (activeTab !== 'Pending') return;
                           e.stopPropagation(); 
                           setFullscreenImage(app.image); 
                         }}
                       />
-                      <div>
-                        <div className="font-bold text-slate-800 text-sm">{app.customerName}</div>
-                        {activeTab !== 'Pending' && (
-                          <div className="text-[10px] text-slate-500 font-medium">ID: {app.id}</div>
-                        )}
+                      <div className="truncate">
+                        <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
                       </div>
                     </div>
                   </td>
-                  {activeTab !== 'Pending' && (
-                    <>
-                      <td className="p-2.5 font-medium text-slate-600 text-xs">{app.center}</td>
-                      <td className="p-2.5 font-medium text-slate-600 text-xs">{app.staffName}</td>
-                      <td className="p-2.5 font-bold text-slate-800 text-sm">₹{app.loanAmount}</td>
-                    </>
-                  )}
-                  <td className="p-2.5 flex items-center justify-center gap-1.5 relative">
+                  <td className="p-2 flex items-center justify-center relative">
                     
                     {/* Three-Dot Menu Button */}
                     <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
