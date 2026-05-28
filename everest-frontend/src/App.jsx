@@ -1,405 +1,349 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Header from './components/Header';
-import DashboardSummary from './components/DashboardSummary';
-import CustomerList from './components/CustomerList';
-import BottomNav from './components/BottomNav';
+import NetBalanceCard from './components/NetBalanceCard';
+import SearchBar from './components/SearchBar';
+import EmptyState from './components/EmptyState';
 import FloatingActionButton from './components/FloatingActionButton';
-import AdminMenu from './components/AdminMenu';
-import SplashVideo from './components/SplashVideo';
+import Footer from './components/Footer';
+import { 
+  Centers, 
+  AddBulkCustomer, 
+  StaffManagement, 
+  DashboardOverview, 
+  CustomerKYCUpdate, 
+  RecycleBin 
+} from './components/Placeholders';
+import ApplicationStatus from './components/ApplicationStatus';
 import AddCustomerModal from './components/AddCustomerModal';
-import ApplicationStatusView from './components/ApplicationStatusView';
-import CustomerGroupsView from './components/CustomerGroupsView';
-import AddBulkCustomerView from './components/AddBulkCustomerView';
-import StaffManagementView from './components/StaffManagementView';
-import LoginScreen from './components/LoginScreen';
-import UserProfileView from './components/UserProfileView';
-import RecycleBinView from './components/RecycleBinView';
-import usePersistentState from './hooks/usePersistentState';
-import { saveToCloud, loadFromCloud } from './services/cloudSync';
-import { App as CapApp } from '@capacitor/app';
-import './index.css';
-import './App.css';
 
 function App() {
-  const [showSplash, setShowSplash] = useState(true);
-  const [branches, setBranches] = useState([{ id: 1, name: 'Main Branch' }]);
-  const [activeBranchId, setActiveBranchId] = useState(1);
-  const [activeView, setActiveView] = useState('dashboard');
+  const [customers, setCustomers] = useState([]);
+  const [isDbLoading, setIsDbLoading] = useState(true);
+
+  useEffect(() => {
+    // ASYNCHRONOUS DATABASE LOAD & SAFE NULL CHECK
+    const initDatabase = async () => {
+      // Small artificial delay to show the splash screen smoothly
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      try {
+        const dbVersion = localStorage.getItem('everest_db_version');
+        const REQUIRED_VERSION = '1.0.6';
+
+        if (dbVersion !== REQUIRED_VERSION) {
+          // HARD RESET LOCAL STORAGE BIAS: Clear corrupt legacy keys/schemas
+          localStorage.removeItem('everest_customers');
+          localStorage.setItem('everest_db_version', REQUIRED_VERSION);
+          setCustomers([]);
+        } else {
+          const saved = localStorage.getItem('everest_customers');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            // Strictly ensure it's an array to prevent white screen crashes
+            if (Array.isArray(parsed)) {
+              setCustomers(parsed);
+            } else {
+              setCustomers([]);
+            }
+          } else {
+            setCustomers([]);
+          }
+        }
+      } catch (error) {
+        console.error("Database Init Error Caught:", error);
+        setCustomers([]);
+      } finally {
+        setIsDbLoading(false);
+      }
+    };
+
+    initDatabase();
+  }, []);
+
+  useEffect(() => {
+    if (!isDbLoading) {
+      localStorage.setItem('everest_customers', JSON.stringify(customers));
+    }
+  }, [customers, isDbLoading]);
+
+  const [currentView, setCurrentView] = useState('Customer');
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState(null);
+  
+  // Filter & Sort State
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeSort, setActiveSort] = useState('Recent');
+  
+  // Temp state for the modal before applying
+  const [tempCategory, setTempCategory] = useState('All');
+  const [tempSort, setTempSort] = useState('Recent');
 
-  // ── USER AUTH STATE ───────────────────────────────────────────────
-  const [user, setUser] = usePersistentState('everest_user', null);
-  const [cloudSyncStatus, setCloudSyncStatus] = useState('synced');
-
-  // Back button exit constraint states
-  const [backToast, setBackToast] = useState('');
-  const [lastBackPress, setLastBackPress] = useState(0);
-
-  // ── PERSISTENT STATE (survives APK rebuilds & reloads) ──────────
-  const [customers, setCustomers] = usePersistentState('everest_customers', []);
-  const [pendingApplications, setPendingApplications] = usePersistentState('everest_pending', []);
-  const [approvedApplications, setApprovedApplications] = usePersistentState('everest_approved', []);
-  const [rejectedApplications, setRejectedApplications] = usePersistentState('everest_rejected', []);
-  const [recycledCustomers, setRecycledCustomers] = usePersistentState('everest_recycled', []);
-
-  const activeBranch = branches.find(b => b.id === activeBranchId) || branches[0];
-
-  const handleAddBranch = (branchName) => {
-    if (!branchName || branchName.trim() === '') return;
-    const newBranch = { id: Date.now(), name: branchName.trim() };
-    setBranches([...branches, newBranch]);
-    setActiveBranchId(newBranch.id);
-  };
-
-  // ── CLOUD SYNC ON LOGIN ─────────────────────────────────────────
-  const handleLogin = (loggedInUser) => {
-    setUser(loggedInUser);
-    if (loggedInUser.role === 'Admin') {
-      setCloudSyncStatus('syncing');
-      loadFromCloud(loggedInUser.email)
-        .then((cloudData) => {
-          if (cloudData) {
-            if (cloudData.customers) setCustomers(cloudData.customers);
-            if (cloudData.pending) setPendingApplications(cloudData.pending);
-            if (cloudData.approved) setApprovedApplications(cloudData.approved);
-            if (cloudData.rejected) setRejectedApplications(cloudData.rejected);
-          }
-          setCloudSyncStatus('synced');
-        })
-        .catch((err) => {
-          console.error("Cloud data pull failed:", err);
-          setCloudSyncStatus('error');
-        });
-    }
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setActiveView('dashboard');
-  };
-
-  // ── REAL-TIME CLOUD AUTO-SYNC (DEBOUNCED) ──────────────────────
-  useEffect(() => {
-    if (user?.role === 'Admin') {
-      setCloudSyncStatus('syncing');
-      const syncTimeout = setTimeout(() => {
-        saveToCloud(user.email, {
-          customers,
-          pending: pendingApplications,
-          approved: approvedApplications,
-          rejected: rejectedApplications
-        })
-          .then((res) => {
-            if (res) setCloudSyncStatus('synced');
-            else setCloudSyncStatus('error');
-          })
-          .catch((err) => {
-            console.error("Cloud sync save failed:", err);
-            setCloudSyncStatus('error');
-          });
-      }, 1000); // 1-second debounce
-      return () => clearTimeout(syncTimeout);
-    }
-  }, [customers, pendingApplications, approvedApplications, rejectedApplications, user]);
-
-  // Enforce operational view restriction for Staff (dashboard, application-status, recycle-bin are allowed)
-  useEffect(() => {
-    const allowedStaffViews = ['dashboard', 'application-status', 'recycle-bin'];
-    if (user?.role === 'Staff' && !allowedStaffViews.includes(activeView)) {
-      setActiveView('dashboard');
-    }
-  }, [user, activeView]);
-
-  // Back Button exit constraints and Home redirection
-  useEffect(() => {
-    let toastTimeout;
-    if (backToast) {
-      toastTimeout = setTimeout(() => {
-        setBackToast('');
-      }, 2000);
-    }
-    return () => clearTimeout(toastTimeout);
-  }, [backToast]);
-
-  useEffect(() => {
-    if (!CapApp) return;
-
-    const handleBackButton = async () => {
-      // 1. If AddCustomerModal is open, close it first
-      if (isAddCustomerOpen) {
-        setIsAddCustomerOpen(false);
-        setEditingCustomer(null);
-        return;
-      }
-
-      // 2. If user is on any other page than dashboard (Home Page), redirect to dashboard first
-      if (activeView !== 'dashboard') {
-        setActiveView('dashboard');
-        return;
-      }
-
-      // 3. If user is on Home Page, double-tap back button to exit
-      const now = Date.now();
-      if (now - lastBackPress < 2000) {
-        CapApp.exitApp();
-      } else {
-        setLastBackPress(now);
-        setBackToast('Press again to exit');
-      }
-    };
-
-    let sub;
-    try {
-      sub = CapApp.addListener('backButton', handleBackButton);
-    } catch (err) {
-      console.warn("Capacitor BackButton listener not active in web browser environment:", err);
-    }
-
-    return () => {
-      if (sub) {
-        sub.then(listener => listener.remove()).catch(() => {});
-      }
-    };
-  }, [activeView, isAddCustomerOpen, lastBackPress]);
-
-  const handleSavePendingCustomer = (newCustomer) => {
-    const existingRecord = customers.find(c => c.id === newCustomer.id);
-    if (existingRecord) {
-      // EDIT MODE: Preserve the original pendingStatus — do NOT reset to PENDING
-      const updatedCustomer = {
-        ...newCustomer,
-        pendingStatus: newCustomer.pendingStatus || existingRecord.pendingStatus || 'PENDING'
-      };
-      setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
-      setPendingApplications(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
-      setApprovedApplications(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
-      setRejectedApplications(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+  const handleScroll = (e) => {
+    if (e.target.scrollTop > 50) {
+      if (!isScrolled) setIsScrolled(true);
     } else {
-      // NEW RECORD: Assign initial PENDING status
-      const customerWithStatus = { ...newCustomer, pendingStatus: 'PENDING' };
-      setPendingApplications(prev => [...prev, customerWithStatus]);
-      setCustomers(prev => [customerWithStatus, ...prev]);
+      if (isScrolled) setIsScrolled(false);
     }
-    setEditingCustomer(null);
   };
 
-  const handleApprove = (customer) => {
-    const approved = { ...customer, pendingStatus: 'APPROVED' };
-    setPendingApplications(prev => prev.filter(c => c.id !== customer.id));
-    setApprovedApplications(prev => [...prev, approved]);
-    setCustomers(prev => prev.map(c => c.id === customer.id ? approved : c));
+  const openFilter = () => {
+    setTempCategory(activeCategory);
+    setTempSort(activeSort);
+    setIsFilterOpen(true);
   };
 
-  const handleReject = (customer) => {
-    const rejected = { ...customer, pendingStatus: 'REJECTED' };
-    setPendingApplications(prev => prev.filter(c => c.id !== customer.id));
-    setRejectedApplications(prev => [...prev, rejected]);
-    setCustomers(prev => prev.map(c => c.id === customer.id ? rejected : c));
+  const applyFilter = () => {
+    setActiveCategory(tempCategory);
+    setActiveSort(tempSort);
+    setIsFilterOpen(false);
   };
 
-  const handleMoveToRePending = (customer) => {
-    const rePending = { ...customer, pendingStatus: 'PENDING' };
-    // Remove from both approved and rejected queues
-    setApprovedApplications(prev => prev.filter(c => c.id !== customer.id));
-    setRejectedApplications(prev => prev.filter(c => c.id !== customer.id));
-    // Add back to pending queue
-    setPendingApplications(prev => [rePending, ...prev.filter(c => c.id !== customer.id)]);
-    setCustomers(prev => prev.map(c => c.id === customer.id ? rePending : c));
+  const clearFilter = () => {
+    setActiveCategory('All');
+    setActiveSort('Recent');
+    setIsFilterOpen(false);
   };
 
-  const handleMoveToApproved = (customer) => {
-    const approved = { ...customer, pendingStatus: 'APPROVED' };
-    // Remove from rejected queue
-    setRejectedApplications(prev => prev.filter(c => c.id !== customer.id));
-    setPendingApplications(prev => prev.filter(c => c.id !== customer.id));
-    setApprovedApplications(prev => [approved, ...prev.filter(c => c.id !== customer.id)]);
-    setCustomers(prev => prev.map(c => c.id === customer.id ? approved : c));
-  };
-
-  const handleDeleteCustomer = (customer) => {
-    const recycledObj = {
-      ...customer,
-      deletedTimestamp: Date.now()
-    };
-    setRecycledCustomers(prev => [recycledObj, ...prev]);
-
-    setCustomers(prev => prev.filter(c => c.id !== customer.id));
-    setPendingApplications(prev => prev.filter(c => c.id !== customer.id));
-    setApprovedApplications(prev => prev.filter(c => c.id !== customer.id));
-    setRejectedApplications(prev => prev.filter(c => c.id !== customer.id));
-  };
-
-  const handleRestoreCustomer = (customer) => {
-    setRecycledCustomers(prev => prev.filter(c => c.id !== customer.id));
-
-    const restoredCustomer = { ...customer };
-    delete restoredCustomer.deletedTimestamp;
-
-    setCustomers(prev => [restoredCustomer, ...prev]);
+  // Process Customers List
+  const processedCustomers = useMemo(() => {
+    let filtered = [...customers];
     
-    if (restoredCustomer.pendingStatus === 'APPROVED') {
-      setApprovedApplications(prev => [restoredCustomer, ...prev]);
-    } else if (restoredCustomer.pendingStatus === 'REJECTED') {
-      setRejectedApplications(prev => [restoredCustomer, ...prev]);
-    } else {
-      restoredCustomer.pendingStatus = restoredCustomer.pendingStatus || 'PENDING';
-      setPendingApplications(prev => [restoredCustomer, ...prev]);
+    if (activeCategory !== 'All') {
+      filtered = filtered.filter(c => c.category === activeCategory);
+    }
+
+    filtered.sort((a, b) => {
+      switch (activeSort) {
+        case 'Recent':
+          return new Date(b.date) - new Date(a.date);
+        case 'Oldest':
+          return new Date(a.date) - new Date(b.date);
+        case 'Highest Amount':
+          return b.loanAmount - a.loanAmount;
+        case 'Least Amount':
+          return a.loanAmount - b.loanAmount;
+        case 'By Name':
+          return a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [activeCategory, activeSort]);
+
+  // Aggregate Financials (Only Approved)
+  const { totalLoan, totalOutstanding } = useMemo(() => {
+    return customers.reduce((acc, curr) => {
+      if (curr.status === 'Approved') {
+        // Both Loan Amount and Outstanding use the Repayment Amount
+        const repay = parseFloat(curr.repayAmount) || 0;
+        acc.totalLoan += repay;
+        acc.totalOutstanding += repay;
+      }
+      return acc;
+    }, { totalLoan: 0, totalOutstanding: 0 });
+  }, [customers]);
+
+  const formatDate = (dateString) => {
+    const d = new Date(dateString);
+    if (isNaN(d)) return dateString;
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+  };
+
+  const renderView = () => {
+    switch(currentView) {
+      case 'Centers': return <div className="flex-1 overflow-y-auto"><Centers /></div>;
+      case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
+      case 'Staff Management': return <div className="flex-1 overflow-y-auto"><StaffManagement /></div>;
+      case 'Dashboard Overview': return <div className="flex-1 overflow-y-auto"><DashboardOverview /></div>;
+      case 'Customer KYC Update': return <div className="flex-1 overflow-y-auto"><CustomerKYCUpdate /></div>;
+      case 'Application Status': 
+        return (
+          <div className="flex-1 overflow-y-auto">
+            <ApplicationStatus 
+              applications={customers}
+              onUpdateStatus={(id, newStatus) => {
+                setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
+              }}
+              onDeleteApp={(id) => {
+                if (window.confirm('Are you sure you want to delete this application?')) {
+                  setCustomers(prev => prev.filter(c => c.id !== id));
+                }
+              }}
+            />
+          </div>
+        );
+      case 'Recycle Bin': return <div className="flex-1 overflow-y-auto"><RecycleBin /></div>;
+      case 'Change Password':
+      case 'Change Phone Number':
+        return (
+          <div className="flex-1 overflow-y-auto p-6 text-center">
+            <h2 className="text-xl font-bold">{currentView}</h2>
+            <p className="mt-2 text-slate-500">Settings placeholder view.</p>
+          </div>
+        );
+      case 'Customer':
+      default:
+        return (
+          <>
+            <div className="flex-shrink-0 z-30 bg-[#f8fafc] pb-2">
+              <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
+              <SearchBar onFilterClick={openFilter} />
+            </div>
+            
+            <main 
+              className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto bg-white"
+              onScroll={handleScroll}
+            >
+              {processedCustomers.filter(c => c.status !== 'Rejected').length > 0 ? (
+                <div className="p-2 space-y-2 pb-24">
+                  {processedCustomers.filter(c => c.status !== 'Rejected').map(customer => (
+                    <div key={customer.id} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
+                          <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-800 text-sm leading-tight">{customer.name}</h4>
+                          <p className="text-[11px] font-medium text-slate-500 mt-0.5">{customer.id} &middot; {formatDate(customer.date)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${customer.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {customer.status}
+                        </span>
+                        <div className="text-right min-w-[70px]">
+                          <div className="text-sm font-bold text-rose-600">₹{customer.repayAmount.toLocaleString('en-IN')}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState />
+              )}
+            </main>
+            
+            <div onClick={() => setIsAddCustomerOpen(true)}>
+              <FloatingActionButton isScrolled={isScrolled} />
+            </div>
+          </>
+        );
     }
   };
 
-  const handlePermanentDeleteCustomer = (customer) => {
-    setRecycledCustomers(prev => prev.filter(c => c.id !== customer.id));
-  };
-
-  const handleMenuSelect = (menuName) => {
-    const map = {
-      'Customer': 'dashboard',
-      'Application Status': 'application-status',
-      'Groups': 'groups',
-      'Add Bulk Customer': 'bulk-customer',
-      'Staff Management': 'staff-management',
-      'Recycle Bin': 'recycle-bin',
-      'Dashboard Overview': 'dashboard',
-      'Customer KYC Update': 'dashboard',
-      'Settings': 'dashboard'
-    };
-    if (map[menuName]) {
-      setActiveView(map[menuName]);
-    }
-  };
-
-  const activeCustomers = customers.filter(c => 
-    c.branchId === activeBranchId && 
-    (c.pendingStatus === 'APPROVED' || c.pendingStatus === 'PENDING')
-  );
-
-  // If splash is loading, show splash only
-  if (showSplash) {
-    return <SplashVideo onComplete={() => setShowSplash(false)} />;
-  }
-
-  // If no active session, show Login Screen
-  if (!user) {
-    return <LoginScreen onLogin={handleLogin} />;
+  if (isDbLoading) {
+    return (
+      <div className="h-[100dvh] bg-slate-900 flex flex-col items-center justify-center text-white relative overflow-hidden">
+        {/* Abstract Corporate Background Elements */}
+        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-brand-blue/20 to-transparent"></div>
+        <div className="absolute bottom-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full"></div>
+        
+        {/* Core Splash Content */}
+        <div className="relative z-10 flex flex-col items-center animate-in fade-in zoom-in duration-700">
+          <div className="w-20 h-20 bg-white rounded-2xl shadow-2xl flex items-center justify-center mb-6 border border-white/10">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold mb-1 tracking-wider text-white">EVEREST</h1>
+          <p className="text-slate-400 text-sm mb-12 font-medium tracking-widest uppercase">Micro Finance</p>
+          
+          <div className="flex flex-col items-center">
+            <div className="w-8 h-8 border-3 border-slate-700 border-t-emerald-400 rounded-full animate-spin mb-4"></div>
+            <p className="text-emerald-400/80 text-[10px] font-bold uppercase tracking-widest animate-pulse">Initializing Database...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="app-container">
-      <Header
-        branches={branches}
-        activeBranch={activeBranch}
-        onSelectBranch={setActiveBranchId}
-        onAddBranch={handleAddBranch}
-        user={user}
-        onLogout={handleLogout}
-        cloudSyncStatus={cloudSyncStatus}
-        onSelectMenu={handleMenuSelect}
-      />
-      <div className="main-content">
-        {user.role === 'User' ? (
-          <UserProfileView user={user} onLogout={handleLogout} customers={customers} />
-        ) : (
-          <div className="dashboard-grid" style={{ gridTemplateColumns: user.role === 'Admin' ? '260px 1fr' : '1fr' }}>
-            {user.role === 'Admin' && (
-              <div className="summary-section desktop-only">
-                <AdminMenu
-                  pendingCount={pendingApplications.length}
-                  onSelectMenu={handleMenuSelect}
-                />
+    <div className="h-[100dvh] bg-[#f8fafc] flex flex-col overflow-hidden relative">
+      <Header currentView={currentView} setCurrentView={setCurrentView} />
+      
+      {renderView()}
+
+      {/* Filter Modal Overlay */}
+      {isFilterOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex flex-col justify-end animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md mx-auto rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom-full duration-300">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-800">Filter & Sort</h3>
+              <button onClick={() => setIsFilterOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 bg-slate-50 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            
+            <div className="p-5 overflow-y-auto max-h-[60vh]">
+              <div className="mb-6">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">FILTER BY CATEGORY</h4>
+                <div className="flex flex-wrap gap-2">
+                  {['All', 'Settled', 'Due Date', 'Upcoming'].map(cat => (
+                    <button 
+                      key={cat}
+                      onClick={() => setTempCategory(cat)}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${tempCategory === cat ? 'bg-brand-blue text-white border-brand-blue' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
-            <div className="ledger-section" style={{ width: '100%', maxWidth: '100%' }}>
-              {activeView === 'dashboard' && (
-                <>
-                  <DashboardSummary customers={activeCustomers} />
-                  <CustomerList 
-                    customers={activeCustomers} 
-                    onScrollChange={setIsScrolled} 
-                    onEditCustomer={(customer) => { setEditingCustomer(customer); setIsAddCustomerOpen(true); }}
-                    onDeleteCustomer={handleDeleteCustomer}
-                  />
-                </>
-              )}
-              {activeView === 'application-status' && (user.role === 'Admin' || user.role === 'Staff') && (
-                <ApplicationStatusView
-                  pendingApplications={pendingApplications}
-                  approvedApplications={approvedApplications}
-                  rejectedApplications={rejectedApplications}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  onMoveToRePending={handleMoveToRePending}
-                  onMoveToApproved={handleMoveToApproved}
-                  onEditCustomer={(customer) => { setEditingCustomer(customer); setIsAddCustomerOpen(true); }}
-                  onDeleteCustomer={handleDeleteCustomer}
-                  userRole={user.role}
-                />
-              )}
-              {activeView === 'recycle-bin' && (user.role === 'Admin' || user.role === 'Staff') && (
-                <RecycleBinView
-                  recycledCustomers={recycledCustomers}
-                  onRestore={handleRestoreCustomer}
-                  onPermanentDelete={handlePermanentDeleteCustomer}
-                  userRole={user.role}
-                />
-              )}
-              {activeView === 'groups' && user.role === 'Admin' && <CustomerGroupsView />}
-              {activeView === 'bulk-customer' && user.role === 'Admin' && <AddBulkCustomerView />}
-              {activeView === 'staff-management' && user.role === 'Admin' && <StaffManagementView />}
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">SORT BY VALUES</h4>
+                <div className="flex flex-col gap-2">
+                  {['Recent', 'Oldest', 'Highest Amount', 'Least Amount', 'By Name'].map(sort => (
+                    <label key={sort} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                      <span className="text-sm font-semibold text-slate-700">{sort}</span>
+                      <input 
+                        type="radio" 
+                        name="sort" 
+                        checked={tempSort === sort} 
+                        onChange={() => setTempSort(sort)} 
+                        className="w-4 h-4 text-brand-blue"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 flex gap-3 pb-safe bg-white">
+              <button 
+                onClick={clearFilter}
+                className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Clear Filter
+              </button>
+              <button 
+                onClick={applyFilter}
+                className="flex-[2] py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20"
+              >
+                Apply
+              </button>
             </div>
           </div>
-        )}
-        
-        {/* Floating Action Button - Only visible on Home Page, collapses on scroll, restricted to Admin & Staff */}
-        {activeView === 'dashboard' && user.role !== 'User' && (
-          <FloatingActionButton 
-            onClick={() => setIsAddCustomerOpen(true)} 
-            isScrolled={isScrolled} 
-          />
-        )}
-        
-        <BottomNav
-          activeView={activeView}
-          onNavigate={setActiveView}
-          userRole={user.role}
-        />
-      </div>
-
-      {isAddCustomerOpen && (
-        <AddCustomerModal
-          onClose={() => {
-            setIsAddCustomerOpen(false);
-            setEditingCustomer(null);
-            setActiveView('dashboard');
-          }}
-          onSave={handleSavePendingCustomer}
-          customers={customers}
-          editCustomer={editingCustomer}
-        />
-      )}
-
-      {backToast && (
-        <div style={{
-          position: 'fixed',
-          bottom: '100px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(27, 42, 96, 0.95)',
-          color: '#ffffff',
-          padding: '12px 24px',
-          borderRadius: '24px',
-          fontSize: '0.9rem',
-          fontWeight: 'bold',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-          zIndex: 9999999,
-          border: '1.5px solid #03a9f4',
-          fontFamily: 'sans-serif',
-          letterSpacing: '0.5px'
-        }}>
-          {backToast}
         </div>
       )}
+
+      {isAddCustomerOpen && (
+        <AddCustomerModal 
+          onClose={() => setIsAddCustomerOpen(false)} 
+          onAddCustomer={(newCustomer) => {
+            setCustomers(prev => [newCustomer, ...prev]);
+            setIsAddCustomerOpen(false);
+          }}
+        />
+      )}
+
+      {/* Adjust footer to not overlap with bottom content by rendering it directly in the flex column */}
+      <div className="flex-shrink-0 z-40 relative">
+        <Footer currentView={currentView} setCurrentView={setCurrentView} />
+      </div>
     </div>
   );
 }

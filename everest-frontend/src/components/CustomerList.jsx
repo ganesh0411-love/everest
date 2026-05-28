@@ -1,2 +1,118 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';\nimport { buildCustomerPDF, loadCustomerImage } from '../utils/pdfGenerator';\nimport './CustomerList.css';\n\n// ── PORTAL CONTEXT MENU (renders outside any overflow:hidden container) ──────\nconst PortalContextMenu = ({ position, onClose, children }) => {\n  useEffect(() => {\n    const handler = () => onClose();\n    document.addEventListener('click', handler);\n    return () => document.removeEventListener('click', handler);\n  }, [onClose]);\n\n  if (!position) return null;\n  return (\n    <div\n      style={{\n        position: 'fixed',\n        top: position.top,\n        left: position.left,\n        zIndex: 999999,\n        background: '#ffffff',\n        border: '1px solid #e2e8f0',\n        borderRadius: '8px',\n        boxShadow: '0 8px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.12)',\n        minWidth: '148px',\n        overflow: 'hidden',\n      }}\n      onClick={(e) => e.stopPropagation()}\n    >\n      {children}\n    </div>\n  );\n};\n\n// ── FUNNEL FILTER OVERLAY ─────────────────────────────────────────────────────\nconst FilterOverlay = ({ onClose, onApply }) => {\n  const [statusFilters, setStatusFilters] = useState({ all: true, settled: false, dueToday: false, upcoming: false });\n  const [sortRule, setSortRule] = useState('recent');\n\n  const toggleStatus = (key) => {\n    if (key === 'all') {\n      setStatusFilters({ all: true, settled: false, dueToday: false, upcoming: false });\n    } else {\n      setStatusFilters(prev => {\n        const next = { ...prev, [key]: !prev[key], all: false };\n        const anyOn = next.settled || next.dueToday || next.upcoming;\n        if (!anyOn) return { all: true, settled: false, dueToday: false, upcoming: false };\n        return next;\n      });\n    }\n  };\n\n  const handleApply = () => {\n    onApply({ statusFilters, sortRule });\n    onClose()
-<truncated 16588 bytes>
+import React, { useState, useEffect } from 'react';
+import AddCustomerModal from './AddCustomerModal';
+import './CustomerList.css';
+
+const CustomerList = ({ customers, onSubmitApplication, activeBranch }) => {
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const totalPrincipal = customers.reduce((sum, c) => sum + (Number(c.loanAmount) || 0), 0);
+  const totalOutstanding = customers.reduce((sum, c) => sum + (Number(c.repayAmount) || 0), 0);
+
+  const filteredCustomers = customers.filter(c => 
+    (c.customerName?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (c.customerId?.toString().includes(searchQuery))
+  );
+
+  return (
+    <div className="customer-list-container">
+      <div className="dashboard-top-section">
+        <div className="net-balance-box">
+          <div className="net-balance-header">
+            <span className="net-balance-label">Net Balance:</span>
+            <button className="view-report-btn">View Report &gt;</button>
+          </div>
+          <div className="net-balance-metrics">
+            <div className="metric">
+              <span className="metric-title">Principal</span>
+              <span className="metric-value green">₹{totalPrincipal.toLocaleString()}</span>
+            </div>
+            <div className="metric">
+              <span className="metric-title">Outstanding</span>
+              <span className="metric-value red">₹{totalOutstanding.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="search-bar-container">
+        <input 
+          type="text" 
+          placeholder="Search Customer or Supplier" 
+          className="search-input"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      <div className="customer-data-list">
+        {filteredCustomers.length === 0 ? (
+          <div className="empty-state">
+            <img src="/src/assets/hero.png" alt="No Customers" className="empty-state-img" />
+          </div>
+        ) : (
+          <table className="customer-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Loan Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCustomers.map((c, i) => (
+                <tr key={i}>
+                  <td>{c.customerId}</td>
+                  <td>{c.customerName}</td>
+                  <td>₹{c.loanAmount}</td>
+                  <td style={{ position: 'relative' }}>
+                    <button onClick={() => setOpenDropdownId(openDropdownId === c.customerId ? null : c.customerId)}>
+                      ...
+                    </button>
+                    {openDropdownId === c.customerId && (
+                      <div className="three-dot-dropdown" style={{ position: 'absolute', right: 0, top: '100%', zIndex: 9999, background: 'white', border: '1px solid #ccc', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
+                        <button style={{ display: 'block', width: '100%', padding: '8px' }}>Edit</button>
+                        <button style={{ display: 'block', width: '100%', padding: '8px', color: 'red' }}>Delete</button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <button 
+        className={`fab-add-customer ${isScrolled ? 'fab-scrolled' : ''}`} 
+        onClick={() => setIsAddModalOpen(true)}
+      >
+        {isScrolled ? '+' : '+ Add Customer'}
+      </button>
+
+      {isAddModalOpen && (
+        <AddCustomerModal 
+          onClose={() => setIsAddModalOpen(false)} 
+          onSubmit={(data) => {
+            onSubmitApplication({ ...data, branch: activeBranch });
+            setIsAddModalOpen(false);
+            alert("Success! Waiting for Approval");
+          }} 
+        />
+      )}
+    </div>
+  );
+};
+
+export default CustomerList;

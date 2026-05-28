@@ -1,145 +1,136 @@
 import React, { useState, useEffect, useRef } from 'react';
-import AdminMenu from './AdminMenu';
-import './Header.css';
+import logo from '../assets/logo.png';
 
-const Header = ({ branches, activeBranch, onSelectBranch, onAddBranch, user, onLogout, cloudSyncStatus, onSelectMenu }) => {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  const settingsRef = useRef(null);
+const Header = ({ currentView, setCurrentView }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const menuRef = useRef(null);
 
+  // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdownOpen(false);
-      }
-      if (settingsRef.current && !settingsRef.current.contains(event.target)) {
-        setSettingsOpen(false);
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+        setIsSettingsOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleBranchSelect = (id) => {
-    onSelectBranch(id);
-    setDropdownOpen(false);
+  const handleMenuClick = (view) => {
+    setCurrentView(view);
+    setIsMenuOpen(false);
+    setIsSettingsOpen(false);
   };
 
-  const handleAddClick = () => {
-    setDropdownOpen(false);
-    const name = window.prompt("Enter new branch name:");
-    if (name) {
-      onAddBranch(name);
-    }
+  const handleLogout = () => {
+    alert("Logged out successfully");
+    setIsMenuOpen(false);
+    setCurrentView('Customer');
   };
+
+  const menuItems = [
+    { name: 'Customer', icon: '👤' },
+    { name: 'Centers', icon: '👥' },
+    { name: 'Add Bulk Customer', icon: '📥' },
+    { name: 'Staff Management', icon: '👔' },
+    { name: 'Dashboard Overview', icon: '📊' },
+    { name: 'Customer KYC Update', icon: '🛡️' },
+    { name: 'Application Status', icon: '📝' },
+    { name: 'Recycle Bin', icon: '🗑️' }
+  ];
 
   return (
-    <header className="app-header">
-      <div className="header-top">
-        <div className="user-profile clickable" ref={dropdownRef} onClick={() => { setDropdownOpen(!dropdownOpen); setSettingsOpen(false); }}>
-          <div className="avatar">
-            <img src="./logo.jpeg" alt="Branch Logo" className="avatar-img" />
+    <header className="w-full bg-white px-4 pt-2 pb-1 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto">
+      <div className="flex justify-between items-start mb-1">
+        <div className="flex items-center gap-2">
+          <img 
+            src={logo} 
+            alt="Everest Logo" 
+            className="w-10 h-10 object-contain magic-crop mix-blend-multiply" 
+          />
+          <div className="relative">
+            <select className="appearance-none bg-transparent font-bold text-lg text-slate-800 pr-4 outline-none cursor-pointer">
+              <option value="main">Main Branch</option>
+              <option value="add">Add Branch</option>
+            </select>
+            <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 text-xs">▼</span>
           </div>
-          <div className="business-info">
-            <span className="business-name">{activeBranch?.name || 'Branch'}</span>
-            <span className={`dropdown-icon ${dropdownOpen ? 'open' : ''}`}>▼</span>
-          </div>
-          
-          {dropdownOpen && (
-            <div className="branch-dropdown">
-              {branches.map(branch => (
-                <div 
-                  key={branch.id} 
-                  className={`dropdown-item ${branch.id === activeBranch?.id ? 'active' : ''}`}
-                  onClick={(e) => { e.stopPropagation(); handleBranchSelect(branch.id); }}
-                >
-                  {branch.name}
-                </div>
-              ))}
-              <div className="dropdown-divider"></div>
-              <div 
-                className="dropdown-item add-branch"
-                onClick={(e) => { e.stopPropagation(); handleAddClick(); }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Add Branch
-              </div>
-            </div>
-          )}
         </div>
-        
-        <div className="header-actions" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
-          {user && (
-            <div className="user-profile-badge" style={{ display: 'flex', alignItems: 'center' }}>
-              <span className="admin-glow">{user.role}</span>
-            </div>
-          )}
+        <div className="flex flex-col items-end relative" ref={menuRef}>
+          <span className="text-emerald-500 font-bold tracking-widest text-xs mb-1 drop-shadow-sm">ADMIN</span>
+          <button 
+            className="p-1 text-slate-500 hover:text-slate-700 transition-colors"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
 
-          {user && (user.role === 'Admin' || user.role === 'Staff') && (
-            <div className="settings-wrapper" ref={settingsRef} style={{ marginTop: '0.1rem' }}>
-              <button className="icon-btn clickable" aria-label="Settings" onClick={() => { setSettingsOpen(!settingsOpen); setDropdownOpen(false); }} style={{ width: '30px', height: '30px' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-              </button>
-              {settingsOpen && (
-                <div className="settings-dropdown" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                  {user.role === 'Admin' ? (
-                    <>
-                      <AdminMenu onSelectMenu={(menuName) => {
-                        setSettingsOpen(false);
-                        onSelectMenu && onSelectMenu(menuName);
-                      }} />
-                      <button className="btn-settings-logout" onClick={onLogout} style={{ width: '100%', padding: '0.85rem', background: 'rgba(239, 68, 68, 0.08)', border: 'none', borderTop: '1px solid var(--border)', color: '#EF4444', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '16px', height: '16px' }}>
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                          <polyline points="16 17 21 12 16 7"></polyline>
-                          <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                        Logout
-                      </button>
-                    </>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+          {/* Admin Menu Dropdown */}
+          {isMenuOpen && (
+            <div className="absolute top-12 right-0 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="bg-black py-3 px-4 text-center border-b-4 border-yellow-400">
+                <h3 className="text-yellow-400 font-bold text-sm tracking-wider">ADMIN DASHBOARD</h3>
+              </div>
+              <div className="py-2 max-h-[60vh] overflow-y-auto">
+                {menuItems.map((item) => (
+                  <button 
+                    key={item.name}
+                    className={`w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 transition-colors ${currentView === item.name ? 'bg-blue-50 text-brand-blue font-semibold' : 'text-slate-700'}`}
+                    onClick={() => handleMenuClick(item.name)}
+                  >
+                    <span className="text-lg opacity-80">{item.icon}</span>
+                    <span className="text-[15px]">{item.name}</span>
+                  </button>
+                ))}
+                
+                {/* Settings Submenu Toggle */}
+                <div className="relative">
+                  <button 
+                    className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-slate-700 transition-colors"
+                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                  >
+                    <span className="text-lg opacity-80">⚙️</span>
+                    <span className="text-[15px] flex-1">Settings</span>
+                    <span className={`text-xs transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`}>▼</span>
+                  </button>
+                  
+                  {isSettingsOpen && (
+                    <div className="bg-slate-50 border-y border-slate-100">
                       <button 
-                        onClick={() => { setSettingsOpen(false); onSelectMenu && onSelectMenu('Recycle Bin'); }}
-                        style={{ width: '100%', padding: '0.85rem', border: 'none', background: 'none', textAlign: 'left', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border)' }}
-                        className="clickable"
+                        className="w-full text-left pl-12 pr-4 py-2 hover:bg-slate-100 text-sm text-slate-600"
+                        onClick={() => handleMenuClick('Change Password')}
                       >
-                        🗑️ Recycle Bin
+                        Change Password
                       </button>
                       <button 
-                        className="btn-settings-logout" 
-                        onClick={onLogout} 
-                        style={{ width: '100%', padding: '0.85rem', background: 'rgba(239, 68, 68, 0.08)', border: 'none', color: '#EF4444', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', transition: 'all 0.2s' }}
+                        className="w-full text-left pl-12 pr-4 py-2 hover:bg-slate-100 text-sm text-slate-600"
+                        onClick={() => handleMenuClick('Change Phone Number')}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '16px', height: '16px' }}>
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                          <polyline points="16 17 21 12 16 7"></polyline>
-                          <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                        Logout
+                        Change Phone Number
                       </button>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="w-full text-center px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 font-semibold flex items-center justify-center gap-2 transition-colors border-t border-red-100 mt-1"
+              >
+                <span>[→</span>
+                <span>Logout</span>
+              </button>
             </div>
           )}
         </div>
       </div>
-      
-      <div className="app-branding" style={{ marginTop: '-0.3rem' }}>
-        <h1 className="app-title" style={{ margin: 0 }}>Everest Micro Finance</h1>
-      </div>
+      <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-tight -mt-1">
+        Everest Micro Finance
+      </h1>
     </header>
   );
 };

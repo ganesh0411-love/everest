@@ -1,2 +1,45 @@
-import jsPDF from 'jspdf';\n\n/**\n * Dynamically builds a customer application report PDF matching the custom Canva layout.\n * Phase 17: GPS location tracker, aligned colons, relocations, and clickable maps PDF hyperlink.\n * @param {Object} c Customer record\n * @param {string} status Watermark status (PENDING, APPROVED, REJECTED)\n * @param {HTMLImageElement|null} imgElement Preloaded profile photo image\n * @param {HTMLImageElement|null} logoImgElement Preloaded corporate logo image\n */\nconst formatDateStr = (dateStr) => {\n  if (!dateStr) return '';\n  try {\n    const d = new Date(dateStr);\n    if (isNaN(d.getTime())) return dateStr;\n    const dd = String(d.getDate()).padStart(2, '0');\n    const mm = String(d.getMonth() + 1).padStart(2, '0');\n    const yyyy = d.getFullYear();\n    return `${dd}${mm}${yyyy}`;\n  } catch {\n    return dateStr;\n  }\n};\n\nconst formatDateWithDashes = (dateStr) => {\n  if (!dateStr) return '—';\n  try {\n    const d = new Date(dateStr);\n    if (isNaN(d.getTime())) return dateStr;\n    const dd = String(d.getDate()).padStart(2, '0');\n    const mm = String(d.getMonth() + 1).padStart(2, '0');\n    const yyyy = d.getFullYear();\n    return `${dd}-${mm}-${yyyy}`;\n  } catch {\n    return dateStr;\n  }\n};\n\nexport const buildCustomerPDF = (c, status = 'PENDING', imgElement = null, logoImgElement = null) => {\n  try {\n    const doc = new jsPDF('p', 'mm', 'a4');\n    const W = 210;\n    const H = 297;\n\n    // Dark Blue color: #1b2a60 -> [27, 42, 96]\n    // Light Blue color: #03a9f4 -> [3, 169, 244]\n\n    // ── 1. GEOMETRIC CORNER OVERLAYS ─────────────────────────────────────\n    // Top-Right Corner Shards\n    doc.setFillColor(3, 169, 244); // light blue\n    doc.triangle(120, 0, 210, 0, 210, 90, 'F');\n    doc.setFillColor(27, 42, 96); // dark blue\n    doc.triangle(155, 0, 210, 0, 210, 55, 'F');\n\n    // Bottom-Left Corner Shards\n    doc.setFillColor(3, 169, 244); // light blue\n    
-<truncated 14999 bytes>
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
+export const generateCustomerPDF = async (elementId, filename = 'Customer_Application.pdf') => {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.error(`Element with id ${elementId} not found`);
+    return;
+  }
+
+  try {
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(filename);
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+  }
+};
+
+export const loadCustomerImage = (file) => {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve(null);
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+};
