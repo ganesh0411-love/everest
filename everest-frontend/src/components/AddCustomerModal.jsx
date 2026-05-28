@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PdfPreviewModal from './PdfPreviewModal';
 
-const AddCustomerModal = ({ onClose }) => {
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+
+const AddCustomerModal = ({ onClose, onAddCustomer }) => {
   const [step, setStep] = useState('form'); // 'form', 'confirm', 'success'
   const [showPdf, setShowPdf] = useState(false);
   
@@ -19,9 +21,17 @@ const AddCustomerModal = ({ onClose }) => {
     if (!isNaN(d)) setAppDay(days[d.getDay()]);
   }, [appDate]);
 
-  const handlePhotoCapture = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setPhoto(URL.createObjectURL(e.target.files[0]));
+  const handlePhotoCapture = async () => {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Prompt // Action sheet for Camera / Gallery
+      });
+      setPhoto(image.webPath);
+    } catch (e) {
+      console.error("User cancelled or camera error", e);
     }
   };
 
@@ -145,7 +155,23 @@ const AddCustomerModal = ({ onClose }) => {
 
   // 6. Workflows
   const handleSubmitClick = () => setStep('confirm');
-  const confirmSubmit = () => setStep('success');
+  const confirmSubmit = () => {
+    const newCustomer = {
+      id: customerId,
+      name: `${nameTitle} ${customerName}`,
+      date: appDate,
+      status: 'Pending',
+      loanAmount: parseFloat(loanAmount) || 0,
+      repayAmount: parseFloat(repayAmount) || 0,
+      category: 'Upcoming'
+    };
+    
+    if (onAddCustomer) {
+      onAddCustomer(newCustomer);
+    }
+    
+    setStep('success');
+  };
 
   if (step === 'success') {
     return (
@@ -258,8 +284,7 @@ const AddCustomerModal = ({ onClose }) => {
         <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">REGISTRATION DATA</h3>
           
-          <input type="file" accept="image/*" capture="environment" ref={fileInputRef} className="hidden" onChange={handlePhotoCapture} />
-          <div className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-400 mb-5 bg-slate-50 cursor-pointer hover:bg-slate-100 overflow-hidden relative" onClick={() => fileInputRef.current?.click()}>
+          <div className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-400 mb-5 bg-slate-50 cursor-pointer hover:bg-slate-100 overflow-hidden relative" onClick={handlePhotoCapture}>
             {photo ? (
               <img src={photo} alt="Profile" className="w-full h-full object-cover" />
             ) : (
