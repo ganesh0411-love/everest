@@ -70,6 +70,14 @@ function App() {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   
+  const [activeHomeMenuId, setActiveHomeMenuId] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveHomeMenuId(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+  
   // Filter & Sort State
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -199,23 +207,40 @@ function App() {
             >
               {processedCustomers.filter(c => c.status !== 'Rejected').length > 0 ? (
                 <div className="p-2 space-y-2 pb-24">
-                  {processedCustomers.filter(c => c.status !== 'Rejected').map(customer => (
-                    <div key={customer.id} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors">
+                  {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').map(customer => (
+                    <div key={customer.id} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
-                          <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
+                          <img src={customer.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
                         </div>
                         <div>
                           <h4 className="font-bold text-slate-800 text-sm leading-tight">{customer.name}</h4>
-                          <p className="text-[11px] font-medium text-slate-500 mt-0.5">{customer.id} &middot; {formatDate(customer.date)}</p>
+                          <p className="text-[11px] font-medium text-slate-500 mt-0.5">{customer.id}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${customer.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {customer.status}
-                        </span>
+                      <div className="flex items-center gap-2">
                         <div className="text-right min-w-[70px]">
-                          <div className="text-sm font-bold text-rose-600">₹{customer.repayAmount.toLocaleString('en-IN')}</div>
+                          <div className="text-sm font-bold text-red-600">₹{customer.repayAmount?.toLocaleString('en-IN') || '0'}</div>
+                        </div>
+                        <div className="relative">
+                          <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                            </svg>
+                          </button>
+                          {activeHomeMenuId === customer.id && (
+                            <div className="absolute right-0 top-8 w-32 bg-white rounded-lg shadow-lg border border-slate-100 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                              <button 
+                                onClick={() => {
+                                  setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: 'Recycled' } : c));
+                                  setActiveHomeMenuId(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

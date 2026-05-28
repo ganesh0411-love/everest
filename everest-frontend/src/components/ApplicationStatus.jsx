@@ -101,9 +101,13 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp }) =
                 <th className="p-2.5">Serial No</th>
                 <th className="p-2.5">Application Date</th>
                 <th className="p-2.5">Customer Name</th>
-                <th className="p-2.5">Center</th>
-                <th className="p-2.5">Staff Name</th>
-                <th className="p-2.5">Loan Amount</th>
+                {activeTab !== 'Pending' && (
+                  <>
+                    <th className="p-2.5">Center</th>
+                    <th className="p-2.5">Staff Name</th>
+                    <th className="p-2.5">Loan Amount</th>
+                  </>
+                )}
                 <th className="p-2.5 text-center">Actions</th>
               </tr>
             </thead>
@@ -121,18 +125,28 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp }) =
                       <img 
                         src={app.image} 
                         alt={app.customerName} 
-                        className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm cursor-pointer hover:scale-105 transition-transform"
-                        onClick={(e) => { e.stopPropagation(); setFullscreenImage(app.image); }}
+                        className={`w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm transition-transform ${activeTab === 'Rejected' ? '' : 'cursor-pointer hover:scale-105'}`}
+                        onClick={(e) => { 
+                          if (activeTab === 'Rejected') return;
+                          e.stopPropagation(); 
+                          setFullscreenImage(app.image); 
+                        }}
                       />
                       <div>
                         <div className="font-bold text-slate-800 text-sm">{app.customerName}</div>
-                        <div className="text-[10px] text-slate-500 font-medium">ID: {app.id}</div>
+                        {activeTab !== 'Pending' && (
+                          <div className="text-[10px] text-slate-500 font-medium">ID: {app.id}</div>
+                        )}
                       </div>
                     </div>
                   </td>
-                  <td className="p-2.5 font-medium text-slate-600 text-xs">{app.center}</td>
-                  <td className="p-2.5 font-medium text-slate-600 text-xs">{app.staffName}</td>
-                  <td className="p-2.5 font-bold text-slate-800 text-sm">₹{app.loanAmount}</td>
+                  {activeTab !== 'Pending' && (
+                    <>
+                      <td className="p-2.5 font-medium text-slate-600 text-xs">{app.center}</td>
+                      <td className="p-2.5 font-medium text-slate-600 text-xs">{app.staffName}</td>
+                      <td className="p-2.5 font-bold text-slate-800 text-sm">₹{app.loanAmount}</td>
+                    </>
+                  )}
                   <td className="p-2.5 flex items-center justify-center gap-1.5 relative">
                     
                     {/* Three-Dot Menu Button */}
