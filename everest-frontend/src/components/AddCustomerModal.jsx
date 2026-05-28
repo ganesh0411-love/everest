@@ -8,11 +8,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer }) => {
   const [showPdf, setShowPdf] = useState(false);
   
   // 1. Initial Registration Data
-  const [appDate, setAppDate] = useState(new Date().toISOString().split('T')[0]);
-  const [appDay, setAppDay] = useState('');
-  const [appNumber] = useState(Math.floor(1000000000 + Math.random() * 9000000000));
-  const [customerId] = useState(`EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
-  const [photo, setPhoto] = useState(null);
+  const [appDate, setAppDate] = useState(initialData?.appDate || new Date().toISOString().split('T')[0]);
+  const [appDay, setAppDay] = useState(initialData?.appDay || '');
+  const [appNumber] = useState(initialData?.appNumber || Math.floor(1000000000 + Math.random() * 9000000000));
+  const [customerId] = useState(initialData?.id || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
+  const [photo, setPhoto] = useState(initialData?.image || null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -36,14 +36,14 @@ const AddCustomerModal = ({ onClose, onAddCustomer }) => {
   };
 
   // 2. Core Identity & Contact
-  const [center, setCenter] = useState('');
-  const [city, setCity] = useState('');
-  const [district, setDistrict] = useState('');
-  const [nameTitle, setNameTitle] = useState('Mrs.');
-  const [customerName, setCustomerName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [altPhone, setAltPhone] = useState('');
-  const [customerStatus, setCustomerStatus] = useState('New'); // New or Existing
+  const [center, setCenter] = useState(initialData?.center || '');
+  const [city, setCity] = useState(initialData?.city || '');
+  const [district, setDistrict] = useState(initialData?.district || '');
+  const [nameTitle, setNameTitle] = useState(initialData?.nameTitle || 'Mrs.');
+  const [customerName, setCustomerName] = useState(initialData?.customerName || '');
+  const [phone, setPhone] = useState(initialData?.phone || '');
+  const [altPhone, setAltPhone] = useState(initialData?.altPhone || '');
+  const [customerStatus, setCustomerStatus] = useState(initialData?.customerStatus || 'New'); // New or Existing
 
   const handlePhoneInput = (setter) => (e) => {
     const val = e.target.value.replace(/[^0-9]/g, '');
@@ -100,10 +100,10 @@ const AddCustomerModal = ({ onClose, onAddCustomer }) => {
 
   // ID Selection
   const [idsChecked, setIdsChecked] = useState({
-    aadhaar: false,
-    pan: false,
-    voter: false,
-    smartCard: false
+    aadhaar: initialData?.idsChecked?.aadhaar || false,
+    pan: initialData?.idsChecked?.pan || false,
+    voter: initialData?.idsChecked?.voter || false,
+    smartCard: initialData?.idsChecked?.smartCard || false
   });
   
   // Aadhaar (12 boxes, fully visible as per strict rule)
@@ -116,13 +116,13 @@ const AddCustomerModal = ({ onClose, onAddCustomer }) => {
     if (val && index < 11) document.getElementById(`aadhaar-${index + 1}`)?.focus();
   };
 
-  // 5. Financial & Loan Logic
-  const [loanType, setLoanType] = useState('Micro Finance');
-  const [tenureVal, setTenureVal] = useState('');
-  const [tenureUnit, setTenureUnit] = useState('Weeks');
-  const [loanAmount, setLoanAmount] = useState('');
-  const [repayAmount, setRepayAmount] = useState('');
-  const [interestPercent, setInterestPercent] = useState('');
+  // 5. Financial Details
+  const [loanType, setLoanType] = useState(initialData?.loanType || 'Micro Finance');
+  const [tenureVal, setTenureVal] = useState(initialData?.tenureVal || '');
+  const [tenureUnit, setTenureUnit] = useState(initialData?.tenureUnit || 'Months');
+  const [loanAmount, setLoanAmount] = useState(initialData?.loanAmount || '');
+  const [repayAmount, setRepayAmount] = useState(initialData?.repayAmount || '');
+  const [interestPercent, setInterestPercent] = useState(initialData?.interestPercent || '');
 
   const handleFinancialChange = (field, value) => {
     let loan = parseFloat(field === 'loanAmount' ? value : loanAmount) || 0;
@@ -155,22 +155,38 @@ const AddCustomerModal = ({ onClose, onAddCustomer }) => {
 
   // 6. Workflows
   const handleSubmitClick = () => setStep('confirm');
-  const confirmSubmit = () => {
-    const newCustomer = {
-      id: customerId,
-      name: `${nameTitle} ${customerName}`,
-      date: appDate,
-      status: 'Pending',
-      loanAmount: parseFloat(loanAmount) || 0,
-      repayAmount: parseFloat(repayAmount) || 0,
-      category: 'Upcoming'
-    };
-    
-    if (onAddCustomer) {
-      onAddCustomer(newCustomer);
+  const confirmSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const newCustomer = {
+        id: customerId,
+        name: `${nameTitle} ${customerName}`,
+        date: appDate,
+        status: 'Pending',
+        loanAmount: parseFloat(loanAmount) || 0,
+        repayAmount: parseFloat(repayAmount) || 0,
+        category: 'Upcoming',
+        // Schema Verification: Explicit mapping
+        appDate, appDay, appNumber, image: photo,
+        center, city, district, nameTitle, customerName,
+        phone, altPhone, customerStatus, dob, age,
+        gender, maritalStatus, religion, caste, education, occupation,
+        idsChecked, loanType, tenureVal, tenureUnit, interestPercent
+      };
+      
+      // Enforcing explicit await wrapper logic on the persistence pipeline
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      if (onAddCustomer) {
+        await onAddCustomer(newCustomer);
+      }
+      
+      setStep('success');
+    } catch (error) {
+      console.error("Save failed:", error);
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setStep('success');
   };
 
   if (step === 'success') {

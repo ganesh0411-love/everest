@@ -179,7 +179,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp }) =
         >
           <button 
             onClick={() => {
-              setIsEditing(true);
+              const appToEdit = applications.find(a => a.id === activeMenuId);
+              setIsEditing(appToEdit);
               setActiveMenuId(null);
             }}
             className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
@@ -239,7 +240,11 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp }) =
 
       {/* Edit Details Modal Overlay */}
       {isEditing && (
-        <AddCustomerModal onClose={() => setIsEditing(false)} />
+        <AddCustomerModal 
+          initialData={isEditing} 
+          onAddCustomer={onUpdateCustomer}
+          onClose={() => setIsEditing(null)} 
+        />
       )}
     </div>
   );

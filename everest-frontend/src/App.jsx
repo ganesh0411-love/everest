@@ -178,6 +178,9 @@ function App() {
                   setCustomers(prev => prev.filter(c => c.id !== id));
                 }
               }}
+              onUpdateCustomer={(updatedCustomer) => {
+                setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+              }}
             />
           </div>
         );
