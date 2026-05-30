@@ -434,7 +434,8 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
               address: address,
               pincode: pincode.join(''),
               aadhaar: aadhaar.join(''),
-              pan: pan
+              pan: pan,
+              locationUrl: locationUrl
             }}
             onClose={() => setShowPdf(false)} 
           />
