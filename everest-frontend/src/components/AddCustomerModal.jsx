@@ -4,6 +4,7 @@ import ImageCropModal from './ImageCropModal';
 import PdfViewer from './PdfViewer';
 
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Geolocation } from '@capacitor/geolocation';
 import { uploadImageToStorage } from '../utils/storageUpload';
 
 const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
@@ -117,22 +118,35 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
     if (val && index < 5) document.getElementById(`pin-${index + 1}`)?.focus();
   };
 
-  const handleGetLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setLocationUrl(`https://maps.google.com/?q=${latitude},${longitude}`);
-          // alert('Location fetched successfully!');
-        },
-        (error) => {
-          console.error("Error fetching location", error);
-          alert('Failed to fetch location. Please ensure location services are enabled and permission is granted.');
-        },
-        { enableHighAccuracy: true, maximumAge: 0 }
-      );
-    } else {
-      alert("Geolocation is not supported by this browser/device.");
+  const handleGetLocation = async () => {
+    try {
+      const permissions = await Geolocation.checkPermissions();
+      if (permissions.location !== 'granted' && permissions.location !== 'prompt') {
+        const request = await Geolocation.requestPermissions();
+        if (request.location !== 'granted') {
+          alert('Location permission denied. Cannot fetch accurate location.');
+          return;
+        }
+      } else if (permissions.location === 'prompt') {
+        const request = await Geolocation.requestPermissions();
+        if (request.location !== 'granted') {
+          alert('Location permission denied. Cannot fetch accurate location.');
+          return;
+        }
+      }
+
+      // Use Capacitor Geolocation for direct native Android GPS lock
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 20000 // Give GPS extra time to acquire precise lock
+      });
+      
+      const { latitude, longitude } = position.coords;
+      setLocationUrl(`https://maps.google.com/?q=${latitude},${longitude}`);
+    } catch (error) {
+      console.error("Error fetching location", error);
+      alert('Failed to fetch high-accuracy location. Please ensure device Location/GPS is ON.');
     }
   };
 
