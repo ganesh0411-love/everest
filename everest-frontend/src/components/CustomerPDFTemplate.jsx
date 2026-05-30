@@ -28,13 +28,8 @@ export const generateAndOpenPDF = async (elementId, customerName) => {
 const CustomerPDFTemplate = ({ customer, status = 'PENDING', id = 'pdf-template' }) => {
   if (!customer) return null;
 
-  let watermarkColor = 'rgba(0, 0, 0, 0.05)';
-  if (status === 'APPROVED') watermarkColor = 'rgba(16, 185, 129, 0.05)'; // Green
-  if (status === 'REJECTED') watermarkColor = 'rgba(239, 68, 68, 0.05)'; // Red
-
   return (
     <div id={id} className="pdf-template-wrapper">
-      <div className="pdf-watermark" style={{ color: watermarkColor }}>{status}</div>
       <div className="pdf-header">
         <h1>Customer Application Report</h1>
         <p><strong>App Number:</strong> {customer.details.appNumber} | <strong>Center:</strong> {customer.details.center}</p>
