@@ -8,18 +8,43 @@ const PdfPreviewModal = ({ application, onClose }) => {
   const containerRef = useRef(null);
 
   // Gesture states
+  const [baseScale, setBaseScale] = useState(1);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  
-  // Touch gesture states
   const [initialDistance, setInitialDistance] = useState(null);
 
-  const handleDownload = async () => {
-    if (!componentRef.current) return;
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    const calculateScale = () => {
+      if (containerRef.current) {
+        const availableWidth = containerRef.current.clientWidth - 32; // Account for p-4 padding
+        const availableHeight = containerRef.current.clientHeight - 32;
+        
+        const scaleX = availableWidth / 794;
+        const scaleY = availableHeight / 1123;
+        
+        const fitScale = Math.min(scaleX, scaleY, 1);
+        setBaseScale(fitScale);
+        setScale(fitScale);
+        setPosition({ x: 0, y: 0 });
+      }
+    };
     
-    // Temporarily reset scale and position for pristine capture
+    const timeoutId = setTimeout(calculateScale, 10);
+    window.addEventListener('resize', calculateScale);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', calculateScale);
+    };
+  }, []);
+
+  const handleDownload = async () => {
+    if (!componentRef.current || isGenerating) return;
+    setIsGenerating(true);
+    
     const originalTransform = componentRef.current.style.transform;
     componentRef.current.style.transform = 'scale(1) translate(0px, 0px)';
     
@@ -42,31 +67,90 @@ const PdfPreviewModal = ({ application, onClose }) => {
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Application_${application?.id || 'Form'}.pdf`);
+      
+      const baseName = `Application_${application?.id || 'Form'}`;
+      let fileNameInput = window.prompt("Enter filename to save:", baseName);
+      if (fileNameInput === null) {
+        setIsGenerating(false);
+        componentRef.current.style.transform = originalTransform;
+        return; // User cancelled
+      }
+      if (!fileNameInput.trim()) fileNameInput = baseName;
+      const filename = `${fileNameInput}.pdf`;
+      
+      // For mobile device compatibility (Capacitor/PWA)
+      if (navigator.share) {
+        const pdfBlob = pdf.output('blob');
+        const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Application Form',
+          });
+        } catch (e) {
+          pdf.save(filename); // Fallback
+        }
+      } else {
+        pdf.save(filename);
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
     } finally {
-      // Restore transform
-      componentRef.current.style.transform = originalTransform;
+      if (componentRef.current) {
+        componentRef.current.style.transform = originalTransform;
+      }
+      setIsGenerating(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!componentRef.current || isGenerating) return;
+    setIsGenerating(true);
+    const originalTransform = componentRef.current.style.transform;
+    componentRef.current.style.transform = 'scale(1) translate(0px, 0px)';
+    
+    try {
+      const canvas = await html2canvas(componentRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      
+      const printWindow = document.createElement('iframe');
+      printWindow.style.position = 'absolute';
+      printWindow.style.top = '-10000px';
+      printWindow.style.border = 'none';
+      printWindow.style.width = '794px';
+      printWindow.style.height = '1123px';
+      document.body.appendChild(printWindow);
+      
+      const printDoc = printWindow.contentWindow.document;
+      printDoc.write('<html><head><title>Print</title>');
+      printDoc.write('<style>@page { size: A4 portrait; margin: 0; } body { margin: 0; display: flex; justify-content: center; }</style>');
+      printDoc.write('</head><body>');
+      printDoc.write(`<img src="${imgData}" style="width: 100%; height: auto;" onload="window.print();" />`);
+      printDoc.write('</body></html>');
+      printDoc.close();
+      
+      setTimeout(() => { document.body.removeChild(printWindow); }, 5000);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to print.");
+    } finally {
+      if (componentRef.current) {
+        componentRef.current.style.transform = originalTransform;
+      }
+      setIsGenerating(false);
+    }
   };
 
   // --- Gesture Handlers ---
   const handleTouchStart = (e) => {
     if (e.touches.length === 2) {
-      // Pinch start
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
       setInitialDistance(dist);
-    } else if (e.touches.length === 1 && scale > 1) {
-      // Pan start
+    } else if (e.touches.length === 1 && scale > baseScale) {
       setIsDragging(true);
       setDragStart({
         x: e.touches[0].clientX - position.x,
@@ -77,21 +161,16 @@ const PdfPreviewModal = ({ application, onClose }) => {
 
   const handleTouchMove = (e) => {
     if (e.touches.length === 2 && initialDistance) {
-      // Pinch to zoom
       e.preventDefault();
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
-      const newScale = Math.min(Math.max(1, scale * (dist / initialDistance)), 4);
+      const newScale = Math.min(Math.max(baseScale, scale * (dist / initialDistance)), baseScale * 4);
       setScale(newScale);
       setInitialDistance(dist);
-      
-      if (newScale === 1) {
-        setPosition({ x: 0, y: 0 }); // reset position if zoomed out entirely
-      }
-    } else if (e.touches.length === 1 && isDragging && scale > 1) {
-      // Pan
+      if (newScale === baseScale) setPosition({ x: 0, y: 0 });
+    } else if (e.touches.length === 1 && isDragging && scale > baseScale) {
       e.preventDefault();
       setPosition({
         x: e.touches[0].clientX - dragStart.x,
@@ -108,36 +187,71 @@ const PdfPreviewModal = ({ application, onClose }) => {
   const handleWheel = (e) => {
     e.preventDefault();
     if (e.ctrlKey) {
-      const newScale = Math.min(Math.max(1, scale - e.deltaY * 0.01), 4);
+      const newScale = Math.min(Math.max(baseScale, scale - e.deltaY * 0.005), baseScale * 4);
       setScale(newScale);
-      if (newScale === 1) setPosition({ x: 0, y: 0 });
-    } else if (scale > 1) {
+      if (newScale === baseScale) setPosition({ x: 0, y: 0 });
+    } else if (scale > baseScale) {
       setPosition(prev => ({
         x: prev.x - e.deltaX,
         y: prev.y - e.deltaY
       }));
     }
   };
-  // ------------------------
 
-  // Auto-fit A4 calculation
-  useEffect(() => {
-    if (containerRef.current && componentRef.current) {
-      // Base A4 is typically 210x297mm (approx 794x1123 pixels at 96dpi)
-      // The CSS will enforce aspect-ratio
-      const containerWidth = containerRef.current.clientWidth;
-      const containerHeight = containerRef.current.clientHeight;
-      // We rely on CSS flex and max-width/max-height for the initial 1:1 fit,
-      // but gestures will override scale.
+  // Safe fallback UI rendering values
+  const appNo = application?.appNumber ? String(application.appNumber).padStart(2, '0') : '01';
+  const formatDateToDDMMYYYY = (dateStr) => {
+    if (!dateStr) return '';
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts[0].length === 4) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
     }
-  }, []);
+    return dateStr;
+  };
+
+  const appDate = formatDateToDDMMYYYY(application?.appDate) || '26-05-2026';
+  const appDay = application?.appDay || 'Wednesday';
+  const customerName = application?.customerName || 'MR. JOSEPH VIJAY';
+  const customerId = application?.id || 'EMF00001';
+  const gender = application?.gender || 'MALE';
+  const rawDob = formatDateToDDMMYYYY(application?.dob) || '';
+  const dob = rawDob.replace(/\D/g, '').padEnd(8, ' ');
+  const age = application?.age || '';
+  const occupation = application?.occupation || '';
+  const marital = application?.maritalStatus || 'Married';
+  const isNew = application?.customerStatus === 'New';
+  const phone = application?.phone || '';
+  const altPhone = application?.altPhone || '';
+  const loanAmt = application?.loanAmount || '';
+  const loanType = application?.loanType || '';
+  const tenure = application?.tenureVal ? `${application.tenureVal} ${application.tenureUnit}` : '';
+  const aadhaar = (application?.aadhaar || '').padEnd(12, ' ');
+  const pan = application?.pan || '';
+  const nominee = application?.nomineeName || '';
+  const relation = application?.nomineeRelation || '';
+  const address = application?.address || '';
+  const city = application?.city || '';
+  const district = application?.district || '';
+  const pin = (application?.pincode || '').padEnd(6, ' ');
+
+  // Colors based on the provided image
+  const darkBlue = '#232066';
+  const midBlue = '#1462ad';
+  const cyanBlue = '#23b3e3';
 
   return (
     <div className="fixed inset-0 bg-slate-900/90 z-[9999] flex flex-col font-sans no-print animate-in fade-in">
       
       {/* Top Utility Banner */}
       <div className="flex-shrink-0 bg-slate-800 text-white p-3 flex justify-between items-center z-50 shadow-md">
-        <button onClick={onClose} className="p-2 bg-slate-700/50 hover:bg-slate-700 rounded-full transition-colors">
+        <button 
+          type="button"
+          onClick={onClose} 
+          onTouchStart={(e) => { e.stopPropagation(); onClose(); }}
+          className="p-2 bg-slate-700/50 hover:bg-slate-700 rounded-full transition-colors"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -150,10 +264,14 @@ const PdfPreviewModal = ({ application, onClose }) => {
             </svg>
             Print
           </button>
-          <button onClick={handleDownload} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-emerald-900/20">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
+          <button onClick={handleDownload} disabled={isGenerating} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-emerald-900/20 disabled:opacity-50">
+            {isGenerating ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            )}
             Download
           </button>
         </div>
@@ -168,165 +286,253 @@ const PdfPreviewModal = ({ application, onClose }) => {
         onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
       >
-        {/* Render PDF Layout (A4 scale) */}
         <div 
           ref={componentRef}
           className="bg-white shadow-2xl relative overflow-hidden flex-shrink-0 origin-center transition-transform print-target"
           style={{ 
-            width: '210mm', 
-            height: '297mm',
-            // Base scale to fit mobile screen (approx 0.35 to 0.45 depending on device)
-            // But we use CSS max-width/max-height for standard fit, and JS scale for zooming.
+            width: '794px', 
+            height: '1123px',
             transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
-            // In a real responsive scenario, we scale the div down using CSS transform to fit the wrapper,
-            // then multiply that by our gesture scale. For now, rely on standard mobile viewport rendering.
-            maxWidth: scale === 1 ? '100%' : 'none',
-            maxHeight: scale === 1 ? '100%' : 'none',
-            aspectRatio: '210/297',
+            transformOrigin: 'center center',
           }}
         >
-          {/* Watermark Background */}
-          {application?.status === 'Approved' && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-[0.04]">
-              <span className="text-[12rem] font-black text-blue-900 -rotate-45 tracking-widest">APPROVE</span>
-            </div>
-          )}
+          {/* Watermark Background - Exactly matching the diagonal APPROVED */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
+            <span 
+              className="font-black opacity-[0.12]" 
+              style={{
+                fontSize: '7rem',
+                color: cyanBlue,
+                transform: 'rotate(-45deg) translateY(-150px)',
+                letterSpacing: '0.1em',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              APPROVED
+            </span>
+          </div>
 
-          {/* Geometric Top Decor */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[#1b63a9] transform rotate-45 translate-x-32 -translate-y-32 z-0"></div>
-          <div className="absolute top-0 right-0 w-48 h-48 bg-[#1e204d] transform rotate-45 translate-x-20 -translate-y-20 z-0"></div>
+          {/* Geometric Background Shapes */}
+          {/* Top Right */}
+          <div className="absolute top-0 right-0 w-[200px] h-[200px] z-0" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)', backgroundColor: midBlue }}></div>
+          <div className="absolute top-0 right-0 w-[175px] h-[175px] z-0" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)', backgroundColor: darkBlue, transform: 'translate(20px, -20px)' }}></div>
+          <div className="absolute top-0 right-0 w-[250px] h-[75px] z-0" style={{ backgroundColor: cyanBlue, transform: 'rotate(45deg) translate(100px, -125px)' }}></div>
+          
+          {/* Bottom Left */}
+          <div className="absolute bottom-0 left-0 w-[175px] h-[175px] z-0" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 100%)', backgroundColor: darkBlue }}></div>
+          <div className="absolute bottom-0 left-0 w-[150px] h-[150px] z-0" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 100%)', backgroundColor: midBlue, transform: 'translate(-15px, 15px)' }}></div>
+          <div className="absolute bottom-0 left-0 w-[200px] h-[50px] z-0" style={{ backgroundColor: cyanBlue, transform: 'rotate(45deg) translate(-125px, 75px)' }}></div>
 
           {/* PDF CONTENT BOUNDARY */}
-          <div className="relative z-10 w-full h-full p-8 flex flex-col font-sans">
+          <div className="relative z-10 w-full h-full px-8 pt-4 pb-8 flex flex-col font-sans">
             
+            {/* Top Right Text */}
+            <div className="text-center w-full mb-2 relative">
+              <span className="font-bold text-lg" style={{ color: cyanBlue }}>APPLICATION NO : {appNo}</span>
+            </div>
+
             {/* Header Section */}
-            <div className="flex justify-center items-center mb-8 relative">
-              <div className="absolute left-0 top-0 w-24 h-24">
-                {/* Replicate Everest Logo Ring */}
-                <div className="w-full h-full rounded-full border-[6px] border-[#1e204d] flex items-center justify-center p-2 relative">
-                  <div className="absolute bottom-0 right-0 w-8 h-8 bg-[#18a2b8] rounded-full flex items-center justify-center transform translate-x-2 translate-y-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white transform -rotate-45" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <img src={logo} alt="Logo" className="w-full h-full object-contain" />
-                </div>
+            <div className="flex items-center justify-center mb-4 px-4 relative h-24">
+              {/* Logo Area */}
+              <div className="absolute left-4 w-24 h-24 flex items-center justify-center p-2">
+                <img src={logo} alt="Logo" className="w-full h-full object-contain" />
               </div>
 
-              <div className="text-center ml-12">
-                <h1 className="text-4xl font-black text-[#1e204d] tracking-wider uppercase">EVEREST MICROFINANCE</h1>
-                <h2 className="text-xl font-bold text-[#1e204d] tracking-widest mt-1">CENTER : {application?.center || 'ANNA NAGAR'}</h2>
+              {/* Header Text */}
+              <div className="flex flex-col items-center">
+                <h1 className="text-3xl font-black tracking-widest uppercase m-0 leading-none" style={{ color: darkBlue, fontFamily: 'Arial Black, Impact, sans-serif' }}>
+                  EVEREST MICROFINANCE
+                </h1>
+                <h2 className="text-lg font-bold tracking-widest mt-1 uppercase" style={{ color: darkBlue }}>
+                  APPLICATION FORM
+                </h2>
               </div>
             </div>
 
-            <div className="flex justify-between items-start mb-6">
-              <div className="bg-[#1e204d] text-white px-10 py-2 rounded-full font-bold text-2xl tracking-widest shadow-md">
-                APPLICATION FORM
+            {/* Application Form Badge & Date */}
+            <div className="flex justify-between items-start mb-4 px-4">
+              <div 
+                className="text-white px-10 py-1 rounded-full font-bold tracking-widest shadow-md text-xl ml-[100px]" 
+                style={{ backgroundColor: darkBlue, fontFamily: 'Arial Black, Impact, sans-serif' }}
+              >
+                CENTER : {application?.center || 'ANNA NAGAR'}
               </div>
-              <div className="text-right text-[#1e204d] font-bold text-sm">
-                <div className="text-cyan-500 font-bold mb-2">APPLICATION NO : {application?.serialNo ? String(application.serialNo).padStart(2, '0') : '01'}</div>
-                <div>Date : {application?.appDate || '26.05.2026'}</div>
-                <div>Day : {application?.appDay || 'Wednesday'}</div>
-              </div>
+              <table className="text-[#1e204d] font-bold text-[13px] leading-tight mr-8" style={{ color: darkBlue }}>
+                <tbody>
+                  <tr><td className="text-left pr-2">Date</td><td className="px-1">:</td><td className="text-left">{appDate}</td></tr>
+                  <tr><td className="text-left pr-2">Day</td><td className="px-1">:</td><td className="text-left">{appDay}</td></tr>
+                </tbody>
+              </table>
             </div>
 
             {/* Applicant Details */}
-            <div className="mb-6 relative">
-              <div className="flex items-center gap-2 text-[#1b63a9] mb-4">
-                <div className="w-6 h-6 rotate-180">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L22 12L12 22L9 19L16 12L9 5L12 2Z"/></svg>
+            <div className="mb-2 relative px-8">
+              {/* Section Header */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center">
+                  <div className="w-0 h-0 border-t-[8px] border-t-transparent border-r-[12px] border-b-[8px] border-b-transparent mr-[-2px] z-10" style={{ borderRightColor: cyanBlue }}></div>
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: darkBlue }}></div>
                 </div>
-                <h3 className="text-lg font-bold tracking-widest">APPLICANT DETAILS</h3>
+                <h3 className="text-xl font-bold tracking-wider" style={{ color: darkBlue }}>APPLICANT DETAILS</h3>
               </div>
 
-              <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-8 space-y-3 text-sm font-bold text-[#1e204d]">
-                  <div className="flex"><span className="w-40">CUSTOMER NAME</span>: <span className="ml-2 uppercase">{application?.customerName || 'MR. JOSEPH VIJAY'}</span></div>
-                  <div className="flex"><span className="w-40">CUSTOMER ID</span>: <span className="ml-2 uppercase">{application?.id || 'EMF00001'}</span></div>
-                  <div className="flex"><span className="w-40">GENDER</span>: <span className="ml-2 uppercase">{application?.gender || 'MALE'}</span></div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-40">Date Of Birth</span>: 
-                    <div className="flex gap-1 ml-2">
-                      {Array(8).fill(0).map((_, i) => <div key={`dob-${i}`} className="w-6 h-6 border border-[#1e204d]"></div>)}
-                    </div>
-                    <span className="ml-4">Age</span>
-                    <div className="w-12 h-6 border border-[#1e204d]"></div>
-                  </div>
-                  <div className="flex items-center"><span className="w-40">Occupation</span>: <div className="ml-2 flex-1 h-6 border border-[#1e204d]"></div></div>
-                  <div className="flex items-center"><span className="w-40">Marital status</span>: <div className="ml-2 w-32 h-6 border border-[#1e204d] px-2 flex items-center">{application?.maritalStatus || 'Married'}</div></div>
-                  <div className="flex items-center gap-4">
-                    <span className="w-40">Account status</span>
-                    <label className="flex items-center gap-2">new <div className={`w-5 h-5 border border-[#1e204d] flex items-center justify-center`}>{application?.status === 'Pending' ? '✓' : ''}</div></label>
-                    <label className="flex items-center gap-2">existing <div className={`w-5 h-5 border border-[#1e204d] flex items-center justify-center`}>{application?.status !== 'Pending' ? '✓' : ''}</div></label>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center"><span className="w-32">Phone Number</span>: <div className="ml-2 w-48 h-6 border border-[#1e204d]"></div></div>
-                    <div className="flex items-center"><span className="w-36 text-right">Alt Phone Number</span>: <div className="ml-2 w-48 h-6 border border-[#1e204d]"></div></div>
-                  </div>
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-9 text-[13px] font-bold" style={{ color: darkBlue }}>
+                  <table className="w-full border-collapse">
+                    <tbody>
+                      <tr>
+                        <td className="w-[180px] py-1 whitespace-nowrap uppercase">CUSTOMER NAME</td>
+                        <td className="w-[20px] py-1 text-center">:</td>
+                        <td className="py-1 uppercase whitespace-nowrap">&nbsp;&nbsp;{customerName}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 whitespace-nowrap uppercase">CUSTOMER ID</td>
+                        <td className="py-1 text-center">:</td>
+                        <td className="py-1 uppercase whitespace-nowrap">&nbsp;&nbsp;{customerId}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 whitespace-nowrap uppercase">GENDER</td>
+                        <td className="py-1 text-center">:</td>
+                        <td className="py-1 uppercase whitespace-nowrap">&nbsp;&nbsp;{gender}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 whitespace-nowrap uppercase">Date Of Birth</td>
+                        <td className="py-1 text-center">:</td>
+                        <td className="py-1 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            &nbsp;&nbsp;
+                            <div className="flex gap-[2px]">
+                            {dob.split('').map((char, i) => (
+                              <div key={`dob-${i}`} className="w-[18px] h-[22px] border flex items-center justify-center font-bold text-xs" style={{ borderColor: darkBlue }}>{char.trim()}</div>
+                            ))}
+                          </div>
+                          <span className="ml-4">Age</span>
+                          <div className="w-12 h-[22px] border px-1 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{age}</div>
+                        </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 whitespace-nowrap uppercase">Occupation</td>
+                        <td className="py-1 text-center">:</td>
+                        <td className="py-1 whitespace-nowrap">
+                          &nbsp;&nbsp;
+                          <div className="w-[280px] h-[22px] border px-2 inline-flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{occupation}</div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 whitespace-nowrap uppercase">Marital status</td>
+                        <td className="py-1 text-center">:</td>
+                        <td className="py-1 whitespace-nowrap">
+                          &nbsp;&nbsp;
+                          <div className="w-36 h-[22px] border px-2 inline-flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{marital}</div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 whitespace-nowrap uppercase">Account status</td>
+                        <td className="py-1 text-center">:</td>
+                        <td className="py-1 flex items-center gap-4 whitespace-nowrap">
+                          &nbsp;&nbsp;
+                          <label className="flex items-center gap-2">new <div className={`w-5 h-5 border flex items-center justify-center font-bold text-lg text-emerald-600`} style={{ borderColor: darkBlue }}>{isNew ? '✓' : ''}</div></label>
+                          <label className="flex items-center gap-2">existing <div className={`w-5 h-5 border flex items-center justify-center font-bold text-lg text-emerald-600`} style={{ borderColor: darkBlue }}>{!isNew ? '✓' : ''}</div></label>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 whitespace-nowrap uppercase">Phone Number</td>
+                        <td className="py-1 text-center">:</td>
+                        <td className="py-1 flex items-center whitespace-nowrap">
+                          &nbsp;&nbsp;
+                          <div className="w-[120px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{phone}</div>
+                          <span className="mx-2">Alt Phone Number</span>
+                          <span className="mx-1">:</span>
+                          &nbsp;&nbsp;
+                          <div className="w-[120px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{altPhone}</div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
 
-                <div className="col-span-4 flex justify-end">
-                  <div className="w-48 h-56 border-2 border-[#1e204d] bg-slate-100 rounded overflow-hidden">
-                    {application?.image && (
-                      <img src={application.image} alt="Profile" className="w-full h-full object-cover" />
-                    )}
+                <div className="col-span-3 flex justify-end items-start pr-4">
+                  <div className="w-[160px] h-[190px] rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-md">
+                    <img src={application?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customerName)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Financial Details */}
-            <div className="mb-6 relative">
-              <div className="flex items-center gap-2 text-[#1b63a9] mb-4">
-                <div className="w-6 h-6 rotate-180">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L22 12L12 22L9 19L16 12L9 5L12 2Z"/></svg>
+            <div className="mb-4 relative px-8 mt-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center">
+                  <div className="w-0 h-0 border-t-[8px] border-t-transparent border-r-[12px] border-b-[8px] border-b-transparent mr-[-2px] z-10" style={{ borderRightColor: cyanBlue }}></div>
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: darkBlue }}></div>
                 </div>
-                <h3 className="text-lg font-bold tracking-widest uppercase">FINACIAL DETAILS</h3>
+                <h3 className="text-xl font-bold tracking-wider uppercase" style={{ color: darkBlue }}>FINACIAL DETAILS</h3>
               </div>
 
-              <div className="space-y-4 text-sm font-bold text-[#1e204d]">
+              <div className="space-y-4 text-[13px] font-bold" style={{ color: darkBlue }}>
                 <div className="flex items-center gap-6">
-                  <div className="flex items-center"><span className="w-32">LOAN AMOUNT</span><div className="w-32 h-6 border border-[#1e204d] px-2">{application?.loanAmount}</div></div>
-                  <div className="flex items-center"><span className="w-24">LOAN TYPE</span><div className="w-32 h-6 border border-[#1e204d]"></div></div>
-                  <div className="flex items-center"><span className="w-20">TENURE</span><div className="w-24 h-6 border border-[#1e204d]"></div></div>
+                  <div className="flex items-center"><span className="w-28 uppercase">LOAN AMOUNT</span><div className="w-[100px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{loanAmt}</div></div>
+                  <div className="flex items-center"><span className="w-24 uppercase ml-4">LOAN TYPE</span><div className="w-[100px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{loanType}</div></div>
+                  <div className="flex items-center"><span className="w-20 uppercase ml-4">TENURE</span><div className="w-[80px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{tenure}</div></div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="w-28">AADHAR NO</span>
-                  <div className="flex gap-1">
-                    {Array(12).fill(0).map((_, i) => <div key={`aadhaar-${i}`} className="w-6 h-8 border border-[#1e204d]"></div>)}
-                  </div>
-                  <span className="ml-4 font-bold">PAN</span>
+                <div className="flex flex-wrap items-center gap-y-4 gap-x-8 mt-2">
+                  {[
+                    { label: 'AADHAAR NO', value: (application?.aadhaar || ''), isBoxes: true, boxCount: 12 },
+                    { label: 'PAN NO', value: application?.pan, isBoxes: false },
+                    { label: 'VOTER ID', value: application?.voterId, isBoxes: false },
+                    { label: 'SMART CARD', value: application?.smartCard, isBoxes: false }
+                  ].filter(doc => doc.value && doc.value.trim().length > 0).map((kyc, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="uppercase">{kyc.label}</span>
+                      {kyc.isBoxes ? (
+                         <div className="flex gap-[2px]">
+                           {kyc.value.padEnd(kyc.boxCount, ' ').split('').map((char, i) => (
+                             <div key={i} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-xs" style={{ borderColor: darkBlue }}>{char.trim()}</div>
+                           ))}
+                         </div>
+                      ) : (
+                         <div className="min-w-[150px] h-[24px] border px-2 flex items-center font-bold text-xs uppercase" style={{ borderColor: darkBlue }}>{kyc.value}</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
 
-            <div className="w-full h-1 bg-[#1e204d] mb-6"></div>
+            {/* Separator Line */}
+            <div className="w-full h-[3px] my-6" style={{ backgroundColor: darkBlue }}></div>
 
             {/* Nominee and Contacts */}
-            <div className="mb-10 relative">
-              <div className="flex items-center gap-2 text-[#1b63a9] mb-4">
-                <div className="w-6 h-6 rotate-180">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L22 12L12 22L9 19L16 12L9 5L12 2Z"/></svg>
+            <div className="mb-8 relative px-8">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center">
+                  <div className="w-0 h-0 border-t-[8px] border-t-transparent border-r-[12px] border-b-[8px] border-b-transparent mr-[-2px] z-10" style={{ borderRightColor: cyanBlue }}></div>
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: darkBlue }}></div>
                 </div>
-                <h3 className="text-lg font-bold tracking-widest uppercase">NOMINEEE AND CONTACTS</h3>
+                <h3 className="text-xl font-bold tracking-wider uppercase" style={{ color: darkBlue }}>NOMINEEE AND CONTACTS</h3>
               </div>
 
-              <div className="space-y-4 text-sm font-bold text-[#1e204d]">
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center"><span className="w-40">NOMINEE NAME</span><div className="w-64 h-8 border border-[#1e204d]"></div></div>
-                  <div className="flex items-center"><span className="w-24">RELATION</span><div className="w-48 h-8 border border-[#1e204d]"></div></div>
+              <div className="space-y-4 text-[13px] font-bold" style={{ color: darkBlue }}>
+                <div className="flex items-center gap-6 mt-2">
+                  <div className="flex items-center"><span className="w-[150px] uppercase">NOMINEE NAME</span><div className="w-[200px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{nominee}</div></div>
+                  <div className="flex items-center"><span className="w-24 uppercase ml-4">RELATION</span><div className="w-[150px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{relation}</div></div>
                 </div>
-                <div className="flex items-start">
-                  <span className="w-40 mt-2">PERMANANT ADDRESS</span>
-                  <div className="flex-1 h-24 border border-[#1e204d]"></div>
+                
+                <div className="flex items-start mt-4">
+                  <span className="w-[150px] uppercase pt-1">PERMANANT ADDRESS</span>
+                  <div className="flex-1 max-w-[400px] h-[60px] border p-2 font-bold text-xs" style={{ borderColor: darkBlue }}>{address}</div>
                 </div>
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center"><span className="w-16">CITY</span><div className="w-40 h-8 border border-[#1e204d]"></div></div>
-                  <div className="flex items-center"><span className="w-24">DISTRICT</span><div className="w-48 h-8 border border-[#1e204d]"></div></div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-10">PIN</span>
-                    <div className="flex gap-1">
-                      {Array(6).fill(0).map((_, i) => <div key={`pin-${i}`} className="w-6 h-8 border border-[#1e204d]"></div>)}
+                
+                <div className="flex items-center gap-4 mt-4">
+                  <div className="flex items-center"><span className="w-[40px] uppercase">CITY</span><div className="w-[140px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{city}</div></div>
+                  <div className="flex items-center ml-2"><span className="w-[70px] uppercase">DISTRICT</span><div className="w-[140px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{district}</div></div>
+                  <div className="flex items-center gap-2 ml-2">
+                    <span className="w-8 uppercase">PIN</span>
+                    <div className="flex gap-[2px]">
+                      {pin.split('').map((char, i) => (
+                        <div key={`pin-${i}`} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-xs" style={{ borderColor: darkBlue }}>{char.trim()}</div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -334,22 +540,18 @@ const PdfPreviewModal = ({ application, onClose }) => {
             </div>
 
             {/* Footer */}
-            <div className="mt-auto flex justify-between items-end relative z-20">
-              <div className="border-l-4 border-[#1e204d] pl-4 text-[#1e204d] text-xs font-bold leading-relaxed">
+            <div className="mt-auto flex justify-between items-end relative z-20 px-12 pb-8">
+              <div className="border-l-[4px] pl-4 text-[10px] font-bold leading-relaxed bg-white/50 p-2 rounded ml-12" style={{ borderColor: darkBlue, color: darkBlue }}>
                 <div>MORE INFORMATION :</div>
                 <div>Pachaipatti pirivu , Batlagundu - 624 202</div>
                 <div>8220096233 / groupseverest@gmail.com</div>
                 <div className="font-medium text-slate-500">www.groupseverest.com</div>
               </div>
-              <div className="text-center w-64 text-[#1e204d] text-sm font-bold">
-                <div className="w-full border-b border-[#1e204d] mb-2"></div>
+              <div className="text-center w-64 text-sm font-bold" style={{ color: darkBlue }}>
+                <div className="w-full border-b mb-2" style={{ borderColor: darkBlue }}></div>
                 Signature Of CUSTOMER
               </div>
             </div>
-            
-            {/* Geometric Bottom Decor */}
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#1b63a9] transform -rotate-45 -translate-x-32 translate-y-32 z-0"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#1e204d] transform -rotate-45 -translate-x-20 translate-y-20 z-0"></div>
 
           </div>
         </div>
@@ -364,7 +566,7 @@ const PdfPreviewModal = ({ application, onClose }) => {
             position: absolute; 
             left: 0; 
             top: 0; 
-            transform: none !important;
+            transform: scale(1) translate(0, 0) !important;
             width: 210mm !important;
             height: 297mm !important;
             max-width: none !important;

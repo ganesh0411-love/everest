@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PdfPreviewModal from './PdfPreviewModal';
+import ImageCropModal from './ImageCropModal';
+import PdfViewer from './PdfViewer';
 
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { uploadImageToStorage } from '../utils/storageUpload';
 
 const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [step, setStep] = useState('form'); // 'form', 'confirm', 'success'
@@ -22,18 +25,38 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
     if (!isNaN(d)) setAppDay(days[d.getDay()]);
   }, [appDate]);
 
-  const handlePhotoCapture = async () => {
+  const [photoActionSheetOpen, setPhotoActionSheetOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState(null);
+
+  const handlePhotoCapture = () => setPhotoActionSheetOpen(true);
+
+  const [cropImageSrc, setCropImageSrc] = useState(null);
+
+  const triggerMainCamera = async (source) => {
     try {
+      if (source === CameraSource.Camera) {
+        const check = await Camera.checkPermissions();
+        if (check.camera !== 'granted') {
+          await Camera.requestPermissions({ permissions: ['camera'] });
+        }
+      }
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Prompt // Action sheet for Camera / Gallery
+        resultType: CameraResultType.Base64,
+        source: source
       });
-      setPhoto(image.webPath);
+      setCropImageSrc(`data:image/jpeg;base64,${image.base64String}`);
     } catch (e) {
       console.error("User cancelled or camera error", e);
+    } finally {
+      setPhotoActionSheetOpen(false);
     }
+  };
+
+  const handleCropComplete = (croppedUrl) => {
+    setPhoto(croppedUrl);
+    setCropImageSrc(null);
   };
 
   // 2. Core Identity & Contact
@@ -60,13 +83,13 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   };
 
   // 3. Personal & Demographic
-  const [gender, setGender] = useState('Female');
-  const [dob, setDob] = useState('');
-  const [age, setAge] = useState('');
-  const [occupation, setOccupation] = useState('');
-  const [maritalStatus, setMaritalStatus] = useState('Married');
-  const [nomineeName, setNomineeName] = useState('');
-  const [nomineeRelation, setNomineeRelation] = useState('Husband');
+  const [gender, setGender] = useState(initialData?.gender || 'Female');
+  const [dob, setDob] = useState(initialData?.dob || '');
+  const [age, setAge] = useState(initialData?.age || '');
+  const [occupation, setOccupation] = useState(initialData?.occupation || '');
+  const [maritalStatus, setMaritalStatus] = useState(initialData?.maritalStatus || 'Married');
+  const [nomineeName, setNomineeName] = useState(initialData?.nomineeName || '');
+  const [nomineeRelation, setNomineeRelation] = useState(initialData?.nomineeRelation || 'Husband');
 
   useEffect(() => {
     if (dob) {
@@ -82,9 +105,9 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   }, [dob]);
 
   // 4. Address, Location & ID
-  const [address, setAddress] = useState('');
-  const [pincode, setPincode] = useState(Array(6).fill(''));
-  const [locationUrl, setLocationUrl] = useState('');
+  const [address, setAddress] = useState(initialData?.address || '');
+  const [pincode, setPincode] = useState(initialData?.pincode ? initialData.pincode.split('').slice(0, 6) : Array(6).fill(''));
+  const [locationUrl, setLocationUrl] = useState(initialData?.locationUrl || '');
   
   const handlePincodeChange = (index, val) => {
     if (!/^\d*$/.test(val)) return;
@@ -107,8 +130,49 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
     smartCard: initialData?.idsChecked?.smartCard || false
   });
   
+  const [kycDocs, setKycDocs] = useState(initialData?.kycDocs || {});
+  const [kycUploadTarget, setKycUploadTarget] = useState(null); // 'aadhaar', 'pan', 'voter', 'smartCard'
+
+  const handleKycUpload = (type, file) => {
+    if (!file) return;
+    setKycDocs(prev => {
+      const current = prev[type] || [];
+      let url = file.url || file.webPath;
+      if (!url && file instanceof File) url = URL.createObjectURL(file);
+      return { ...prev, [type]: [...current, { name: file.name, url, fileObj: file instanceof File ? file : null }] };
+    });
+  };
+
+  const removeKycDoc = (type, index) => {
+    setKycDocs(prev => {
+      const current = prev[type] || [];
+      return { ...prev, [type]: current.filter((_, i) => i !== index) };
+    });
+  };
+
+  const triggerKycCamera = async (type) => {
+    try {
+      const check = await Camera.checkPermissions();
+      if (check.camera !== 'granted') {
+        await Camera.requestPermissions({ permissions: ['camera'] });
+      }
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera
+      });
+      // Store the image path as the file for this type
+      handleKycUpload(type, { name: `Camera_Capture_${Date.now()}.jpg`, url: `data:image/jpeg;base64,${image.base64String}` });
+    } catch (e) {
+      console.error("Camera error", e);
+    } finally {
+      setKycUploadTarget(null);
+    }
+  };
+  
   // Aadhaar (12 boxes, fully visible as per strict rule)
-  const [aadhaar, setAadhaar] = useState(Array(12).fill(''));
+  const [aadhaar, setAadhaar] = useState(initialData?.aadhaar ? initialData.aadhaar.split('') : Array(12).fill(''));
   const handleAadhaarChange = (index, val) => {
     if (!/^\d*$/.test(val)) return;
     const newAadhaar = [...aadhaar];
@@ -116,6 +180,10 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
     setAadhaar(newAadhaar);
     if (val && index < 11) document.getElementById(`aadhaar-${index + 1}`)?.focus();
   };
+
+  const [pan, setPan] = useState(initialData?.pan || '');
+  const [voterId, setVoterId] = useState(initialData?.voterId || '');
+  const [smartCard, setSmartCard] = useState(initialData?.smartCard || '');
 
   // 5. Financial Details
   const [loanType, setLoanType] = useState(initialData?.loanType || 'Micro Finance');
@@ -155,36 +223,97 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   };
 
   // 6. Workflows
-  const handleSubmitClick = () => setStep('confirm');
+  const handleSubmitClick = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    setStep('confirm');
+  };
+
   const confirmSubmit = async () => {
     setIsSubmitting(true);
     try {
+      let finalPhoto = photo;
+      if (photo && !photo.includes('firebasestorage.googleapis.com')) {
+         finalPhoto = await uploadImageToStorage(photo, 'profile_pics', `${customerId}_profile`);
+      }
+
+      // Strip fileObj from kycDocs to prevent Firestore 'custom object' errors
+      const cleanKycDocs = (docs) => {
+        const cleaned = {};
+        for (const key in docs) {
+          if (docs[key]) {
+            cleaned[key] = docs[key].map(d => {
+              const { fileObj, ...rest } = d;
+              return rest;
+            });
+          }
+        }
+        return cleaned;
+      };
+
       const newCustomer = {
         id: customerId,
         name: `${nameTitle} ${customerName}`,
         date: appDate,
-        status: 'Pending',
+        status: initialData?.status || 'Pending',
         loanAmount: parseFloat(loanAmount) || 0,
         repayAmount: parseFloat(repayAmount) || 0,
         category: 'Upcoming',
         // Schema Verification: Explicit mapping
-        appDate, appDay, appNumber, image: photo,
+        appDate, appDay, appNumber, image: finalPhoto,
         center, city, district, nameTitle, customerName,
         phone, altPhone, customerStatus, dob, age,
-        gender, maritalStatus, religion, caste, education, occupation,
-        idsChecked, loanType, tenureVal, tenureUnit, interestPercent
+        gender, maritalStatus, religion: '', caste: '', education: '', occupation,
+        idsChecked, loanType, tenureVal, tenureUnit, interestPercent,
+        nomineeName, nomineeRelation, address, pincode: pincode.join(''),
+        aadhaar: aadhaar.join(''), pan, voterId, smartCard, kycDocs: cleanKycDocs(kycDocs), locationUrl
       };
       
-      // Enforcing explicit await wrapper logic on the persistence pipeline
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
       if (onAddCustomer) {
-        await onAddCustomer(newCustomer);
+        onAddCustomer(newCustomer);
       }
       
       setStep('success');
+
+      // Background Upload Task (KYC Only)
+      setTimeout(async () => {
+        try {
+          let finalKycDocs = { ...kycDocs };
+          const uploadKycDocs = async (type, prefix) => {
+            if (finalKycDocs[type]) {
+              const uploaded = await Promise.all(finalKycDocs[type].map(async (docObj, idx) => {
+                if (!docObj.url.includes('firebasestorage.googleapis.com')) {
+                   const target = docObj.fileObj || docObj.url;
+                   const newUrl = await uploadImageToStorage(target, `kyc_${prefix}`, `${customerId}_${prefix}_${idx}`);
+                   return { ...docObj, url: newUrl };
+                }
+                return docObj;
+              }));
+              finalKycDocs[type] = uploaded;
+            }
+          };
+          
+          await Promise.all([
+             uploadKycDocs('aadhaar', 'aadhaar'),
+             uploadKycDocs('pan', 'pan'),
+             uploadKycDocs('voter', 'voter_id'),
+             uploadKycDocs('smartCard', 'smart_card')
+          ]);
+
+          const { doc, updateDoc } = await import('firebase/firestore');
+          const { db } = await import('../firebase');
+          await updateDoc(doc(db, 'customers', customerId), {
+            image: finalPhoto,
+            kycDocs: cleanKycDocs(finalKycDocs)
+          });
+        } catch (e) {
+          console.error('Background upload failed for', customerId, e);
+        }
+      }, 50);
+
     } catch (error) {
       console.error("Save failed:", error);
+      alert("Failed to save application: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -250,16 +379,34 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
             application={{
               id: customerId,
               customerName: `${nameTitle} ${customerName}`,
-              status: 'Pending',
+              status: initialData?.status || 'Pending',
+              customerStatus: customerStatus,
               appDate: appDate,
               appDay: appDay,
+              appNumber: appNumber,
               serialNo: 1, // Mock
               gender: gender,
               maritalStatus: maritalStatus,
               loanAmount: loanAmount,
               repayAmount: repayAmount,
-              image: photo || 'https://i.pravatar.cc/150?img=5',
-              center: center
+              loanType: loanType,
+              tenureVal: tenureVal,
+              tenureUnit: tenureUnit,
+              image: photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(customerName)}&background=random`,
+              center: center,
+              city: city,
+              district: district,
+              phone: phone,
+              altPhone: altPhone,
+              dob: dob,
+              age: age,
+              occupation: occupation,
+              nomineeName: nomineeName,
+              nomineeRelation: nomineeRelation,
+              address: address,
+              pincode: pincode.join(''),
+              aadhaar: aadhaar.join(''),
+              pan: pan
             }}
             onClose={() => setShowPdf(false)} 
           />
@@ -521,31 +668,83 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
                       </React.Fragment>
                     ))}
                   </div>
-                  <button className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1"><span>📎</span> Upload Document</button>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(kycDocs.aadhaar || []).map((doc, idx) => (
+                      <div key={idx} className="relative flex items-center bg-emerald-50 border border-emerald-200 rounded px-2 py-1 shadow-sm">
+                        <span className="text-xs font-bold text-emerald-700 truncate max-w-[150px] cursor-pointer hover:underline" onClick={() => setPreviewDoc(doc)}>{doc.name}</span>
+                        <button className="ml-2 text-rose-500 font-bold hover:text-rose-700" onClick={() => removeKycDoc('aadhaar', idx)}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="relative inline-block">
+                    <button onClick={() => setKycUploadTarget('aadhaar')} className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1 hover:bg-slate-50 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      <span className="truncate max-w-[150px]">Upload Document</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
               {idsChecked.pan && (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3">
                   <label className="block text-[11px] font-bold text-slate-600 mb-2">PAN CARD (FULL VISIBILITY)</label>
-                  <input type="text" placeholder="ABCDE1234F" maxLength={10} className="w-full p-3 border border-slate-300 rounded-lg outline-none font-bold text-slate-800 uppercase tracking-widest mb-3 bg-white" />
-                  <button className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1"><span>📎</span> Upload Document</button>
+                  <input type="text" value={pan} onChange={e => setPan(e.target.value.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} className="w-full p-3 border border-slate-300 rounded-lg outline-none font-bold text-slate-800 uppercase tracking-widest mb-3 bg-white" />
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(kycDocs.pan || []).map((doc, idx) => (
+                      <div key={idx} className="relative flex items-center bg-emerald-50 border border-emerald-200 rounded px-2 py-1 shadow-sm">
+                        <span className="text-xs font-bold text-emerald-700 truncate max-w-[150px] cursor-pointer hover:underline" onClick={() => setPreviewDoc(doc)}>{doc.name}</span>
+                        <button className="ml-2 text-rose-500 font-bold hover:text-rose-700" onClick={() => removeKycDoc('pan', idx)}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="relative inline-block">
+                    <button onClick={() => setKycUploadTarget('pan')} className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1 hover:bg-slate-50 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      <span className="truncate max-w-[150px]">Upload Document</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
               {idsChecked.voter && (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3">
                   <label className="block text-[11px] font-bold text-slate-600 mb-2">VOTER ID (FULL VISIBILITY)</label>
-                  <input type="text" placeholder="XYZ1234567" className="w-full p-3 border border-slate-300 rounded-lg outline-none font-bold text-slate-800 uppercase tracking-widest mb-3 bg-white" />
-                  <button className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1"><span>📎</span> Upload Document</button>
+                  <input type="text" value={voterId} onChange={e => setVoterId(e.target.value.toUpperCase())} placeholder="XYZ1234567" className="w-full p-3 border border-slate-300 rounded-lg outline-none font-bold text-slate-800 uppercase tracking-widest mb-3 bg-white" />
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(kycDocs.voter || []).map((doc, idx) => (
+                      <div key={idx} className="relative flex items-center bg-emerald-50 border border-emerald-200 rounded px-2 py-1 shadow-sm">
+                        <span className="text-xs font-bold text-emerald-700 truncate max-w-[150px] cursor-pointer hover:underline" onClick={() => setPreviewDoc(doc)}>{doc.name}</span>
+                        <button className="ml-2 text-rose-500 font-bold hover:text-rose-700" onClick={() => removeKycDoc('voter', idx)}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="relative inline-block">
+                    <button onClick={() => setKycUploadTarget('voter')} className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1 hover:bg-slate-50 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      <span className="truncate max-w-[150px]">Upload Document</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
               {idsChecked.smartCard && (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3">
                   <label className="block text-[11px] font-bold text-slate-600 mb-2">SMART CARD (FULL VISIBILITY)</label>
-                  <input type="text" inputMode="numeric" placeholder="333123456789" className="w-full p-3 border border-slate-300 rounded-lg outline-none font-bold text-slate-800 tracking-widest mb-3 bg-white" />
-                  <button className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1"><span>📎</span> Upload Document</button>
+                  <input type="text" value={smartCard} onChange={e => setSmartCard(e.target.value)} inputMode="numeric" placeholder="333123456789" className="w-full p-3 border border-slate-300 rounded-lg outline-none font-bold text-slate-800 tracking-widest mb-3 bg-white" />
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(kycDocs.smartCard || []).map((doc, idx) => (
+                      <div key={idx} className="relative flex items-center bg-emerald-50 border border-emerald-200 rounded px-2 py-1 shadow-sm">
+                        <span className="text-xs font-bold text-emerald-700 truncate max-w-[150px] cursor-pointer hover:underline" onClick={() => setPreviewDoc(doc)}>{doc.name}</span>
+                        <button className="ml-2 text-rose-500 font-bold hover:text-rose-700" onClick={() => removeKycDoc('smartCard', idx)}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="relative inline-block">
+                    <button onClick={() => setKycUploadTarget('smartCard')} className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1 hover:bg-slate-50 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      <span className="truncate max-w-[150px]">Upload Document</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -621,6 +820,88 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
           Submit
         </button>
       </div>
+
+      {/* KYC Upload Action Sheet */}
+      {kycUploadTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-end justify-center p-4 animate-in fade-in duration-200" onClick={() => setKycUploadTarget(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-8 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-100 text-center bg-slate-50">
+              <h3 className="font-bold text-slate-800 uppercase tracking-widest text-sm">Upload Document</h3>
+              <p className="text-xs text-slate-500 mt-1 font-medium">Supported: JPG, PNG, PDF</p>
+            </div>
+            <div className="flex flex-col">
+              <button onClick={() => triggerKycCamera(kycUploadTarget)} className="p-4 flex items-center justify-center gap-3 font-bold text-brand-blue hover:bg-slate-50 border-b border-slate-100 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Open Camera
+              </button>
+              <div className="relative">
+                <input type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => { handleKycUpload(kycUploadTarget, e.target.files[0]); setKycUploadTarget(null); }} />
+                <button className="w-full p-4 flex items-center justify-center gap-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                  Choose from Files
+                </button>
+              </div>
+            </div>
+            <div className="p-3 bg-slate-50">
+              <button onClick={() => setKycUploadTarget(null)} className="w-full p-3 text-center font-bold text-rose-500 rounded-xl hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Photo Upload Action Sheet */}
+      {photoActionSheetOpen && !cropImageSrc && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-end justify-center p-4 animate-in fade-in duration-200" onClick={() => setPhotoActionSheetOpen(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-8 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-100 text-center bg-slate-50">
+              <h3 className="font-bold text-slate-800 uppercase tracking-widest text-sm">Profile Photo</h3>
+            </div>
+            <div className="flex flex-col">
+              <button onClick={() => triggerMainCamera(CameraSource.Camera)} className="p-4 flex items-center justify-center gap-3 font-bold text-brand-blue hover:bg-slate-50 border-b border-slate-100 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Take Photo
+              </button>
+              <button onClick={() => triggerMainCamera(CameraSource.Photos)} className="p-4 flex items-center justify-center gap-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                Choose Photo
+              </button>
+            </div>
+            <div className="p-3 bg-slate-50">
+              <button onClick={() => setPhotoActionSheetOpen(false)} className="w-full p-3 text-center font-bold text-rose-500 rounded-xl hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Document Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/95 flex flex-col p-4 animate-in fade-in duration-200">
+          <div className="flex justify-end mb-4">
+            <button onClick={() => setPreviewDoc(null)} className="p-2 bg-slate-800 text-white rounded-full hover:bg-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center overflow-hidden rounded-lg">
+            {previewDoc.name.toLowerCase().endsWith('.pdf') ? (
+              <PdfViewer fileUrl={previewDoc.url} />
+            ) : (
+              <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full max-h-full object-contain rounded-lg" />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Image Cropping Modal */}
+      {cropImageSrc && (
+        <ImageCropModal 
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={() => setCropImageSrc(null)}
+        />
+      )}
     </div>
   );
 };

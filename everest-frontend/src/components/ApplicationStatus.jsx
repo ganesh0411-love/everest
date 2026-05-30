@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import PdfPreviewModal from './PdfPreviewModal';
 import AddCustomerModal from './AddCustomerModal';
 
-const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp }) => {
+const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer }) => {
   const [activeTab, setActiveTab] = useState('Pending');
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -59,7 +59,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp }) =
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-white min-h-[50vh] animate-in fade-in duration-300 relative">
+    <div className="w-full h-full max-w-4xl mx-auto bg-white min-h-full flex flex-col animate-in fade-in duration-300 relative">
       
       {/* Header & Tabs */}
       <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-20">
@@ -118,9 +118,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp }) =
                       <img 
                         src={app.image} 
                         alt={app.customerName} 
-                        className={`w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm transition-transform flex-shrink-0 ${activeTab !== 'Pending' ? '' : 'cursor-pointer hover:scale-105'}`}
+                        className={`w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm transition-transform flex-shrink-0 cursor-pointer hover:scale-105`}
                         onClick={(e) => { 
-                          if (activeTab !== 'Pending') return;
                           e.stopPropagation(); 
                           setFullscreenImage(app.image); 
                         }}

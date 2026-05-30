@@ -3,10 +3,10 @@ import './DashboardSummary.css';
 
 const DashboardSummary = ({ customers }) => {
   // EXCLUDE ALL PENDING/REJECTED records from cumulative math! Only APPROVED records contribute.
-  const approvedCustomers = (customers || []).filter(c => c.pendingStatus === 'APPROVED');
+  const approvedCustomers = (customers || []).filter(c => c.status === 'Approved');
   // Loan Amount card = cumulative Re-pay Amount (the repayment total, not principal disbursed)
-  const totalLoanAmount = approvedCustomers.reduce((sum, c) => sum + (c.amount || 0), 0);
-  const totalOutstanding = approvedCustomers.reduce((sum, c) => sum + (c.amount || 0), 0);
+  const totalLoanAmount = approvedCustomers.reduce((sum, c) => sum + (parseFloat(c.loanAmount) || 0), 0);
+  const totalOutstanding = approvedCustomers.reduce((sum, c) => sum + (parseFloat(c.repayAmount) || 0), 0);
 
   return (
     <div className="summary-container">

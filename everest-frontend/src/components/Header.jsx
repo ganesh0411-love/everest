@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/logo.png';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase';
 
 const Header = ({ currentView, setCurrentView }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -24,10 +26,14 @@ const Header = ({ currentView, setCurrentView }) => {
     setIsSettingsOpen(false);
   };
 
-  const handleLogout = () => {
-    alert("Logged out successfully");
-    setIsMenuOpen(false);
-    setCurrentView('Customer');
+  const handleLogout = async () => {
+    if (window.confirm("Are you sure you want to logout?")) {
+      try {
+        await signOut(auth);
+      } catch (error) {
+        console.error('Error signing out:', error);
+      }
+    }
   };
 
   const menuItems = [

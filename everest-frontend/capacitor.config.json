@@ -1,5 +1,12 @@
 {
   "appId": "com.everest.microfinance",
   "appName": "Everest",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#0f172a"
+    }
+  }
 }

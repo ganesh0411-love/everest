@@ -1,100 +1,74 @@
 import React from 'react';
 
-const RecycleBinView = ({ recycledCustomers = [], onRestore, onPermanentDelete }) => {
-  const daysLeft = (deletedTimestamp) => {
-    if (!deletedTimestamp) return 180;
-    const elapsedMs = Date.now() - deletedTimestamp;
-    const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
-    const left = 180 - elapsedDays;
-    return left > 0 ? left : 0;
-  };
+const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete }) => {
+  const recycledCustomers = customers.filter(c => c.status === 'Recycled');
 
   const formatDate = (timestamp) => {
-    if (!timestamp) return '—';
-    const date = new Date(timestamp);
-    const d = String(date.getDate()).padStart(2, '0');
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const y = date.getFullYear();
-    return `${d}-${m}-${y}`;
+    if (!timestamp) return 'N/A';
+    const d = new Date(timestamp);
+    if (isNaN(d)) return timestamp;
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
   };
 
   return (
-    <div className="application-status-view recycle-bin-view" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
-      <div className="status-header" style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-        <h2>Recycle Bin Subsystem</h2>
-        <p>Manage deleted customer accounts. Items are safely held for a strict 180-day lifecycle holding period.</p>
+    <div className="w-full max-w-4xl mx-auto bg-[#f8fafc] min-h-full flex flex-col p-4 animate-in fade-in duration-300">
+      <div className="mb-4">
+        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Recycle Bin
+        </h2>
+        <p className="text-sm text-slate-500 mt-1">Manage deleted records. Permanently deleted records cannot be recovered.</p>
       </div>
 
       {recycledCustomers.length === 0 ? (
-        <div className="empty-state" style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-muted)' }}>
-          <div className="empty-icon" style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }}>🗑️</div>
-          <p>The Recycle Bin is empty. No deleted profiles found.</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-400">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <p className="font-semibold text-slate-500">Recycle Bin is Empty</p>
         </div>
       ) : (
-        <div className="table-wrapper" style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid var(--border)' }}>
-          <table className="status-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255, 255, 255, 0.04)' }}>
-                <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name</th>
-                <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Original Status</th>
-                <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Deletion Date</th>
-                <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Holding Days Remaining</th>
-                <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recycledCustomers.map((app, idx) => (
-                <tr key={app.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding: '0.75rem 0.8rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', overflow: 'hidden' }}>
-                        {app.details?.imageUri ? (
-                          <img src={app.details.imageUri} alt="Customer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <span>{app.name?.charAt(0)}</span>
-                        )}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-main)' }}>{app.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {app.id}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{ padding: '0.75rem 0.8rem', fontSize: '0.85rem' }}>
-                    <span className={`status-pill ${app.pendingStatus?.toLowerCase() || 'pending'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, background: app.pendingStatus === 'APPROVED' ? 'rgba(16,185,129,0.15)' : app.pendingStatus === 'REJECTED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)', color: app.pendingStatus === 'APPROVED' ? '#10B981' : app.pendingStatus === 'REJECTED' ? '#EF4444' : '#F59E0B' }}>
-                      {app.pendingStatus || 'PENDING'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.75rem 0.8rem', fontSize: '0.85rem', color: 'var(--text-main)' }}>{formatDate(app.deletedTimestamp)}</td>
-                  <td style={{ padding: '0.75rem 0.8rem', fontSize: '0.85rem', fontWeight: 700, color: '#F59E0B' }}>
-                    ⏱️ {daysLeft(app.deletedTimestamp)} days left
-                  </td>
-                  <td style={{ padding: '0.75rem 0.8rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                      <button 
-                        onClick={() => onRestore(app)}
-                        style={{ padding: '0.4rem 0.85rem', background: 'rgba(16, 185, 129, 0.15)', border: 'none', color: '#10B981', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', transition: 'all 0.2s' }}
-                        className="clickable"
-                      >
-                        🔄 Restore
-                      </button>
-                      <button 
-                        onClick={() => {
-                          if (window.confirm(`Are you absolutely sure you want to permanently delete ${app.name}? This action CANNOT be undone.`)) {
-                            onPermanentDelete(app);
-                          }
-                        }}
-                        style={{ padding: '0.4rem 0.85rem', background: 'rgba(239, 68, 68, 0.15)', border: 'none', color: '#EF4444', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', transition: 'all 0.2s' }}
-                        className="clickable"
-                      >
-                        🚨 Hard Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="grid grid-cols-12 gap-2 p-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
+            <div className="col-span-2 text-center">S.No</div>
+            <div className="col-span-3 text-left">Deleted Date</div>
+            <div className="col-span-4 text-left">Customer Name</div>
+            <div className="col-span-3 text-center"></div>
+          </div>
+          
+          <div className="divide-y divide-slate-100">
+            {recycledCustomers.map((customer, index) => (
+              <div key={customer.id} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-50 transition-colors">
+                <div className="col-span-2 text-center text-sm font-semibold text-slate-400">
+                  {index + 1}
+                </div>
+                <div className="col-span-3 text-left text-xs font-medium text-slate-600">
+                  {formatDate(customer.lastUpdated)}
+                </div>
+                <div className="col-span-4 text-left text-sm font-bold text-slate-800 truncate">
+                  {customer.name?.replace(/^(Mr\.|Mrs\.|Miss)\s*/i, '').trim() || customer.customerName?.replace(/^(Mr\.|Mrs\.|Miss)\s*/i, '').trim()}
+                </div>
+                <div className="col-span-3 flex justify-center gap-2">
+                  <button 
+                    onClick={() => onRestore(customer.id, customer.previousStatus || 'Pending')}
+                    className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded transition-colors"
+                    title="Restore"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  </button>
+                  <button 
+                    onClick={() => onPermanentDelete(customer.id)}
+                    className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded transition-colors"
+                    title="Permanent Delete"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

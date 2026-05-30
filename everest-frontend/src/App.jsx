@@ -11,54 +11,99 @@ import {
   StaffManagement, 
   DashboardOverview, 
   CustomerKYCUpdate, 
-  RecycleBin 
 } from './components/Placeholders';
 import ApplicationStatus from './components/ApplicationStatus';
 import AddCustomerModal from './components/AddCustomerModal';
+import RecycleBinView from './components/RecycleBinView';
+import { App as CapacitorApp } from '@capacitor/app';
+import { auth, db } from './firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc, collection, getDocs, setDoc, updateDoc, query, where } from 'firebase/firestore';
+import Login from './components/Login';
+import CustomerDashboard from './components/CustomerDashboard';
 
 function App() {
-  const [customers, setCustomers] = useState([]);
-  const [isDbLoading, setIsDbLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [customers, setCustomers] = useState(() => {
+    const saved = localStorage.getItem('everest_customers');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isDbLoading, setIsDbLoading] = useState(() => {
+    return !localStorage.getItem('everest_customers');
+  });
+  const [authChecking, setAuthChecking] = useState(true);
+
+  const [userProfile, setUserProfile] = useState(() => {
+    const saved = localStorage.getItem('everest_user_profile');
+    return saved ? JSON.parse(saved) : null;
+  });
 
   useEffect(() => {
-    // ASYNCHRONOUS DATABASE LOAD & SAFE NULL CHECK
-    const initDatabase = async () => {
-      // Small artificial delay to show the splash screen smoothly
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      try {
-        const dbVersion = localStorage.getItem('everest_db_version');
-        const REQUIRED_VERSION = '1.0.6';
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        setAuthChecking(false); // Unblock UI immediately
+        
+        // Fetch fresh profile in background
+        getDoc(doc(db, 'users', currentUser.phoneNumber || currentUser.uid))
+          .then(profileSnap => {
+            const profileData = profileSnap.exists() 
+              ? profileSnap.data() 
+              : { role: 'customer', phone: currentUser.phoneNumber };
+            setUserProfile(profileData);
+            localStorage.setItem('everest_user_profile', JSON.stringify(profileData));
+          })
+          .catch(err => console.error("Error fetching profile:", err));
+      } else {
+        setUser(null);
+        setUserProfile(null);
+        localStorage.removeItem('everest_user_profile');
+        setAuthChecking(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
-        if (dbVersion !== REQUIRED_VERSION) {
-          // HARD RESET LOCAL STORAGE BIAS: Clear corrupt legacy keys/schemas
-          localStorage.removeItem('everest_customers');
-          localStorage.setItem('everest_db_version', REQUIRED_VERSION);
-          setCustomers([]);
-        } else {
-          const saved = localStorage.getItem('everest_customers');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            // Strictly ensure it's an array to prevent white screen crashes
-            if (Array.isArray(parsed)) {
-              setCustomers(parsed);
-            } else {
-              setCustomers([]);
-            }
-          } else {
-            setCustomers([]);
-          }
-        }
-      } catch (error) {
-        console.error("Database Init Error Caught:", error);
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      if (!user || !userProfile) {
         setCustomers([]);
+        setIsDbLoading(false);
+        return;
+      }
+      if (customers.length === 0) {
+        setIsDbLoading(true);
+      }
+      try {
+        let q;
+        if (userProfile.role === 'admin') {
+          q = collection(db, 'customers');
+        } else if (userProfile.role === 'staff') {
+          // Simplified staff query
+          q = query(collection(db, 'customers'), where('center_id', '==', userProfile.center_id || ''));
+        } else {
+          // Customer role
+          q = query(collection(db, 'customers'), where('phone', '==', user.phoneNumber));
+        }
+        
+        const querySnapshot = await getDocs(q);
+        const fetched = [];
+        querySnapshot.forEach((docSnap) => {
+          fetched.push({ ...docSnap.data(), id: docSnap.id });
+        });
+        setCustomers(fetched);
+      } catch (error) {
+        console.error("Firebase Init Error Caught:", error);
+        if (customers.length === 0) setCustomers([]);
       } finally {
         setIsDbLoading(false);
       }
     };
-
-    initDatabase();
-  }, []);
+    
+    if (!authChecking) {
+      fetchCustomers();
+    }
+  }, [user, userProfile, authChecking]);
 
   useEffect(() => {
     if (!isDbLoading) {
@@ -67,17 +112,31 @@ function App() {
   }, [customers, isDbLoading]);
 
   const [currentView, setCurrentView] = useState('Customer');
+  const [viewHistory, setViewHistory] = useState(['Customer']);
+  const [backPressCount, setBackPressCount] = useState(0);
+
+  const navigateToView = (newView) => {
+    setViewHistory(prev => {
+      if (prev[prev.length - 1] === newView) return prev;
+      return [...prev, newView];
+    });
+    setCurrentView(newView);
+  };
+
+  const switchTab = (newView) => {
+    if (newView === 'Customer') {
+      setViewHistory(['Customer']);
+    } else {
+      setViewHistory(['Customer', newView]);
+    }
+    setCurrentView(newView);
+  };
+
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  
+  const [fullscreenImage, setFullscreenImage] = useState(null);
   const [activeHomeMenuId, setActiveHomeMenuId] = useState(null);
 
-  useEffect(() => {
-    const handleClickOutside = () => setActiveHomeMenuId(null);
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-  
   // Filter & Sort State
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -86,6 +145,73 @@ function App() {
   // Temp state for the modal before applying
   const [tempCategory, setTempCategory] = useState('All');
   const [tempSort, setTempSort] = useState('Recent');
+
+  // Hardware Back Button & Double-Tap Exit
+  useEffect(() => {
+    let backTimeout;
+    let backListenerHandle = null;
+
+    const setupListener = async () => {
+      backListenerHandle = await CapacitorApp.addListener('backButton', () => {
+        // 1. Close open modal states first
+        if (fullscreenImage) { setFullscreenImage(null); return; }
+        if (isAddCustomerOpen) { setIsAddCustomerOpen(false); return; }
+        if (isFilterOpen) { setIsFilterOpen(false); return; }
+        if (activeHomeMenuId) { setActiveHomeMenuId(null); return; }
+
+        // 2. Handle View History Stack
+        setViewHistory(prev => {
+          if (prev.length > 1) {
+            const newHistory = [...prev];
+            newHistory.pop(); // Remove current view
+            const prevView = newHistory[newHistory.length - 1];
+            setCurrentView(prevView);
+            return newHistory;
+          } else {
+            // 3. Double-Tap Exit Guard (only if at root/Home page)
+            if (backPressCount === 0) {
+              setBackPressCount(1);
+              const toast = document.createElement('div');
+              toast.innerText = 'Press again to exit';
+              toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg z-[9999] animate-in fade-in';
+              document.body.appendChild(toast);
+              
+              backTimeout = setTimeout(() => {
+                setBackPressCount(0);
+                if (document.body.contains(toast)) document.body.removeChild(toast);
+              }, 2000);
+              return prev;
+            } else {
+              CapacitorApp.exitApp();
+              return prev;
+            }
+          }
+        });
+      });
+    };
+
+    setupListener();
+
+    return () => {
+      if (backListenerHandle) {
+        backListenerHandle.remove();
+      }
+      if (backTimeout) clearTimeout(backTimeout);
+    };
+  }, [fullscreenImage, isAddCustomerOpen, isFilterOpen, activeHomeMenuId, backPressCount]);
+
+  // Real-Time UI Trigger (Forces re-render every minute for accurate elapsed time)
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveHomeMenuId(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const handleScroll = (e) => {
     if (e.target.scrollTop > 50) {
@@ -139,11 +265,11 @@ function App() {
     });
 
     return filtered;
-  }, [activeCategory, activeSort]);
+  }, [activeCategory, activeSort, customers]);
 
   // Aggregate Financials (Dynamic Based on UI Stream)
   const { totalLoan, totalOutstanding } = useMemo(() => {
-    const activeStream = processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled');
+    const activeStream = processedCustomers.filter(c => c.status === 'Approved');
     return activeStream.reduce((acc, curr) => {
       const repay = parseFloat(curr.repayAmount) || 0;
       acc.totalLoan += repay;
@@ -158,6 +284,40 @@ function App() {
     return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
   };
 
+  const formatName = (name) => {
+    if (!name) return '';
+    return name.replace(/^(Mr\.|Mrs\.|Miss)\s*/i, '').trim();
+  };
+
+  const timeAgo = (dateString, updateTimestamp) => {
+    if (!dateString) return '';
+    const now = new Date();
+    const dateToUse = updateTimestamp ? new Date(updateTimestamp) : new Date(dateString);
+    if (isNaN(dateToUse)) return dateString;
+
+    const diffInSeconds = Math.floor((now - dateToUse) / 1000);
+    
+    if (diffInSeconds < 60) return "Just Now";
+    if (diffInSeconds < 3600) {
+      const mins = Math.floor(diffInSeconds / 60);
+      return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+    }
+    if (diffInSeconds < 86400) {
+      const hrs = Math.floor(diffInSeconds / 3600);
+      return `${hrs} hour${hrs !== 1 ? 's' : ''} ago`;
+    }
+    if (diffInSeconds < 2592000) { // < 30 days
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days} day${days !== 1 ? 's' : ''} ago`;
+    }
+    if (diffInSeconds < 31536000) { // < 365 days
+      const months = Math.floor(diffInSeconds / 2592000);
+      return `${months} month${months !== 1 ? 's' : ''} ago`;
+    }
+    const years = Math.floor(diffInSeconds / 31536000);
+    return `${years} year${years !== 1 ? 's' : ''} ago`;
+  };
+
   const renderView = () => {
     switch(currentView) {
       case 'Centers': return <div className="flex-1 overflow-y-auto"><Centers /></div>;
@@ -167,24 +327,58 @@ function App() {
       case 'Customer KYC Update': return <div className="flex-1 overflow-y-auto"><CustomerKYCUpdate /></div>;
       case 'Application Status': 
         return (
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto flex flex-col">
             <ApplicationStatus 
               applications={customers}
-              onUpdateStatus={(id, newStatus) => {
-                setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c));
-              }}
-              onDeleteApp={(id) => {
-                if (window.confirm('Are you sure you want to delete this application?')) {
-                  setCustomers(prev => prev.filter(c => c.id !== id));
+              onUpdateStatus={async (id, newStatus) => {
+                const nowIso = new Date().toISOString();
+                try {
+                  await updateDoc(doc(db, 'customers', id), { status: newStatus, lastUpdated: nowIso });
+                  setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus, lastUpdated: nowIso } : c));
+                } catch(e) {
+                  console.error('Update error', e);
                 }
               }}
-              onUpdateCustomer={(updatedCustomer) => {
-                setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+              onDeleteApp={async (id) => {
+                const nowIso = new Date().toISOString();
+                const c = customers.find(x => x.id === id);
+                try {
+                  await updateDoc(doc(db, 'customers', id), { status: 'Recycled', previousStatus: c?.status || 'Pending', lastUpdated: nowIso });
+                  setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: 'Recycled', previousStatus: c.status, lastUpdated: nowIso } : c));
+                } catch(e) { console.error('Delete error', e); }
+              }}
+              onUpdateCustomer={async (updatedCustomer) => {
+                const nowIso = new Date().toISOString();
+                const toSave = { ...updatedCustomer, lastUpdated: nowIso };
+                try {
+                  await setDoc(doc(db, 'customers', updatedCustomer.id), toSave, { merge: true });
+                  setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? toSave : c));
+                } catch(e) { console.error('Update customer error', e); }
               }}
             />
           </div>
         );
-      case 'Recycle Bin': return <div className="flex-1 overflow-y-auto"><RecycleBin /></div>;
+      case 'Recycle Bin': 
+        return (
+          <div className="flex-1 overflow-y-auto flex flex-col">
+            <RecycleBinView 
+              customers={customers}
+              onRestore={async (id, prevStatus) => {
+                const nowIso = new Date().toISOString();
+                try {
+                  await updateDoc(doc(db, 'customers', id), { status: prevStatus, lastUpdated: nowIso });
+                  setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus, lastUpdated: nowIso } : c));
+                } catch(e) { console.error('Restore error', e); }
+              }}
+              onPermanentDelete={async (id) => {
+                try {
+                  // await deleteDoc(doc(db, 'customers', id));
+                  setCustomers(prev => prev.filter(c => c.id !== id));
+                } catch(e) { console.error('Perm delete error', e); }
+              }}
+            />
+          </div>
+        );
       case 'Change Password':
       case 'Change Phone Number':
         return (
@@ -210,16 +404,34 @@ function App() {
                 <div className="p-2 space-y-2 pb-24">
                   {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').map(customer => (
                     <div key={customer.id} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative">
-                      <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0 flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
                           <img src={customer.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
                         </div>
-                        <div>
-                          <h4 className="font-bold text-slate-800 text-sm leading-tight">{customer.name}</h4>
-                          <p className="text-[11px] font-medium text-slate-500 mt-0.5">{customer.id}</p>
+                        <div className="min-w-0 pr-2">
+                          <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
+                          <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      
+                      {/* Status Badges - Strict Fixed Width Column */}
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                        <div className="flex flex-col items-center justify-center w-6 gap-1">
+                          {customer.status === 'Pending' && (
+                            <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          )}
+                          {customer.status === 'Approved' && (
+                            <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
                         <div className="text-right min-w-[70px]">
                           <div className="text-sm font-bold text-red-600">₹{customer.repayAmount?.toLocaleString('en-IN') || '0'}</div>
                         </div>
@@ -232,8 +444,12 @@ function App() {
                           {activeHomeMenuId === customer.id && (
                             <div className="absolute right-0 top-8 w-32 bg-white rounded-lg shadow-lg border border-slate-100 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                               <button 
-                                onClick={() => {
-                                  setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: 'Recycled' } : c));
+                                onClick={async () => {
+                                  const nowIso = new Date().toISOString();
+                                  try {
+                                    await updateDoc(doc(db, 'customers', customer.id), { status: 'Recycled', previousStatus: customer.status, lastUpdated: nowIso });
+                                    setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: 'Recycled', previousStatus: c.status, lastUpdated: nowIso } : c));
+                                  } catch(e) { console.error('Delete error', e); }
                                   setActiveHomeMenuId(null);
                                 }}
                                 className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
@@ -255,10 +471,38 @@ function App() {
             <div onClick={() => setIsAddCustomerOpen(true)}>
               <FloatingActionButton isScrolled={isScrolled} />
             </div>
+
+            {/* Full-Screen Image Modal Overlay */}
+            {fullscreenImage && (
+              <div 
+                className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 cursor-pointer animate-in fade-in"
+                onClick={() => setFullscreenImage(null)}
+              >
+                <button className="absolute top-6 right-6 text-white bg-black/50 p-2 rounded-full hover:bg-white/20 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <img 
+                  src={fullscreenImage} 
+                  alt="Customer Fullscreen" 
+                  className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95" 
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
           </>
         );
     }
   };
+
+  if (authChecking) {
+    return <div className="h-[100dvh] bg-slate-900 flex items-center justify-center text-white">Authenticating...</div>;
+  }
+
+  if (!user) {
+    return <Login onLoginSuccess={setUser} />;
+  }
 
   if (isDbLoading) {
     return (
@@ -288,7 +532,11 @@ function App() {
 
   return (
     <div className="h-[100dvh] bg-[#f8fafc] flex flex-col overflow-hidden relative">
-      <Header currentView={currentView} setCurrentView={setCurrentView} />
+      {userProfile?.role === 'customer' ? (
+        <CustomerDashboard userProfile={userProfile} customers={customers} />
+      ) : (
+        <>
+          <Header currentView={currentView} setCurrentView={switchTab} />
       
       {renderView()}
 
@@ -359,16 +607,24 @@ function App() {
       {isAddCustomerOpen && (
         <AddCustomerModal 
           onClose={() => setIsAddCustomerOpen(false)} 
-          onAddCustomer={(newCustomer) => {
-            setCustomers(prev => [newCustomer, ...prev]);
+          onAddCustomer={async (newCustomer) => {
+            const nowIso = new Date().toISOString();
+            const customerToSave = { ...newCustomer, lastUpdated: nowIso };
+            try {
+              await setDoc(doc(db, 'customers', customerToSave.id), customerToSave);
+              setCustomers(prev => [customerToSave, ...prev]);
+            } catch(e) {
+              console.error('Error adding customer', e);
+            }
           }}
         />
       )}
 
-      {/* Adjust footer to not overlap with bottom content by rendering it directly in the flex column */}
       <div className="flex-shrink-0 z-40 relative">
-        <Footer currentView={currentView} setCurrentView={setCurrentView} />
+        <Footer currentView={currentView} setCurrentView={switchTab} />
       </div>
+        </>
+      )}
     </div>
   );
 }
