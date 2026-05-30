@@ -118,8 +118,22 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   };
 
   const handleGetLocation = () => {
-    setLocationUrl('https://maps.google.com/?q=10.234,77.432');
-    alert('Location fetched automatically.');
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setLocationUrl(`https://maps.google.com/?q=${latitude},${longitude}`);
+          // alert('Location fetched successfully!');
+        },
+        (error) => {
+          console.error("Error fetching location", error);
+          alert('Failed to fetch location. Please ensure location services are enabled and permission is granted.');
+        },
+        { enableHighAccuracy: true, maximumAge: 0 }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser/device.");
+    }
   };
 
   // ID Selection
