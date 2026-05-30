@@ -178,7 +178,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
     });
   };
 
-  const triggerKycCamera = async (type) => {
+  const triggerKycCamera = async (type, isNominee = false) => {
     try {
       const check = await Camera.checkPermissions();
       if (check.camera !== 'granted') {
@@ -191,11 +191,16 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         source: CameraSource.Camera
       });
       // Store the image path as the file for this type
-      handleKycUpload(type, { name: `Camera_Capture_${Date.now()}.jpg`, url: `data:image/jpeg;base64,${image.base64String}` });
+      if (isNominee) {
+        handleNomineeKycUpload(type, { name: `Camera_Capture_${Date.now()}.jpg`, url: `data:image/jpeg;base64,${image.base64String}` });
+      } else {
+        handleKycUpload(type, { name: `Camera_Capture_${Date.now()}.jpg`, url: `data:image/jpeg;base64,${image.base64String}` });
+      }
     } catch (e) {
       console.error("Camera error", e);
     } finally {
-      setKycUploadTarget(null);
+      if (isNominee) setNomineeKycUploadTarget(null);
+      else setKycUploadTarget(null);
     }
   };
   
