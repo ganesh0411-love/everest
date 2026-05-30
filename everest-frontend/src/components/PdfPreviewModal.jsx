@@ -521,18 +521,18 @@ const PdfPreviewModal = ({ application, onClose }) => {
                       ))}
                     </div>
                   </div>
+                </div>
                 {application?.locationUrl && (
-                  <div className="flex items-center gap-2 mt-4 text-[11px] font-bold">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                  <div className="flex items-center gap-2 mt-4 text-[11px] font-bold w-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                     </svg>
-                    <span className="uppercase w-[80px]">LOCATION URL</span>
-                    <a href={application.locationUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline truncate max-w-[400px]">
+                    <span className="uppercase w-[110px] flex-shrink-0">LOCATION URL</span>
+                    <a href={application.locationUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline break-all flex-1" style={{ wordBreak: 'break-all' }}>
                       {application.locationUrl}
                     </a>
                   </div>
                 )}
-              </div>
             </div>
 
             </div>
