@@ -91,6 +91,45 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [maritalStatus, setMaritalStatus] = useState(initialData?.maritalStatus || 'Married');
   const [nomineeName, setNomineeName] = useState(initialData?.nomineeName || '');
   const [nomineeRelation, setNomineeRelation] = useState(initialData?.nomineeRelation || 'Husband');
+  const [nomineeOccupation, setNomineeOccupation] = useState(initialData?.nomineeOccupation || '');
+  const [nomineeIdsChecked, setNomineeIdsChecked] = useState({
+    aadhaar: initialData?.nomineeIdsChecked?.aadhaar || false,
+    pan: initialData?.nomineeIdsChecked?.pan || false,
+    voter: initialData?.nomineeIdsChecked?.voter || false,
+    smartCard: initialData?.nomineeIdsChecked?.smartCard || false
+  });
+  const [nomineeKycDocs, setNomineeKycDocs] = useState(initialData?.nomineeKycDocs || {});
+  const [nomineeKycUploadTarget, setNomineeKycUploadTarget] = useState(null);
+  const [nomineeAadhaar, setNomineeAadhaar] = useState(initialData?.nomineeAadhaar ? initialData.nomineeAadhaar.split('') : Array(12).fill(''));
+  const handleNomineeAadhaarChange = (index, val) => {
+    if (!/^\d*$/.test(val)) return;
+    const newAadhaar = [...nomineeAadhaar];
+    newAadhaar[index] = val;
+    setNomineeAadhaar(newAadhaar);
+    if (val && index < 11) document.getElementById(`nomineeAadhaar-${index + 1}`)?.focus();
+  };
+  const [nomineePan, setNomineePan] = useState(initialData?.nomineePan || '');
+  const [nomineeVoterId, setNomineeVoterId] = useState(initialData?.nomineeVoterId || '');
+  const [nomineeSmartCard, setNomineeSmartCard] = useState(initialData?.nomineeSmartCard || '');
+
+  const handleNomineeKycUpload = (type, file) => {
+    if (!file) return;
+    setNomineeKycDocs(prev => {
+      const current = prev[type] || [];
+      let url = file.url || file.webPath;
+      if (!url && file instanceof File) url = URL.createObjectURL(file);
+      return { ...prev, [type]: [...current, { name: file.name, url, fileObj: file instanceof File ? file : null }] };
+    });
+  };
+
+  const removeNomineeKycDoc = (type, index) => {
+    setNomineeKycDocs(prev => {
+      const current = prev[type] || [];
+      const updated = [...current];
+      updated.splice(index, 1);
+      return { ...prev, [type]: updated };
+    });
+  };
 
   useEffect(() => {
     if (dob) {
@@ -194,13 +233,13 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
       if (isNominee) {
         handleNomineeKycUpload(type, { name: `Camera_Capture_${Date.now()}.jpg`, url: `data:image/jpeg;base64,${image.base64String}` });
       } else {
-        handleKycUpload(type, { name: `Camera_Capture_${Date.now()}.jpg`, url: `data:image/jpeg;base64,${image.base64String}` });
+        if (isNominee) handleNomineeKycUpload(type, { name: `Camera_Capture_${Date.now()}.jpg`, url: `data:image/jpeg;base64,${image.base64String}` }); else handleKycUpload(type, { name: `Camera_Capture_${Date.now()}.jpg`, url: `data:image/jpeg;base64,${image.base64String}` });
       }
     } catch (e) {
       console.error("Camera error", e);
     } finally {
       if (isNominee) setNomineeKycUploadTarget(null);
-      else setKycUploadTarget(null);
+      else if (isNominee) setNomineeKycUploadTarget(null); else setKycUploadTarget(null);
     }
   };
   
@@ -300,6 +339,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         idsChecked, loanType, tenureVal, tenureUnit, interestPercent,
         nomineeName, nomineeRelation, address, pincode: pincode.join(''),
         aadhaar: aadhaar.join(''), pan, voterId, smartCard, kycDocs: cleanKycDocs(kycDocs), locationUrl
+        ,nomineeOccupation, nomineeIdsChecked, nomineeAadhaar: nomineeAadhaar.join(''), nomineePan, nomineeVoterId, nomineeSmartCard, nomineeKycDocs: cleanKycDocs(nomineeKycDocs)
       };
       
       if (onAddCustomer) {
@@ -331,6 +371,28 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
              uploadKycDocs('pan', 'pan'),
              uploadKycDocs('voter', 'voter_id'),
              uploadKycDocs('smartCard', 'smart_card')
+          ]);
+          const uploadNomineeKycDocs = async (key, prefix) => {
+            if (nomineeKycDocs[key] && nomineeKycDocs[key].length > 0) {
+              const urls = [];
+              for (let i = 0; i < nomineeKycDocs[key].length; i++) {
+                const doc = nomineeKycDocs[key][i];
+                if (doc.fileObj) {
+                  const url = await uploadImageToStorage(doc.fileObj, `customers/${customerId}/nominee_${prefix}_${Date.now()}_${i}`);
+                  urls.push({ name: doc.name, url });
+                } else {
+                  urls.push({ name: doc.name, url: doc.url });
+                }
+              }
+              newCustomer.nomineeKycDocs[key] = urls;
+            }
+          };
+
+          await Promise.all([
+             uploadNomineeKycDocs('aadhaar', 'aadhaar'),
+             uploadNomineeKycDocs('pan', 'pan'),
+             uploadNomineeKycDocs('voter', 'voter_id'),
+             uploadNomineeKycDocs('smartCard', 'smart_card')
           ]);
 
           const { doc, updateDoc } = await import('firebase/firestore');
@@ -649,6 +711,111 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
               </div>
             </div>
           </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Occupation</label>
+                <input type="text" value={nomineeOccupation} onChange={e => setNomineeOccupation(e.target.value)} placeholder="E.g. Teacher, Farmer" className="w-full p-3 border border-slate-200 rounded-xl outline-none bg-white font-medium text-slate-700" />
+              </div>
+              
+              <div className="pt-2 border-t border-slate-200 mt-2">
+                <label className="block text-[11px] font-semibold text-slate-500 mb-2">Nominee ID Proof Verification</label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {Object.keys(nomineeIdsChecked).map((key) => (
+                    <label key={`nominee-${key}`} className="flex items-center gap-1.5 bg-white px-2 py-1.5 rounded-lg border border-slate-200 cursor-pointer">
+                      <input type="checkbox" checked={nomineeIdsChecked[key]} onChange={(e) => setNomineeIdsChecked({...nomineeIdsChecked, [key]: e.target.checked})} className="w-3.5 h-3.5 text-brand-blue rounded" />
+                      <span className="text-[11px] font-medium text-slate-700">
+                        {key === 'aadhaar' ? 'Aadhaar' : key === 'pan' ? 'PAN' : key === 'voter' ? 'Voter ID' : 'Smart Card'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                {nomineeIdsChecked.aadhaar && (
+                  <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-200 mb-3">
+                    <label className="block text-[10px] font-bold text-amber-800 mb-1">AADHAAR CARD</label>
+                    <div className="flex gap-1 flex-wrap mb-2">
+                      {nomineeAadhaar.map((digit, i) => (
+                        <React.Fragment key={`nomineeAadhaar-${i}`}>
+                          <input id={`nomineeAadhaar-${i}`} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleNomineeAadhaarChange(i, e.target.value)} className="w-7 h-9 border border-slate-300 rounded text-center font-bold outline-none focus:border-amber-500 bg-white text-xs" />
+                          {(i === 3 || i === 7) && <span className="flex items-center text-slate-400 px-0.5 text-xs">-</span>}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {(nomineeKycDocs.aadhaar || []).map((doc, idx) => (
+                        <div key={idx} className="relative flex items-center bg-emerald-50 border border-emerald-200 rounded px-2 py-1 shadow-sm">
+                          <span className="text-[10px] font-bold text-emerald-700 truncate max-w-[100px] cursor-pointer hover:underline" onClick={() => setPreviewDoc(doc)}>{doc.name}</span>
+                          <button className="ml-1 text-rose-500 font-bold hover:text-rose-700 text-xs" onClick={() => removeNomineeKycDoc('aadhaar', idx)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="relative inline-block">
+                      <button onClick={() => setNomineeKycUploadTarget('aadhaar')} className="text-[10px] bg-white border border-slate-300 px-2 py-1 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1 hover:bg-slate-50 transition-colors">
+                        Upload
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {nomineeIdsChecked.pan && (
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 mb-3">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">PAN CARD</label>
+                    <input type="text" value={nomineePan} onChange={e => setNomineePan(e.target.value.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} className="w-full p-2 border border-slate-300 rounded outline-none font-bold text-slate-800 uppercase tracking-widest mb-2 bg-white text-xs" />
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {(nomineeKycDocs.pan || []).map((doc, idx) => (
+                        <div key={idx} className="relative flex items-center bg-emerald-50 border border-emerald-200 rounded px-2 py-1 shadow-sm">
+                          <span className="text-[10px] font-bold text-emerald-700 truncate max-w-[100px] cursor-pointer hover:underline" onClick={() => setPreviewDoc(doc)}>{doc.name}</span>
+                          <button className="ml-1 text-rose-500 font-bold hover:text-rose-700 text-xs" onClick={() => removeNomineeKycDoc('pan', idx)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="relative inline-block">
+                      <button onClick={() => setNomineeKycUploadTarget('pan')} className="text-[10px] bg-white border border-slate-300 px-2 py-1 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1 hover:bg-slate-50 transition-colors">
+                        Upload
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {nomineeIdsChecked.voter && (
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 mb-3">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">VOTER ID</label>
+                    <input type="text" value={nomineeVoterId} onChange={e => setNomineeVoterId(e.target.value.toUpperCase())} placeholder="ABC1234567" className="w-full p-2 border border-slate-300 rounded outline-none font-bold text-slate-800 uppercase tracking-widest mb-2 bg-white text-xs" />
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {(nomineeKycDocs.voter || []).map((doc, idx) => (
+                        <div key={idx} className="relative flex items-center bg-emerald-50 border border-emerald-200 rounded px-2 py-1 shadow-sm">
+                          <span className="text-[10px] font-bold text-emerald-700 truncate max-w-[100px] cursor-pointer hover:underline" onClick={() => setPreviewDoc(doc)}>{doc.name}</span>
+                          <button className="ml-1 text-rose-500 font-bold hover:text-rose-700 text-xs" onClick={() => removeNomineeKycDoc('voter', idx)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="relative inline-block">
+                      <button onClick={() => setNomineeKycUploadTarget('voter')} className="text-[10px] bg-white border border-slate-300 px-2 py-1 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1 hover:bg-slate-50 transition-colors">
+                        Upload
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {nomineeIdsChecked.smartCard && (
+                  <div className="bg-white p-3 rounded-xl border border-slate-200">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">SMART CARD</label>
+                    <input type="text" value={nomineeSmartCard} onChange={e => setNomineeSmartCard(e.target.value.toUpperCase())} placeholder="Card Number" className="w-full p-2 border border-slate-300 rounded outline-none font-bold text-slate-800 uppercase tracking-widest mb-2 bg-white text-xs" />
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {(nomineeKycDocs.smartCard || []).map((doc, idx) => (
+                        <div key={idx} className="relative flex items-center bg-emerald-50 border border-emerald-200 rounded px-2 py-1 shadow-sm">
+                          <span className="text-[10px] font-bold text-emerald-700 truncate max-w-[100px] cursor-pointer hover:underline" onClick={() => setPreviewDoc(doc)}>{doc.name}</span>
+                          <button className="ml-1 text-rose-500 font-bold hover:text-rose-700 text-xs" onClick={() => removeNomineeKycDoc('smartCard', idx)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="relative inline-block">
+                      <button onClick={() => setNomineeKycUploadTarget('smartCard')} className="text-[10px] bg-white border border-slate-300 px-2 py-1 rounded font-medium text-slate-700 shadow-sm flex items-center gap-1 hover:bg-slate-50 transition-colors">
+                        Upload
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
         </section>
 
         {/* Section 4: Address & ID */}
@@ -856,6 +1023,34 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
       </div>
 
       {/* KYC Upload Action Sheet */}
+      {nomineeKycUploadTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-end justify-center p-4 animate-in fade-in duration-200" onClick={() => setNomineeKycUploadTarget(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-8 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-100 text-center bg-slate-50">
+              <h3 className="font-bold text-slate-800">Upload Nominee Document</h3>
+              <p className="text-xs text-slate-500 mt-1">Select a method to upload</p>
+            </div>
+            <div className="flex flex-col">
+              <button onClick={() => triggerKycCamera(nomineeKycUploadTarget, true)} className="p-4 flex items-center justify-center gap-3 font-bold text-brand-blue hover:bg-slate-50 border-b border-slate-100 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Open Camera
+              </button>
+              <div className="relative">
+                <input type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => { handleNomineeKycUpload(nomineeKycUploadTarget, e.target.files[0]); setNomineeKycUploadTarget(null); }} />
+                <button className="w-full p-4 flex items-center justify-center gap-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                  Browse Files
+                </button>
+              </div>
+            </div>
+            <div className="p-3 bg-slate-50">
+              <button onClick={() => setNomineeKycUploadTarget(null)} className="w-full p-3 text-center font-bold text-rose-500 rounded-xl hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {kycUploadTarget && (
         <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-end justify-center p-4 animate-in fade-in duration-200" onClick={() => setKycUploadTarget(null)}>
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-8 duration-200" onClick={e => e.stopPropagation()}>
