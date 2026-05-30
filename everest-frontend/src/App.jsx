@@ -18,7 +18,7 @@ import RecycleBinView from './components/RecycleBinView';
 import { App as CapacitorApp } from '@capacitor/app';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, getDocs, setDoc, updateDoc, query, where } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
 import Login from './components/Login';
 import CustomerDashboard from './components/CustomerDashboard';
 
@@ -372,7 +372,7 @@ function App() {
               }}
               onPermanentDelete={async (id) => {
                 try {
-                  // await deleteDoc(doc(db, 'customers', id));
+                  await deleteDoc(doc(db, 'customers', id));
                   setCustomers(prev => prev.filter(c => c.id !== id));
                 } catch(e) { console.error('Perm delete error', e); }
               }}
