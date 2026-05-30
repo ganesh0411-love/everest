@@ -18,7 +18,7 @@ import RecycleBinView from './components/RecycleBinView';
 import { App as CapacitorApp } from '@capacitor/app';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
 import Login from './components/Login';
 import CustomerDashboard from './components/CustomerDashboard';
 
@@ -65,7 +65,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const fetchCustomers = async () => {
+    let unsubscribe = null;
+    
+    const setupRealtimeSync = () => {
       if (!user || !userProfile) {
         setCustomers([]);
         setIsDbLoading(false);
@@ -86,23 +88,32 @@ function App() {
           q = query(collection(db, 'customers'), where('phone', '==', user.phoneNumber));
         }
         
-        const querySnapshot = await getDocs(q);
-        const fetched = [];
-        querySnapshot.forEach((docSnap) => {
-          fetched.push({ ...docSnap.data(), id: docSnap.id });
+        unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const fetched = [];
+          querySnapshot.forEach((docSnap) => {
+            fetched.push({ ...docSnap.data(), id: docSnap.id });
+          });
+          setCustomers(fetched);
+          setIsDbLoading(false);
+        }, (error) => {
+          console.error("Firebase Real-time Sync Error Caught:", error);
+          if (customers.length === 0) setCustomers([]);
+          setIsDbLoading(false);
         });
-        setCustomers(fetched);
       } catch (error) {
         console.error("Firebase Init Error Caught:", error);
         if (customers.length === 0) setCustomers([]);
-      } finally {
         setIsDbLoading(false);
       }
     };
     
     if (!authChecking) {
-      fetchCustomers();
+      setupRealtimeSync();
     }
+    
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [user, userProfile, authChecking]);
 
   useEffect(() => {
