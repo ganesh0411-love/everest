@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import NetBalanceCard from './components/NetBalanceCard';
 import SearchBar from './components/SearchBar';
@@ -124,7 +124,7 @@ function App() {
 
   const [currentView, setCurrentView] = useState('Customer');
   const [viewHistory, setViewHistory] = useState(['Customer']);
-  const [backPressCount, setBackPressCount] = useState(0);
+  const backPressCountRef = useRef(0);
 
   const navigateToView = (newView) => {
     setViewHistory(prev => {
@@ -181,16 +181,23 @@ function App() {
             return newHistory;
           } else {
             // 3. Double-Tap Exit Guard (only if at root/Home page)
-            if (backPressCount === 0) {
-              setBackPressCount(1);
+            if (backPressCountRef.current === 0) {
+              backPressCountRef.current = 1;
               const toast = document.createElement('div');
+              toast.id = 'exit-app-toast';
               toast.innerText = 'Press again to exit';
               toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg z-[9999] animate-in fade-in';
+              
+              // Remove any existing toast just in case
+              const existingToast = document.getElementById('exit-app-toast');
+              if (existingToast) existingToast.remove();
+              
               document.body.appendChild(toast);
               
               backTimeout = setTimeout(() => {
-                setBackPressCount(0);
-                if (document.body.contains(toast)) document.body.removeChild(toast);
+                backPressCountRef.current = 0;
+                const toastToRemove = document.getElementById('exit-app-toast');
+                if (toastToRemove) toastToRemove.remove();
               }, 2000);
               return prev;
             } else {
@@ -209,8 +216,11 @@ function App() {
         backListenerHandle.remove();
       }
       if (backTimeout) clearTimeout(backTimeout);
+      const existingToast = document.getElementById('exit-app-toast');
+      if (existingToast) existingToast.remove();
+      backPressCountRef.current = 0;
     };
-  }, [fullscreenImage, isAddCustomerOpen, isFilterOpen, activeHomeMenuId, backPressCount]);
+  }, [fullscreenImage, isAddCustomerOpen, isFilterOpen, activeHomeMenuId]);
 
   // Real-Time UI Trigger (Forces re-render every minute for accurate elapsed time)
   const [, setTick] = useState(0);
