@@ -81,7 +81,9 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
       
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       
-      const baseName = `Application_${application?.id || 'Form'}`;
+      const today = new Date();
+      const formattedDate = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+      const baseName = `${application?.customerName || 'Customer'} Application Form ${formattedDate}`;
       let fileNameInput = window.prompt("Enter filename to save:", baseName);
       if (fileNameInput === null) {
         setIsGenerating(false);
@@ -175,12 +177,19 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     cloneContainer.appendChild(clone);
     document.body.appendChild(cloneContainer);
     
+    const today = new Date();
+    const formattedDate = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+    const printJobName = `${application?.customerName || 'Customer'} Application Form ${formattedDate}`;
+    
+    const originalTitle = document.title;
+    document.title = printJobName;
+
     // For Native Apps, window.print() is often blocked by the WebView. 
     // We use the @capgo/capacitor-printer plugin's printWebView() to invoke the native print spooler.
     try {
       if (Capacitor.isNativePlatform()) {
         const { Printer } = await import('@capgo/capacitor-printer');
-        await Printer.printWebView({ name: 'EverestCustomer' });
+        await Printer.printWebView({ name: printJobName });
       } else {
         // The webview's native window.print() will instantly format the DOM and open the OS print dialog
         window.print();
@@ -188,6 +197,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     } catch (e) {
       console.error("Print failed:", e);
     } finally {
+      document.title = originalTitle;
       // Android print spooler acts asynchronously and takes time to render the PDF.
       // Since the clone is hidden from the screen via CSS, we can safely leave it in the DOM 
       // for 30 seconds to ensure the print job completes successfully before cleanup.
