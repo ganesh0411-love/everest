@@ -436,6 +436,7 @@ function App() {
                 onFilterClick={openFilter} 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                isFilterActive={activeCategory !== 'All' || activeSort !== 'Recent'}
               />
             </div>
             
