@@ -11,7 +11,7 @@ const SearchBar = ({ onFilterClick }) => {
         </div>
         <input 
           type="text" 
-          placeholder="Search Customer or Supplier" 
+          placeholder="Search Customer" 
           className="flex-1 h-full bg-transparent outline-none text-slate-700 text-sm placeholder-slate-400"
         />
         <button 

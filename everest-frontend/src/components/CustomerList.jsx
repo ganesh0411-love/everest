@@ -21,7 +21,8 @@ const CustomerList = ({ customers, onSubmitApplication, activeBranch }) => {
 
   const filteredCustomers = customers.filter(c => 
     (c.customerName?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (c.customerId?.toString().includes(searchQuery))
+    (c.customerId?.toString().includes(searchQuery)) ||
+    (c.phone?.toString().includes(searchQuery))
   );
 
   return (
@@ -48,7 +49,7 @@ const CustomerList = ({ customers, onSubmitApplication, activeBranch }) => {
       <div className="search-bar-container">
         <input 
           type="text" 
-          placeholder="Search Customer or Supplier" 
+          placeholder="Search Customer" 
           className="search-input"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
