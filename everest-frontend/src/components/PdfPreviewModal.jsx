@@ -439,9 +439,11 @@ const PdfPreviewModal = ({ application, onClose }) => {
                 </div>
 
                 <div className="col-span-3 flex justify-end items-start pr-4">
-                  <div className="w-[160px] h-[190px] rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-md">
-                    <img src={application?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customerName)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
-                  </div>
+                  {application?.image && (
+                    <div className="w-[160px] h-[190px] rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-md">
+                      <img src={application.image} alt="Profile" className="w-full h-full object-cover" />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
