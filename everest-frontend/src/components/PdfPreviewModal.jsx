@@ -119,6 +119,40 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
 
   const handlePrint = async () => {
     if (!componentRef.current || isGenerating) return;
+    
+    // For Web, completely skip html2canvas and base64 parsing which causes the infinite "LOADING" bug
+    if (!Capacitor.isNativePlatform()) {
+      let printStyle = document.getElementById('web-direct-print-style');
+      if (!printStyle) {
+        printStyle = document.createElement('style');
+        printStyle.id = 'web-direct-print-style';
+        printStyle.innerHTML = `
+          @media print {
+            body * { visibility: hidden !important; }
+            #pdf-content-wrapper, #pdf-content-wrapper * { visibility: visible !important; }
+            #pdf-content-wrapper {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 794px !important;
+              height: 1123px !important;
+              transform: scale(1) translate(0, 0) !important;
+              box-shadow: none !important;
+              margin: 0 !important;
+            }
+            .pdf-no-print { display: none !important; }
+            @page { size: A4 portrait; margin: 0; }
+          }
+        `;
+        document.head.appendChild(printStyle);
+      }
+      
+      // The browser's native window.print() will instantly format the DOM and open the print dialog
+      window.print();
+      return;
+    }
+
+    // For Native Android/iOS Mobile Apps, we must generate the image buffer to send to the OS PrintManager
     setIsGenerating(true);
     const originalTransform = componentRef.current.style.transform;
     componentRef.current.style.transform = 'scale(1) translate(0px, 0px)';
@@ -126,57 +160,19 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     try {
       const canvas = await html2canvas(componentRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      const base64Data = imgDataUrl.split(',')[1];
       
-      if (Capacitor.isNativePlatform()) {
-        const base64Data = imgDataUrl.split(',')[1];
-        
-        if (componentRef.current) {
-          componentRef.current.style.transform = originalTransform;
-        }
-        setIsGenerating(false);
-
-        const { Printer } = await import('@capgo/capacitor-printer');
-        await Printer.printBase64({
-          name: 'EverestCustomer',
-          data: base64Data,
-          mimeType: 'image/jpeg'
-        });
-      } else {
-        // Web Platform: use simple window.print()
-        let printContainer = document.getElementById('native-print-container');
-        if (!printContainer) {
-          printContainer = document.createElement('div');
-          printContainer.id = 'native-print-container';
-          document.body.appendChild(printContainer);
-        }
-        printContainer.innerHTML = `<img src="${imgDataUrl}" style="width: 100%; max-width: 210mm;" />`;
-        
-        let printStyle = document.getElementById('native-print-style');
-        if (!printStyle) {
-          printStyle = document.createElement('style');
-          printStyle.id = 'native-print-style';
-          printStyle.innerHTML = `
-            @media print {
-              body > *:not(#native-print-container) { display: none !important; }
-              #native-print-container { display: flex !important; justify-content: center; }
-              @page { size: portrait; margin: 0; }
-            }
-            @media screen {
-              #native-print-container { display: none !important; }
-            }
-          `;
-          document.head.appendChild(printStyle);
-        }
-
-        if (componentRef.current) {
-          componentRef.current.style.transform = originalTransform;
-        }
-        setIsGenerating(false);
-
-        setTimeout(() => {
-          window.print();
-        }, 150);
+      if (componentRef.current) {
+        componentRef.current.style.transform = originalTransform;
       }
+      setIsGenerating(false);
+
+      const { Printer } = await import('@capgo/capacitor-printer');
+      await Printer.printBase64({
+        name: 'EverestCustomer',
+        data: base64Data,
+        mimeType: 'image/jpeg'
+      });
 
     } catch (e) {
       console.error(e);
@@ -291,7 +287,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     <div className={`fixed inset-0 bg-slate-900/90 z-[9999] flex flex-col font-sans no-print animate-in fade-in`}>
       
       {/* Top Utility Banner */}
-      <div className="flex-shrink-0 bg-slate-800 text-white p-3 flex justify-between items-center z-50 shadow-md">
+      <div className="flex-shrink-0 bg-slate-800 text-white p-3 flex justify-between items-center z-50 shadow-md pdf-no-print">
         <button 
           type="button"
           onClick={onClose} 
@@ -333,6 +329,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
         onWheel={handleWheel}
       >
         <div 
+          id="pdf-content-wrapper"
           ref={componentRef}
           className="bg-white shadow-2xl relative overflow-hidden flex-shrink-0 origin-center transition-transform print-target"
           style={{ 
