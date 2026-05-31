@@ -9,6 +9,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [activePdfApp, setActivePdfApp] = useState(null);
+  const [pdfAutoMode, setPdfAutoMode] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
 
   const tabs = [
@@ -196,12 +197,26 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
           >
             <span>📄</span> View PDF
           </button>
-          <button className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50">
-            <span>📥</span> Download
-          </button>
-          <button className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50">
-            <span>🖨️</span> Print PDF
-          </button>
+            <button 
+              onClick={() => {
+                setPdfAutoMode('download');
+                setActivePdfApp(applications.find(a => a.id === activeMenuId));
+                setActiveMenuId(null);
+              }}
+              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+            >
+              <span>📥</span> Download
+            </button>
+            <button 
+              onClick={() => {
+                setPdfAutoMode('print');
+                setActivePdfApp(applications.find(a => a.id === activeMenuId));
+                setActiveMenuId(null);
+              }}
+              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+            >
+              <span>🖨️</span> Print PDF
+            </button>
           <button onClick={() => deleteApp(activeMenuId)} className="w-full text-left px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3">
             <span>🗑️</span> Delete
           </button>
@@ -233,7 +248,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       {activePdfApp && (
         <PdfPreviewModal 
           application={activePdfApp} 
-          onClose={() => setActivePdfApp(null)} 
+          onClose={() => { setActivePdfApp(null); setPdfAutoMode(null); }} 
+          autoMode={pdfAutoMode}
         />
       )}
 

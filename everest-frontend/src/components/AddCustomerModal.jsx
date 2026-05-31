@@ -10,6 +10,7 @@ import { uploadImageToStorage } from '../utils/storageUpload';
 const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [step, setStep] = useState('form'); // 'form', 'confirm', 'success'
   const [showPdf, setShowPdf] = useState(false);
+  const [pdfAutoMode, setPdfAutoMode] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // 1. Initial Registration Data
@@ -470,21 +471,17 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
           </div>
 
           <div className="px-6 pb-6 space-y-3">
-            <div className="flex gap-3">
-              <button onClick={() => setShowPdf(true)} className="flex-1 bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 transition-colors flex justify-center items-center gap-2 shadow-sm">
-                <span>👁️</span> View PDF
+              <div className="flex gap-3">
+                <button onClick={() => { setPdfAutoMode(null); setShowPdf(true); }} className="flex-1 bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 transition-colors flex justify-center items-center gap-2 shadow-sm">
+                  <span>👀</span> View PDF
+                </button>
+                <button onClick={() => { setPdfAutoMode('download'); setShowPdf(true); }} className="flex-1 bg-[#10a37f] text-white font-bold py-3 rounded-xl hover:bg-[#0e906f] transition-colors flex justify-center items-center gap-2 shadow-md shadow-[#10a37f]/30">
+                  <span>📥</span> Download PDF
+                </button>
+              </div>
+              <button onClick={() => { setPdfAutoMode('print'); setShowPdf(true); }} className="w-full bg-[#10a37f] text-white font-bold py-3 rounded-xl hover:bg-[#0e906f] transition-colors flex justify-center items-center gap-2 shadow-md shadow-[#10a37f]/30">
+                <span>🖨️</span> Print PDF
               </button>
-              {/* To trigger download/print directly, we can open the modal and tell the user they can use its buttons, or we just open it.
-                  The prompt says: "Download PDF Button: Must silently execute the PDF rendering engine...". 
-                  Since the engine is inside PdfPreviewModal, the simplest elegant fix is to just show the modal for all 3, but the modal has those buttons.
-                  Wait, I can pass an 'autoAction' prop to PdfPreviewModal, or just show it. Let's just show it. */}
-              <button onClick={() => setShowPdf(true)} className="flex-1 bg-[#10a37f] text-white font-bold py-3 rounded-xl hover:bg-[#0e906f] transition-colors flex justify-center items-center gap-2 shadow-md shadow-[#10a37f]/30">
-                <span>📥</span> Download PDF
-              </button>
-            </div>
-            <button onClick={() => setShowPdf(true)} className="w-full bg-[#10a37f] text-white font-bold py-3 rounded-xl hover:bg-[#0e906f] transition-colors flex justify-center items-center gap-2 shadow-md shadow-[#10a37f]/30">
-              <span>🖨️</span> Print PDF
-            </button>
             <button onClick={onClose} className="w-full bg-white border border-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-50 transition-colors mt-2">
               Done — Back to Home
             </button>
@@ -526,7 +523,8 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
               pan: pan,
               locationUrl: locationUrl
             }}
-            onClose={() => setShowPdf(false)} 
+            onClose={() => { setShowPdf(false); setPdfAutoMode(null); }}
+            autoMode={pdfAutoMode}
           />
         )}
       </div>

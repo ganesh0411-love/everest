@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import logo from '../assets/logo.png';
 
-const PdfPreviewModal = ({ application, onClose }) => {
+const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
   const componentRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -33,13 +33,25 @@ const PdfPreviewModal = ({ application, onClose }) => {
       }
     };
     
-    const timeoutId = setTimeout(calculateScale, 10);
+    calculateScale();
     window.addEventListener('resize', calculateScale);
     return () => {
-      clearTimeout(timeoutId);
       window.removeEventListener('resize', calculateScale);
     };
   }, []);
+
+  // Auto trigger for external buttons
+  useEffect(() => {
+    if (!autoMode) return;
+    const timer = setTimeout(() => {
+      if (autoMode === 'print') {
+        handlePrint().then(() => onClose());
+      } else if (autoMode === 'download') {
+        handleDownload().then(() => onClose());
+      }
+    }, 300); // give it a moment to render the DOM
+    return () => clearTimeout(timer);
+  }, [autoMode]);
 
   const handleDownload = async () => {
     if (!componentRef.current || isGenerating) return;
@@ -268,7 +280,7 @@ const PdfPreviewModal = ({ application, onClose }) => {
   const cyanBlue = '#23b3e3';
 
   return (
-    <div className="fixed inset-0 bg-slate-900/90 z-[9999] flex flex-col font-sans no-print animate-in fade-in">
+    <div className={`fixed inset-0 bg-slate-900/90 z-[9999] flex flex-col font-sans no-print ${autoMode ? 'opacity-0 pointer-events-none' : 'animate-in fade-in'}`}>
       
       {/* Top Utility Banner */}
       <div className="flex-shrink-0 bg-slate-800 text-white p-3 flex justify-between items-center z-50 shadow-md">
