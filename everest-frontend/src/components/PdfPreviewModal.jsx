@@ -157,17 +157,37 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
       `;
       document.head.appendChild(style);
       
-      setTimeout(() => {
-        window.print();
+      await new Promise((resolve) => {
         setTimeout(() => {
-          if (document.getElementById('global-print-overlay')) {
-            document.body.removeChild(printOverlay);
-          }
-          if (document.getElementById('global-print-style')) {
-            document.head.removeChild(style);
-          }
-        }, 2000);
-      }, 150);
+          window.print();
+          
+          let cleanedUp = false;
+          const cleanup = () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
+            if (document.getElementById('global-print-overlay')) {
+              document.body.removeChild(printOverlay);
+            }
+            if (document.getElementById('global-print-style')) {
+              document.head.removeChild(style);
+            }
+            window.removeEventListener('afterprint', cleanup);
+            window.removeEventListener('focus', fallbackCleanup);
+            resolve();
+          };
+
+          const fallbackCleanup = () => {
+            setTimeout(cleanup, 500);
+          };
+
+          window.addEventListener('afterprint', cleanup);
+          window.addEventListener('focus', fallbackCleanup);
+          
+          // Fallback just in case events don't fire
+          setTimeout(cleanup, 60000); // 60 seconds fallback
+          
+        }, 150);
+      });
 
     } catch (e) {
       console.error(e);
