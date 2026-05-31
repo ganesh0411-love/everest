@@ -148,6 +148,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [address, setAddress] = useState(initialData?.address || '');
   const [pincode, setPincode] = useState(initialData?.pincode ? initialData.pincode.split('').slice(0, 6) : Array(6).fill(''));
   const [locationUrl, setLocationUrl] = useState(initialData?.locationUrl || '');
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   
   const handlePincodeChange = (index, val) => {
     if (!/^\d*$/.test(val)) return;
@@ -158,18 +159,21 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   };
 
   const handleGetLocation = async () => {
+    setIsFetchingLocation(true);
     try {
       const permissions = await Geolocation.checkPermissions();
       if (permissions.location !== 'granted' && permissions.location !== 'prompt') {
         const request = await Geolocation.requestPermissions();
         if (request.location !== 'granted') {
           alert('Location permission denied. Cannot fetch accurate location.');
+          setIsFetchingLocation(false);
           return;
         }
       } else if (permissions.location === 'prompt') {
         const request = await Geolocation.requestPermissions();
         if (request.location !== 'granted') {
           alert('Location permission denied. Cannot fetch accurate location.');
+          setIsFetchingLocation(false);
           return;
         }
       }
@@ -178,14 +182,16 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
         maximumAge: 0,
-        timeout: 20000 // Give GPS extra time to acquire precise lock
+        timeout: 30000 // Give GPS extra time (30s) to acquire precise lock
       });
       
       const { latitude, longitude } = position.coords;
       setLocationUrl(`https://maps.google.com/?q=${latitude},${longitude}`);
     } catch (error) {
       console.error("Error fetching location", error);
-      alert('Failed to fetch high-accuracy location. Please ensure device Location/GPS is ON.');
+      alert('Failed to fetch location: ' + error.message + '\n\nTip: Ensure GPS is ON and you have clear sky visibility for a precise lock.');
+    } finally {
+      setIsFetchingLocation(false);
     }
   };
 
@@ -841,7 +847,9 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
               <label className="block text-xs font-semibold text-slate-500 mb-1">Location GPS Coordinates</label>
               <div className="flex gap-2">
                 <input type="text" readOnly value={locationUrl} placeholder="Auto-filled URL" className="flex-1 p-3 border border-slate-200 rounded-xl bg-slate-50 outline-none text-sm text-blue-500" />
-                <button onClick={handleGetLocation} className="bg-blue-100 text-brand-blue px-3 rounded-xl font-semibold text-xs border border-blue-200">Get Location</button>
+                <button onClick={handleGetLocation} disabled={isFetchingLocation} className={`px-3 py-2 rounded-xl font-semibold text-xs border ${isFetchingLocation ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-blue-100 text-brand-blue border-blue-200'}`}>
+                  {isFetchingLocation ? 'Fetching...' : 'Get Location'}
+                </button>
               </div>
             </div>
 
