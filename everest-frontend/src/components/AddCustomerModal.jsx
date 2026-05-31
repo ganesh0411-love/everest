@@ -475,8 +475,8 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
                 <button onClick={() => { setPdfAutoMode(null); setShowPdf(true); }} className="flex-1 bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 transition-colors flex justify-center items-center gap-2 shadow-sm">
                   <span>👀</span> View PDF
                 </button>
-                <button onClick={() => { setPdfAutoMode('download'); setShowPdf(true); }} className="flex-1 bg-[#10a37f] text-white font-bold py-3 rounded-xl hover:bg-[#0e906f] transition-colors flex justify-center items-center gap-2 shadow-md shadow-[#10a37f]/30">
-                  <span>📥</span> Download PDF
+                <button onClick={() => { setPdfAutoMode('share'); setShowPdf(true); }} className="flex-1 bg-[#10a37f] text-white font-bold py-3 rounded-xl hover:bg-[#0e906f] transition-colors flex justify-center items-center gap-2 shadow-md shadow-[#10a37f]/30">
+                  <span>🔗</span> Share
                 </button>
               </div>
               <button onClick={() => { setPdfAutoMode('print'); setShowPdf(true); }} className="w-full bg-[#10a37f] text-white font-bold py-3 rounded-xl hover:bg-[#0e906f] transition-colors flex justify-center items-center gap-2 shadow-md shadow-[#10a37f]/30">

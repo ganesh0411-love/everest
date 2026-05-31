@@ -199,13 +199,13 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
           </button>
             <button 
               onClick={() => {
-                setPdfAutoMode('download');
+                setPdfAutoMode('share');
                 setActivePdfApp(applications.find(a => a.id === activeMenuId));
                 setActiveMenuId(null);
               }}
               className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
             >
-              <span>📥</span> Download
+              <span>🔗</span> Share
             </button>
             <button 
               onClick={() => {
