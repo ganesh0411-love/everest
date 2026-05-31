@@ -487,7 +487,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                         <td className="py-1 text-center">:</td>
                         <td className="py-1 whitespace-nowrap">
                           &nbsp;&nbsp;
-                          <div className="w-[280px] h-[24px] border px-2 inline-flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{occupation}</div>
+                          <div className="min-w-[280px] w-auto min-h-[24px] border px-2 py-0.5 inline-flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{occupation}</div>
                         </td>
                       </tr>
                       <tr>
@@ -495,7 +495,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                         <td className="py-1 text-center">:</td>
                         <td className="py-1 whitespace-nowrap">
                           &nbsp;&nbsp;
-                          <div className="w-36 h-[24px] border px-2 inline-flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{marital}</div>
+                          <div className="min-w-[144px] w-auto min-h-[24px] border px-2 py-0.5 inline-flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{marital}</div>
                         </td>
                       </tr>
                       <tr>
@@ -512,11 +512,11 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                         <td className="py-1 text-center">:</td>
                         <td className="py-1 flex items-center whitespace-nowrap">
                           &nbsp;&nbsp;
-                          <div className="w-[120px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{phone}</div>
-                          <span className="mx-2">Alt Phone Number</span>
+                          <div className="min-w-[120px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{phone}</div>
+                          <span className="mx-2 whitespace-nowrap">Alt Phone Number</span>
                           <span className="mx-1">:</span>
                           &nbsp;&nbsp;
-                          <div className="w-[120px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{altPhone}</div>
+                          <div className="min-w-[120px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{altPhone}</div>
                         </td>
                       </tr>
                     </tbody>
@@ -545,9 +545,9 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
 
               <div className="space-y-4 text-[13px] font-bold" style={{ color: darkBlue }}>
                 <div className="flex items-center gap-6">
-                  <div className="flex items-center"><span className="w-28 uppercase">LOAN AMOUNT</span><div className="w-[100px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{loanAmt}</div></div>
-                  <div className="flex items-center"><span className="w-24 uppercase ml-4">LOAN TYPE</span><div className="w-[100px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{loanType}</div></div>
-                  <div className="flex items-center"><span className="w-20 uppercase ml-4">TENURE</span><div className="w-[80px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{tenure}</div></div>
+                  <div className="flex items-center"><span className="w-28 uppercase whitespace-nowrap">LOAN AMOUNT</span><div className="min-w-[100px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{loanAmt}</div></div>
+                  <div className="flex items-center"><span className="w-24 uppercase ml-4 whitespace-nowrap">LOAN TYPE</span><div className="min-w-[100px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{loanType}</div></div>
+                  <div className="flex items-center"><span className="w-20 uppercase ml-4 whitespace-nowrap">TENURE</span><div className="min-w-[80px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{tenure}</div></div>
                 </div>
                 <div className="flex flex-wrap items-center gap-y-4 gap-x-8 mt-2">
                   {[
@@ -565,7 +565,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                            ))}
                          </div>
                       ) : (
-                         <div className="min-w-[150px] h-[24px] border px-2 flex items-center font-bold text-[13px] uppercase" style={{ borderColor: darkBlue }}>{kyc.value}</div>
+                         <div className="min-w-[150px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] uppercase whitespace-nowrap" style={{ borderColor: darkBlue }}>{kyc.value}</div>
                       )}
                     </div>
                   ))}
@@ -588,18 +588,18 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
 
               <div className="space-y-4 text-[13px] font-bold" style={{ color: darkBlue }}>
                 <div className="flex items-center gap-6 mt-2">
-                  <div className="flex items-center"><span className="w-[150px] uppercase">NOMINEE NAME</span><div className="w-[200px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{nominee}</div></div>
-                  <div className="flex items-center"><span className="w-24 uppercase ml-4">RELATION</span><div className="w-[150px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{relation}</div></div>
+                  <div className="flex items-center"><span className="w-[150px] uppercase whitespace-nowrap">NOMINEE NAME</span><div className="min-w-[200px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{nominee}</div></div>
+                  <div className="flex items-center"><span className="w-24 uppercase ml-4 whitespace-nowrap">RELATION</span><div className="min-w-[150px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{relation}</div></div>
                 </div>
                 
                 <div className="flex items-start mt-4">
-                  <span className="w-[150px] uppercase pt-1">PERMANANT ADDRESS</span>
-                  <div className="flex-1 max-w-[400px] h-[60px] border p-2 font-bold text-xs" style={{ borderColor: darkBlue }}>{address}</div>
+                  <span className="w-[150px] uppercase pt-1 whitespace-nowrap">PERMANANT ADDRESS</span>
+                  <div className="flex-1 max-w-[400px] min-h-[60px] h-auto border p-2 font-bold text-[13px] leading-tight" style={{ borderColor: darkBlue }}>{address}</div>
                 </div>
                 
                 <div className="flex items-center gap-4 mt-4">
-                  <div className="flex items-center"><span className="w-[40px] uppercase">CITY</span><div className="w-[140px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{city}</div></div>
-                  <div className="flex items-center ml-2"><span className="w-[70px] uppercase">DISTRICT</span><div className="w-[140px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{district}</div></div>
+                  <div className="flex items-center"><span className="w-[40px] uppercase whitespace-nowrap">CITY</span><div className="min-w-[140px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{city}</div></div>
+                  <div className="flex items-center ml-2"><span className="w-[70px] uppercase whitespace-nowrap">DISTRICT</span><div className="min-w-[140px] w-auto min-h-[24px] border px-2 py-0.5 flex items-center font-bold text-[13px] whitespace-nowrap" style={{ borderColor: darkBlue }}>{district}</div></div>
                   <div className="flex items-center gap-2 ml-2">
                     <span className="w-8 uppercase">PIN</span>
                     <div className="flex gap-[2px]">
