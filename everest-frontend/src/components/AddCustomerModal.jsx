@@ -181,8 +181,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
       // Use Capacitor Geolocation for direct native Android GPS lock
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 30000 // Give GPS extra time (30s) to acquire precise lock
+        timeout: 10000 // 10s timeout
       });
       
       const { latitude, longitude } = position.coords;
