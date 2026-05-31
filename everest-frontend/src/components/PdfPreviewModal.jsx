@@ -120,92 +120,59 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
   const handlePrint = async () => {
     if (!componentRef.current || isGenerating) return;
     
-    // For Web, completely skip html2canvas and base64 parsing which causes the infinite "LOADING" bug
-    if (!Capacitor.isNativePlatform()) {
-      let printStyle = document.getElementById('web-direct-print-style');
-      if (!printStyle) {
-        printStyle = document.createElement('style');
-        printStyle.id = 'web-direct-print-style';
-        printStyle.innerHTML = `
-          @media print {
-            body > *:not(#print-clone-container) { display: none !important; }
-            #print-clone-container {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 794px !important;
-              height: 1123px !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              background-color: white !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .pdf-no-print { display: none !important; }
-            @page { size: A4 portrait; margin: 0; }
+    // We use the same highly reliable DOM-cloning approach for both Web and Mobile Capacitor webviews.
+    // This entirely avoids html2canvas bugs (which caused the screen zoom-in issue) and layout distortion.
+    let printStyle = document.getElementById('universal-print-style');
+    if (!printStyle) {
+      printStyle = document.createElement('style');
+      printStyle.id = 'universal-print-style';
+      printStyle.innerHTML = `
+        @media print {
+          body > *:not(#print-clone-container) { display: none !important; }
+          #print-clone-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 794px !important;
+            height: 1123px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-        `;
-        document.head.appendChild(printStyle);
-      }
-      
-      const original = document.getElementById('pdf-content-wrapper');
-      if (!original) return;
-      const cloneContainer = document.createElement('div');
-      cloneContainer.id = 'print-clone-container';
-      
-      const clone = original.cloneNode(true);
-      clone.style.transform = 'none';
-      clone.style.position = 'relative';
-      clone.style.left = '0';
-      clone.style.top = '0';
-      clone.style.margin = '0';
-      clone.style.boxShadow = 'none';
-      
-      cloneContainer.appendChild(clone);
-      document.body.appendChild(cloneContainer);
-      
-      // The browser's native window.print() will instantly format the DOM and open the print dialog
-      window.print();
-      
-      // Cleanup after print dialog unblocks
-      setTimeout(() => {
-        if (cloneContainer.parentNode) {
-          cloneContainer.parentNode.removeChild(cloneContainer);
+          .pdf-no-print { display: none !important; }
+          @page { size: A4 portrait; margin: 0; }
         }
-      }, 500);
-      return;
+      `;
+      document.head.appendChild(printStyle);
     }
-
-    // For Native Android/iOS Mobile Apps, we must generate the image buffer to send to the OS PrintManager
-    setIsGenerating(true);
-    const originalTransform = componentRef.current.style.transform;
-    componentRef.current.style.transform = 'scale(1) translate(0px, 0px)';
     
-    try {
-      const canvas = await html2canvas(componentRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const imgDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      const base64Data = imgDataUrl.split(',')[1];
-      
-      if (componentRef.current) {
-        componentRef.current.style.transform = originalTransform;
+    const original = document.getElementById('pdf-content-wrapper');
+    if (!original) return;
+    const cloneContainer = document.createElement('div');
+    cloneContainer.id = 'print-clone-container';
+    
+    const clone = original.cloneNode(true);
+    clone.style.transform = 'none';
+    clone.style.position = 'relative';
+    clone.style.left = '0';
+    clone.style.top = '0';
+    clone.style.margin = '0';
+    clone.style.boxShadow = 'none';
+    
+    cloneContainer.appendChild(clone);
+    document.body.appendChild(cloneContainer);
+    
+    // The webview's native window.print() will instantly format the DOM and open the OS print dialog
+    window.print();
+    
+    // Cleanup after print dialog unblocks
+    setTimeout(() => {
+      if (cloneContainer.parentNode) {
+        cloneContainer.parentNode.removeChild(cloneContainer);
       }
-      setIsGenerating(false);
-
-      const { Printer } = await import('@capgo/capacitor-printer');
-      await Printer.printBase64({
-        name: 'EverestCustomer',
-        data: base64Data,
-        mimeType: 'image/jpeg'
-      });
-
-    } catch (e) {
-      console.error(e);
-      alert("Failed to print.");
-      if (componentRef.current) {
-        componentRef.current.style.transform = originalTransform;
-      }
-      setIsGenerating(false);
-    }
+    }, 500);
   };
 
   // --- Gesture Handlers ---
