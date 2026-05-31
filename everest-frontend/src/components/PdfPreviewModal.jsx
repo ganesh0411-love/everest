@@ -164,15 +164,26 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     cloneContainer.appendChild(clone);
     document.body.appendChild(cloneContainer);
     
-    // The webview's native window.print() will instantly format the DOM and open the OS print dialog
-    window.print();
-    
-    // Cleanup after print dialog unblocks
-    setTimeout(() => {
-      if (cloneContainer.parentNode) {
-        cloneContainer.parentNode.removeChild(cloneContainer);
+    // For Native Apps, window.print() is often blocked by the WebView. 
+    // We use the @capgo/capacitor-printer plugin's printWebView() to invoke the native print spooler.
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const { Printer } = await import('@capgo/capacitor-printer');
+        await Printer.printWebView({ name: 'EverestCustomer' });
+      } else {
+        // The webview's native window.print() will instantly format the DOM and open the OS print dialog
+        window.print();
       }
-    }, 500);
+    } catch (e) {
+      console.error("Print failed:", e);
+    } finally {
+      // Cleanup after print dialog unblocks or completes
+      setTimeout(() => {
+        if (cloneContainer.parentNode) {
+          cloneContainer.parentNode.removeChild(cloneContainer);
+        }
+      }, 1000);
+    }
   };
 
   // --- Gesture Handlers ---
