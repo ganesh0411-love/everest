@@ -128,17 +128,18 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
         printStyle.id = 'web-direct-print-style';
         printStyle.innerHTML = `
           @media print {
-            body * { visibility: hidden !important; }
-            #pdf-content-wrapper, #pdf-content-wrapper * { visibility: visible !important; }
-            #pdf-content-wrapper {
+            body > *:not(#print-clone-container) { display: none !important; }
+            #print-clone-container {
               position: absolute !important;
               left: 0 !important;
               top: 0 !important;
               width: 794px !important;
               height: 1123px !important;
-              transform: scale(1) translate(0, 0) !important;
-              box-shadow: none !important;
               margin: 0 !important;
+              padding: 0 !important;
+              background-color: white !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
             .pdf-no-print { display: none !important; }
             @page { size: A4 portrait; margin: 0; }
@@ -147,8 +148,31 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
         document.head.appendChild(printStyle);
       }
       
+      const original = document.getElementById('pdf-content-wrapper');
+      if (!original) return;
+      const cloneContainer = document.createElement('div');
+      cloneContainer.id = 'print-clone-container';
+      
+      const clone = original.cloneNode(true);
+      clone.style.transform = 'none';
+      clone.style.position = 'relative';
+      clone.style.left = '0';
+      clone.style.top = '0';
+      clone.style.margin = '0';
+      clone.style.boxShadow = 'none';
+      
+      cloneContainer.appendChild(clone);
+      document.body.appendChild(cloneContainer);
+      
       // The browser's native window.print() will instantly format the DOM and open the print dialog
       window.print();
+      
+      // Cleanup after print dialog unblocks
+      setTimeout(() => {
+        if (cloneContainer.parentNode) {
+          cloneContainer.parentNode.removeChild(cloneContainer);
+        }
+      }, 500);
       return;
     }
 
@@ -432,7 +456,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                             &nbsp;&nbsp;
                             <div className="flex gap-[2px]">
                             {dob.split('').map((char, i) => (
-                              <div key={`dob-${i}`} className="w-[18px] h-[22px] border flex items-center justify-center font-bold text-xs" style={{ borderColor: darkBlue }}>{char.trim()}</div>
+                              <div key={`dob-${i}`} className="w-[18px] h-[22px] border flex items-center justify-center font-bold text-xs leading-none pt-[1px]" style={{ borderColor: darkBlue }}>{char.trim()}</div>
                             ))}
                           </div>
                           <span className="ml-4">Age</span>
@@ -519,7 +543,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                       {kyc.isBoxes ? (
                          <div className="flex gap-[2px]">
                            {kyc.value.padEnd(kyc.boxCount, ' ').split('').map((char, i) => (
-                             <div key={i} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-xs" style={{ borderColor: darkBlue }}>{char.trim()}</div>
+                             <div key={i} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-xs leading-none pt-[1px]" style={{ borderColor: darkBlue }}>{char.trim()}</div>
                            ))}
                          </div>
                       ) : (
@@ -562,7 +586,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                     <span className="w-8 uppercase">PIN</span>
                     <div className="flex gap-[2px]">
                       {pin.split('').map((char, i) => (
-                        <div key={`pin-${i}`} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-xs" style={{ borderColor: darkBlue }}>{char.trim()}</div>
+                        <div key={`pin-${i}`} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-xs leading-none pt-[1px]" style={{ borderColor: darkBlue }}>{char.trim()}</div>
                       ))}
                     </div>
                   </div>
