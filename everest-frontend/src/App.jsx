@@ -356,7 +356,7 @@ function App() {
                 const nowIso = new Date().toISOString();
                 try {
                   await updateDoc(doc(db, 'customers', id), { status: newStatus, lastUpdated: nowIso });
-                  setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus, lastUpdated: nowIso } : c));
+                  // setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus, lastUpdated: nowIso } : c));
                 } catch(e) {
                   console.error('Update error', e);
                 }
@@ -366,7 +366,7 @@ function App() {
                 const c = customers.find(x => x.id === id);
                 try {
                   await updateDoc(doc(db, 'customers', id), { status: 'Recycled', previousStatus: c?.status || 'Pending', lastUpdated: nowIso });
-                  setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: 'Recycled', previousStatus: c.status, lastUpdated: nowIso } : c));
+                  // setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: 'Recycled', previousStatus: c.status, lastUpdated: nowIso } : c));
                 } catch(e) { console.error('Delete error', e); }
               }}
               onUpdateCustomer={async (updatedCustomer) => {
@@ -374,7 +374,7 @@ function App() {
                 const toSave = { ...updatedCustomer, lastUpdated: nowIso };
                 try {
                   await setDoc(doc(db, 'customers', updatedCustomer.id), toSave, { merge: true });
-                  setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? toSave : c));
+                  // setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? toSave : c));
                 } catch(e) { console.error('Update customer error', e); }
               }}
             />
@@ -389,13 +389,13 @@ function App() {
                 const nowIso = new Date().toISOString();
                 try {
                   await updateDoc(doc(db, 'customers', id), { status: prevStatus, lastUpdated: nowIso });
-                  setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus, lastUpdated: nowIso } : c));
+                  // setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus, lastUpdated: nowIso } : c));
                 } catch(e) { console.error('Restore error', e); }
               }}
               onPermanentDelete={async (id) => {
                 try {
                   await deleteDoc(doc(db, 'customers', id));
-                  setCustomers(prev => prev.filter(c => c.id !== id));
+                  // setCustomers(prev => prev.filter(c => c.id !== id));
                 } catch(e) { console.error('Perm delete error', e); }
               }}
             />
@@ -474,7 +474,7 @@ function App() {
                                   const nowIso = new Date().toISOString();
                                   try {
                                     await updateDoc(doc(db, 'customers', customer.id), { status: 'Recycled', previousStatus: customer.status, lastUpdated: nowIso });
-                                    setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: 'Recycled', previousStatus: c.status, lastUpdated: nowIso } : c));
+                                    // setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: 'Recycled', previousStatus: c.status, lastUpdated: nowIso } : c));
                                   } catch(e) { console.error('Delete error', e); }
                                   setActiveHomeMenuId(null);
                                 }}
@@ -638,7 +638,7 @@ function App() {
             const customerToSave = { ...newCustomer, lastUpdated: nowIso };
             try {
               await setDoc(doc(db, 'customers', customerToSave.id), customerToSave);
-              setCustomers(prev => [customerToSave, ...prev]);
+              // setCustomers(prev => [customerToSave, ...prev]);
             } catch(e) {
               console.error('Error adding customer', e);
             }
