@@ -114,23 +114,49 @@ const PdfPreviewModal = ({ application, onClose }) => {
       const canvas = await html2canvas(componentRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
       
-      const printWindow = document.createElement('iframe');
-      printWindow.style.position = 'absolute';
-      printWindow.style.top = '-10000px';
-      printWindow.style.border = 'none';
-      printWindow.style.width = '794px';
-      printWindow.style.height = '1123px';
-      document.body.appendChild(printWindow);
+      const printOverlay = document.createElement('div');
+      printOverlay.id = 'global-print-overlay';
+      printOverlay.style.position = 'absolute';
+      printOverlay.style.top = '0';
+      printOverlay.style.left = '0';
+      printOverlay.style.width = '100%';
+      printOverlay.style.zIndex = '999999';
+      printOverlay.style.backgroundColor = '#ffffff';
+      printOverlay.style.display = 'flex';
+      printOverlay.style.justifyContent = 'center';
       
-      const printDoc = printWindow.contentWindow.document;
-      printDoc.write('<html><head><title>Print</title>');
-      printDoc.write('<style>@page { size: A4 portrait; margin: 0; } body { margin: 0; display: flex; justify-content: center; }</style>');
-      printDoc.write('</head><body>');
-      printDoc.write(`<img src="${imgData}" style="width: 100%; height: auto;" onload="window.print();" />`);
-      printDoc.write('</body></html>');
-      printDoc.close();
+      const img = document.createElement('img');
+      img.src = imgData;
+      img.style.width = '100%';
+      img.style.maxWidth = '210mm';
       
-      setTimeout(() => { document.body.removeChild(printWindow); }, 5000);
+      printOverlay.appendChild(img);
+      document.body.appendChild(printOverlay);
+      
+      const style = document.createElement('style');
+      style.id = 'global-print-style';
+      style.innerHTML = `
+        @media print {
+          body > *:not(#global-print-overlay):not(#global-print-style) {
+            display: none !important;
+          }
+          @page { size: portrait; margin: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+      
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          if (document.getElementById('global-print-overlay')) {
+            document.body.removeChild(printOverlay);
+          }
+          if (document.getElementById('global-print-style')) {
+            document.head.removeChild(style);
+          }
+        }, 2000);
+      }, 150);
+
     } catch (e) {
       console.error(e);
       alert("Failed to print.");
