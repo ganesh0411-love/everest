@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { Capacitor } from '@capacitor/core';
 import logo from '../assets/logo.png';
 
 const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
@@ -125,20 +126,57 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     try {
       const canvas = await html2canvas(componentRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      const base64Data = imgDataUrl.split(',')[1];
       
-      // We can restore transform and UI immediately because the native plugin handles the image independently
-      if (componentRef.current) {
-        componentRef.current.style.transform = originalTransform;
-      }
-      setIsGenerating(false);
+      if (Capacitor.isNativePlatform()) {
+        const base64Data = imgDataUrl.split(',')[1];
+        
+        if (componentRef.current) {
+          componentRef.current.style.transform = originalTransform;
+        }
+        setIsGenerating(false);
 
-      const { Printer } = await import('@capgo/capacitor-printer');
-      await Printer.printBase64({
-        name: 'EverestCustomer',
-        data: base64Data,
-        mimeType: 'image/jpeg'
-      });
+        const { Printer } = await import('@capgo/capacitor-printer');
+        await Printer.printBase64({
+          name: 'EverestCustomer',
+          data: base64Data,
+          mimeType: 'image/jpeg'
+        });
+      } else {
+        // Web Platform: use simple window.print()
+        let printContainer = document.getElementById('native-print-container');
+        if (!printContainer) {
+          printContainer = document.createElement('div');
+          printContainer.id = 'native-print-container';
+          document.body.appendChild(printContainer);
+        }
+        printContainer.innerHTML = `<img src="${imgDataUrl}" style="width: 100%; max-width: 210mm;" />`;
+        
+        let printStyle = document.getElementById('native-print-style');
+        if (!printStyle) {
+          printStyle = document.createElement('style');
+          printStyle.id = 'native-print-style';
+          printStyle.innerHTML = `
+            @media print {
+              body > *:not(#native-print-container) { display: none !important; }
+              #native-print-container { display: flex !important; justify-content: center; }
+              @page { size: portrait; margin: 0; }
+            }
+            @media screen {
+              #native-print-container { display: none !important; }
+            }
+          `;
+          document.head.appendChild(printStyle);
+        }
+
+        if (componentRef.current) {
+          componentRef.current.style.transform = originalTransform;
+        }
+        setIsGenerating(false);
+
+        setTimeout(() => {
+          window.print();
+        }, 150);
+      }
 
     } catch (e) {
       console.error(e);
