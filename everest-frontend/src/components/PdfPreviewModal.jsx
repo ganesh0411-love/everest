@@ -47,14 +47,14 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     const timer = setTimeout(() => {
       if (autoMode === 'print') {
         handlePrint(); // DO NOT close automatically to prevent OS print dialog abort
-      } else if (autoMode === 'download') {
-        handleDownload().then(() => onClose());
+      } else if (autoMode === 'share') {
+        handleShare().then(() => onClose());
       }
     }, 300); // give it a moment to render the DOM
     return () => clearTimeout(timer);
   }, [autoMode]);
 
-  const handleDownload = async () => {
+  const handleShare = async () => {
     if (!componentRef.current || isGenerating) return;
     setIsGenerating(true);
     
@@ -84,33 +84,50 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
       const today = new Date();
       const formattedDate = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
       const baseName = `${application?.customerName || 'Customer'} Application Form ${formattedDate}`;
-      let fileNameInput = window.prompt("Enter filename to save:", baseName);
-      if (fileNameInput === null) {
-        setIsGenerating(false);
-        componentRef.current.style.transform = originalTransform;
-        return; // User cancelled
-      }
-      if (!fileNameInput.trim()) fileNameInput = baseName;
-      const filename = `${fileNameInput}.pdf`;
+      const filename = `${baseName}.pdf`;
       
-      // For mobile device compatibility (Capacitor/PWA)
-      if (navigator.share) {
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import('@capacitor/share');
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        
+        // Save PDF to cache directory first so it can be shared via native FileProvider
+        const pdfBase64 = pdf.output('datauristring').split(',')[1];
+        
+        const fileWriteResult = await Filesystem.writeFile({
+          path: filename,
+          data: pdfBase64,
+          directory: Directory.Cache
+        });
+        
+        await Share.share({
+          title: baseName,
+          text: 'Here is the customer application form',
+          url: fileWriteResult.uri,
+          dialogTitle: 'Share Application PDF'
+        });
+      } else {
         const pdfBlob = pdf.output('blob');
         const file = new File([pdfBlob], filename, { type: 'application/pdf' });
-        try {
-          await navigator.share({
-            files: [file],
-            title: 'Application Form',
-          });
-        } catch (e) {
-          pdf.save(filename); // Fallback
+        
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: baseName,
+            });
+          } catch (e) {
+            if (e.name !== 'AbortError') {
+              pdf.save(filename); // Fallback if share fails (but not if user cancelled)
+            }
+          }
+        } else {
+          // Fallback for desktop browsers without Web Share API support
+          pdf.save(filename);
         }
-      } else {
-        pdf.save(filename);
       }
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      console.error('Error sharing PDF:', error);
+      alert('Failed to share PDF. Please try again.');
     } finally {
       if (componentRef.current) {
         componentRef.current.style.transform = originalTransform;
@@ -331,15 +348,15 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
             </svg>
             Print
           </button>
-          <button onClick={handleDownload} disabled={isGenerating} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-emerald-900/20 disabled:opacity-50">
+          <button onClick={handleShare} disabled={isGenerating} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-emerald-900/20 disabled:opacity-50">
             {isGenerating ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
               </svg>
             )}
-            Download
+            Share
           </button>
         </div>
       </div>
