@@ -161,28 +161,45 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const handleGetLocation = async () => {
     setIsFetchingLocation(true);
     try {
-      const permissions = await Geolocation.checkPermissions();
-      if (permissions.location !== 'granted' && permissions.location !== 'prompt') {
-        const request = await Geolocation.requestPermissions();
-        if (request.location !== 'granted') {
-          alert('Location permission denied. Cannot fetch accurate location.');
-          setIsFetchingLocation(false);
-          return;
+      try {
+        const permissions = await Geolocation.checkPermissions();
+        if (permissions.location !== 'granted' && permissions.location !== 'prompt') {
+          const request = await Geolocation.requestPermissions();
+          if (request.location !== 'granted') {
+            alert('Location permission denied. Cannot fetch accurate location.');
+            setIsFetchingLocation(false);
+            return;
+          }
+        } else if (permissions.location === 'prompt') {
+          const request = await Geolocation.requestPermissions();
+          if (request.location !== 'granted') {
+            alert('Location permission denied. Cannot fetch accurate location.');
+            setIsFetchingLocation(false);
+            return;
+          }
         }
-      } else if (permissions.location === 'prompt') {
-        const request = await Geolocation.requestPermissions();
-        if (request.location !== 'granted') {
-          alert('Location permission denied. Cannot fetch accurate location.');
-          setIsFetchingLocation(false);
-          return;
+      } catch (permError) {
+        // Ignore 'Not implemented on web.' error since browsers handle permissions automatically
+        if (permError?.message !== 'Not implemented on web.') {
+          console.warn('Permission check error:', permError);
         }
       }
 
-      // Use Capacitor Geolocation for direct native Android GPS lock
-      const position = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 10000 // 10s timeout
-      });
+      let position;
+      try {
+        // Attempt high accuracy first
+        position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 20000 // Give 20s to find high-accuracy lock
+        });
+      } catch (highAccError) {
+        console.warn('High accuracy location failed, falling back to lower accuracy:', highAccError);
+        // Fallback to lower accuracy if high accuracy times out (especially common on web/desktops)
+        position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 10000 
+        });
+      }
       
       const { latitude, longitude } = position.coords;
       setLocationUrl(`https://maps.google.com/?q=${latitude},${longitude}`);
