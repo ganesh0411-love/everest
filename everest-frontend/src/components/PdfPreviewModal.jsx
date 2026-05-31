@@ -127,9 +127,13 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
       printStyle = document.createElement('style');
       printStyle.id = 'universal-print-style';
       printStyle.innerHTML = `
+        @media screen {
+          #print-clone-container { display: none !important; }
+        }
         @media print {
           body > *:not(#print-clone-container) { display: none !important; }
           #print-clone-container {
+            display: block !important;
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
@@ -150,6 +154,13 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     
     const original = document.getElementById('pdf-content-wrapper');
     if (!original) return;
+    
+    // Remove any previous lingering clones
+    const oldClone = document.getElementById('print-clone-container');
+    if (oldClone && oldClone.parentNode) {
+      oldClone.parentNode.removeChild(oldClone);
+    }
+
     const cloneContainer = document.createElement('div');
     cloneContainer.id = 'print-clone-container';
     
@@ -177,12 +188,14 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     } catch (e) {
       console.error("Print failed:", e);
     } finally {
-      // Cleanup after print dialog unblocks or completes
+      // Android print spooler acts asynchronously and takes time to render the PDF.
+      // Since the clone is hidden from the screen via CSS, we can safely leave it in the DOM 
+      // for 30 seconds to ensure the print job completes successfully before cleanup.
       setTimeout(() => {
         if (cloneContainer.parentNode) {
           cloneContainer.parentNode.removeChild(cloneContainer);
         }
-      }, 1000);
+      }, 30000);
     }
   };
 
