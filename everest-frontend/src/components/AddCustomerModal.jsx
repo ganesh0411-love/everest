@@ -509,7 +509,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
               loanType: loanType,
               tenureVal: tenureVal,
               tenureUnit: tenureUnit,
-              image: photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(customerName)}&background=random`,
+              image: photo,
               center: center,
               city: city,
               district: district,
