@@ -383,15 +383,15 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
         >
           
 
-          {/* Geometric Background Shapes */}
+          {/* Geometric Background Shapes for html2canvas compatibility */}
           {/* Top Right */}
-          <div className="absolute top-0 right-0 w-[200px] h-[200px] z-0" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)', backgroundColor: midBlue }}></div>
-          <div className="absolute top-0 right-0 w-[175px] h-[175px] z-0" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)', backgroundColor: darkBlue, transform: 'translate(20px, -20px)' }}></div>
+          <div className="absolute top-0 right-0 w-0 h-0 z-0" style={{ borderTop: `200px solid ${midBlue}`, borderLeft: '200px solid transparent' }}></div>
+          <div className="absolute top-[-20px] right-[-20px] w-0 h-0 z-0" style={{ borderTop: `175px solid ${darkBlue}`, borderLeft: '175px solid transparent' }}></div>
           <div className="absolute top-0 right-0 w-[250px] h-[75px] z-0" style={{ backgroundColor: cyanBlue, transform: 'rotate(45deg) translate(100px, -125px)' }}></div>
           
           {/* Bottom Left */}
-          <div className="absolute bottom-0 left-0 w-[175px] h-[175px] z-0" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 100%)', backgroundColor: darkBlue }}></div>
-          <div className="absolute bottom-0 left-0 w-[150px] h-[150px] z-0" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 100%)', backgroundColor: midBlue, transform: 'translate(-15px, 15px)' }}></div>
+          <div className="absolute bottom-0 left-0 w-0 h-0 z-0" style={{ borderBottom: `175px solid ${darkBlue}`, borderRight: '175px solid transparent' }}></div>
+          <div className="absolute bottom-[-15px] left-[-15px] w-0 h-0 z-0" style={{ borderBottom: `150px solid ${midBlue}`, borderRight: '150px solid transparent' }}></div>
           <div className="absolute bottom-0 left-0 w-[200px] h-[50px] z-0" style={{ backgroundColor: cyanBlue, transform: 'rotate(45deg) translate(-125px, 75px)' }}></div>
 
           {/* PDF CONTENT BOUNDARY */}
@@ -474,11 +474,11 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                             &nbsp;&nbsp;
                             <div className="flex gap-[2px]">
                             {dob.split('').map((char, i) => (
-                              <div key={`dob-${i}`} className="w-[18px] h-[22px] border flex items-center justify-center font-bold text-xs leading-none pt-[1px]" style={{ borderColor: darkBlue }}>{char.trim()}</div>
+                              <div key={`dob-${i}`} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{char.trim()}</div>
                             ))}
                           </div>
                           <span className="ml-4">Age</span>
-                          <div className="w-12 h-[22px] border px-1 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{age}</div>
+                          <div className="w-12 h-[24px] border px-1 flex items-center justify-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{age}</div>
                         </div>
                         </td>
                       </tr>
@@ -487,7 +487,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                         <td className="py-1 text-center">:</td>
                         <td className="py-1 whitespace-nowrap">
                           &nbsp;&nbsp;
-                          <div className="w-[280px] h-[22px] border px-2 inline-flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{occupation}</div>
+                          <div className="w-[280px] h-[24px] border px-2 inline-flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{occupation}</div>
                         </td>
                       </tr>
                       <tr>
@@ -495,7 +495,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                         <td className="py-1 text-center">:</td>
                         <td className="py-1 whitespace-nowrap">
                           &nbsp;&nbsp;
-                          <div className="w-36 h-[22px] border px-2 inline-flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{marital}</div>
+                          <div className="w-36 h-[24px] border px-2 inline-flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{marital}</div>
                         </td>
                       </tr>
                       <tr>
@@ -512,11 +512,11 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                         <td className="py-1 text-center">:</td>
                         <td className="py-1 flex items-center whitespace-nowrap">
                           &nbsp;&nbsp;
-                          <div className="w-[120px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{phone}</div>
+                          <div className="w-[120px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{phone}</div>
                           <span className="mx-2">Alt Phone Number</span>
                           <span className="mx-1">:</span>
                           &nbsp;&nbsp;
-                          <div className="w-[120px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{altPhone}</div>
+                          <div className="w-[120px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{altPhone}</div>
                         </td>
                       </tr>
                     </tbody>
@@ -545,9 +545,9 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
 
               <div className="space-y-4 text-[13px] font-bold" style={{ color: darkBlue }}>
                 <div className="flex items-center gap-6">
-                  <div className="flex items-center"><span className="w-28 uppercase">LOAN AMOUNT</span><div className="w-[100px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{loanAmt}</div></div>
-                  <div className="flex items-center"><span className="w-24 uppercase ml-4">LOAN TYPE</span><div className="w-[100px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{loanType}</div></div>
-                  <div className="flex items-center"><span className="w-20 uppercase ml-4">TENURE</span><div className="w-[80px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{tenure}</div></div>
+                  <div className="flex items-center"><span className="w-28 uppercase">LOAN AMOUNT</span><div className="w-[100px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{loanAmt}</div></div>
+                  <div className="flex items-center"><span className="w-24 uppercase ml-4">LOAN TYPE</span><div className="w-[100px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{loanType}</div></div>
+                  <div className="flex items-center"><span className="w-20 uppercase ml-4">TENURE</span><div className="w-[80px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{tenure}</div></div>
                 </div>
                 <div className="flex flex-wrap items-center gap-y-4 gap-x-8 mt-2">
                   {[
@@ -561,11 +561,11 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
                       {kyc.isBoxes ? (
                          <div className="flex gap-[2px]">
                            {kyc.value.padEnd(kyc.boxCount, ' ').split('').map((char, i) => (
-                             <div key={i} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-xs leading-none pt-[1px]" style={{ borderColor: darkBlue }}>{char.trim()}</div>
+                             <div key={i} className="w-[18px] h-[24px] border flex items-center justify-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{char.trim()}</div>
                            ))}
                          </div>
                       ) : (
-                         <div className="min-w-[150px] h-[24px] border px-2 flex items-center font-bold text-xs uppercase" style={{ borderColor: darkBlue }}>{kyc.value}</div>
+                         <div className="min-w-[150px] h-[24px] border px-2 flex items-center font-bold text-[13px] uppercase" style={{ borderColor: darkBlue }}>{kyc.value}</div>
                       )}
                     </div>
                   ))}
@@ -588,8 +588,8 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
 
               <div className="space-y-4 text-[13px] font-bold" style={{ color: darkBlue }}>
                 <div className="flex items-center gap-6 mt-2">
-                  <div className="flex items-center"><span className="w-[150px] uppercase">NOMINEE NAME</span><div className="w-[200px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{nominee}</div></div>
-                  <div className="flex items-center"><span className="w-24 uppercase ml-4">RELATION</span><div className="w-[150px] h-[22px] border px-2 flex items-center font-bold text-xs" style={{ borderColor: darkBlue }}>{relation}</div></div>
+                  <div className="flex items-center"><span className="w-[150px] uppercase">NOMINEE NAME</span><div className="w-[200px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{nominee}</div></div>
+                  <div className="flex items-center"><span className="w-24 uppercase ml-4">RELATION</span><div className="w-[150px] h-[24px] border px-2 flex items-center font-bold text-[13px]" style={{ borderColor: darkBlue }}>{relation}</div></div>
                 </div>
                 
                 <div className="flex items-start mt-4">
