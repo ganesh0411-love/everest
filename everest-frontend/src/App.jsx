@@ -295,7 +295,9 @@ function App() {
         case 'Least Amount':
           return a.loanAmount - b.loanAmount;
         case 'By Name':
-          return String(a.name || '').trim().toLowerCase().localeCompare(String(b.name || '').trim().toLowerCase());
+          const cleanNameA = String(a.name || '').replace(/^(Mr|Mrs|Miss|Ms)\.?\s+/i, '').trim().toLowerCase();
+          const cleanNameB = String(b.name || '').replace(/^(Mr|Mrs|Miss|Ms)\.?\s+/i, '').trim().toLowerCase();
+          return cleanNameA.localeCompare(cleanNameB);
         default:
           return 0;
       }
