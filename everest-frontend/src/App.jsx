@@ -261,12 +261,13 @@ function App() {
 
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(c => 
-        (c.name?.toLowerCase().includes(q)) ||
-        (c.appNumber?.toLowerCase().includes(q)) ||
-        (c.phone?.toString().includes(q)) ||
-        (c.id?.toString().includes(q))
-      );
+      filtered = filtered.filter(c => {
+        const nameMatch = String(c.name || '').toLowerCase().includes(q);
+        const appNumMatch = String(c.appNumber || '').toLowerCase().includes(q);
+        const phoneMatch = String(c.phone || '').toLowerCase().includes(q);
+        const idMatch = String(c.id || '').toLowerCase().includes(q);
+        return nameMatch || appNumMatch || phoneMatch || idMatch;
+      });
     }
 
     filtered.sort((a, b) => {
