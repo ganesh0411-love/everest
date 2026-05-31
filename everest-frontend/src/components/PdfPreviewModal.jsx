@@ -125,69 +125,45 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     try {
       const canvas = await html2canvas(componentRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      
-      const printOverlay = document.createElement('div');
-      printOverlay.id = 'global-print-overlay';
-      printOverlay.style.position = 'absolute';
-      printOverlay.style.top = '0';
-      printOverlay.style.left = '0';
-      printOverlay.style.width = '100%';
-      printOverlay.style.zIndex = '999999';
-      printOverlay.style.backgroundColor = '#ffffff';
-      printOverlay.style.display = 'flex';
-      printOverlay.style.justifyContent = 'center';
-      
-      const img = document.createElement('img');
-      img.src = imgData;
-      img.style.width = '100%';
-      img.style.maxWidth = '210mm';
-      
-      printOverlay.appendChild(img);
-      document.body.appendChild(printOverlay);
-      
-      const style = document.createElement('style');
-      style.id = 'global-print-style';
-      style.innerHTML = `
-        @media print {
-          body > *:not(#global-print-overlay):not(#global-print-style) {
-            display: none !important;
-          }
-          @page { size: portrait; margin: 0; }
-        }
-      `;
-      document.head.appendChild(style);
-      
-      await new Promise((resolve) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = '0px';
+        iframe.tabIndex = -1;
+        document.body.appendChild(iframe);
+        
+        const iframeDoc = iframe.contentWindow.document;
+        iframeDoc.open();
+        iframeDoc.write(`
+          <html>
+            <head>
+              <style>
+                @page { size: portrait; margin: 0; }
+                body { margin: 0; padding: 0; text-align: center; background: #fff; }
+                img { width: 100%; max-width: 210mm; }
+              </style>
+            </head>
+            <body>
+              <img src="${imgData}" onload="setTimeout(function() { window.focus(); window.print(); }, 150);" />
+            </body>
+          </html>
+        `);
+        iframeDoc.close();
+        
+        // Wait 2 seconds to allow the print dialog to securely open and take focus.
+        // This prevents React state changes from immediately unmounting components 
+        // and aborting the native OS print spooler.
+        await new Promise(r => setTimeout(r, 2000));
+        
+        // Clean up the iframe after 2 minutes so it never interrupts an active print session
         setTimeout(() => {
-          window.print();
-          
-          let cleanedUp = false;
-          const cleanup = () => {
-            if (cleanedUp) return;
-            cleanedUp = true;
-            if (document.getElementById('global-print-overlay')) {
-              document.body.removeChild(printOverlay);
-            }
-            if (document.getElementById('global-print-style')) {
-              document.head.removeChild(style);
-            }
-            window.removeEventListener('afterprint', cleanup);
-            window.removeEventListener('focus', fallbackCleanup);
-            resolve();
-          };
-
-          const fallbackCleanup = () => {
-            setTimeout(cleanup, 500);
-          };
-
-          window.addEventListener('afterprint', cleanup);
-          window.addEventListener('focus', fallbackCleanup);
-          
-          // Fallback just in case events don't fire
-          setTimeout(cleanup, 60000); // 60 seconds fallback
-          
-        }, 150);
-      });
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 120000);
 
     } catch (e) {
       console.error(e);
