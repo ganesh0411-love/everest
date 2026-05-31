@@ -148,7 +148,8 @@ function App() {
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [activeHomeMenuId, setActiveHomeMenuId] = useState(null);
 
-  // Filter & Sort State
+  // Filter, Sort, and Search State
+  const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeSort, setActiveSort] = useState('Recent');
@@ -258,6 +259,16 @@ function App() {
       filtered = filtered.filter(c => c.category === activeCategory);
     }
 
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(c => 
+        (c.name?.toLowerCase().includes(q)) ||
+        (c.appNumber?.toLowerCase().includes(q)) ||
+        (c.phone?.toString().includes(q)) ||
+        (c.id?.toString().includes(q))
+      );
+    }
+
     filtered.sort((a, b) => {
       switch (activeSort) {
         case 'Recent':
@@ -276,7 +287,7 @@ function App() {
     });
 
     return filtered;
-  }, [activeCategory, activeSort, customers]);
+  }, [activeCategory, activeSort, customers, searchQuery]);
 
   // Aggregate Financials (Dynamic Based on UI Stream)
   const { totalLoan, totalOutstanding } = useMemo(() => {
@@ -404,7 +415,11 @@ function App() {
           <>
             <div className="flex-shrink-0 z-30 bg-[#f8fafc] pb-2">
               <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
-              <SearchBar onFilterClick={openFilter} />
+              <SearchBar 
+                onFilterClick={openFilter} 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
             
             <main 
