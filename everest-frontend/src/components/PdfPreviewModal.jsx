@@ -45,7 +45,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     if (!autoMode) return;
     const timer = setTimeout(() => {
       if (autoMode === 'print') {
-        handlePrint().then(() => onClose());
+        handlePrint(); // DO NOT close automatically to prevent OS print dialog abort
       } else if (autoMode === 'download') {
         handleDownload().then(() => onClose());
       }
@@ -125,50 +125,48 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
     try {
       const canvas = await html2canvas(componentRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.border = '0px';
-        iframe.tabIndex = -1;
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentWindow.document;
-        iframeDoc.open();
-        iframeDoc.write(`
-          <html>
-            <head>
-              <style>
-                @page { size: portrait; margin: 0; }
-                body { margin: 0; padding: 0; text-align: center; background: #fff; }
-                img { width: 100%; max-width: 210mm; }
-              </style>
-            </head>
-            <body>
-              <img src="${imgData}" onload="setTimeout(function() { window.focus(); window.print(); }, 150);" />
-            </body>
-          </html>
-        `);
-        iframeDoc.close();
-        
-        // Wait 2 seconds to allow the print dialog to securely open and take focus.
-        // This prevents React state changes from immediately unmounting components 
-        // and aborting the native OS print spooler.
-        await new Promise(r => setTimeout(r, 2000));
-        
-        // Clean up the iframe after 2 minutes so it never interrupts an active print session
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
+      
+      // We create a persistent print container that is hidden on screen but visible during print
+      let printContainer = document.getElementById('native-print-container');
+      if (!printContainer) {
+        printContainer = document.createElement('div');
+        printContainer.id = 'native-print-container';
+        document.body.appendChild(printContainer);
+      }
+      printContainer.innerHTML = `<img src="${imgData}" style="width: 100%; max-width: 210mm;" />`;
+      
+      let printStyle = document.getElementById('native-print-style');
+      if (!printStyle) {
+        printStyle = document.createElement('style');
+        printStyle.id = 'native-print-style';
+        printStyle.innerHTML = `
+          @media print {
+            body > *:not(#native-print-container) { display: none !important; }
+            #native-print-container { display: flex !important; justify-content: center; }
+            @page { size: portrait; margin: 0; }
           }
-        }, 120000);
+          @media screen {
+            #native-print-container { display: none !important; }
+          }
+        `;
+        document.head.appendChild(printStyle);
+      }
+      
+      // Delay slightly to ensure React rendering is stable and the image is parsed
+      setTimeout(() => {
+        window.print();
+        
+        // Restore transform and UI state immediately. 
+        // The modal stays open to prevent DOM mutation aborting the print dialog.
+        if (componentRef.current) {
+          componentRef.current.style.transform = originalTransform;
+        }
+        setIsGenerating(false);
+      }, 150);
 
     } catch (e) {
       console.error(e);
       alert("Failed to print.");
-    } finally {
       if (componentRef.current) {
         componentRef.current.style.transform = originalTransform;
       }
@@ -276,7 +274,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
   const cyanBlue = '#23b3e3';
 
   return (
-    <div className={`fixed inset-0 bg-slate-900/90 z-[9999] flex flex-col font-sans no-print ${autoMode ? 'opacity-0 pointer-events-none' : 'animate-in fade-in'}`}>
+    <div className={`fixed inset-0 bg-slate-900/90 z-[9999] flex flex-col font-sans no-print animate-in fade-in`}>
       
       {/* Top Utility Banner */}
       <div className="flex-shrink-0 bg-slate-800 text-white p-3 flex justify-between items-center z-50 shadow-md">
