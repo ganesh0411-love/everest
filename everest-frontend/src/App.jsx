@@ -6,6 +6,10 @@ import EmptyState from './components/EmptyState';
 import FloatingActionButton from './components/FloatingActionButton';
 import Footer from './components/Footer';
 import { 
+  CheckCircle2, LayoutGrid, CalendarClock, TrendingUp, 
+  Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownAZ 
+} from 'lucide-react';
+import { 
   Centers, 
   AddBulkCustomer, 
   StaffManagement, 
@@ -291,7 +295,7 @@ function App() {
         case 'Least Amount':
           return a.loanAmount - b.loanAmount;
         case 'By Name':
-          return a.name.localeCompare(b.name);
+          return String(a.name || '').trim().toLowerCase().localeCompare(String(b.name || '').trim().toLowerCase());
         default:
           return 0;
       }
@@ -592,33 +596,57 @@ function App() {
               <div className="mb-6">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">FILTER BY CATEGORY</h4>
                 <div className="flex flex-wrap gap-2">
-                  {['All', 'Settled', 'Due Date', 'Upcoming'].map(cat => (
-                    <button 
-                      key={cat}
-                      onClick={() => setTempCategory(cat)}
-                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors border ${tempCategory === cat ? 'bg-brand-blue text-white border-brand-blue' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
+                  {[
+                    { name: 'All', icon: LayoutGrid, color: 'text-blue-500' },
+                    { name: 'Settled', icon: CheckCircle2, color: 'text-emerald-500' },
+                    { name: 'Due Date', icon: CalendarClock, color: 'text-amber-500' },
+                    { name: 'Upcoming', icon: TrendingUp, color: 'text-purple-500' }
+                  ].map(cat => {
+                    const Icon = cat.icon;
+                    const isActive = tempCategory === cat.name;
+                    return (
+                      <button 
+                        key={cat.name}
+                        onClick={() => setTempCategory(cat.name)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${isActive ? 'bg-brand-blue text-white border-brand-blue shadow-md shadow-blue-500/20' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+                      >
+                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : cat.color}`} />
+                        {cat.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               <div>
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">SORT BY VALUES</h4>
                 <div className="flex flex-col gap-2">
-                  {['Recent', 'Oldest', 'Highest Amount', 'Least Amount', 'By Name'].map(sort => (
-                    <label key={sort} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
-                      <span className="text-sm font-semibold text-slate-700">{sort}</span>
-                      <input 
-                        type="radio" 
-                        name="sort" 
-                        checked={tempSort === sort} 
-                        onChange={() => setTempSort(sort)} 
-                        className="w-4 h-4 text-brand-blue"
-                      />
-                    </label>
-                  ))}
+                  {[
+                    { name: 'Recent', icon: Clock, color: 'text-sky-500' },
+                    { name: 'Oldest', icon: History, color: 'text-slate-500' },
+                    { name: 'Highest Amount', icon: ArrowUpRight, color: 'text-rose-500' },
+                    { name: 'Least Amount', icon: ArrowDownRight, color: 'text-emerald-500' },
+                    { name: 'By Name', icon: ArrowDownAZ, color: 'text-indigo-500' }
+                  ].map(sort => {
+                    const Icon = sort.icon;
+                    return (
+                      <label key={sort.name} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100">
+                            <Icon className={`w-5 h-5 ${sort.color}`} />
+                          </div>
+                          <span className="text-sm font-bold text-slate-700">{sort.name}</span>
+                        </div>
+                        <input 
+                          type="radio" 
+                          name="sort" 
+                          checked={tempSort === sort.name} 
+                          onChange={() => setTempSort(sort.name)} 
+                          className="w-5 h-5 text-brand-blue border-slate-300 focus:ring-brand-blue accent-brand-blue cursor-pointer"
+                        />
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             </div>
