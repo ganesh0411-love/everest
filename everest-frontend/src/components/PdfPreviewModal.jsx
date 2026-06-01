@@ -70,24 +70,18 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
         onclone: (doc) => {
           const boxes = doc.querySelectorAll('.border.items-center');
           boxes.forEach(box => {
-            // 1. Override the broken flexbox layout that html2canvas miscalculates
-            box.style.setProperty('display', 'inline-block', 'important');
-            box.style.setProperty('vertical-align', 'middle', 'important');
-            box.style.setProperty('line-height', 'normal', 'important');
+            // 1. The boxes render too high relative to the semicolons outside.
+            // Force the entire container visually downward by 3 pixels.
+            box.style.setProperty('position', 'relative', 'important');
+            box.style.setProperty('top', '3px', 'important');
             
-            // 2. Physically wrap the text in a span to force a mathematical upward translation
-            if (box.childNodes.length > 0) {
-              const span = doc.createElement('span');
-              span.style.setProperty('position', 'relative', 'important');
-              span.style.setProperty('top', '-3px', 'important'); // Exact upward offset
-              span.style.setProperty('display', 'inline-block', 'important');
-              
-              // Move all original text/content inside the forced translation span
-              while (box.firstChild) {
-                span.appendChild(box.firstChild);
-              }
-              box.appendChild(span);
-            }
+            // 2. The text inside touches the bottom border.
+            // Override flex-center by forcing alignment to the top and padding the bottom,
+            // visually centering the text inside the borders.
+            box.style.setProperty('align-items', 'flex-start', 'important');
+            box.style.setProperty('padding-top', '1px', 'important');
+            box.style.setProperty('padding-bottom', '4px', 'important');
+            box.style.setProperty('line-height', '1', 'important');
           });
         }
       });
