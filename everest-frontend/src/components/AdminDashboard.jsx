@@ -4,17 +4,17 @@ const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "border border-[#d8892f]/40 shadow-[0_0_15px_rgba(216,137,47,0.3)] transition-all duration-300 hover:border-[#d8892f] hover:shadow-[0_0_25px_rgba(216,137,47,0.6)]";
 
   return (
-    <div className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-20 overflow-y-auto">
+    <div className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto">
       {/* Total Collections Progress */}
       <div className={`bg-white rounded-xl p-3 mb-3 ${cardShadowClass}`}>
         <div className="flex justify-between items-center text-[11px] font-bold mb-1">
-          <div className="text-emerald-600 flex items-center gap-1">
+          <div className="text-slate-900 flex items-center gap-1 font-black uppercase text-[10px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-            COLLECTION <span className="text-slate-800 text-sm">₹15,450</span>
+            Collection <span className="text-emerald-600 text-[13px] ml-0.5">₹15,450</span>
           </div>
-          <div className="text-red-500 flex items-center gap-1">
+          <div className="text-slate-900 flex items-center gap-1 font-black uppercase text-[10px]">
             <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
-            TARGET <span className="text-slate-800 text-sm">₹25,000</span>
+            Target <span className="text-red-500 text-[13px] ml-0.5">₹25,000</span>
           </div>
         </div>
         <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
@@ -32,9 +32,15 @@ const AdminDashboard = ({ setCurrentView }) => {
         <div className="flex-1 flex flex-col gap-3">
           {/* 1. Collections Donut Chart (Largest & Tallest) */}
           <div className={`h-48 rounded-xl p-3 flex flex-col items-center justify-between ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #10637c 0%, #0a3d4f 100%)' }}>
-            <h3 className="text-white text-[11px] font-black tracking-wider mb-1 uppercase">Collections</h3>
+            <h3 className="text-white text-sm font-black tracking-wider mb-1 uppercase">Collections</h3>
             <div className="relative w-24 h-24 my-auto">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                <defs>
+                  <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#38bdf8" />
+                    <stop offset="100%" stopColor="#818cf8" />
+                  </linearGradient>
+                </defs>
                 <path
                   className="text-[#d8892f]"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -43,11 +49,10 @@ const AdminDashboard = ({ setCurrentView }) => {
                   strokeWidth="4"
                 />
                 <path
-                  className="text-white"
+                  stroke="url(#arcGradient)"
                   strokeDasharray="65, 100"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
-                  stroke="currentColor"
                   strokeWidth="4"
                 />
               </svg>
@@ -56,24 +61,26 @@ const AdminDashboard = ({ setCurrentView }) => {
                 <span className="text-white font-black text-sm leading-none mt-0.5">65%</span>
               </div>
             </div>
-            <div className="text-center mt-1 w-full">
-              <div className="text-white/70 text-[9px] font-bold">Total: ₹15,450</div>
-              <div className="text-white font-black text-sm">Total: ₹15,450</div>
+            <div className="text-center mt-1 w-full flex flex-col gap-0.5">
+              <div className="text-white font-black text-[10px] uppercase tracking-wide">Collection <span className="text-emerald-400 text-[13px] ml-0.5">₹15,450</span></div>
+              <div className="text-white font-bold text-[9px] uppercase tracking-wide">Target <span className="text-red-400 text-[12px] ml-0.5">₹25,000</span></div>
             </div>
           </div>
 
           {/* 2. Customer Recent List (Smallest) */}
           <button 
             onClick={() => setCurrentView('Customer')}
-            className={`h-24 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center ${cardShadowClass}`}
+            className={`h-24 bg-white rounded-xl p-3 flex items-center gap-3 text-left ${cardShadowClass}`}
           >
-            <div className="p-1.5 bg-slate-50 rounded-full text-[#0369a1] mb-1.5 shadow-sm border border-slate-100">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="p-2 bg-slate-50 rounded-full text-[#0369a1] shadow-sm border border-slate-100 shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
             </div>
-            <div className="font-black text-slate-800 text-[10px] tracking-wider uppercase">CUSTOMER</div>
-            <div className="text-slate-500 text-[8px] font-bold">(Recent the List)</div>
+            <div className="flex flex-col justify-center">
+              <div className="font-black text-slate-800 text-sm tracking-wider uppercase mb-0.5">CUSTOMER</div>
+              <div className="text-slate-600 text-[10px] font-bold">Recent the List</div>
+            </div>
           </button>
         </div>
 
@@ -81,23 +88,23 @@ const AdminDashboard = ({ setCurrentView }) => {
         <div className="flex-1 flex flex-col gap-3">
           {/* 3. Centers Overview (Medium-Large) */}
           <div className={`h-40 bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
-            <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase text-center mb-1">Centers Overview</h3>
+            <h3 className="font-black text-slate-800 text-sm tracking-wider uppercase text-center mb-1">Centers Overview</h3>
             <div className="text-center my-auto">
-              <div className="text-[#d8892f] text-2xl font-black leading-none">33</div>
-              <div className="text-slate-500 text-[9px] font-bold mt-1">All Centers</div>
+              <div className="text-[#d8892f] text-3xl font-black leading-none">33</div>
+              <div className="text-slate-800 text-[10px] font-black mt-1 uppercase tracking-wide">All Centers</div>
             </div>
             <div className="flex justify-between border-b border-slate-100 pb-1.5 mb-1.5 mt-auto">
               <div className="text-center w-1/2">
-                <div className="flex items-center justify-center gap-1 text-[9px] font-black">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ACTIVE
+                <div className="flex items-center justify-center gap-1 text-[10px] font-black text-slate-800">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ACTIVE <span className="text-emerald-600 ml-0.5">20</span>
                 </div>
-                <div className="text-[8px] text-slate-500 font-bold leading-tight">Centers Status</div>
+                <div className="text-[9px] text-slate-600 font-bold leading-tight mt-0.5">Current Status</div>
               </div>
               <div className="text-center w-1/2 border-l border-slate-100">
-                <div className="flex items-center justify-center gap-1 text-[9px] font-black">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> CLOSED
+                <div className="flex items-center justify-center gap-1 text-[10px] font-black text-slate-800">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> CLOSED <span className="text-red-500 ml-0.5">13</span>
                 </div>
-                <div className="text-[8px] text-slate-500 font-bold leading-tight">Centers Status</div>
+                <div className="text-[9px] text-slate-600 font-bold leading-tight mt-0.5">Current Status</div>
               </div>
             </div>
             <div className="flex justify-between text-[9px] font-black uppercase">
@@ -107,24 +114,23 @@ const AdminDashboard = ({ setCurrentView }) => {
           </div>
 
           {/* 4. EMI Calculator (Medium-Small) */}
-          <div className={`h-32 bg-white rounded-xl p-3 flex flex-col justify-center relative overflow-hidden ${cardShadowClass}`}>
-            <h3 className="font-black text-slate-800 text-[11px] tracking-wider uppercase mb-1">EMI Calculator</h3>
-            <div className="text-slate-500 text-[9px] font-bold mb-2">Calculate Your Loan EMI</div>
-            <div className="flex items-center justify-between mt-auto">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-[#0369a1]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="2" y1="10" x2="22" y2="10"></line>
-                <circle cx="8" cy="15" r="1.5"></circle>
-                <circle cx="12" cy="15" r="1.5"></circle>
-                <circle cx="16" cy="15" r="1.5"></circle>
-                <circle cx="8" cy="19" r="1.5"></circle>
-                <circle cx="12" cy="19" r="1.5"></circle>
-                <circle cx="16" cy="19" r="1.5"></circle>
-              </svg>
-              <span className="text-slate-400 font-bold text-sm">&gt;</span>
+          <div className={`h-24 bg-white rounded-xl p-3 flex items-center justify-between relative overflow-hidden ${cardShadowClass}`}>
+            <div className="flex flex-col justify-center">
+              <h3 className="font-black text-slate-800 text-sm tracking-wider uppercase mb-0.5">EMI Calculator</h3>
+              <div className="text-slate-600 text-[10px] font-bold">Calculate Your Loan EMI</div>
             </div>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-[#0369a1] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="2" y1="10" x2="22" y2="10"></line>
+              <circle cx="8" cy="15" r="1.5"></circle>
+              <circle cx="12" cy="15" r="1.5"></circle>
+              <circle cx="16" cy="15" r="1.5"></circle>
+              <circle cx="8" cy="19" r="1.5"></circle>
+              <circle cx="12" cy="19" r="1.5"></circle>
+              <circle cx="16" cy="19" r="1.5"></circle>
+            </svg>
           </div>
         </div>
       </div>
