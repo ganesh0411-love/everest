@@ -66,7 +66,18 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        onclone: (doc) => {
+          const boxes = doc.querySelectorAll('.border.items-center');
+          boxes.forEach(box => {
+            // Force flex-start to snap content to the top border, then explicitly push down.
+            // This completely defeats the html2canvas broken 'center' layout calculation.
+            box.style.setProperty('align-items', 'flex-start', 'important');
+            box.style.setProperty('padding-top', '3px', 'important');
+            box.style.setProperty('padding-bottom', '0px', 'important');
+            box.style.setProperty('line-height', '1', 'important');
+          });
+        }
       });
       
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
