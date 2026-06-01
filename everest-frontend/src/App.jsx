@@ -216,29 +216,35 @@ function App() {
             setCurrentView(prevView);
             return newHistory;
           } else {
-            // 3. Double-Tap Exit Guard (only if at root/Home page)
-            if (backPressCountRef.current === 0) {
-              backPressCountRef.current = 1;
-              const toast = document.createElement('div');
-              toast.id = 'exit-app-toast';
-              toast.innerText = 'Press again to exit';
-              toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg z-[9999] animate-in fade-in';
-              
-              // Remove any existing toast just in case
-              const existingToast = document.getElementById('exit-app-toast');
-              if (existingToast) existingToast.remove();
-              
-              document.body.appendChild(toast);
-              
-              backTimeout = setTimeout(() => {
-                backPressCountRef.current = 0;
-                const toastToRemove = document.getElementById('exit-app-toast');
-                if (toastToRemove) toastToRemove.remove();
-              }, 2000);
-              return prev;
+            const activeView = prev[0];
+            if (activeView === 'Home') {
+              // 3. Double-Tap Exit Guard (strictly restricted to root/Home page)
+              if (backPressCountRef.current === 0) {
+                backPressCountRef.current = 1;
+                const toast = document.createElement('div');
+                toast.id = 'exit-app-toast';
+                toast.innerText = 'Press again to exit';
+                toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg z-[9999] animate-in fade-in';
+                
+                const existingToast = document.getElementById('exit-app-toast');
+                if (existingToast) existingToast.remove();
+                
+                document.body.appendChild(toast);
+                
+                backTimeout = setTimeout(() => {
+                  backPressCountRef.current = 0;
+                  const toastToRemove = document.getElementById('exit-app-toast');
+                  if (toastToRemove) toastToRemove.remove();
+                }, 2000);
+                return prev;
+              } else {
+                CapacitorApp.exitApp();
+                return prev;
+              }
             } else {
-              CapacitorApp.exitApp();
-              return prev;
+              // If not on Home but history is at root, smoothly navigate back to Home
+              setCurrentView('Home');
+              return ['Home'];
             }
           }
         });

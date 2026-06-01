@@ -57,7 +57,7 @@ const Header = ({ currentView, setCurrentView }) => {
               <span className="text-emerald-600 text-[10px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
             </div>
           ) : (currentView === 'Customer') ? (
-            <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[22px] font-black text-slate-900 tracking-wider leading-tight mt-1 whitespace-nowrap" style={{ fontFamily: 'Georgia, serif' }}>
+            <h1 className="text-[22px] font-black text-slate-900 tracking-wider leading-tight mt-1 whitespace-nowrap" style={{ fontFamily: 'Georgia, serif' }}>
               CUSTOMER LIST
             </h1>
           ) : (
