@@ -3,7 +3,7 @@ import React from 'react';
 const NetBalanceCard = ({ loanAmount = 0, outstanding = 0 }) => {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 mt-2">
-      <div className="bg-white rounded-xl border border-[#1ca3a6]/40 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border-2 border-[#1ca3a6] shadow-sm overflow-hidden">
         <div className="px-4 pt-2 pb-1 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Balance:</span>
@@ -21,7 +21,7 @@ const NetBalanceCard = ({ loanAmount = 0, outstanding = 0 }) => {
             </div>
           </div>
           
-          <div className="w-px bg-slate-200 mx-2"></div>
+          <div className="w-[1.5px] bg-slate-300 mx-2 self-stretch my-1 rounded-full"></div>
           
           <div className="flex-1 pl-4 flex flex-col items-end">
             <div className="text-[10px] font-bold text-slate-500 tracking-wider mb-0.5 text-right">OUTSTANDING</div>

@@ -483,6 +483,9 @@ function App() {
             >
               {processedCustomers.filter(c => c.status !== 'Rejected').length > 0 ? (
                 <div className="p-2 space-y-2 pb-24">
+                  <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider">
+                    Entries: {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').length}
+                  </div>
                   {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').map(customer => (
                     <div key={customer.id} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card">
                       <div className="flex-1 min-w-0 flex items-center gap-3">

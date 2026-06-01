@@ -94,7 +94,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
           <table className="w-full text-left whitespace-nowrap table-fixed">
             <thead className="text-[10px] font-bold text-black uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="p-2 w-12 text-center">SI NO</th>
+                <th className="p-2 w-12 text-center">S.no</th>
                 <th className="p-2 w-24">Apply Date</th>
                 <th className="p-2 text-left truncate">CUSTOMER</th>
                 <th className="p-2 w-16 text-center">ACTIONS</th>

@@ -48,17 +48,17 @@ const Header = ({ currentView, setCurrentView }) => {
   ];
 
   return (
-    <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto bg-[#eaf5f4] ${(currentView === 'Application Status' || currentView === 'Home' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'}`}>
-      <div className={`flex justify-between ${(currentView === 'Home' || currentView === 'Customer') ? 'items-end pb-1' : 'items-start'}`}>
+    <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto bg-[#eaf5f4] ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'}`}>
+      <div className={`flex justify-between relative ${(currentView === 'Customer') ? 'items-center pb-1' : 'items-start'}`}>
         <div className="flex items-center gap-2">
           {currentView === 'Application Status' ? (
-            <div className="flex flex-col -mt-0.5">
-              <span className="font-bold text-[23px] text-slate-900 leading-tight">Application Status</span>
-              <span className="text-emerald-600 text-xs font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
+            <div className="flex flex-col mt-1">
+              <span className="font-black text-[21px] text-slate-900 leading-tight tracking-wider">APPLICATION STATUS</span>
+              <span className="text-emerald-600 text-[10px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
             </div>
-          ) : (currentView === 'Home' || currentView === 'Customer') ? (
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight mb-0.5" style={{ fontFamily: 'Georgia, serif' }}>
-              Customer List
+          ) : (currentView === 'Customer') ? (
+            <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[22px] font-black text-slate-900 tracking-wider leading-tight mt-1 whitespace-nowrap" style={{ fontFamily: 'Georgia, serif' }}>
+              CUSTOMER LIST
             </h1>
           ) : (
             <>
@@ -143,7 +143,7 @@ const Header = ({ currentView, setCurrentView }) => {
           )}
         </div>
       </div>
-      {(currentView !== 'Application Status' && currentView !== 'Home' && currentView !== 'Customer') && (
+      {(currentView !== 'Application Status' && currentView !== 'Customer') && (
         <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight -mt-2 ml-11" style={{ fontFamily: 'Georgia, serif' }}>
           Everest Micro<span style={{ fontSize: '21px' }}>Finance</span>
         </h1>
