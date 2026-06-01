@@ -72,13 +72,28 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
           boxes.forEach(box => {
             // 1. Pull the entire box downward by an exact margin/offset to align parallel with semicolons
             box.style.setProperty('position', 'relative', 'important');
-            box.style.setProperty('top', '4px', 'important'); // Increased downward pull
+            box.style.setProperty('top', '4px', 'important'); 
             
             // 2. Physically push the text font further upward inside the boxes to center it
             box.style.setProperty('align-items', 'flex-start', 'important');
-            box.style.setProperty('padding-top', '0px', 'important'); // No top padding
-            box.style.setProperty('padding-bottom', '6px', 'important'); // Pushes the bottom border further down, centering text
+            box.style.setProperty('padding-top', '0px', 'important'); 
+            box.style.setProperty('padding-bottom', '6px', 'important'); 
             box.style.setProperty('line-height', '1', 'important');
+          });
+
+          // 3. Specific fix for CENTER: ANNA NAGAR box (push text upward)
+          const centerBox = doc.querySelector('.text-white.rounded-full.tracking-widest');
+          if (centerBox) {
+            centerBox.style.setProperty('display', 'inline-block', 'important');
+            centerBox.style.setProperty('padding-top', '0px', 'important');
+            centerBox.style.setProperty('padding-bottom', '6px', 'important');
+          }
+
+          // 4. Specific fix for the checkmarks inside 'new' and 'existing' (push tick upward inside the box)
+          const checkmarks = doc.querySelectorAll('.text-emerald-600.border');
+          checkmarks.forEach(check => {
+            check.style.setProperty('padding-bottom', '12px', 'important'); // Aggressively pushes the tick upward
+            check.style.setProperty('line-height', '8px', 'important');
           });
         }
       });
