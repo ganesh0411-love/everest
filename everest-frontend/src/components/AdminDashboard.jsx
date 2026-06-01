@@ -95,14 +95,14 @@ const AdminDashboard = ({ setCurrentView }) => {
             </div>
             <div className="flex justify-between border-b border-slate-100 pb-1.5 mb-1.5 mt-auto">
               <div className="text-center w-1/2">
-                <div className="flex items-center justify-center gap-1 text-[10px] font-black text-slate-800">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ACTIVE <span className="text-emerald-600 ml-0.5">20</span>
+                <div className="flex items-center justify-center gap-1 text-[10px] font-black text-slate-800 pr-2">
+                  ACTIVE <span className="text-emerald-600 ml-0.5">20</span>
                 </div>
-                <div className="text-[9px] text-slate-600 font-bold leading-tight mt-0.5">Current Status</div>
+                <div className="text-[9px] text-slate-600 font-bold leading-tight mt-0.5 pr-2">Current Status</div>
               </div>
               <div className="text-center w-1/2 border-l border-slate-100">
                 <div className="flex items-center justify-center gap-1 text-[10px] font-black text-slate-800">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> CLOSED <span className="text-red-500 ml-0.5">13</span>
+                  CLOSED <span className="text-red-500 ml-0.5">13</span>
                 </div>
                 <div className="text-[9px] text-slate-600 font-bold leading-tight mt-0.5">Current Status</div>
               </div>
@@ -154,7 +154,7 @@ const AdminDashboard = ({ setCurrentView }) => {
           </div>
           
           {/* SVG Chart: Two Solid Bars Per Month */}
-          <div className="h-24 w-full relative mt-auto border-l border-b border-white/20 pl-6 pb-2 flex items-end justify-between pr-2">
+          <div className="h-24 w-full relative mt-auto border-b border-white/20 pl-6 pb-2 flex items-end justify-between pr-2">
              {/* Y-Axis Labels - Made 100% visible */}
              <div className="absolute left-0 top-0 bottom-2 flex flex-col justify-between text-[7px] font-bold text-white/90 h-full">
                <span>1000</span>
