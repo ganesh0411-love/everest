@@ -48,26 +48,26 @@ const Header = ({ currentView, setCurrentView }) => {
   ];
 
   return (
-    <header className="w-full bg-white px-4 pt-2 pb-1 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto">
-      <div className="flex justify-between items-start mb-1">
+    <header className="w-full px-4 pt-2 pb-1.5 shadow-md relative z-50 flex flex-col max-w-4xl mx-auto" style={{ background: 'linear-gradient(90deg, #10637c 0%, #0a3d4f 100%)' }}>
+      <div className="flex justify-between items-start">
         <div className="flex items-center gap-2">
           <img 
             src={logo} 
             alt="Everest Logo" 
-            className="w-10 h-10 object-contain magic-crop mix-blend-multiply" 
+            className="w-9 h-9 object-contain magic-crop brightness-0 invert" 
           />
           <div className="relative">
-            <select className="appearance-none bg-transparent font-bold text-lg text-slate-800 pr-4 outline-none cursor-pointer">
-              <option value="main">Main Branch</option>
-              <option value="add">Add Branch</option>
+            <select className="appearance-none bg-transparent font-bold text-lg text-white pr-4 outline-none cursor-pointer">
+              <option value="main" className="text-slate-800">Main Branch</option>
+              <option value="add" className="text-slate-800">Add Branch</option>
             </select>
-            <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 text-xs">▼</span>
+            <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-white/70 text-xs">▼</span>
           </div>
         </div>
         <div className="flex flex-col items-end relative" ref={menuRef}>
-          <span className="text-emerald-500 font-bold tracking-widest text-xs mb-1 drop-shadow-sm">ADMIN</span>
+          <span className="text-emerald-400 font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
           <button 
-            className="p-1 text-slate-500 hover:text-slate-700 transition-colors"
+            className="p-1 text-white/80 hover:text-white transition-colors"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -134,7 +134,7 @@ const Header = ({ currentView, setCurrentView }) => {
           )}
         </div>
       </div>
-      <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-tight -mt-1">
+      <h1 className="text-2xl font-black text-white tracking-tight leading-tight -mt-1 ml-11">
         Everest Micro Finance
       </h1>
     </header>
