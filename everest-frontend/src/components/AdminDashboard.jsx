@@ -1,7 +1,7 @@
 import React from 'react';
 
 const AdminDashboard = ({ setCurrentView }) => {
-  const cardShadowClass = "shadow-[0_0_15px_rgba(216,137,47,0.25)] transition-shadow duration-300 hover:shadow-[0_0_25px_rgba(216,137,47,0.5)]";
+  const cardShadowClass = "border border-[#d8892f]/40 shadow-[0_0_15px_rgba(216,137,47,0.3)] transition-all duration-300 hover:border-[#d8892f] hover:shadow-[0_0_25px_rgba(216,137,47,0.6)]";
 
   return (
     <div className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-20 overflow-y-auto">
@@ -10,7 +10,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       </h2>
 
       {/* Total Collections Progress */}
-      <div className={`bg-white rounded-xl border border-slate-100 p-3 mb-3 ${cardShadowClass}`}>
+      <div className={`bg-white rounded-xl p-3 mb-3 ${cardShadowClass}`}>
         <div className="flex justify-between items-center text-[11px] font-bold mb-1">
           <div className="text-emerald-600 flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
@@ -31,7 +31,7 @@ const AdminDashboard = ({ setCurrentView }) => {
         {/* Left Column */}
         <div className="flex-1 flex flex-col gap-3">
           {/* 1. Collections Donut Chart (Largest & Tallest) */}
-          <div className={`h-48 rounded-xl p-3 flex flex-col items-center justify-between border border-[#0a3d4f]/20 ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)' }}>
+          <div className={`h-48 rounded-xl p-3 flex flex-col items-center justify-between ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #10637c 0%, #0a3d4f 100%)' }}>
             <h3 className="text-white text-[11px] font-black tracking-wider mb-1 uppercase">Collections</h3>
             <div className="relative w-24 h-24 my-auto">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
@@ -65,7 +65,7 @@ const AdminDashboard = ({ setCurrentView }) => {
           {/* 2. Customer Recent List (Smallest) */}
           <button 
             onClick={() => setCurrentView('Customer')}
-            className={`h-24 bg-white rounded-xl border border-slate-100 p-2 flex flex-col items-center justify-center text-center ${cardShadowClass}`}
+            className={`h-24 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center ${cardShadowClass}`}
           >
             <div className="p-1.5 bg-slate-50 rounded-full text-[#0369a1] mb-1.5 shadow-sm border border-slate-100">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -80,7 +80,7 @@ const AdminDashboard = ({ setCurrentView }) => {
         {/* Right Column */}
         <div className="flex-1 flex flex-col gap-3">
           {/* 3. Centers Overview (Medium-Large) */}
-          <div className={`h-40 bg-white rounded-xl border border-slate-100 p-3 flex flex-col justify-between ${cardShadowClass}`}>
+          <div className={`h-40 bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
             <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase text-center mb-1">Centers Overview</h3>
             <div className="text-center my-auto">
               <div className="text-[#d8892f] text-2xl font-black leading-none">33</div>
@@ -107,7 +107,7 @@ const AdminDashboard = ({ setCurrentView }) => {
           </div>
 
           {/* 4. EMI Calculator (Medium-Small) */}
-          <div className={`h-32 bg-white rounded-xl border-b-2 border-[#d8892f]/30 p-3 flex flex-col justify-center relative overflow-hidden ${cardShadowClass}`}>
+          <div className={`h-32 bg-white rounded-xl p-3 flex flex-col justify-center relative overflow-hidden ${cardShadowClass}`}>
             <h3 className="font-black text-slate-800 text-[11px] tracking-wider uppercase mb-1">EMI Calculator</h3>
             <div className="text-slate-500 text-[9px] font-bold mb-2">Calculate Your Loan EMI</div>
             <div className="flex items-center justify-between mt-auto">
@@ -130,7 +130,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       </div>
 
       {/* Business Overview & Analytics */}
-      <div className={`rounded-xl mb-3 flex overflow-hidden border border-[#0a3d4f]/20 ${cardShadowClass}`} style={{ background: 'linear-gradient(90deg, #0ea5e9 0%, #0369a1 100%)' }}>
+      <div className={`rounded-xl mb-3 flex overflow-hidden ${cardShadowClass}`} style={{ background: 'linear-gradient(90deg, #10637c 0%, #0a3d4f 100%)' }}>
         <div className="w-[75%] p-3 pr-2 flex flex-col relative">
           <h3 className="text-white text-[11px] font-black tracking-wider mb-2 uppercase">Business Overview</h3>
           <div className="flex items-center gap-3 mb-3 text-[8px] font-bold text-white/90">
@@ -179,7 +179,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         {/* Staff Management */}
-        <div className={`bg-white rounded-xl border border-slate-100 p-3 flex flex-col justify-between ${cardShadowClass}`}>
+        <div className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-2">Staff Management</h3>
           <div className="flex items-center justify-between">
             <div className="flex -space-x-2">
@@ -192,7 +192,7 @@ const AdminDashboard = ({ setCurrentView }) => {
         </div>
 
         {/* Application Status */}
-        <div className={`bg-white rounded-xl border border-slate-100 p-3 flex flex-col justify-between ${cardShadowClass}`}>
+        <div className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-1">Application Status</h3>
           <div className="flex items-center justify-between relative mt-1 px-1">
             <div className="absolute top-1.5 left-2 right-2 h-0.5 bg-slate-200 z-0"></div>
@@ -216,19 +216,19 @@ const AdminDashboard = ({ setCurrentView }) => {
 
       {/* Bottom Actions Grid */}
       <div className="grid grid-cols-3 gap-3">
-        <div className={`bg-white rounded-xl border border-slate-100 p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
+        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
           <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Collection<br/>Reports</div>
         </div>
-        <div className={`bg-white rounded-xl border border-slate-100 p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
+        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
           <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Branch<br/>Details</div>
         </div>
-        <div className={`bg-white rounded-xl border border-slate-100 p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
+        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
