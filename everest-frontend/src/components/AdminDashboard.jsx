@@ -1,7 +1,7 @@
 import React from 'react';
 
 const AdminDashboard = ({ setCurrentView }) => {
-  const cardShadowClass = "border border-[#d8892f]/40 shadow-[0_0_15px_rgba(216,137,47,0.3)] transition-all duration-300 hover:border-[#d8892f] hover:shadow-[0_0_25px_rgba(216,137,47,0.6)]";
+  const cardShadowClass = "border border-[#d8892f]/40 shadow-[0_0_15px_rgba(216,137,47,0.3)] transition-all duration-300 transform-gpu hover:-translate-y-1 hover:scale-105 hover:border-[#d8892f] hover:shadow-[0_0_40px_rgba(216,137,47,0.9)] active:-translate-y-1 active:scale-105 active:border-[#d8892f] active:shadow-[0_0_40px_rgba(216,137,47,0.9)] focus:-translate-y-1 focus:scale-105 focus:border-[#d8892f] focus:shadow-[0_0_40px_rgba(216,137,47,0.9)] cursor-pointer";
 
   return (
     <div className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto">
@@ -165,11 +165,11 @@ const AdminDashboard = ({ setCurrentView }) => {
                    </linearGradient>
                  </defs>
                  <path 
-                   d="M 0,60 L 8,60 C 16,60 16,40 25,40 C 33,40 33,50 42,50 C 50,50 50,15 58,15 C 66,15 66,45 75,45 C 83,45 83,10 92,10 L 100,10 L 100,100 L 0,100 Z" 
+                   d="M 0,60 L 8,60 L 25,40 L 42,50 L 58,15 L 75,45 L 92,10 L 100,10 L 100,100 L 0,100 Z" 
                    fill="url(#waveGradient)" 
                  />
                  <path 
-                   d="M 0,60 L 8,60 C 16,60 16,40 25,40 C 33,40 33,50 42,50 C 50,50 50,15 58,15 C 66,15 66,45 75,45 C 83,45 83,10 92,10 L 100,10" 
+                   d="M 0,60 L 8,60 L 25,40 L 42,50 L 58,15 L 75,45 L 92,10 L 100,10" 
                    fill="none" 
                    stroke="#06b6d4" 
                    strokeWidth="2.5" 
