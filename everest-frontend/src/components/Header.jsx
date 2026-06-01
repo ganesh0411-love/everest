@@ -48,7 +48,7 @@ const Header = ({ currentView, setCurrentView }) => {
   ];
 
   return (
-    <header className="w-full px-4 pt-2 pb-1.5 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto bg-[#eaf5f4]">
+    <header className="w-full px-4 pt-2 pb-1 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto bg-[#eaf5f4]">
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-2">
           <img 
@@ -134,7 +134,7 @@ const Header = ({ currentView, setCurrentView }) => {
           )}
         </div>
       </div>
-      <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight -mt-1 ml-11">
+      <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight -mt-2 ml-11" style={{ fontFamily: 'Georgia, serif' }}>
         Everest Micro Finance
       </h1>
     </header>

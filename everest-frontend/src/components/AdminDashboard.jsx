@@ -5,7 +5,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
   return (
     <div className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-20 overflow-y-auto">
-      <h2 className="text-xl font-black mb-3 uppercase tracking-wide" style={{ fontFamily: 'Georgia, serif', color: '#000' }}>
+      <h2 className="text-[15px] font-black mb-3 uppercase tracking-wide text-black">
         Admin Dashboard
       </h2>
 
