@@ -70,17 +70,14 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
         onclone: (doc) => {
           const boxes = doc.querySelectorAll('.border.items-center');
           boxes.forEach(box => {
-            // 1. The boxes render too high relative to the semicolons outside.
-            // Force the entire container visually downward by 3 pixels.
+            // 1. Pull the entire box downward by an exact margin/offset to align parallel with semicolons
             box.style.setProperty('position', 'relative', 'important');
-            box.style.setProperty('top', '3px', 'important');
+            box.style.setProperty('top', '4px', 'important'); // Increased downward pull
             
-            // 2. The text inside touches the bottom border.
-            // Override flex-center by forcing alignment to the top and padding the bottom,
-            // visually centering the text inside the borders.
+            // 2. Physically push the text font further upward inside the boxes to center it
             box.style.setProperty('align-items', 'flex-start', 'important');
-            box.style.setProperty('padding-top', '1px', 'important');
-            box.style.setProperty('padding-bottom', '4px', 'important');
+            box.style.setProperty('padding-top', '0px', 'important'); // No top padding
+            box.style.setProperty('padding-bottom', '6px', 'important'); // Pushes the bottom border further down, centering text
             box.style.setProperty('line-height', '1', 'important');
           });
         }
