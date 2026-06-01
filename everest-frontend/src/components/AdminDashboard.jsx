@@ -5,10 +5,6 @@ const AdminDashboard = ({ setCurrentView }) => {
 
   return (
     <div className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-20 overflow-y-auto">
-      <h2 className="text-[15px] font-black mb-3 uppercase tracking-wide text-black">
-        Admin Dashboard
-      </h2>
-
       {/* Total Collections Progress */}
       <div className={`bg-white rounded-xl p-3 mb-3 ${cardShadowClass}`}>
         <div className="flex justify-between items-center text-[11px] font-bold mb-1">
@@ -25,6 +21,10 @@ const AdminDashboard = ({ setCurrentView }) => {
           <div className="bg-[#1ca3a6] h-full rounded-full" style={{ width: '65%' }}></div>
         </div>
       </div>
+
+      <h2 className="text-[15px] font-black mb-3 uppercase tracking-wide text-black">
+        Admin Dashboard
+      </h2>
 
       {/* Asymmetrical Grid of 4 Cards */}
       <div className="flex gap-3 mb-3">

@@ -135,7 +135,7 @@ const Header = ({ currentView, setCurrentView }) => {
         </div>
       </div>
       <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight -mt-2 ml-11" style={{ fontFamily: 'Georgia, serif' }}>
-        Everest Micro Finance
+        Everest Micro<span style={{ fontSize: '21px' }}>Finance</span>
       </h1>
     </header>
   );
