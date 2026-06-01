@@ -1,10 +1,49 @@
 import React from 'react';
 
 const AdminDashboard = ({ setCurrentView }) => {
-  const cardShadowClass = "border border-[#d8892f]/40 shadow-[0_0_15px_rgba(216,137,47,0.3)] transition-all duration-300 transform-gpu hover:-translate-y-1 hover:scale-105 hover:border-[#d8892f] hover:shadow-[0_0_40px_rgba(216,137,47,0.9)] active:-translate-y-1 active:scale-105 active:border-[#d8892f] active:shadow-[0_0_40px_rgba(216,137,47,0.9)] focus:-translate-y-1 focus:scale-105 focus:border-[#d8892f] focus:shadow-[0_0_40px_rgba(216,137,47,0.9)] cursor-pointer";
+  const cardShadowClass = "interactive-card";
+
+  // Ref to track currently hovered element during touch drag
+  const currentTouchCardRef = React.useRef(null);
+
+  const handleTouchStart = (e) => {
+    const card = e.target.closest('.interactive-card');
+    if (card) {
+      card.classList.add('touch-boom');
+      currentTouchCardRef.current = card;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const card = element?.closest('.interactive-card');
+    
+    if (currentTouchCardRef.current && currentTouchCardRef.current !== card) {
+      currentTouchCardRef.current.classList.remove('touch-boom');
+    }
+    
+    if (card && currentTouchCardRef.current !== card) {
+      card.classList.add('touch-boom');
+      currentTouchCardRef.current = card;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (currentTouchCardRef.current) {
+      currentTouchCardRef.current.classList.remove('touch-boom');
+      currentTouchCardRef.current = null;
+    }
+  };
 
   return (
-    <div className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto">
+    <div 
+      className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
       {/* Total Collections Progress */}
       <div className={`bg-white rounded-xl p-3 mb-3 ${cardShadowClass}`}>
         <div className="flex justify-between items-center text-[11px] font-bold mb-1">
