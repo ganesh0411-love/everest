@@ -150,13 +150,36 @@ const AdminDashboard = ({ setCurrentView }) => {
           <h3 className="text-white text-[11px] font-black tracking-wider mb-2 uppercase">Business Overview</h3>
           <div className="flex items-center gap-3 mb-3 text-[8px] font-bold text-white/90">
             <span className="flex items-center gap-1"><span className="w-2 h-2 bg-[#d8892f] rounded-sm"></span> LOAN DISBURSEMENTS</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-white rounded-sm"></span> COLLECTIONS</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-[#06b6d4] rounded-sm"></span> COLLECTIONS</span>
           </div>
           
           {/* SVG Chart: Two Solid Bars Per Month */}
           <div className="h-24 w-full relative mt-auto border-b border-white/20 pl-6 pb-2 flex items-end justify-between pr-2">
+             {/* SVG Wave Line underneath */}
+             <div className="absolute top-0 bottom-2 left-6 right-2 z-0 overflow-hidden pointer-events-none">
+               <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
+                 <defs>
+                   <linearGradient id="waveGradient" x1="0" x2="0" y1="0" y2="1">
+                     <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.6" />
+                     <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                   </linearGradient>
+                 </defs>
+                 <path 
+                   d="M 0,70 L 8,70 C 16,70 16,50 25,50 C 33,50 33,60 42,60 C 50,60 50,40 58,40 C 66,40 66,55 75,55 C 83,55 83,30 92,30 L 100,30 L 100,100 L 0,100 Z" 
+                   fill="url(#waveGradient)" 
+                 />
+                 <path 
+                   d="M 0,70 L 8,70 C 16,70 16,50 25,50 C 33,50 33,60 42,60 C 50,60 50,40 58,40 C 66,40 66,55 75,55 C 83,55 83,30 92,30 L 100,30" 
+                   fill="none" 
+                   stroke="#06b6d4" 
+                   strokeWidth="2.5" 
+                   style={{ filter: 'drop-shadow(0px 2px 4px rgba(6,182,212,0.8))' }}
+                 />
+               </svg>
+             </div>
+             
              {/* Y-Axis Labels - Made 100% visible */}
-             <div className="absolute left-0 top-0 bottom-2 flex flex-col justify-between text-[7px] font-bold text-white/90 h-full">
+             <div className="absolute left-0 top-0 bottom-2 flex flex-col justify-between text-[7px] font-bold text-white/90 h-full z-10">
                <span>1000</span>
                <span>800</span>
                <span>600</span>
@@ -166,17 +189,17 @@ const AdminDashboard = ({ setCurrentView }) => {
              </div>
              
              {/* X-Axis Labels */}
-             <div className="absolute -bottom-3.5 left-6 right-2 flex justify-between text-[7px] font-bold text-white/90">
+             <div className="absolute -bottom-3.5 left-6 right-2 flex justify-between text-[7px] font-bold text-white/90 z-10">
                <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
              </div>
              
              {/* Bars (Disbursements / Collections Pairs) */}
-             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[30%] bg-[#d8892f]"></div><div className="w-1.5 h-[20%] bg-white"></div></div>
-             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[50%] bg-[#d8892f]"></div><div className="w-1.5 h-[35%] bg-white"></div></div>
-             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[40%] bg-[#d8892f]"></div><div className="w-1.5 h-[25%] bg-white"></div></div>
-             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[60%] bg-[#d8892f]"></div><div className="w-1.5 h-[40%] bg-white"></div></div>
-             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[45%] bg-[#d8892f]"></div><div className="w-1.5 h-[30%] bg-white"></div></div>
-             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[70%] bg-[#d8892f]"></div><div className="w-1.5 h-[50%] bg-white"></div></div>
+             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[30%] bg-[#d8892f] relative z-20"></div><div className="w-1.5 h-[20%] bg-[#06b6d4] relative z-20"></div></div>
+             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[50%] bg-[#d8892f] relative z-20"></div><div className="w-1.5 h-[35%] bg-[#06b6d4] relative z-20"></div></div>
+             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[40%] bg-[#d8892f] relative z-20"></div><div className="w-1.5 h-[25%] bg-[#06b6d4] relative z-20"></div></div>
+             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[60%] bg-[#d8892f] relative z-20"></div><div className="w-1.5 h-[40%] bg-[#06b6d4] relative z-20"></div></div>
+             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[45%] bg-[#d8892f] relative z-20"></div><div className="w-1.5 h-[30%] bg-[#06b6d4] relative z-20"></div></div>
+             <div className="flex items-end gap-0.5 h-full z-10"><div className="w-1.5 h-[70%] bg-[#d8892f] relative z-20"></div><div className="w-1.5 h-[50%] bg-[#06b6d4] relative z-20"></div></div>
           </div>
         </div>
         
