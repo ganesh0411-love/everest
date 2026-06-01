@@ -137,6 +137,12 @@ const AdminDashboard = ({ setCurrentView }) => {
           </div>
         </div>
       </div>
+      {/* Floating Analytics Title in the Gap */}
+      <div className="relative w-full h-0 z-10 pointer-events-none">
+        <div className="absolute bottom-0 right-0 w-[25%] flex justify-center items-end pb-1.5">
+          <h3 className="font-black text-[#0369a1] text-[12px] uppercase whitespace-nowrap pointer-events-auto">Analytics</h3>
+        </div>
+      </div>
 
       {/* Business Overview & Analytics */}
       <div className={`rounded-xl mb-3 flex overflow-hidden ${cardShadowClass}`} style={{ background: 'linear-gradient(90deg, #10637c 0%, #0a3d4f 100%)' }}>
@@ -176,8 +182,7 @@ const AdminDashboard = ({ setCurrentView }) => {
         
         {/* Analytics Section - Right 25% Width */}
         <div className="w-[25%] bg-white p-2 flex flex-col justify-center text-center relative border-l border-slate-200">
-          <h3 className="text-[#0369a1] font-black text-[9px] tracking-wider mb-1 uppercase absolute top-2 right-0 left-0 text-center">Analytics</h3>
-          <div className="mt-4">
+          <div className="mt-2">
             <div className="text-[#d8892f] font-black text-xs">₹8,250</div>
             <div className="text-slate-600 text-[7px] font-bold uppercase border-b border-slate-100 pb-1 mb-1">Disbursements</div>
             <div className="text-[#0369a1] font-black text-xs mt-1.5">₹5,450</div>
