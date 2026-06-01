@@ -70,12 +70,24 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
         onclone: (doc) => {
           const boxes = doc.querySelectorAll('.border.items-center');
           boxes.forEach(box => {
-            // Force flex-start to snap content to the top border, then explicitly push down.
-            // This completely defeats the html2canvas broken 'center' layout calculation.
-            box.style.setProperty('align-items', 'flex-start', 'important');
-            box.style.setProperty('padding-top', '3px', 'important');
-            box.style.setProperty('padding-bottom', '0px', 'important');
-            box.style.setProperty('line-height', '1', 'important');
+            // 1. Override the broken flexbox layout that html2canvas miscalculates
+            box.style.setProperty('display', 'inline-block', 'important');
+            box.style.setProperty('vertical-align', 'middle', 'important');
+            box.style.setProperty('line-height', 'normal', 'important');
+            
+            // 2. Physically wrap the text in a span to force a mathematical upward translation
+            if (box.childNodes.length > 0) {
+              const span = doc.createElement('span');
+              span.style.setProperty('position', 'relative', 'important');
+              span.style.setProperty('top', '-3px', 'important'); // Exact upward offset
+              span.style.setProperty('display', 'inline-block', 'important');
+              
+              // Move all original text/content inside the forced translation span
+              while (box.firstChild) {
+                span.appendChild(box.firstChild);
+              }
+              box.appendChild(span);
+            }
           });
         }
       });
