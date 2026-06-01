@@ -62,8 +62,8 @@ const AdminDashboard = ({ setCurrentView }) => {
               </div>
             </div>
             <div className="text-center mt-1 w-full flex flex-col gap-0.5">
-              <div className="text-white font-black text-[10px] uppercase tracking-wide">Collection <span className="text-emerald-400 text-[13px] ml-0.5">₹15,450</span></div>
-              <div className="text-white font-bold text-[9px] uppercase tracking-wide">Target <span className="text-red-400 text-[12px] ml-0.5">₹25,000</span></div>
+              <div className="text-white font-bold text-[9px] uppercase tracking-wide">Target <span className="text-white text-[12px] ml-0.5">₹25,000</span></div>
+              <div className="text-white font-black text-[10px] uppercase tracking-wide">Collection <span className="text-white text-[13px] ml-0.5">₹15,450</span></div>
             </div>
           </div>
 
@@ -88,7 +88,7 @@ const AdminDashboard = ({ setCurrentView }) => {
         <div className="flex-1 flex flex-col gap-3">
           {/* 3. Centers Overview (Medium-Large) */}
           <div className={`h-40 bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
-            <h3 className="font-black text-slate-800 text-sm tracking-wider uppercase text-center mb-1">Centers Overview</h3>
+            <h3 className="font-black text-slate-800 text-[12px] uppercase text-center mb-1 whitespace-nowrap">Centers Overview</h3>
             <div className="text-center my-auto">
               <div className="text-[#d8892f] text-3xl font-black leading-none">33</div>
               <div className="text-slate-800 text-[10px] font-black mt-1 uppercase tracking-wide">All Centers</div>
@@ -114,23 +114,26 @@ const AdminDashboard = ({ setCurrentView }) => {
           </div>
 
           {/* 4. EMI Calculator (Medium-Small) */}
-          <div className={`h-24 bg-white rounded-xl p-3 flex items-center justify-between relative overflow-hidden ${cardShadowClass}`}>
-            <div className="flex flex-col justify-center">
-              <h3 className="font-black text-slate-800 text-sm tracking-wider uppercase mb-0.5">EMI Calculator</h3>
-              <div className="text-slate-600 text-[10px] font-bold">Calculate Your Loan EMI</div>
+          <div className={`h-24 bg-white rounded-xl p-2.5 flex flex-col justify-between relative overflow-hidden ${cardShadowClass}`}>
+            <div>
+              <h3 className="font-black text-slate-800 text-[12px] uppercase mb-0.5 whitespace-nowrap">EMI Calculator</h3>
+              <div className="text-slate-600 text-[9px] font-bold whitespace-nowrap">Calculate Your Loan EMI</div>
             </div>
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-[#0369a1] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="2" y1="10" x2="22" y2="10"></line>
-              <circle cx="8" cy="15" r="1.5"></circle>
-              <circle cx="12" cy="15" r="1.5"></circle>
-              <circle cx="16" cy="15" r="1.5"></circle>
-              <circle cx="8" cy="19" r="1.5"></circle>
-              <circle cx="12" cy="19" r="1.5"></circle>
-              <circle cx="16" cy="19" r="1.5"></circle>
-            </svg>
+            <div className="flex items-center justify-between mt-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-[#0369a1]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+                <circle cx="8" cy="15" r="1.5"></circle>
+                <circle cx="12" cy="15" r="1.5"></circle>
+                <circle cx="16" cy="15" r="1.5"></circle>
+                <circle cx="8" cy="19" r="1.5"></circle>
+                <circle cx="12" cy="19" r="1.5"></circle>
+                <circle cx="16" cy="19" r="1.5"></circle>
+              </svg>
+              <span className="text-slate-400 font-bold text-sm">&gt;</span>
+            </div>
           </div>
         </div>
       </div>
