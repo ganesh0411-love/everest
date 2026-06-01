@@ -13,9 +13,9 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const [isEditing, setIsEditing] = useState(false);
 
   const tabs = [
-    { id: 'Pending', label: 'Pending', color: 'text-amber-500', bg: 'bg-amber-100' },
-    { id: 'Approved', label: 'Approved', color: 'text-emerald-500', bg: 'bg-emerald-100' },
-    { id: 'Rejected', label: 'Rejected', color: 'text-rose-500', bg: 'bg-rose-100' }
+    { id: 'Pending', label: 'Pending', activeClass: 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' },
+    { id: 'Approved', label: 'Approved', activeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm' },
+    { id: 'Rejected', label: 'Rejected', activeClass: 'bg-rose-50 text-rose-700 border border-rose-200 shadow-sm' }
   ];
 
   const currentApps = applications.filter(app => app.status === activeTab);
@@ -74,18 +74,14 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-2.5 px-3 font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                className={`flex-1 py-1.5 px-2 font-bold text-[13px] transition-all flex flex-row items-center justify-center gap-1.5 rounded-lg ${
                   isActive 
-                    ? tab.id === 'Pending'
-                      ? 'border-2 border-blue-500 text-blue-600 bg-transparent rounded-none shadow-sm'
-                      : 'bg-slate-800 text-white shadow-md scale-100 rounded-xl'
-                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100 scale-95 rounded-xl'
+                    ? tab.activeClass
+                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent scale-95'
                 }`}
               >
                 <span>{tab.label}</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${isActive ? (tab.id === 'Pending' ? 'bg-blue-100 text-blue-600' : tab.bg + ' ' + tab.color) : 'bg-slate-200 text-slate-600'}`}>
-                  {count}
-                </span>
+                <span>({count})</span>
               </button>
             );
           })}
@@ -96,12 +92,12 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       <div className="p-2 w-full flex-1 overflow-y-auto">
         <div className="w-full pb-32">
           <table className="w-full text-left whitespace-nowrap table-fixed">
-            <thead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <thead className="text-[10px] font-bold text-black uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="p-2 w-12 text-center">S.No</th>
-                <th className="p-2 w-24">App Date</th>
-                <th className="p-2 text-left truncate">Customer</th>
-                <th className="p-2 w-16 text-center">Actions</th>
+                <th className="p-2 w-12 text-center">SI NO</th>
+                <th className="p-2 w-24">Apply Date</th>
+                <th className="p-2 text-left truncate">CUSTOMER</th>
+                <th className="p-2 w-16 text-center">ACTIONS</th>
               </tr>
             </thead>
             <tbody>

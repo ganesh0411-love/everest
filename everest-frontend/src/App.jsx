@@ -130,6 +130,37 @@ function App() {
   const [currentView, setCurrentView] = useState('Home');
   const [viewHistory, setViewHistory] = useState(['Home']);
   const backPressCountRef = useRef(0);
+  const currentTouchCardRef = useRef(null);
+
+  const handleTouchStart = (e) => {
+    const card = e.target.closest('.interactive-card');
+    if (card) {
+      card.classList.add('touch-boom');
+      currentTouchCardRef.current = card;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const card = element?.closest('.interactive-card');
+    
+    if (currentTouchCardRef.current && currentTouchCardRef.current !== card) {
+      currentTouchCardRef.current.classList.remove('touch-boom');
+    }
+    
+    if (card && currentTouchCardRef.current !== card) {
+      card.classList.add('touch-boom');
+      currentTouchCardRef.current = card;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (currentTouchCardRef.current) {
+      currentTouchCardRef.current.classList.remove('touch-boom');
+      currentTouchCardRef.current = null;
+    }
+  };
 
   const navigateToView = (newView) => {
     setViewHistory(prev => {
@@ -445,11 +476,15 @@ function App() {
             <main 
               className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto bg-white"
               onScroll={handleScroll}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
             >
               {processedCustomers.filter(c => c.status !== 'Rejected').length > 0 ? (
                 <div className="p-2 space-y-2 pb-24">
                   {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').map(customer => (
-                    <div key={customer.id} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative">
+                    <div key={customer.id} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card">
                       <div className="flex-1 min-w-0 flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
                           <img src={customer.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
