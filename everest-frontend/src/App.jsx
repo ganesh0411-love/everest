@@ -25,6 +25,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
 import Login from './components/Login';
 import CustomerDashboard from './components/CustomerDashboard';
+import AdminDashboard from './components/AdminDashboard';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -126,8 +127,8 @@ function App() {
     }
   }, [customers, isDbLoading]);
 
-  const [currentView, setCurrentView] = useState('Customer');
-  const [viewHistory, setViewHistory] = useState(['Customer']);
+  const [currentView, setCurrentView] = useState('Home');
+  const [viewHistory, setViewHistory] = useState(['Home']);
   const backPressCountRef = useRef(0);
 
   const navigateToView = (newView) => {
@@ -139,10 +140,10 @@ function App() {
   };
 
   const switchTab = (newView) => {
-    if (newView === 'Customer') {
-      setViewHistory(['Customer']);
+    if (newView === 'Home') {
+      setViewHistory(['Home']);
     } else {
-      setViewHistory(['Customer', newView]);
+      setViewHistory(['Home', newView]);
     }
     setCurrentView(newView);
   };
@@ -359,6 +360,7 @@ function App() {
 
   const renderView = () => {
     switch(currentView) {
+      case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} /></div>;
       case 'Centers': return <div className="flex-1 overflow-y-auto"><Centers /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto"><StaffManagement /></div>;
