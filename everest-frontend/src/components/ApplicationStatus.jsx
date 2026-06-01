@@ -60,11 +60,10 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   };
 
   return (
-    <div className="w-full h-full max-w-4xl mx-auto bg-white min-h-full flex flex-col animate-in fade-in duration-300 relative">
+    <div className="w-full flex-1 max-w-4xl mx-auto bg-white min-h-full flex flex-col animate-in fade-in duration-300 relative">
       
       {/* Header & Tabs */}
-      <div className="p-4 border-b border-slate-200 sticky top-0 bg-white z-20">
-        <h2 className="text-xl font-bold text-slate-800 mb-4">Application Status</h2>
+      <div className="px-4 py-3 border-b border-slate-200 sticky top-0 bg-white z-20">
         
         <div className="flex gap-2">
           {tabs.map(tab => {
@@ -94,7 +93,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       </div>
 
       {/* Dynamic Data Table / List Cards */}
-      <div className="p-2 w-full overflow-hidden">
+      <div className="p-2 w-full flex-1 overflow-y-auto">
         <div className="w-full pb-32">
           <table className="w-full text-left whitespace-nowrap table-fixed">
             <thead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border-b border-slate-200">

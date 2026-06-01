@@ -3,6 +3,30 @@ import React from 'react';
 const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
 
+  const [staffImages, setStaffImages] = React.useState({
+    vignesh: "https://ui-avatars.com/api/?name=Vignesh&background=random",
+    ganesh: "https://ui-avatars.com/api/?name=Ganesh&background=random",
+    joseph: "https://ui-avatars.com/api/?name=Joseph+Vijay&background=random"
+  });
+
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('everest_customers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const vignesh = parsed.find(c => c.name && c.name.toLowerCase().includes('vignesh'));
+        const ganesh = parsed.find(c => c.name && c.name.toLowerCase().includes('ganesh'));
+        const joseph = parsed.find(c => c.name && c.name.toLowerCase().includes('joseph'));
+        
+        setStaffImages({
+          vignesh: vignesh?.image || "https://ui-avatars.com/api/?name=Vignesh&background=random",
+          ganesh: ganesh?.image || "https://ui-avatars.com/api/?name=Ganesh&background=random",
+          joseph: joseph?.image || "https://ui-avatars.com/api/?name=Joseph+Vijay&background=random"
+        });
+      }
+    } catch(e) {}
+  }, []);
+
   // Ref to track currently hovered element during touch drag
   const currentTouchCardRef = React.useRef(null);
 
@@ -242,13 +266,13 @@ const AdminDashboard = ({ setCurrentView }) => {
           </div>
         </div>
         
-        {/* Analytics Section - Right 25% Width */}
-        <div className="w-[25%] bg-white p-2 flex flex-col justify-center text-center relative border-l border-slate-200">
+        {/* Analytics Section - Right Cut-off Container */}
+        <div className="w-[32%] my-auto bg-white py-3 pl-2 pr-7 flex flex-col justify-center text-center relative rounded-l-3xl translate-x-6 shadow-[-4px_0_12px_rgba(0,0,0,0.1)]">
           <div className="mt-2">
             <div className="text-[#d8892f] font-black text-xs">₹8,250</div>
-            <div className="text-slate-600 text-[7px] font-bold uppercase border-b border-slate-100 pb-1 mb-1">Disbursements</div>
+            <div className="text-slate-800 text-[8px] font-black uppercase border-b border-slate-100 pb-1 mb-1">Disbursements</div>
             <div className="text-[#0369a1] font-black text-xs mt-1.5">₹5,450</div>
-            <div className="text-slate-600 text-[7px] font-bold uppercase">Collections</div>
+            <div className="text-slate-800 text-[8px] font-black uppercase">Collections</div>
           </div>
         </div>
       </div>
@@ -258,17 +282,20 @@ const AdminDashboard = ({ setCurrentView }) => {
         <div className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-2">Staff Management</h3>
           <div className="flex items-center justify-between">
-            <div className="flex -space-x-2">
-              <img src="https://ui-avatars.com/api/?name=Staff+1&background=random" className="w-7 h-7 rounded-full border-2 border-white shadow-sm" alt="Staff" />
-              <img src="https://ui-avatars.com/api/?name=Staff+2&background=random" className="w-7 h-7 rounded-full border-2 border-white shadow-sm" alt="Staff" />
-              <img src="https://ui-avatars.com/api/?name=Staff+3&background=random" className="w-7 h-7 rounded-full border-2 border-white shadow-sm" alt="Staff" />
+            <div className="flex gap-2">
+              <img src={staffImages.vignesh} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover" alt="Vignesh" />
+              <img src={staffImages.ganesh} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover" alt="Ganesh" />
+              <img src={staffImages.joseph} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover" alt="Joseph Vijay" />
             </div>
             <span className="text-slate-400 font-bold text-sm">&gt;</span>
           </div>
         </div>
 
         {/* Application Status */}
-        <div className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
+        <div 
+          className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}
+          onClick={() => setCurrentView('Application Status')}
+        >
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-1">Application Status</h3>
           <div className="flex items-center justify-between relative mt-1 px-1">
             <div className="absolute top-1.5 left-2 right-2 h-0.5 bg-slate-200 z-0"></div>
@@ -276,15 +303,15 @@ const AdminDashboard = ({ setCurrentView }) => {
             
             <div className="flex flex-col items-center z-10">
               <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[7px] flex items-center justify-center font-black mb-1 shadow-sm border border-white">1</div>
-              <div className="text-[7px] font-bold text-slate-600 uppercase">Progress</div>
+              <div className="text-[7px] font-black text-slate-800 uppercase">Apply</div>
             </div>
             <div className="flex flex-col items-center z-10">
               <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[7px] flex items-center justify-center font-black mb-1 shadow-sm border border-white">2</div>
-              <div className="text-[7px] font-bold text-slate-600 uppercase">Progress</div>
+              <div className="text-[7px] font-black text-slate-800 uppercase">Progress</div>
             </div>
             <div className="flex flex-col items-center z-10">
               <div className="w-3.5 h-3.5 rounded-full bg-slate-200 text-slate-500 text-[7px] flex items-center justify-center font-black mb-1 shadow-sm border border-white">3</div>
-              <div className="text-[7px] font-bold text-slate-400 uppercase">Closed</div>
+              <div className="text-[7px] font-black text-slate-800 uppercase">Status</div>
             </div>
           </div>
         </div>

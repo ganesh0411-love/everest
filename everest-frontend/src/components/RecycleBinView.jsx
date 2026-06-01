@@ -11,7 +11,7 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete }) => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-[#f8fafc] min-h-full flex flex-col p-4 animate-in fade-in duration-300">
+    <div className="w-full flex-1 max-w-4xl mx-auto bg-[#f8fafc] min-h-full flex flex-col p-4 animate-in fade-in duration-300">
       <div className="mb-4">
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -30,7 +30,7 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete }) => {
           <p className="font-semibold text-slate-500">Recycle Bin is Empty</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
           <div className="grid grid-cols-12 gap-2 p-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
             <div className="col-span-2 text-center">S.No</div>
             <div className="col-span-3 text-left">Deleted Date</div>
@@ -38,7 +38,7 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete }) => {
             <div className="col-span-3 text-center"></div>
           </div>
           
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 flex-1 overflow-y-auto pb-32">
             {recycledCustomers.map((customer, index) => (
               <div key={customer.id} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-50 transition-colors">
                 <div className="col-span-2 text-center text-sm font-semibold text-slate-400">

@@ -48,21 +48,30 @@ const Header = ({ currentView, setCurrentView }) => {
   ];
 
   return (
-    <header className="w-full px-4 pt-2 pb-1 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto bg-[#eaf5f4]">
+    <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto bg-[#eaf5f4] ${currentView === 'Application Status' ? 'py-1' : 'pt-2 pb-1'}`}>
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-2">
-          <img 
-            src={logo} 
-            alt="Everest Logo" 
-            className="w-9 h-9 object-contain magic-crop mix-blend-multiply" 
-          />
-          <div className="relative">
-            <select className="appearance-none bg-transparent font-bold text-lg text-slate-900 pr-4 outline-none cursor-pointer">
-              <option value="main" className="text-slate-800">Main Branch</option>
-              <option value="add" className="text-slate-800">Add Branch</option>
-            </select>
-            <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">▼</span>
-          </div>
+          {currentView !== 'Application Status' && (
+            <img 
+              src={logo} 
+              alt="Everest Logo" 
+              className="w-9 h-9 object-contain magic-crop mix-blend-multiply" 
+            />
+          )}
+          {currentView === 'Application Status' ? (
+            <div className="flex flex-col -mt-0.5">
+              <span className="font-bold text-[23px] text-slate-900 leading-tight">Application Status</span>
+              <span className="text-emerald-600 text-xs font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
+            </div>
+          ) : (
+            <div className="relative">
+              <select className="appearance-none bg-transparent font-bold text-lg text-slate-900 pr-4 outline-none cursor-pointer">
+                <option value="main" className="text-slate-800">Main Branch</option>
+                <option value="add" className="text-slate-800">Add Branch</option>
+              </select>
+              <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">▼</span>
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-end relative" ref={menuRef}>
           <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
@@ -134,9 +143,11 @@ const Header = ({ currentView, setCurrentView }) => {
           )}
         </div>
       </div>
-      <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight -mt-2 ml-11" style={{ fontFamily: 'Georgia, serif' }}>
-        Everest Micro<span style={{ fontSize: '21px' }}>Finance</span>
-      </h1>
+      {currentView !== 'Application Status' && (
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight -mt-2 ml-11" style={{ fontFamily: 'Georgia, serif' }}>
+          Everest Micro<span style={{ fontSize: '21px' }}>Finance</span>
+        </h1>
+      )}
     </header>
   );
 };
