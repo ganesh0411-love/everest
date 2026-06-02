@@ -27,6 +27,7 @@ import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, 
 import Login from './components/Login';
 import CustomerDashboard from './components/CustomerDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import EMICalculator from './components/EMICalculator';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -409,6 +410,7 @@ function App() {
   const renderView = () => {
     switch(currentView) {
       case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} /></div>;
+      case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
       case 'Centers': return <div className="flex-1 overflow-y-auto"><Centers /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto"><StaffManagement /></div>;
@@ -637,7 +639,7 @@ function App() {
         <CustomerDashboard userProfile={userProfile} customers={customers} />
       ) : (
         <>
-          <Header currentView={currentView} setCurrentView={switchTab} />
+          {currentView !== 'EMI Calculator' && <Header currentView={currentView} setCurrentView={switchTab} />}
       
       {renderView()}
 
