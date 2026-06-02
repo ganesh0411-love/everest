@@ -147,39 +147,63 @@ const solveTenureFromRepay = (P, R, A, k) => {
   return (low + high) / 2;
 };
 
-// ─── Flat Rate Helpers (Absolute Total Flat Rate) ──────────────────────────────
-const calcEmiFlat = (P, R, n) => {
+// ─── Flat Rate Helpers (Conditional Annualization) ──────────────────────────────
+const calcEmiFlat = (P, R, n, unit) => {
   if (n <= 0) return 0;
-  const I = P * (R / 100);
+  let totalRate = R;
+  if (unit === 'Months') totalRate = R * (n / 12);
+  else if (unit === 'Years') totalRate = R * n;
+  const I = P * (totalRate / 100);
   return (P + I) / n;
 };
 
-const calcTenureFlat = (P, R, E) => {
-  const A = P + P * (R / 100);
-  if (E <= 0) return 0;
-  return A / E;
+const calcTenureFlat = (P, R, E, unit) => {
+  if (E <= 0 || P <= 0) return 0;
+  if (unit === 'Months') {
+     const denom = E - ((P * R) / 1200);
+     return denom > 0 ? P / denom : 0;
+  } else if (unit === 'Years') {
+     const denom = E - ((P * R) / 100);
+     return denom > 0 ? P / denom : 0;
+  } else {
+     return (P + P * (R / 100)) / E;
+  }
 };
 
-const calcRateFlat = (P, E, n) => {
+const calcRateFlat = (P, E, n, unit) => {
   if (P <= 0 || n <= 0) return 0;
   const A = E * n;
   const I = A - P;
   if (I < 0) return 0;
-  return (I / P) * 100;
+  const totalRate = (I / P) * 100;
+  if (unit === 'Months') return totalRate / (n / 12);
+  if (unit === 'Years') return totalRate / n;
+  return totalRate;
 };
 
-const calcPrincipalFlat = (R, n, E) => {
-  const factor = 1 + (R / 100);
+const calcPrincipalFlat = (R, n, E, unit) => {
+  let totalRate = R;
+  if (unit === 'Months') totalRate = R * (n / 12);
+  else if (unit === 'Years') totalRate = R * n;
+  const factor = 1 + (totalRate / 100);
   if (factor <= 0) return 0;
   return (E * n) / factor;
 };
 
-const solveTenureFromRepayFlat = (P, R, A, currN) => {
-  return currN; // In absolute flat rate, Tenure cannot be derived from P, R, A
+const solveTenureFromRepayFlat = (P, R, A, currN, unit) => {
+  if (unit === 'Months') {
+     if (P * R === 0) return currN;
+     return ((A - P) * 1200) / (P * R);
+  }
+  if (unit === 'Years') {
+     if (P * R === 0) return currN;
+     return ((A - P) * 100) / (P * R);
+  }
+  return currN;
 };
 
 // ─── Donut Chart ─────────────────────────────────────────────────────────────
-const DonutChart = ({ principal, interest, total, emi }) => {
+const DonutChart = ({ principal, interest, total, emi, isPaidTenureMode, interestPaid }) => {
   const SIZE = 200;
   const SW   = 32;
   const R    = (SIZE - SW) / 2;
@@ -195,6 +219,8 @@ const DonutChart = ({ principal, interest, total, emi }) => {
   const GAP  = sum > 0 ? CIRC * 0.008 : 0;
 
   const rotate = `rotate(-90 ${CX} ${CY})`;
+
+  const centerValue = isPaidTenureMode ? interestPaid : emi;
 
   return (
     <div style={{ position: 'relative', width: SIZE, height: SIZE }}>
@@ -218,17 +244,34 @@ const DonutChart = ({ principal, interest, total, emi }) => {
         position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
         pointerEvents: 'none', flexDirection: 'column', gap: 2,
       }}>
-        <p style={{
-          margin: 0, fontSize: 14, fontWeight: 900, color: '#888',
-          letterSpacing: 1, textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
-        }}>
-          EMI
-        </p>
+        {isPaidTenureMode ? (
+          <div style={{ textAlign: 'center', lineHeight: 1.1 }}>
+            <p style={{
+              margin: 0, fontSize: 13, fontWeight: 900, color: '#888',
+              letterSpacing: 1, textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
+            }}>
+              Interest
+            </p>
+            <p style={{
+              margin: 0, fontSize: 13, fontWeight: 900, color: '#888',
+              letterSpacing: 1, textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
+            }}>
+              Paid
+            </p>
+          </div>
+        ) : (
+          <p style={{
+            margin: 0, fontSize: 14, fontWeight: 900, color: '#888',
+            letterSpacing: 1, textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
+          }}>
+            EMI
+          </p>
+        )}
         <p style={{
           margin: 0, fontSize: 22, fontWeight: 900, color: '#0A1F6E',
           fontFamily: "'Inter', 'Roboto', Arial, sans-serif", letterSpacing: '-0.3px',
         }}>
-          ₹ {Number(emi).toLocaleString('en-IN')}
+          ₹ {Number(centerValue).toLocaleString('en-IN')}
         </p>
       </div>
     </div>
@@ -322,47 +365,121 @@ const AmountRow = ({ label, amount, color, showDivider = true }) => (
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const EMICalculator = ({ onBack }) => {
-  const defaultState = {
-    principal: '100000',
-    rate: '8',
-    tenure: '12',
-    tenureUnit: 'Months',
-    emi: '9000',
-    repay: '108000'
+  const emptyInputs = {
+    principal: '',
+    rate: '',
+    flatRate: '',
+    flatRatePm: '',
+    tenure: '',
+    paidTenure: '',
+    tenureUnit: 'Weeks',
+    emi: '',
+    repay: ''
   };
 
-  const defaultOutputs = {
+  const flatOutputs = {
+    principal: 10000,
+    repay: 12600,
+    emi: 1050,
+    totalInt: 2600
+  };
+
+  const bankingOutputs = {
     principal: 100000,
     repay: 108000,
     emi: 9000,
-    totalInt: 8000
+    totalInt: 8000,
+    principalPaid: 0,
+    outstandingAmount: 0
   };
 
   const [calcMode, setCalcMode] = useState('Flat');
   const [showModeMenu, setShowModeMenu] = useState(false);
-  const [inputs, setInputs] = useState(defaultState);
-  const [calcOutputs, setCalcOutputs] = useState(defaultOutputs);
+  const [inputs, setInputs] = useState(emptyInputs);
+  const [calcOutputs, setCalcOutputs] = useState(flatOutputs);
 
   const [editedFields, setEditedFields] = useState([]);
+  const [pmFocused, setPmFocused] = useState(false);
+  const [paFocused, setPaFocused] = useState(false);
+  const [rateFocused, setRateFocused] = useState(false);
+  const [isPaidTenureActive, setIsPaidTenureActive] = useState(false);
+  const [showTenureMenu, setShowTenureMenu] = useState(false);
+
+  useEffect(() => {
+    const handleDismiss = () => {
+      setShowModeMenu(false);
+      setShowTenureMenu(false);
+    };
+    if (showModeMenu || showTenureMenu) {
+      window.addEventListener('scroll', handleDismiss, true);
+      window.addEventListener('click', handleDismiss);
+    }
+    return () => {
+      window.removeEventListener('scroll', handleDismiss, true);
+      window.removeEventListener('click', handleDismiss);
+    };
+  }, [showModeMenu, showTenureMenu]);
 
   const handleModeChange = (mode) => {
     setCalcMode(mode);
-    if (mode === 'Banking' && (inputs.tenureUnit === 'Weeks' || inputs.tenureUnit === 'Days')) {
-      setInputs(prev => ({ ...prev, tenureUnit: 'Months' }));
-    }
+    setInputs({
+      principal: '',
+      rate: '',
+      flatRate: '',
+      flatRatePm: '',
+      tenure: '',
+      paidTenure: '',
+      tenureUnit: mode === 'Flat' ? 'Weeks' : 'Months',
+      emi: '',
+      repay: ''
+    });
+    setCalcOutputs(mode === 'Flat' ? flatOutputs : bankingOutputs);
+    setEditedFields([]);
   };
 
   const handleEdit = (field, val) => {
-    setInputs(prev => ({ ...prev, [field]: val }));
+    setInputs(prev => {
+      const next = { ...prev, [field]: val };
+      if (field === 'flatRate') {
+        next.flatRatePm = val === '' ? '' : (Number(val) / 12).toFixed(2);
+      } else if (field === 'flatRatePm') {
+        next.flatRate = val === '' ? '' : (Number(val) * 12).toFixed(2);
+      }
+      return next;
+    });
     setEditedFields(prev => {
-      const arr = prev.filter(f => f !== field);
-      arr.push(field);
+      let arr = prev.filter(f => f !== field);
+      if (field === 'flatRate' || field === 'flatRatePm') {
+         arr = arr.filter(f => f !== 'flatRate' && f !== 'flatRatePm');
+         arr.push('flatRate');
+      } else {
+         arr.push(field);
+      }
       return arr;
     });
   };
 
   const handleCalculate = () => {
     let activeKnowns = [...editedFields];
+    let overrideRepay = null;
+
+    if (activeKnowns.includes('flatRate')) {
+      let pTemp = Number(inputs.principal) || 0;
+      let fRateTemp = Number(inputs.flatRate) || 0;
+      let nTemp = Number(inputs.tenure) || 0;
+      if (pTemp > 0) {
+        let totalFlatRate = fRateTemp;
+        if (inputs.tenureUnit === 'Months' && nTemp > 0) {
+          totalFlatRate = fRateTemp * (nTemp / 12);
+        } else if (inputs.tenureUnit === 'Years' && nTemp > 0) {
+          totalFlatRate = fRateTemp * nTemp;
+        }
+        overrideRepay = String(pTemp + (pTemp * totalFlatRate / 100));
+        if (!activeKnowns.includes('repay')) activeKnowns.push('repay');
+      }
+      activeKnowns = activeKnowns.filter(k => k !== 'flatRate');
+    }
+
     const defaults = ['principal', 'tenure', 'rate', 'emi', 'repay'];
     while (activeKnowns.length < 3) {
       const nextDef = defaults.find(f => !activeKnowns.includes(f));
@@ -383,7 +500,7 @@ const EMICalculator = ({ onBack }) => {
     let r = Number(inputs.rate) || 0;
     let n = Number(inputs.tenure) || 0;
     let e = Number(inputs.emi) || 0;
-    let a = Number(inputs.repay) || 0;
+    let a = overrideRepay !== null ? Number(overrideRepay) : (Number(inputs.repay) || 0);
     let k = getK(inputs.tenureUnit);
 
     if (calcMode === 'Banking') {
@@ -395,33 +512,33 @@ const EMICalculator = ({ onBack }) => {
 
     if (has('principal') && has('tenure') && has('emi')) {
       a = e * n;
-      r = calcMode === 'Flat' ? calcRateFlat(p, e, n) : calcRateBinary(p, e, n, k);
+      r = calcMode === 'Flat' ? calcRateFlat(p, e, n, inputs.tenureUnit) : calcRateBinary(p, e, n, k);
     } else if (has('principal') && has('rate') && has('tenure')) {
-      e = calcMode === 'Flat' ? calcEmiFlat(p, r, n) : calcEmi(p, r, n, k);
+      e = calcMode === 'Flat' ? calcEmiFlat(p, r, n, inputs.tenureUnit) : calcEmi(p, r, n, k);
       a = e * n;
     } else if (has('principal') && has('rate') && has('emi')) {
-      n = calcMode === 'Flat' ? calcTenureFlat(p, r, e) : calcTenure(p, r, e, k);
+      n = calcMode === 'Flat' ? calcTenureFlat(p, r, e, inputs.tenureUnit) : calcTenure(p, r, e, k);
       a = e * n;
     } else if (has('principal') && has('tenure') && has('repay')) {
       e = n > 0 ? a / n : 0;
-      r = calcMode === 'Flat' ? calcRateFlat(p, e, n) : calcRateBinary(p, e, n, k);
+      r = calcMode === 'Flat' ? calcRateFlat(p, e, n, inputs.tenureUnit) : calcRateBinary(p, e, n, k);
     } else if (has('principal') && has('emi') && has('repay')) {
       n = e > 0 ? a / e : 0;
-      r = calcMode === 'Flat' ? calcRateFlat(p, e, n) : calcRateBinary(p, e, n, k);
+      r = calcMode === 'Flat' ? calcRateFlat(p, e, n, inputs.tenureUnit) : calcRateBinary(p, e, n, k);
     } else if (has('rate') && has('tenure') && has('emi')) {
       a = e * n;
-      p = calcMode === 'Flat' ? calcPrincipalFlat(r, n, e) : calcPrincipal(r, n, e, k);
+      p = calcMode === 'Flat' ? calcPrincipalFlat(r, n, e, inputs.tenureUnit) : calcPrincipal(r, n, e, k);
     } else if (has('rate') && has('tenure') && has('repay')) {
       e = n > 0 ? a / n : 0;
-      p = calcMode === 'Flat' ? calcPrincipalFlat(r, n, e) : calcPrincipal(r, n, e, k);
+      p = calcMode === 'Flat' ? calcPrincipalFlat(r, n, e, inputs.tenureUnit) : calcPrincipal(r, n, e, k);
     } else if (has('rate') && has('emi') && has('repay')) {
       n = e > 0 ? a / e : 0;
-      p = calcMode === 'Flat' ? calcPrincipalFlat(r, n, e) : calcPrincipal(r, n, e, k);
+      p = calcMode === 'Flat' ? calcPrincipalFlat(r, n, e, inputs.tenureUnit) : calcPrincipal(r, n, e, k);
     } else if (has('principal') && has('rate') && has('repay')) {
-      n = calcMode === 'Flat' ? solveTenureFromRepayFlat(p, r, a, n) : solveTenureFromRepay(p, r, a, k);
+      n = calcMode === 'Flat' ? solveTenureFromRepayFlat(p, r, a, n, inputs.tenureUnit) : solveTenureFromRepay(p, r, a, k);
       e = n > 0 ? a / n : 0;
     } else {
-      e = calcMode === 'Flat' ? calcEmiFlat(p, r, n) : calcEmi(p, r, n, k);
+      e = calcMode === 'Flat' ? calcEmiFlat(p, r, n, inputs.tenureUnit) : calcEmi(p, r, n, k);
       a = e * n;
     }
 
@@ -451,19 +568,55 @@ const EMICalculator = ({ onBack }) => {
       repay: a > 0 ? String(a) : ''
     }));
 
+    let outstanding = 0;
+    let prinPaid = 0;
+
+    if (calcMode === 'Banking' && isPaidTenureActive && Number(inputs.paidTenure) > 0) {
+      let r_month = k === 12 ? r / 12 / 100 : (k === 52 ? r / 52 / 100 : r / 365 / 100);
+      let n_total = n; // already converted to periods (e.g. months) above if needed, wait.
+      // Above: if calcMode === 'Banking' && tenureUnit === 'Years', n = n * 12; so n is in months.
+      let k_paid = Number(inputs.paidTenure);
+      if (inputs.tenureUnit === 'Years') {
+        k_paid = k_paid * 12;
+      }
+      k_paid = Math.min(k_paid, n_total);
+
+      if (r_month > 0 && n_total > 0 && k_paid > 0) {
+        const growth = Math.pow(1 + r_month, k_paid);
+        outstanding = (p * growth) - (e * ((growth - 1) / r_month));
+      } else if (r_month === 0 && n_total > 0 && k_paid > 0) {
+        outstanding = p - (e * k_paid);
+      } else {
+        outstanding = p;
+      }
+      outstanding = Math.max(0, Math.round(outstanding));
+      prinPaid = Math.max(0, p - outstanding);
+    }
+
     setCalcOutputs({
       principal: p,
       repay: a,
       emi: e,
-      totalInt: Math.max(0, a - p)
+      totalInt: Math.max(0, a - p),
+      principalPaid: prinPaid,
+      outstandingAmount: outstanding
     });
   };
 
   const handleReset = () => {
-    setInputs(defaultState);
-    setCalcOutputs(defaultOutputs);
+    setInputs({
+      principal: '',
+      rate: '',
+      flatRate: '',
+      flatRatePm: '',
+      tenure: '',
+      paidTenure: '',
+      tenureUnit: calcMode === 'Flat' ? 'Weeks' : 'Months',
+      emi: '',
+      repay: ''
+    });
+    setCalcOutputs(calcMode === 'Flat' ? flatOutputs : bankingOutputs);
     setEditedFields([]);
-    setCalcMode('Flat');
   };
 
   const emiLabel = calcMode === 'Banking' 
@@ -484,7 +637,10 @@ const EMICalculator = ({ onBack }) => {
       }}>
         <EMIIcon />
         <div 
-          onClick={() => setShowModeMenu(!showModeMenu)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowModeMenu(!showModeMenu);
+          }}
           style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
         >
           <h1 style={{
@@ -529,12 +685,31 @@ const EMICalculator = ({ onBack }) => {
       {/* ── Donut + Breakdown ─────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '18px 16px 8px', gap: 12 }}>
         <div style={{ flexShrink: 0 }}>
-          <DonutChart principal={calcOutputs.principal} interest={calcOutputs.totalInt} total={calcOutputs.repay} emi={calcOutputs.emi} />
+          <DonutChart 
+            principal={calcOutputs.principal} 
+            interest={calcOutputs.totalInt} 
+            total={calcOutputs.repay} 
+            emi={calcOutputs.emi} 
+            isPaidTenureMode={isPaidTenureActive}
+            interestPaid={calcOutputs.totalInt - (calcOutputs.totalInt - ((calcOutputs.emi * Number(inputs.paidTenure || 0)) - calcOutputs.principalPaid))} // wait, I didn't add interestPaid to calcOutputs? Let's just pass `interestPaid` down based on `totalPayments - principalPaid`
+            // actually, we can just calculate it in line or add it to handleCalculate. Let's add it inline since it's simple.
+            // EMI * paidTenure - principalPaid
+            // Wait, I should just pass `calcOutputs.totalInt` if we want the actual total interest in the chart. But the center text is "Interest Paid".
+          />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <AmountRow label="Principal Amount" amount={calcOutputs.principal} color="#4a148c" />
-          <AmountRow label="Total Interest"   amount={calcOutputs.totalInt}  color="#990000" />
-          <AmountRow label="Total Amount"     amount={calcOutputs.repay}  color="#cc5200" showDivider={false} />
+          <AmountRow 
+            label={isPaidTenureActive ? "Principal Paid" : "Total Interest"}   
+            amount={isPaidTenureActive ? calcOutputs.principalPaid : calcOutputs.totalInt}  
+            color="#990000" 
+          />
+          <AmountRow 
+            label={isPaidTenureActive ? "Total Outstanding Amount" : "Total Amount"}     
+            amount={isPaidTenureActive ? calcOutputs.outstandingAmount : calcOutputs.repay}  
+            color="#cc5200" 
+            showDivider={false} 
+          />
         </div>
       </div>
 
@@ -578,74 +753,321 @@ const EMICalculator = ({ onBack }) => {
 
         {/* Interest Rate Input */}
         <SectionLabel>Interest Rate (%)</SectionLabel>
-        <div style={{
-          background: '#f0f2f5', borderRadius: 12, padding: '14px 18px',
-          marginBottom: 18, border: '1.5px solid #e4e7eb',
-          display: 'flex', alignItems: 'center'
-        }}>
-          <input
-            type="text"
-            value={inputs.rate}
-            onChange={(e) => {
-              let val = e.target.value.replace(/[^0-9.]/g, '');
-              if ((val.match(/\./g) || []).length > 1) return;
-              handleEdit('rate', val);
-            }}
-            placeholder="0"
-            style={{
-              background: 'transparent', border: 'none', outline: 'none',
-              width: '100%', fontSize: 16, fontWeight: 600, color: '#1a1a2e',
-              fontFamily: "'Inter', Arial, sans-serif"
-            }}
-          />
+        {calcMode === 'Banking' ? (() => {
+          const derivedFlatRateStr = (() => {
+            if (paFocused) return inputs.flatRate;
+            if (inputs.flatRate !== undefined && inputs.flatRate !== '') return inputs.flatRate;
+            if (calcOutputs.principal <= 0) return '';
+            const totalFlatRate = (calcOutputs.totalInt / calcOutputs.principal) * 100;
+            const n = Number(inputs.tenure) || 0;
+            if (n > 0) {
+              if (inputs.tenureUnit === 'Months') return (totalFlatRate / (n / 12)).toFixed(2);
+              if (inputs.tenureUnit === 'Years') return (totalFlatRate / n).toFixed(2);
+            }
+            return totalFlatRate.toFixed(2);
+          })();
+
+          const currentPmValStr = pmFocused
+            ? inputs.flatRatePm
+            : (inputs.flatRatePm !== undefined && inputs.flatRatePm !== ''
+              ? inputs.flatRatePm
+              : (derivedFlatRateStr ? (Number(derivedFlatRateStr) / 12).toFixed(2) : ''));
+          
+          const currentPmNum = Number(currentPmValStr) || 0;
+          const isPaisa = currentPmNum > 0 && currentPmNum < 1.0;
+          
+          const displayPmValue = pmFocused 
+            ? currentPmValStr 
+            : (currentPmValStr ? (isPaisa ? (currentPmNum * 100).toFixed(0) : parseFloat(currentPmNum.toFixed(2)).toString()) : '');
+          
+          const pmSuffix = pmFocused ? '% P.M.' : (isPaisa && currentPmValStr ? 'Paisa P.M.' : '% P.M.');
+
+          const displayBankingRate = rateFocused
+            ? inputs.rate
+            : (inputs.rate !== '' ? inputs.rate : (calcOutputs.rate ? calcOutputs.rate.toFixed(2) : ''));
+
+          return (
+            <div style={{
+              display: 'flex', gap: 14, marginBottom: 18, justifyContent: 'flex-start'
+            }}>
+              {/* Split Flat Rate Box */}
+              <div style={{
+                flex: 1, background: '#f8fafc',
+                border: '1px solid #e2e8f0', borderRadius: 8,
+                display: 'flex', flexDirection: 'column', overflow: 'hidden'
+              }}>
+                <div style={{ padding: '6px 14px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: '#64748b', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                    Flat Rate
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flex: 1 }}>
+                  {/* Left Column: P.A. */}
+                  <div style={{ flex: 1, padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderRight: '1px solid #e2e8f0', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                      <input
+                        type="text"
+                        onFocus={() => setPaFocused(true)}
+                        onBlur={() => setPaFocused(false)}
+                        value={derivedFlatRateStr}
+                        onChange={(e) => {
+                          let val = e.target.value.replace(/[^0-9.]/g, '');
+                          if ((val.match(/\./g) || []).length > 1) return;
+                          handleEdit('flatRate', val);
+                        }}
+                        placeholder="0"
+                        style={{
+                          background: 'transparent', border: 'none', outline: 'none',
+                          width: Math.max(30, String(derivedFlatRateStr).length * 9 + 5),
+                          fontSize: 15, fontWeight: 800, color: '#334155',
+                          fontFamily: "'Inter', Arial, sans-serif", textAlign: 'center'
+                        }}
+                      />
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', marginLeft: 2, whiteSpace: 'nowrap' }}>% P.A.</span>
+                    </div>
+                  </div>
+                  {/* Right Column: P.M. */}
+                  <div style={{ flex: 1, padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                      <input
+                        type="text"
+                        onFocus={() => setPmFocused(true)}
+                        onBlur={() => setPmFocused(false)}
+                        value={displayPmValue}
+                        onChange={(e) => {
+                          let val = e.target.value.replace(/[^0-9.]/g, '');
+                          if ((val.match(/\./g) || []).length > 1) return;
+                          handleEdit('flatRatePm', val);
+                        }}
+                        placeholder="0"
+                        style={{
+                          background: 'transparent', border: 'none', outline: 'none',
+                          width: Math.max(30, String(displayPmValue).length * 9 + 5),
+                          fontSize: 15, fontWeight: 800, color: '#334155',
+                          fontFamily: "'Inter', Arial, sans-serif", textAlign: 'center'
+                        }}
+                      />
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', marginLeft: 2, whiteSpace: 'nowrap' }}>{pmSuffix}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Banking Rate Box */}
+              <div style={{
+                flex: '0 0 auto', padding: '0', background: '#ffffff',
+                border: '1px solid #cbd5e1', borderRadius: 8,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                display: 'flex', flexDirection: 'column', overflow: 'hidden'
+              }}>
+                <div style={{ padding: '6px 14px', background: '#f0f9ff', borderBottom: '1px solid #e0f2fe', textAlign: 'center' }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: '#0ea5e9', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                    Banking Rate
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flex: 1, padding: '10px 14px', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                    <input
+                      type="text"
+                      onFocus={() => setRateFocused(true)}
+                      onBlur={() => setRateFocused(false)}
+                      value={displayBankingRate}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/[^0-9.]/g, '');
+                        if ((val.match(/\./g) || []).length > 1) return;
+                        handleEdit('rate', val);
+                      }}
+                      placeholder="0"
+                      style={{
+                        background: 'transparent', border: 'none', outline: 'none',
+                        width: Math.max(30, String(displayBankingRate || '').length * 9 + 5),
+                        fontSize: 15, fontWeight: 800, color: '#0284c7',
+                        fontFamily: "'Inter', Arial, sans-serif", textAlign: 'center'
+                      }}
+                    />
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#7dd3fc', marginLeft: 2, whiteSpace: 'nowrap' }}>% P.A.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })() : (
+          <div style={{
+            background: '#f0f2f5', borderRadius: 12, padding: '14px 18px',
+            marginBottom: 18, border: '1.5px solid #e4e7eb',
+            display: 'flex', alignItems: 'center'
+          }}>
+            <input
+              type="text"
+              value={inputs.rate}
+              onChange={(e) => {
+                let val = e.target.value.replace(/[^0-9.]/g, '');
+                if ((val.match(/\./g) || []).length > 1) return;
+                handleEdit('rate', val);
+              }}
+              placeholder="0"
+              style={{
+                background: 'transparent', border: 'none', outline: 'none',
+                width: '100%', fontSize: 16, fontWeight: 600, color: '#1a1a2e',
+                fontFamily: "'Inter', Arial, sans-serif"
+              }}
+            />
+          </div>
+        )}
+
+        <div style={{ position: 'relative', marginBottom: 7, display: 'flex', alignItems: 'center' }}>
+          <p style={{
+            margin: 0,
+            fontSize: 11.5, fontWeight: 900, color: '#1a1a1a', letterSpacing: 1.1,
+            textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
+            display: 'flex', alignItems: 'center', gap: 6
+          }}>
+            TENURE
+            {calcMode === 'Banking' && (
+              <span 
+                onClick={(e) => { e.stopPropagation(); setShowTenureMenu(!showTenureMenu); }}
+                style={{ cursor: 'pointer', color: '#ff6b00', fontSize: 10, padding: '2px 4px', display: 'inline-block' }}
+              >
+                ▼
+              </span>
+            )}
+          </p>
+          {showTenureMenu && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0,
+              background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.12)', zIndex: 50, overflow: 'hidden',
+              width: 180, marginTop: 8
+            }}>
+              <div 
+                onClick={() => { setIsPaidTenureActive(false); setShowTenureMenu(false); }}
+                style={{
+                  padding: '12px 14px', fontSize: 13, fontWeight: 700, color: !isPaidTenureActive ? '#0284c7' : '#4a5568',
+                  background: !isPaidTenureActive ? '#f0f9ff' : '#fff', cursor: 'pointer',
+                  borderBottom: '1px solid #edf2f7', fontFamily: "'Inter', Arial, sans-serif"
+                }}
+              >
+                Standard Tenure
+              </div>
+              <div 
+                onClick={() => { setIsPaidTenureActive(true); setShowTenureMenu(false); }}
+                style={{
+                  padding: '12px 14px', fontSize: 13, fontWeight: 700, color: isPaidTenureActive ? '#0284c7' : '#4a5568',
+                  background: isPaidTenureActive ? '#f0f9ff' : '#fff', cursor: 'pointer', fontFamily: "'Inter', Arial, sans-serif"
+                }}
+              >
+                Paid Tenure
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Tenure & Unit Input */}
-        <SectionLabel>Tenure</SectionLabel>
-        <div style={{
-          background: '#f0f2f5', borderRadius: 12, padding: '14px 18px',
-          marginBottom: 20, border: '1.5px solid #e4e7eb',
-          display: 'flex', alignItems: 'center'
-        }}>
-          <input
-            type="text"
-            value={inputs.tenure}
-            onChange={(e) => {
-              let val = e.target.value.replace(/[^0-9.]/g, '');
-              if ((val.match(/\./g) || []).length > 1) return;
-              handleEdit('tenure', val);
-            }}
-            placeholder="0"
-            style={{
-              background: 'transparent', border: 'none', outline: 'none',
-              flex: 1, fontSize: 16, fontWeight: 600, color: '#1a1a2e',
-              fontFamily: "'Inter', Arial, sans-serif"
-            }}
-          />
-          <select
-            value={inputs.tenureUnit}
-            onChange={(e) => setInputs(prev => ({...prev, tenureUnit: e.target.value}))}
-            style={{
-              background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 16, fontWeight: 800, color: '#1a1a2e',
-              fontFamily: "'Inter', Arial, sans-serif", marginLeft: 8
-            }}
-          >
-            {calcMode === 'Flat' ? (
-              <>
-                <option value="Months">Months</option>
-                <option value="Years">Years</option>
-                <option value="Weeks">Weeks</option>
-                <option value="Days">Days</option>
-              </>
-            ) : (
-              <>
-                <option value="Months">Months</option>
-                <option value="Years">Years</option>
-              </>
-            )}
-          </select>
-        </div>
+        {isPaidTenureActive && calcMode === 'Banking' ? (
+          <div style={{
+            display: 'flex', background: '#f8fafc', borderRadius: 12,
+            marginBottom: 20, border: '1.5px solid #e2e8f0', overflow: 'hidden'
+          }}>
+            <div style={{ flex: 1, padding: '10px 14px', borderRight: '1.5px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 }}>
+                Total Tenure
+              </span>
+              <input
+                type="text"
+                value={inputs.tenure}
+                onChange={(e) => {
+                  let val = e.target.value.replace(/[^0-9.]/g, '');
+                  if ((val.match(/\./g) || []).length > 1) return;
+                  handleEdit('tenure', val);
+                }}
+                placeholder="0"
+                style={{
+                  background: 'transparent', border: 'none', outline: 'none',
+                  width: '100%', fontSize: 16, fontWeight: 700, color: '#1e293b',
+                  fontFamily: "'Inter', Arial, sans-serif"
+                }}
+              />
+            </div>
+            <div style={{ flex: 1, padding: '10px 14px', display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 }}>
+                Paid Tenure
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={inputs.paidTenure}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/[^0-9.]/g, '');
+                    if ((val.match(/\./g) || []).length > 1) return;
+                    handleEdit('paidTenure', val);
+                  }}
+                  placeholder="0"
+                  style={{
+                    background: 'transparent', border: 'none', outline: 'none',
+                    flex: 1, fontSize: 16, fontWeight: 700, color: '#1e293b',
+                    fontFamily: "'Inter', Arial, sans-serif", width: '100%'
+                  }}
+                />
+                <select
+                  value={inputs.tenureUnit}
+                  onChange={(e) => setInputs(prev => ({...prev, tenureUnit: e.target.value}))}
+                  style={{
+                    background: 'transparent', border: 'none', outline: 'none',
+                    fontSize: 14, fontWeight: 800, color: '#94a3b8',
+                    fontFamily: "'Inter', Arial, sans-serif", marginLeft: 8, cursor: 'pointer'
+                  }}
+                >
+                  <option value="Months">Mo ▼</option>
+                  <option value="Years">Yr ▼</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            background: '#f0f2f5', borderRadius: 12, padding: '14px 18px',
+            marginBottom: 20, border: '1.5px solid #e4e7eb',
+            display: 'flex', alignItems: 'center'
+          }}>
+            <input
+              type="text"
+              value={inputs.tenure}
+              onChange={(e) => {
+                let val = e.target.value.replace(/[^0-9.]/g, '');
+                if ((val.match(/\./g) || []).length > 1) return;
+                handleEdit('tenure', val);
+              }}
+              placeholder="0"
+              style={{
+                background: 'transparent', border: 'none', outline: 'none',
+                flex: 1, fontSize: 16, fontWeight: 600, color: '#1a1a2e',
+                fontFamily: "'Inter', Arial, sans-serif"
+              }}
+            />
+            <select
+              value={inputs.tenureUnit}
+              onChange={(e) => setInputs(prev => ({...prev, tenureUnit: e.target.value}))}
+              style={{
+                background: 'transparent', border: 'none', outline: 'none',
+                fontSize: 16, fontWeight: 800, color: '#1a1a2e',
+                fontFamily: "'Inter', Arial, sans-serif", marginLeft: 8
+              }}
+            >
+              {calcMode === 'Flat' ? (
+                <>
+                  <option value="Months">Months</option>
+                  <option value="Years">Years</option>
+                  <option value="Weeks">Weeks</option>
+                  <option value="Days">Days</option>
+                </>
+              ) : (
+                <>
+                  <option value="Months">Months</option>
+                  <option value="Years">Years</option>
+                </>
+              )}
+            </select>
+          </div>
+        )}
 
         {/* Monthly EMI Input */}
         <div style={{ textAlign: 'center', paddingBottom: 6 }}>
