@@ -19,6 +19,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [appNumber] = useState(initialData?.appNumber || Math.floor(1000000000 + Math.random() * 9000000000));
   const [customerId] = useState(initialData?.id || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
   const [photo, setPhoto] = useState(initialData?.image || null);
+  const [branch, setBranch] = useState(initialData?.branch || 'Batlagundu');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -355,7 +356,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         repayAmount: parseFloat(repayAmount) || 0,
         category: 'Upcoming',
         // Schema Verification: Explicit mapping
-        appDate, appDay, appNumber, image: finalPhoto,
+        appDate, appDay, appNumber, image: finalPhoto, branch,
         center, city, district, nameTitle, customerName,
         phone, altPhone, customerStatus, dob, age,
         gender, maritalStatus, religion: '', caste: '', education: '', occupation,
@@ -566,17 +567,33 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">REGISTRATION DATA</h3>
           
-          <div className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-400 mb-5 bg-slate-50 cursor-pointer hover:bg-slate-100 overflow-hidden relative" onClick={handlePhotoCapture}>
-            {photo ? (
-              <img src={photo} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span className="text-[10px] font-medium">Tap to Capture</span>
-              </>
-            )}
+          <div className="flex gap-4 mb-5 items-start">
+            <div className="w-24 h-24 shrink-0 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100 overflow-hidden relative" onClick={handlePhotoCapture}>
+              {photo ? (
+                <img src={photo} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className="text-[10px] font-medium">Tap to Capture</span>
+                </>
+              )}
+            </div>
+            
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Select Branch</label>
+              <select 
+                value={branch} 
+                onChange={(e) => setBranch(e.target.value)}
+                className="w-full p-3 border border-slate-200 rounded-xl bg-white outline-none font-medium text-slate-700"
+              >
+                <option value="Batlagundu">Batlagundu</option>
+                <option value="Nilakottai">Nilakottai</option>
+                <option value="Sempatti">Sempatti</option>
+                <option value="Periyakulam">Periyakulam</option>
+              </select>
+            </div>
           </div>
 
           <div className="space-y-4">
