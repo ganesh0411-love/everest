@@ -7,7 +7,8 @@ import FloatingActionButton from './components/FloatingActionButton';
 import Footer from './components/Footer';
 import { 
   CheckCircle2, LayoutGrid, CalendarClock, TrendingUp, 
-  Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownAZ 
+  Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownAZ,
+  Banknote, User, Sprout, CalendarDays
 } from 'lucide-react';
 import { 
   Centers, 
@@ -187,12 +188,15 @@ function App() {
   // Filter, Sort, and Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState('Microfinance');
   const [activeSort, setActiveSort] = useState('Recent');
   
   // Temp state for the modal before applying
-  const [tempCategory, setTempCategory] = useState('All');
+  const [tempCategory, setTempCategory] = useState('Microfinance');
   const [tempSort, setTempSort] = useState('Recent');
+
+  const currentViewRef = useRef(currentView);
+  useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
 
   // Hardware Back Button & Double-Tap Exit
   useEffect(() => {
@@ -209,42 +213,43 @@ function App() {
 
         // 2. Handle View History Stack
         setViewHistory(prev => {
-          if (prev.length > 1) {
-            const newHistory = [...prev];
-            newHistory.pop(); // Remove current view
-            const prevView = newHistory[newHistory.length - 1];
-            setCurrentView(prevView);
-            return newHistory;
-          } else {
-            const activeView = prev[0];
-            if (activeView === 'Home') {
-              // 3. Double-Tap Exit Guard (strictly restricted to root/Home page)
-              if (backPressCountRef.current === 0) {
-                backPressCountRef.current = 1;
-                const toast = document.createElement('div');
-                toast.id = 'exit-app-toast';
-                toast.innerText = 'Press again to exit';
-                toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg z-[9999] animate-in fade-in';
-                
-                const existingToast = document.getElementById('exit-app-toast');
-                if (existingToast) existingToast.remove();
-                
-                document.body.appendChild(toast);
-                
-                backTimeout = setTimeout(() => {
-                  backPressCountRef.current = 0;
-                  const toastToRemove = document.getElementById('exit-app-toast');
-                  if (toastToRemove) toastToRemove.remove();
-                }, 2000);
-                return prev;
-              } else {
-                CapacitorApp.exitApp();
-                return prev;
-              }
+          const actualView = currentViewRef.current;
+          
+          if (actualView !== 'Home') {
+            if (prev.length > 1) {
+              const newHistory = [...prev];
+              newHistory.pop(); // Remove current view
+              const prevView = newHistory[newHistory.length - 1];
+              setCurrentView(prevView);
+              return newHistory;
             } else {
               // If not on Home but history is at root, smoothly navigate back to Home
               setCurrentView('Home');
               return ['Home'];
+            }
+          } else {
+            // 3. Double-Tap Exit Guard (strictly restricted to root/Home page)
+            if (backPressCountRef.current === 0) {
+              backPressCountRef.current = 1;
+              const toast = document.createElement('div');
+              toast.id = 'exit-app-toast';
+              toast.innerText = 'Press again to exit';
+              toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg z-[9999] animate-in fade-in';
+              
+              const existingToast = document.getElementById('exit-app-toast');
+              if (existingToast) existingToast.remove();
+              
+              document.body.appendChild(toast);
+              
+              backTimeout = setTimeout(() => {
+                backPressCountRef.current = 0;
+                const toastToRemove = document.getElementById('exit-app-toast');
+                if (toastToRemove) toastToRemove.remove();
+              }, 2000);
+              return prev;
+            } else {
+              CapacitorApp.exitApp();
+              return prev;
             }
           }
         });
@@ -308,7 +313,13 @@ function App() {
     let filtered = [...customers];
     
     if (activeCategory !== 'All') {
-      filtered = filtered.filter(c => c.category === activeCategory);
+      const loanTypeCategories = ['Microfinance', 'Personal Loan', 'Agri Loan', 'Weekly Loan'];
+      if (loanTypeCategories.includes(activeCategory)) {
+        const matchType = activeCategory === 'Microfinance' ? 'Micro Finance' : activeCategory;
+        filtered = filtered.filter(c => c.loanType === activeCategory || c.loanType === matchType);
+      } else {
+        filtered = filtered.filter(c => c.category === activeCategory);
+      }
     }
 
     if (searchQuery.trim() !== '') {
@@ -649,7 +660,11 @@ function App() {
                     { name: 'All', icon: LayoutGrid, color: 'text-blue-500' },
                     { name: 'Settled', icon: CheckCircle2, color: 'text-emerald-500' },
                     { name: 'Due Date', icon: CalendarClock, color: 'text-amber-500' },
-                    { name: 'Upcoming', icon: TrendingUp, color: 'text-purple-500' }
+                    { name: 'Upcoming', icon: TrendingUp, color: 'text-purple-500' },
+                    { name: 'Microfinance', icon: Banknote, color: 'text-teal-500' },
+                    { name: 'Personal Loan', icon: User, color: 'text-rose-500' },
+                    { name: 'Agri Loan', icon: Sprout, color: 'text-green-500' },
+                    { name: 'Weekly Loan', icon: CalendarDays, color: 'text-orange-500' }
                   ].map(cat => {
                     const Icon = cat.icon;
                     const isActive = tempCategory === cat.name;
