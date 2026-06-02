@@ -22,3 +22,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backup folders and archives
+../*Backup*/
+../*.7z
+../*.zip
+../*.mp4
+
+# Scratch/utility scripts
+../check_may27.cjs
+../extract_prompts.cjs
+../read_inputs.cjs
+../inputs.txt
+../prompts_up_to_0921.json
