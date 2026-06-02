@@ -83,17 +83,17 @@ const DonutChart = ({ principal, interest, total }) => {
   return (
     <div style={{ position: 'relative', width: SIZE, height: SIZE }}>
       <svg width={SIZE} height={SIZE}>
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#4A90D9"
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#4a148c"
           strokeWidth={SW}
           strokeDasharray={`${bLen - GAP} ${CIRC}`}
           strokeDashoffset={0}
           strokeLinecap="butt" transform={rotate} />
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#C0392B"
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#990000"
           strokeWidth={SW}
           strokeDasharray={`${rLen - GAP} ${CIRC}`}
           strokeDashoffset={-(bLen + GAP)}
           strokeLinecap="butt" transform={rotate} />
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#E07B39"
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#cc5200"
           strokeWidth={SW}
           strokeDasharray={`${oLen - GAP} ${CIRC}`}
           strokeDashoffset={-(bLen + GAP + rLen + GAP)}
@@ -108,8 +108,8 @@ const DonutChart = ({ principal, interest, total }) => {
       }}>
         <p style={{
           margin: 0,
-          fontSize: 11,
-          fontWeight: 700,
+          fontSize: 14,
+          fontWeight: 900,
           color: '#888',
           letterSpacing: 1,
           textTransform: 'uppercase',
@@ -119,7 +119,7 @@ const DonutChart = ({ principal, interest, total }) => {
         </p>
         <p style={{
           margin: 0,
-          fontSize: 15,
+          fontSize: 22,
           fontWeight: 900,
           color: '#0A1F6E',
           fontFamily: "'Inter', 'Roboto', Arial, sans-serif",
@@ -280,9 +280,9 @@ const EMICalculator = ({ onBack }) => {
         </div>
         {/* Right-side breakdown — In Words only here */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <AmountRow label="Principal Amount" amount={principal} color="#4A90D9" />
-          <AmountRow label="Total Interest"   amount={totalInt}  color="#C0392B" />
-          <AmountRow label="Total Amount"     amount={totalAmt}  color="#E07B39" showDivider={false} />
+          <AmountRow label="Principal Amount" amount={principal} color="#4a148c" />
+          <AmountRow label="Total Interest"   amount={totalInt}  color="#990000" />
+          <AmountRow label="Total Amount"     amount={totalAmt}  color="#cc5200" showDivider={false} />
         </div>
       </div>
 
@@ -298,14 +298,14 @@ const EMICalculator = ({ onBack }) => {
         }}>
           <div style={{ flex: 1, padding: '13px 14px' }}>
             <p style={{
-              margin: '0 0 3px', fontSize: 10, fontWeight: 700,
-              color: '#aaa', letterSpacing: 0.8,
+              margin: '0 0 3px', fontSize: 10, fontWeight: 800,
+              color: '#000000', letterSpacing: 0.8,
             }}>
               LOAN AMOUNT
             </p>
             <p style={{
-              margin: 0, fontSize: 17, fontWeight: 800,
-              color: '#4A90D9',
+              margin: 0, fontSize: 17, fontWeight: 900,
+              color: '#4a148c',
               fontFamily: "'Inter', 'Roboto', Arial, sans-serif",
             }}>
               ₹ {principal.toLocaleString('en-IN')}
@@ -314,14 +314,14 @@ const EMICalculator = ({ onBack }) => {
           <div style={{ width: 1.5, background: '#e2d9c8', margin: '10px 0' }} />
           <div style={{ flex: 1, padding: '13px 14px' }}>
             <p style={{
-              margin: '0 0 3px', fontSize: 10, fontWeight: 700,
-              color: '#aaa', letterSpacing: 0.8,
+              margin: '0 0 3px', fontSize: 10, fontWeight: 800,
+              color: '#000000', letterSpacing: 0.8,
             }}>
               REPAY AMOUNT
             </p>
             <p style={{
-              margin: 0, fontSize: 17, fontWeight: 800,
-              color: '#E07B39',
+              margin: 0, fontSize: 17, fontWeight: 900,
+              color: '#cc5200',
               fontFamily: "'Inter', 'Roboto', Arial, sans-serif",
             }}>
               ₹ {totalAmt.toLocaleString('en-IN')}
