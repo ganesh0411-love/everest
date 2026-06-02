@@ -404,13 +404,15 @@ const EMICalculator = ({ onBack }) => {
   const [rateFocused, setRateFocused] = useState(false);
   const [isPaidTenureActive, setIsPaidTenureActive] = useState(false);
   const [showTenureMenu, setShowTenureMenu] = useState(false);
+  const [showTenureUnitMenu, setShowTenureUnitMenu] = useState(false);
 
   useEffect(() => {
     const handleDismiss = () => {
       setShowModeMenu(false);
       setShowTenureMenu(false);
+      setShowTenureUnitMenu(false);
     };
-    if (showModeMenu || showTenureMenu) {
+    if (showModeMenu || showTenureMenu || showTenureUnitMenu) {
       window.addEventListener('scroll', handleDismiss, true);
       window.addEventListener('click', handleDismiss);
     }
@@ -418,7 +420,7 @@ const EMICalculator = ({ onBack }) => {
       window.removeEventListener('scroll', handleDismiss, true);
       window.removeEventListener('click', handleDismiss);
     };
-  }, [showModeMenu, showTenureMenu]);
+  }, [showModeMenu, showTenureMenu, showTenureUnitMenu]);
 
   const handleModeChange = (mode) => {
     setCalcMode(mode);
@@ -460,7 +462,7 @@ const EMICalculator = ({ onBack }) => {
   };
 
   const handleCalculate = () => {
-    let activeKnowns = [...editedFields];
+    let activeKnowns = [...editedFields].filter(k => k !== 'paidTenure');
     let overrideRepay = null;
 
     if (activeKnowns.includes('flatRate')) {
@@ -570,27 +572,39 @@ const EMICalculator = ({ onBack }) => {
 
     let outstanding = 0;
     let prinPaid = 0;
+    let intPaid = 0;
 
     if (calcMode === 'Banking' && isPaidTenureActive && Number(inputs.paidTenure) > 0) {
       let r_month = k === 12 ? r / 12 / 100 : (k === 52 ? r / 52 / 100 : r / 365 / 100);
-      let n_total = n; // already converted to periods (e.g. months) above if needed, wait.
-      // Above: if calcMode === 'Banking' && tenureUnit === 'Years', n = n * 12; so n is in months.
+      let n_total = n; 
       let k_paid = Number(inputs.paidTenure);
       if (inputs.tenureUnit === 'Years') {
         k_paid = k_paid * 12;
       }
       k_paid = Math.min(k_paid, n_total);
 
+      let currentOutstanding = p;
+      let totalPrinPaid = 0;
+      let totalIntPaid = 0;
+
       if (r_month > 0 && n_total > 0 && k_paid > 0) {
-        const growth = Math.pow(1 + r_month, k_paid);
-        outstanding = (p * growth) - (e * ((growth - 1) / r_month));
+        for (let month = 1; month <= k_paid; month++) {
+          let monthlyInterest = Math.round(currentOutstanding * r_month);
+          let monthlyPrinPaid = e - monthlyInterest;
+          currentOutstanding -= monthlyPrinPaid;
+          totalIntPaid += monthlyInterest;
+          totalPrinPaid += monthlyPrinPaid;
+        }
+        outstanding = Math.max(0, currentOutstanding);
       } else if (r_month === 0 && n_total > 0 && k_paid > 0) {
-        outstanding = p - (e * k_paid);
+        outstanding = Math.max(0, p - (e * k_paid));
+        totalPrinPaid = p - outstanding;
       } else {
         outstanding = p;
       }
-      outstanding = Math.max(0, Math.round(outstanding));
-      prinPaid = Math.max(0, p - outstanding);
+
+      prinPaid = Math.max(0, totalPrinPaid);
+      intPaid = Math.max(0, totalIntPaid);
     }
 
     setCalcOutputs({
@@ -599,7 +613,8 @@ const EMICalculator = ({ onBack }) => {
       emi: e,
       totalInt: Math.max(0, a - p),
       principalPaid: prinPaid,
-      outstandingAmount: outstanding
+      outstandingAmount: outstanding,
+      interestPaid: intPaid
     });
   };
 
@@ -691,10 +706,7 @@ const EMICalculator = ({ onBack }) => {
             total={calcOutputs.repay} 
             emi={calcOutputs.emi} 
             isPaidTenureMode={isPaidTenureActive}
-            interestPaid={calcOutputs.totalInt - (calcOutputs.totalInt - ((calcOutputs.emi * Number(inputs.paidTenure || 0)) - calcOutputs.principalPaid))} // wait, I didn't add interestPaid to calcOutputs? Let's just pass `interestPaid` down based on `totalPayments - principalPaid`
-            // actually, we can just calculate it in line or add it to handleCalculate. Let's add it inline since it's simple.
-            // EMI * paidTenure - principalPaid
-            // Wait, I should just pass `calcOutputs.totalInt` if we want the actual total interest in the chart. But the center text is "Interest Paid".
+            interestPaid={calcOutputs.interestPaid || 0}
           />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1007,18 +1019,44 @@ const EMICalculator = ({ onBack }) => {
                     fontFamily: "'Inter', Arial, sans-serif", width: '100%'
                   }}
                 />
-                <select
-                  value={inputs.tenureUnit}
-                  onChange={(e) => setInputs(prev => ({...prev, tenureUnit: e.target.value}))}
-                  style={{
-                    background: 'transparent', border: 'none', outline: 'none',
-                    fontSize: 14, fontWeight: 800, color: '#94a3b8',
-                    fontFamily: "'Inter', Arial, sans-serif", marginLeft: 8, cursor: 'pointer'
-                  }}
-                >
-                  <option value="Months">Mo ▼</option>
-                  <option value="Years">Yr ▼</option>
-                </select>
+                <div style={{ position: 'relative' }}>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); setShowTenureUnitMenu(!showTenureUnitMenu); }}
+                    style={{
+                      fontSize: 14, color: '#94a3b8', marginLeft: 8, cursor: 'pointer', padding: '2px 4px', display: 'inline-block'
+                    }}
+                  >
+                    ▼
+                  </span>
+                  {showTenureUnitMenu && (
+                    <div style={{
+                      position: 'absolute', top: '100%', right: 0,
+                      background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.12)', zIndex: 50, overflow: 'hidden',
+                      width: 120, marginTop: 8
+                    }}>
+                      <div 
+                        onClick={() => { setInputs(prev => ({...prev, tenureUnit: 'Months'})); setShowTenureUnitMenu(false); }}
+                        style={{
+                          padding: '12px 14px', fontSize: 13, fontWeight: 700, color: inputs.tenureUnit === 'Months' ? '#0284c7' : '#4a5568',
+                          background: inputs.tenureUnit === 'Months' ? '#f0f9ff' : '#fff', cursor: 'pointer',
+                          borderBottom: '1px solid #edf2f7', fontFamily: "'Inter', Arial, sans-serif"
+                        }}
+                      >
+                        Months
+                      </div>
+                      <div 
+                        onClick={() => { setInputs(prev => ({...prev, tenureUnit: 'Years'})); setShowTenureUnitMenu(false); }}
+                        style={{
+                          padding: '12px 14px', fontSize: 13, fontWeight: 700, color: inputs.tenureUnit === 'Years' ? '#0284c7' : '#4a5568',
+                          background: inputs.tenureUnit === 'Years' ? '#f0f9ff' : '#fff', cursor: 'pointer', fontFamily: "'Inter', Arial, sans-serif"
+                        }}
+                      >
+                        Years
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
