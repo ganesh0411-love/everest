@@ -8,8 +8,8 @@
   }
   
   .interactive-card {
-    border: 1px solid rgba(216, 137, 47, 0.4);
-    box-shadow: 0 0 15px rgba(216, 137, 47, 0.3);
+    border: 1px solid rgba(16, 163, 127, 0.4);
+    box-shadow: 0 0 15px rgba(16, 163, 127, 0.3);
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     cursor: pointer;
     will-change: transform, box-shadow, border-color;
@@ -17,13 +17,10 @@
   }
 
   .interactive-card:hover,
-  .interactive-card:active,
-  .interactive-card:focus,
-  .interactive-card:focus-within,
   .interactive-card.touch-boom {
     transform: translateY(-4px) scale(1.03) !important;
-    border-color: rgba(216, 137, 47, 1) !important;
-    box-shadow: 0 0 40px rgba(216, 137, 47, 0.9) !important;
+    border-color: rgba(16, 163, 127, 1) !important;
+    box-shadow: 0 0 40px rgba(16, 163, 127, 0.9) !important;
     z-index: 50 !important;
   }
 }
