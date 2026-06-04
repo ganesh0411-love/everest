@@ -60,6 +60,7 @@ const CurrencyInput = ({ value, onChange, color, fontSize = 17, autoWidth, style
   return (
     <input
       type="text"
+      inputMode="decimal"
       value={displayVal}
       onChange={(e) => {
         const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -437,6 +438,7 @@ const EMICalculator = ({ onBack }) => {
     });
     setCalcOutputs(mode === 'Flat' ? flatOutputs : bankingOutputs);
     setEditedFields([]);
+    setIsPaidTenureActive(false);
   };
 
   const handleEdit = (field, val) => {
@@ -632,6 +634,7 @@ const EMICalculator = ({ onBack }) => {
     });
     setCalcOutputs(calcMode === 'Flat' ? flatOutputs : bankingOutputs);
     setEditedFields([]);
+    setIsPaidTenureActive(false);
   };
 
   const emiLabel = calcMode === 'Banking' 
@@ -705,20 +708,20 @@ const EMICalculator = ({ onBack }) => {
             interest={calcOutputs.totalInt} 
             total={calcOutputs.repay} 
             emi={calcOutputs.emi} 
-            isPaidTenureMode={isPaidTenureActive}
+            isPaidTenureMode={calcMode === 'Banking' && isPaidTenureActive}
             interestPaid={calcOutputs.interestPaid || 0}
           />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <AmountRow label="Principal Amount" amount={calcOutputs.principal} color="#4a148c" />
           <AmountRow 
-            label={isPaidTenureActive ? "Principal Paid" : "Total Interest"}   
-            amount={isPaidTenureActive ? calcOutputs.principalPaid : calcOutputs.totalInt}  
+            label={(calcMode === 'Banking' && isPaidTenureActive) ? "Principal Paid" : "Total Interest"}   
+            amount={(calcMode === 'Banking' && isPaidTenureActive) ? calcOutputs.principalPaid : calcOutputs.totalInt}  
             color="#990000" 
           />
           <AmountRow 
-            label={isPaidTenureActive ? "Total Outstanding Amount" : "Total Amount"}     
-            amount={isPaidTenureActive ? calcOutputs.outstandingAmount : calcOutputs.repay}  
+            label={(calcMode === 'Banking' && isPaidTenureActive) ? "Total Outstanding Amount" : "Total Amount"}     
+            amount={(calcMode === 'Banking' && isPaidTenureActive) ? calcOutputs.outstandingAmount : calcOutputs.repay}  
             color="#cc5200" 
             showDivider={false} 
           />
@@ -819,6 +822,7 @@ const EMICalculator = ({ onBack }) => {
                     <div style={{ display: 'flex', alignItems: 'baseline' }}>
                       <input
                         type="text"
+                        inputMode="decimal"
                         onFocus={() => setPaFocused(true)}
                         onBlur={() => setPaFocused(false)}
                         value={derivedFlatRateStr}
@@ -843,6 +847,7 @@ const EMICalculator = ({ onBack }) => {
                     <div style={{ display: 'flex', alignItems: 'baseline' }}>
                       <input
                         type="text"
+                        inputMode="decimal"
                         onFocus={() => setPmFocused(true)}
                         onBlur={() => setPmFocused(false)}
                         value={displayPmValue}
@@ -881,6 +886,7 @@ const EMICalculator = ({ onBack }) => {
                   <div style={{ display: 'flex', alignItems: 'baseline' }}>
                     <input
                       type="text"
+                      inputMode="decimal"
                       onFocus={() => setRateFocused(true)}
                       onBlur={() => setRateFocused(false)}
                       value={displayBankingRate}
@@ -911,6 +917,7 @@ const EMICalculator = ({ onBack }) => {
           }}>
             <input
               type="text"
+              inputMode="decimal"
               value={inputs.rate}
               onChange={(e) => {
                 let val = e.target.value.replace(/[^0-9.]/g, '');
@@ -985,6 +992,7 @@ const EMICalculator = ({ onBack }) => {
               </span>
               <input
                 type="text"
+                inputMode="decimal"
                 value={inputs.tenure}
                 onChange={(e) => {
                   let val = e.target.value.replace(/[^0-9.]/g, '');
@@ -1006,6 +1014,7 @@ const EMICalculator = ({ onBack }) => {
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <input
                   type="text"
+                  inputMode="decimal"
                   value={inputs.paidTenure}
                   onChange={(e) => {
                     let val = e.target.value.replace(/[^0-9.]/g, '');
@@ -1068,6 +1077,7 @@ const EMICalculator = ({ onBack }) => {
           }}>
             <input
               type="text"
+              inputMode="decimal"
               value={inputs.tenure}
               onChange={(e) => {
                 let val = e.target.value.replace(/[^0-9.]/g, '');
