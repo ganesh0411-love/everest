@@ -329,9 +329,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
     setIsSubmitting(true);
     try {
       let finalPhoto = photo;
-      if (photo && !photo.includes('firebasestorage.googleapis.com')) {
-         finalPhoto = await uploadImageToStorage(photo, 'profile_pics', `${customerId}_profile`);
-      }
+
 
       // Strip fileObj from kycDocs to prevent Firestore 'custom object' errors
       const cleanKycDocs = (docs) => {
@@ -419,10 +417,19 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
              uploadNomineeKycDocs('smartCard', 'smart_card')
           ]);
 
+          let updatedProfilePic = finalPhoto;
+          if (photo && !photo.includes('firebasestorage.googleapis.com')) {
+             try {
+                updatedProfilePic = await uploadImageToStorage(photo, 'profile_pics', `${customerId}_profile`);
+             } catch (imgError) {
+                console.warn('Could not upload profile photo, keeping base64:', imgError);
+             }
+          }
+
           const { doc, updateDoc } = await import('firebase/firestore');
           const { db } = await import('../firebase');
           await updateDoc(doc(db, 'customers', customerId), {
-            image: finalPhoto,
+            image: updatedProfilePic,
             kycDocs: cleanKycDocs(finalKycDocs)
           });
         } catch (e) {
