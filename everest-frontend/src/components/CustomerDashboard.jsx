@@ -1,6 +1,7 @@
 import React from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
+import OfflineImage from './OfflineImage';
 
 const CustomerDashboard = ({ userProfile, customers }) => {
   const handleLogout = async () => {
@@ -40,7 +41,7 @@ const CustomerDashboard = ({ userProfile, customers }) => {
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                <div className="w-16 h-16 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border-2 border-brand-blue">
-                 <img src={myData.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(myData.name)}`} alt="Profile" className="w-full h-full object-cover" />
+                 <OfflineImage src={myData.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(myData.name)}`} alt="Profile" className="w-full h-full object-cover" />
                </div>
                <div>
                  <h2 className="text-xl font-bold text-slate-800">{myData.name}</h2>
