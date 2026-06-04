@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAnalytics } from "firebase/analytics";
 
@@ -19,15 +19,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 auth.settings.appVerificationDisabledForTesting = true;
-const db = getFirestore(app);
+// Enforce browser local persistence for authentication to survive server restarts/tab closes
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.warn('Error setting auth persistence', err);
+});
 
-// Enable offline persistence for customer data visibility
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-  } else if (err.code === 'unimplemented') {
-    console.warn('The current browser does not support all of the features required to enable persistence.');
-  }
+// Use robust persistent cache for Firebase v9+ / v10+ instead of deprecated enableIndexedDbPersistence
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
 });
 
 const storage = getStorage(app);

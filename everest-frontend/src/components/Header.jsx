@@ -30,6 +30,8 @@ const Header = ({ currentView, setCurrentView }) => {
     if (window.confirm("Are you sure you want to logout?")) {
       try {
         await signOut(auth);
+        localStorage.removeItem('everest_user_profile');
+        localStorage.removeItem('everest_customers');
       } catch (error) {
         console.error('Error signing out:', error);
       }

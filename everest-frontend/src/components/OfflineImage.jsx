@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { saveImageToIDB, getImageFromIDB } from '../utils/idbHelper';
 
 const OfflineImage = ({ src, alt, className, style, fallback }) => {
-  const [imgSrc, setImgSrc] = useState(null);
+  const [imgSrc, setImgSrc] = useState('');
 
   useEffect(() => {
-    let objectUrl = null;
     let isMounted = true;
-
+    
     const loadImage = async () => {
       if (!src) {
         if (isMounted) setImgSrc(fallback || '');
@@ -20,38 +20,33 @@ const OfflineImage = ({ src, alt, className, style, fallback }) => {
       }
 
       try {
-        const cache = await caches.open('everest-image-cache');
-        const cachedResponse = await cache.match(src);
-        
-        if (cachedResponse) {
-          const blob = await cachedResponse.blob();
-          objectUrl = URL.createObjectURL(blob);
-          if (isMounted) setImgSrc(objectUrl);
-        } else {
-          // If not in cache and online, fetch it
-          if (navigator.onLine) {
-            try {
-              const fetchResponse = await fetch(src);
-              if (fetchResponse.ok) {
-                // Cache it for future offline use
-                cache.put(src, fetchResponse.clone());
-                const blob = await fetchResponse.blob();
-                objectUrl = URL.createObjectURL(blob);
-                if (isMounted) setImgSrc(objectUrl);
-              } else {
-                if (isMounted) setImgSrc(src);
-              }
-            } catch (err) {
-              // Might fail due to CORS, fallback to normal src
+        const cachedBase64 = await getImageFromIDB(src);
+        if (cachedBase64) {
+          if (isMounted) setImgSrc(cachedBase64);
+        } else if (navigator.onLine) {
+          try {
+            const response = await fetch(src);
+            if (response.ok) {
+              const blob = await response.blob();
+              const reader = new FileReader();
+              reader.onloadend = async () => {
+                const base64 = reader.result;
+                if (isMounted) setImgSrc(base64);
+                await saveImageToIDB(src, base64);
+              };
+              reader.readAsDataURL(blob);
+            } else {
               if (isMounted) setImgSrc(src);
             }
-          } else {
-            // Offline and not in cache
-            if (isMounted) setImgSrc(src); // Let native browser cache try, or fail
+          } catch (err) {
+            if (isMounted) setImgSrc(src);
           }
+        } else {
+          // Offline and not in cache
+          if (isMounted) setImgSrc(src);
         }
-      } catch (error) {
-        console.warn("Offline image cache error:", error);
+      } catch (e) {
+        console.error("Error caching image", e);
         if (isMounted) setImgSrc(src);
       }
     };
@@ -60,9 +55,6 @@ const OfflineImage = ({ src, alt, className, style, fallback }) => {
 
     return () => {
       isMounted = false;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
     };
   }, [src, fallback]);
 

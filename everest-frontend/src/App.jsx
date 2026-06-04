@@ -77,7 +77,8 @@ function App() {
     
     const setupRealtimeSync = () => {
       if (!user || !userProfile) {
-        setCustomers([]);
+        // Only stop DB loading if auth is resolved to null, but do NOT wipe customers array
+        // The customers array will only be wiped upon explicit logout in the Header/Dashboard components
         setIsDbLoading(false);
         return;
       }
@@ -105,12 +106,10 @@ function App() {
           setIsDbLoading(false);
         }, (error) => {
           console.error("Firebase Real-time Sync Error Caught:", error);
-          if (customers.length === 0) setCustomers([]);
           setIsDbLoading(false);
         });
       } catch (error) {
         console.error("Firebase Init Error Caught:", error);
-        if (customers.length === 0) setCustomers([]);
         setIsDbLoading(false);
       }
     };
@@ -125,10 +124,11 @@ function App() {
   }, [user, userProfile, authChecking]);
 
   useEffect(() => {
-    if (!isDbLoading) {
+    // Only overwrite localStorage if we have a valid logged-in user and it's not loading
+    if (!isDbLoading && user && userProfile) {
       localStorage.setItem('everest_customers', JSON.stringify(customers));
     }
-  }, [customers, isDbLoading]);
+  }, [customers, isDbLoading, user, userProfile]);
 
   const [currentView, setCurrentView] = useState('Home');
   const [viewHistory, setViewHistory] = useState(['Home']);
