@@ -29,6 +29,7 @@ import CustomerDashboard from './components/CustomerDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import EMICalculator from './components/EMICalculator';
 import OfflineImage from './components/OfflineImage';
+import CustomerDetail from './components/CustomerDetail';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -132,6 +133,7 @@ function App() {
 
   const [currentView, setCurrentView] = useState('Home');
   const [viewHistory, setViewHistory] = useState(['Home']);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const backPressCountRef = useRef(0);
   const currentTouchCardRef = useRef(null);
 
@@ -479,6 +481,18 @@ function App() {
             <p className="mt-2 text-slate-500">Settings placeholder view.</p>
           </div>
         );
+      case 'Customer Detail':
+        return (
+          <div className="flex-1 overflow-y-auto bg-slate-900">
+            <CustomerDetail 
+              customer={selectedCustomer} 
+              onBack={() => {
+                setCurrentView('Home');
+                setSelectedCustomer(null);
+              }}
+            />
+          </div>
+        );
       case 'Customer':
       default:
         return (
@@ -507,7 +521,7 @@ function App() {
                     Entries: {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').length}
                   </div>
                   {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').map(customer => (
-                    <div key={customer.id} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card">
+                    <div key={customer.id} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
                       <div className="flex-1 min-w-0 flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
                           <OfflineImage src={customer.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
@@ -640,7 +654,7 @@ function App() {
         <CustomerDashboard userProfile={userProfile} customers={customers} />
       ) : (
         <>
-          {currentView !== 'EMI Calculator' && <Header currentView={currentView} setCurrentView={switchTab} />}
+          {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && <Header currentView={currentView} setCurrentView={switchTab} />}
       
       {renderView()}
 
@@ -752,9 +766,11 @@ function App() {
         />
       )}
 
-      <div className="flex-shrink-0 z-40 relative">
-        <Footer currentView={currentView} setCurrentView={switchTab} />
-      </div>
+      {currentView !== 'Customer Detail' && (
+        <div className="flex-shrink-0 z-40 relative">
+          <Footer currentView={currentView} setCurrentView={switchTab} />
+        </div>
+      )}
         </>
       )}
     </div>
