@@ -487,7 +487,7 @@ function App() {
             <CustomerDetail 
               customer={selectedCustomer} 
               onBack={() => {
-                setCurrentView('Home');
+                setCurrentView('Customer');
                 setSelectedCustomer(null);
               }}
             />

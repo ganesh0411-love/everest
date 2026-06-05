@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, AlertTriangle, Scale, Sprout, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical } from 'lucide-react';
 import OfflineImage from './OfflineImage';
 
 const CustomerDetail = ({ customer, onBack }) => {
@@ -33,41 +33,41 @@ const CustomerDetail = ({ customer, onBack }) => {
     <div className="flex flex-col h-[100dvh] bg-gradient-to-b from-[#115e41] via-[#1b7c58] to-[#f4f7f6] overflow-hidden relative font-sans w-full max-w-md mx-auto shadow-2xl">
       
       {/* Top Section */}
-      <div className="px-6 pt-8 pb-0 relative z-10 flex-shrink-0">
-        <div className="flex justify-between items-start w-full">
+      <div className="px-3 sm:px-6 pt-6 pb-0 relative z-10 flex-shrink-0">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-start w-full gap-2">
           {/* Left: Back Button & Phone */}
-          <div className="flex-1 flex gap-2 justify-start items-start">
-            <button onClick={onBack} className="text-white p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors z-20">
-              <ArrowLeft className="w-8 h-8" />
+          <div className="flex gap-2 justify-start items-start">
+            <button onClick={onBack} className="text-white p-2 sm:-ml-2 rounded-full hover:bg-white/10 transition-colors z-20">
+              <ArrowLeft className="w-7 h-7 sm:w-8 sm:h-8" />
             </button>
-            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20">
-              <Phone className="w-5 h-5 text-white" />
+            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5">
+              <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </button>
           </div>
 
           {/* Center: Profile Card */}
-          <div className="w-[170px] bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-2xl border-[1.5px] border-[#4ade80]/40 rounded-[1.5rem] p-3 flex flex-col items-center shadow-[0_0_40px_rgba(52,211,153,0.3)] relative overflow-hidden flex-shrink-0 z-30">
+          <div className="w-[140px] sm:w-[170px] bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-2xl border-[1.5px] border-[#4ade80]/40 rounded-2xl sm:rounded-[1.5rem] p-2 sm:p-3 flex flex-col items-center shadow-[0_0_40px_rgba(52,211,153,0.3)] relative overflow-hidden z-30 mx-auto">
             {/* Glow effect inside card */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-gradient-to-b from-emerald-300/30 to-transparent pointer-events-none"></div>
             
-            <div className="w-[68px] h-[68px] rounded-full border-[3px] border-white/50 overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.4)] mb-2.5 relative z-10 bg-slate-200 flex-shrink-0">
+            <div className="w-[56px] h-[56px] sm:w-[68px] sm:h-[68px] rounded-full border-[3px] border-white/50 overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.4)] mb-2 relative z-10 bg-slate-200 flex-shrink-0">
               <OfflineImage src={customer.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
             </div>
-            <h2 className="text-lg font-bold text-white mb-1 relative z-10 text-center tracking-tight leading-tight">{formatName(customer.name)}</h2>
+            <h2 className="text-base sm:text-lg font-bold text-white mb-1 relative z-10 text-center tracking-tight leading-tight whitespace-normal break-words">{formatName(customer.name)}</h2>
             
             {/* Glowing line */}
-            <div className="w-[85%] h-[1.5px] bg-gradient-to-r from-transparent via-emerald-300 to-transparent mb-1.5 shadow-[0_0_15px_rgba(110,231,183,1)] relative z-10"></div>
+            <div className="w-[85%] h-[1.5px] bg-gradient-to-r from-transparent via-emerald-300 to-transparent mb-1 shadow-[0_0_15px_rgba(110,231,183,1)] relative z-10"></div>
             
-            <p className="text-emerald-50 text-[11px] font-medium relative z-10 tracking-wide">{customer.area || 'Anna Nagar'}</p>
+            <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center">{customer.area || 'Anna Nagar'}</p>
           </div>
 
           {/* Right: MapPin and Settings */}
-          <div className="flex-1 flex gap-3 justify-end items-start">
-            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20">
-              <MapPin className="w-5 h-5 text-white" />
+          <div className="flex gap-2 sm:gap-3 justify-end items-start">
+            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5">
+              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </button>
-            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20">
-              <MoreVertical className="w-5 h-5 text-white" />
+            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5">
+              <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </button>
           </div>
         </div>
@@ -215,8 +215,8 @@ const CustomerDetail = ({ customer, onBack }) => {
 
           {/* Report */}
           <button className="flex flex-col items-center justify-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity flex-1">
-            <div className="p-2 border border-rose-500/30 bg-rose-500/10 rounded-2xl">
-               <AlertTriangle className="w-5 h-5 text-rose-300" />
+            <div className="p-2 border border-blue-500/30 bg-blue-500/10 rounded-2xl">
+               <FileText className="w-5 h-5 text-blue-300" />
             </div>
             <span className="text-[10px] text-white font-bold tracking-widest uppercase">Report</span>
           </button>
