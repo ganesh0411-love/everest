@@ -1,8 +1,21 @@
-import React from 'react';
-import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square } from 'lucide-react';
 import OfflineImage from './OfflineImage';
 
 const CustomerDetail = ({ customer, onBack }) => {
+  const [showPhoneMenu, setShowPhoneMenu] = useState(false);
+  const phoneMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (phoneMenuRef.current && !phoneMenuRef.current.contains(event.target)) {
+        setShowPhoneMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   if (!customer) return null;
 
   const loanAmount = customer.loanAmount || 10000;
@@ -41,15 +54,32 @@ const CustomerDetail = ({ customer, onBack }) => {
               <button onClick={onBack} className="text-white p-1.5 sm:p-2 sm:-ml-2 rounded-full hover:bg-white/10 transition-colors z-20 flex-shrink-0">
                 <ArrowLeft className="w-6 h-6 sm:w-8 sm:h-8" />
               </button>
-              <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0">
-                <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-              </button>
+              <div className="relative" ref={phoneMenuRef}>
+                <button 
+                  onClick={() => setShowPhoneMenu(!showPhoneMenu)}
+                  className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0"
+                >
+                  <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                </button>
+                {showPhoneMenu && (
+                  <div className="absolute top-full left-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-lg p-1.5 shadow-2xl z-50 min-w-[140px] flex flex-col gap-0.5">
+                    <a href={`tel:${customer.mobile || '9876543210'}`} className="flex items-center gap-2 text-white hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors text-[11px] sm:text-xs font-semibold whitespace-nowrap">
+                      <Star className="w-3 h-3 text-emerald-400 fill-emerald-400 flex-shrink-0" />
+                      <span>{customer.mobile || '9876543210'}</span>
+                    </a>
+                    <a href={`tel:${customer.alternateMobile || '8765432109'}`} className="flex items-center gap-2 text-slate-300 hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors text-[11px] sm:text-xs font-medium whitespace-nowrap">
+                      <Square className="w-2.5 h-2.5 text-slate-400 fill-slate-400 flex-shrink-0 ml-[1px]" />
+                      <span>{customer.alternateMobile || '8765432109'}</span>
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="flex flex-col items-center mt-12 sm:mt-14 w-full min-w-0">
               <p className="text-[9px] min-[360px]:text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-wider mb-0.5 text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.6)', textShadow: '0 1px 1px rgba(0,0,0,0.5)' }}>Loan Amount</p>
-              <h3 className="text-[20px] sm:text-[26px] font-extrabold text-[#4ade80] tracking-tighter flex items-center justify-center text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.8px rgba(0,0,0,0.9)', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                <IndianRupee className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mr-[1px] stroke-[3] flex-shrink-0" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }} />
+              <h3 className="text-[20px] sm:text-[26px] font-black text-[#4ade80] tracking-tighter flex items-center justify-center text-center whitespace-nowrap bg-transparent drop-shadow-md">
+                <IndianRupee className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mr-[1px] stroke-[3] flex-shrink-0 drop-shadow-sm" />
                 <span>{loanAmount.toLocaleString('en-IN')}</span>
               </h3>
             </div>
@@ -69,7 +99,7 @@ const CustomerDetail = ({ customer, onBack }) => {
               {/* Glowing line */}
               <div className="w-[85%] h-[1.5px] bg-gradient-to-r from-transparent via-emerald-300 to-transparent mb-1 shadow-[0_0_15px_rgba(110,231,183,1)] relative z-10"></div>
               
-              <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center">{customer.area || 'Anna Nagar'}</p>
+              <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center min-h-[15px] sm:min-h-[16.5px]">{customer.center || customer.area || '\u00A0'}</p>
             </div>
             
             <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Due: {formattedDueDate}</p>
@@ -88,8 +118,8 @@ const CustomerDetail = ({ customer, onBack }) => {
 
             <div className="flex flex-col items-center mt-12 sm:mt-14 w-full min-w-0">
               <p className="text-[9px] min-[360px]:text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-wider mb-0.5 text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.6)', textShadow: '0 1px 1px rgba(0,0,0,0.5)' }}>Outstanding</p>
-              <h3 className="text-[20px] sm:text-[26px] font-extrabold text-[#ef4444] tracking-tighter flex items-center justify-center text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.8px rgba(0,0,0,0.9)', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                <IndianRupee className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mr-[1px] stroke-[3] flex-shrink-0" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }} />
+              <h3 className="text-[20px] sm:text-[26px] font-black text-[#ef4444] tracking-tighter flex items-center justify-center text-center whitespace-nowrap bg-transparent drop-shadow-md">
+                <IndianRupee className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mr-[1px] stroke-[3] flex-shrink-0 drop-shadow-sm" />
                 <span>{repayAmount.toLocaleString('en-IN')}</span>
               </h3>
             </div>
