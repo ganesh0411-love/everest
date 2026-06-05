@@ -35,72 +35,70 @@ const CustomerDetail = ({ customer, onBack }) => {
       {/* Top Section */}
       <div className="px-3 sm:px-6 pt-6 pb-0 relative z-10 flex-shrink-0">
         <div className="grid grid-cols-[1fr_auto_1fr] items-start w-full gap-2">
-          {/* Left: Back Button & Phone */}
-          <div className="flex gap-2 justify-start items-start">
-            <button onClick={onBack} className="text-white p-2 sm:-ml-2 rounded-full hover:bg-white/10 transition-colors z-20">
-              <ArrowLeft className="w-7 h-7 sm:w-8 sm:h-8" />
-            </button>
-            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5">
-              <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </button>
-          </div>
-
-          {/* Center: Profile Card */}
-          <div className="w-[140px] sm:w-[170px] bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-2xl border-[1.5px] border-[#4ade80]/40 rounded-2xl sm:rounded-[1.5rem] p-2 sm:p-3 flex flex-col items-center shadow-[0_0_40px_rgba(52,211,153,0.3)] relative overflow-hidden z-30 mx-auto">
-            {/* Glow effect inside card */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-gradient-to-b from-emerald-300/30 to-transparent pointer-events-none"></div>
-            
-            <div className="w-[56px] h-[56px] sm:w-[68px] sm:h-[68px] rounded-full border-[3px] border-white/50 overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.4)] mb-2 relative z-10 bg-slate-200 flex-shrink-0">
-              <OfflineImage src={customer.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
+          {/* Left: Back Button, Phone & Loan Amount */}
+          <div className="flex flex-col gap-3 justify-start items-start min-w-0">
+            <div className="flex gap-1 sm:gap-2">
+              <button onClick={onBack} className="text-white p-1.5 sm:p-2 sm:-ml-2 rounded-full hover:bg-white/10 transition-colors z-20 flex-shrink-0">
+                <ArrowLeft className="w-6 h-6 sm:w-8 sm:h-8" />
+              </button>
+              <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0">
+                <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </button>
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-white mb-1 relative z-10 text-center tracking-tight leading-tight whitespace-normal break-words">{formatName(customer.name)}</h2>
             
-            {/* Glowing line */}
-            <div className="w-[85%] h-[1.5px] bg-gradient-to-r from-transparent via-emerald-300 to-transparent mb-1 shadow-[0_0_15px_rgba(110,231,183,1)] relative z-10"></div>
-            
-            <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center">{customer.area || 'Anna Nagar'}</p>
+            <div className="flex flex-col items-center mt-12 sm:mt-14 w-full min-w-0">
+              <p className="text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-widest mb-0.5 text-center w-auto max-w-full overflow-visible break-words px-1 bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.5)', textShadow: '0 0 2px rgba(255,255,255,0.2)' }}>Loan Amount</p>
+              <h3 className="text-[16px] sm:text-[22px] font-extrabold text-emerald-400 tracking-tight flex items-center justify-center text-center w-auto max-w-full overflow-visible break-words px-1 bg-transparent" style={{ WebkitTextStroke: '0.5px rgba(52,211,153,0.6)', textShadow: '0 0 8px rgba(52,211,153,0.8), 0 0 15px rgba(52,211,153,0.4)' }}>
+                <IndianRupee className="w-[14px] h-[14px] sm:w-[18px] sm:h-[18px] mr-[1px] stroke-[3] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 6px rgba(52,211,153,0.8))' }} />
+                <span className="overflow-visible pr-1">{loanAmount.toLocaleString('en-IN')}</span>
+              </h3>
+            </div>
           </div>
 
-          {/* Right: MapPin and Settings */}
-          <div className="flex gap-2 sm:gap-3 justify-end items-start">
-            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5">
-              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </button>
-            <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5">
-              <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </button>
+          {/* Center: Profile Card & Due Date */}
+          <div className="flex flex-col items-center">
+            <div className="w-[140px] sm:w-[170px] bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-2xl border-[1.5px] border-[#4ade80]/40 rounded-2xl sm:rounded-[1.5rem] p-2 sm:p-3 flex flex-col items-center shadow-[0_0_40px_rgba(52,211,153,0.3)] relative overflow-hidden z-30 mx-auto">
+              {/* Glow effect inside card */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-gradient-to-b from-emerald-300/30 to-transparent pointer-events-none"></div>
+              
+              <div className="w-[56px] h-[56px] sm:w-[68px] sm:h-[68px] rounded-full border-[3px] border-white/50 overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.4)] mb-2 relative z-10 bg-slate-200 flex-shrink-0">
+                <OfflineImage src={customer.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-white mb-1 relative z-10 text-center tracking-tight leading-tight whitespace-normal break-words">{formatName(customer.name)}</h2>
+              
+              {/* Glowing line */}
+              <div className="w-[85%] h-[1.5px] bg-gradient-to-r from-transparent via-emerald-300 to-transparent mb-1 shadow-[0_0_15px_rgba(110,231,183,1)] relative z-10"></div>
+              
+              <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center">{customer.area || 'Anna Nagar'}</p>
+            </div>
+            
+            <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Due: {formattedDueDate}</p>
+          </div>
+
+          {/* Right: MapPin, Settings & Outstanding Amount */}
+          <div className="flex flex-col gap-3 justify-start items-end min-w-0">
+            <div className="flex gap-1 sm:gap-3">
+              <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0">
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </button>
+              <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0">
+                <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center mt-12 sm:mt-14 w-full min-w-0">
+              <p className="text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-widest mb-0.5 text-center w-auto max-w-full overflow-visible break-words px-1 bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.5)', textShadow: '0 0 2px rgba(255,255,255,0.2)' }}>Outstanding</p>
+              <h3 className="text-[16px] sm:text-[22px] font-extrabold text-red-500 tracking-tight flex items-center justify-center text-center w-auto max-w-full overflow-visible break-words px-1 bg-transparent" style={{ WebkitTextStroke: '0.5px rgba(239,68,68,0.6)', textShadow: '0 0 8px rgba(239,68,68,0.8), 0 0 15px rgba(239,68,68,0.4)' }}>
+                <IndianRupee className="w-[14px] h-[14px] sm:w-[18px] sm:h-[18px] mr-[1px] stroke-[3] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 6px rgba(239,68,68,0.8))' }} />
+                <span className="overflow-visible pr-1">{repayAmount.toLocaleString('en-IN')}</span>
+              </h3>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Metrics & Details Section */}
-      <div className="flex-1 bg-[#f8fafc] rounded-t-[2.5rem] pt-8 px-6 relative z-20 flex flex-col items-center shadow-[0_-10px_30px_rgba(0,0,0,0.15)]">
-        
-        {/* Loan Metrics Card */}
-        <div className="w-full max-w-[300px] bg-white/90 backdrop-blur-2xl rounded-[1.25rem] shadow-[0_15px_40px_rgba(74,222,128,0.15)] border-[1.5px] border-[#4ade80]/30 p-4 mb-4 relative -mt-10 z-30">
-           {/* Subtle glow behind card */}
-           <div className="absolute inset-0 bg-gradient-to-br from-emerald-100/50 to-transparent rounded-[1.25rem] pointer-events-none"></div>
-
-           <div className="flex justify-between items-center mb-3 relative z-10">
-             <div className="text-center w-1/2 border-r border-slate-200/60 pr-2">
-                <p className="text-[#1b7c58] font-semibold text-[11px] mb-1">Your Loan Amount</p>
-                <h3 className="text-[#0d593b] font-extrabold text-[18px] flex items-center justify-center tracking-tight">
-                  <IndianRupee className="w-4 h-4 mr-[1px] stroke-[2.5]" />{loanAmount.toLocaleString('en-IN')}
-                </h3>
-             </div>
-             <div className="text-center w-1/2 pl-2">
-                <p className="text-[#a02020] font-semibold text-[11px] mb-1">Outstanding Amount</p>
-                <h3 className="text-[#b91c1c] font-extrabold text-[18px] flex items-center justify-center tracking-tight">
-                  <IndianRupee className="w-4 h-4 mr-[1px] stroke-[2.5]" />{repayAmount.toLocaleString('en-IN')}
-                </h3>
-             </div>
-           </div>
-           <div className="border-t border-slate-200/60 pt-2.5 text-center relative z-10">
-              <p className="text-slate-800 font-bold text-[13px] tracking-wide">Due Date: {formattedDueDate}</p>
-           </div>
-        </div>
-
-        {/* Center Illustration - CSS/SVG Composite */}
+      <div className="flex-1 bg-[#f8fafc] rounded-t-[2.5rem] pt-8 px-6 relative z-20 flex flex-col items-center shadow-[0_-10px_30px_rgba(0,0,0,0.15)] mt-4">        {/* Center Illustration - CSS/SVG Composite */}
         <div className="flex-1 flex flex-col items-center justify-center relative w-full pb-24">
            {/* Abstract dashed circles */}
            <div className="absolute w-[280px] h-[280px] border border-slate-200/80 rounded-full border-dashed opacity-70 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
@@ -186,39 +184,36 @@ const CustomerDetail = ({ customer, onBack }) => {
 
       {/* Bottom Navigation */}
       <div className="absolute bottom-0 left-0 w-full z-50">
-        <div className="bg-[#124b33] rounded-t-[2.5rem] h-24 flex justify-between items-center px-8 relative shadow-[0_-15px_30px_rgba(0,0,0,0.15)] border-t border-white/5">
+        <div className="bg-[#124b33] rounded-t-[2rem] h-20 flex justify-between items-center px-8 relative shadow-[0_-15px_30px_rgba(0,0,0,0.15)] border-t border-white/5 pb-2">
           
           {/* Pay Later */}
-          <button className="flex flex-col items-center justify-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity flex-1">
-            <div className="p-2 border border-white/10 bg-white/5 rounded-2xl">
-               <Clock className="w-5 h-5 text-emerald-100" />
+          <button className="flex flex-col items-center justify-center gap-1 opacity-80 hover:opacity-100 transition-opacity flex-1">
+            <div className="p-1.5 border border-white/10 bg-white/5 rounded-xl">
+               <Clock className="w-4 h-4 text-emerald-100" />
             </div>
-            <span className="text-[10px] text-emerald-100 font-bold tracking-widest uppercase">Pay Later</span>
+            <span className="text-[9px] text-emerald-100 font-bold tracking-widest uppercase mt-0.5">Pay Later</span>
           </button>
 
           {/* Pay Now (Center pop-up) */}
-          <div className="relative -top-8 flex-shrink-0 mx-2">
-            <button className="bg-gradient-to-b from-[#19825b] to-[#125c40] border-[6px] border-[#f4f7f6] w-[86px] h-[86px] rounded-full flex flex-col items-center justify-center shadow-[0_8px_25px_rgba(18,75,51,0.5)] hover:scale-105 transition-transform group relative overflow-hidden">
-               
+          <div className="relative -top-6 flex-shrink-0 mx-2 flex flex-col items-center">
+            <button className="bg-gradient-to-b from-[#19825b] to-[#125c40] border-[4px] border-[#f4f7f6] w-[70px] h-[70px] rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(18,75,51,0.5)] hover:scale-105 transition-transform group relative overflow-hidden z-10">
                {/* Internal Glow */}
                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
                
-               {/* Decorative Circular Arrows (Sync) */}
-               <div className="absolute w-[64px] h-[64px] border border-[#4ade80]/40 rounded-full border-dashed group-hover:animate-spin-slow"></div>
+               {/* Decorative Dashed Ring */}
+               <div className="absolute inset-[4px] border-[2px] border-white/40 rounded-full border-dashed group-hover:animate-spin-slow"></div>
 
-               <div className="bg-white/20 p-2 rounded-full mb-1">
-                 <IndianRupee className="w-6 h-6 text-white stroke-[2.5]" />
-               </div>
-               <span className="text-[10px] text-white font-extrabold tracking-widest uppercase">Pay Now</span>
+               <IndianRupee className="w-7 h-7 text-white stroke-[2.5] drop-shadow-md z-10 relative" />
             </button>
+            <span className="absolute -bottom-5 text-[10px] text-slate-800 font-extrabold tracking-widest uppercase bg-white px-2 py-0.5 rounded-full shadow-sm z-20 border border-slate-200">Pay Now</span>
           </div>
 
           {/* Report */}
-          <button className="flex flex-col items-center justify-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity flex-1">
-            <div className="p-2 border border-blue-500/30 bg-blue-500/10 rounded-2xl">
-               <FileText className="w-5 h-5 text-blue-300" />
+          <button className="flex flex-col items-center justify-center gap-1 opacity-80 hover:opacity-100 transition-opacity flex-1">
+            <div className="p-1.5 border border-blue-500/30 bg-blue-500/10 rounded-xl">
+               <FileText className="w-4 h-4 text-blue-300" />
             </div>
-            <span className="text-[10px] text-white font-bold tracking-widest uppercase">Report</span>
+            <span className="text-[9px] text-white font-bold tracking-widest uppercase mt-0.5">Report</span>
           </button>
 
         </div>
