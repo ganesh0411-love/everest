@@ -19,6 +19,7 @@
     "@capacitor/geolocation": "^8.2.0",
     "@capacitor/share": "^8.0.1",
     "@capgo/capacitor-printer": "^8.0.14",
+    "@imgly/background-removal": "^1.7.0",
     "@ionic/pwa-elements": "^3.4.0",
     "@supabase/supabase-js": "^2.106.2",
     "firebase": "^12.14.0",

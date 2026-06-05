@@ -75,8 +75,25 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [altPhone, setAltPhone] = useState(initialData?.altPhone || '');
   const [customerStatus, setCustomerStatus] = useState(initialData?.customerStatus || 'New'); // New or Existing
 
-  const handlePhoneInput = (setter) => (e) => {
-    const val = e.target.value.replace(/[^0-9]/g, '');
+  const handlePhoneInput = (currentVal, setter) => (e) => {
+    let val = e.target.value.replace(/[^0-9+]/g, '');
+    const inputType = e.nativeEvent.inputType;
+
+    if (inputType === 'insertFromPaste') {
+      setter(val);
+      return;
+    }
+
+    if (inputType === 'insertText') {
+      const currLen = currentVal.replace(/[^0-9+]/g, '').length;
+      if (currLen >= 10 && val.length > currLen) {
+        return; 
+      }
+      if (val.length > 10) {
+        val = val.slice(0, 10); 
+      }
+    }
+
     setter(val);
   };
 
@@ -651,11 +668,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Phone Number</label>
-                <input type="text" inputMode="numeric" value={phone} onChange={handlePhoneInput(setPhone)} placeholder="10 digits" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-medium text-slate-700" />
+                <input type="text" inputMode="numeric" value={phone} onChange={handlePhoneInput(phone, setPhone)} placeholder="10 digits" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-medium text-slate-700" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Alt. Phone</label>
-                <input type="text" inputMode="numeric" value={altPhone} onChange={handlePhoneInput(setAltPhone)} placeholder="Optional" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-medium text-slate-700" />
+                <input type="text" inputMode="numeric" value={altPhone} onChange={handlePhoneInput(altPhone, setAltPhone)} placeholder="Optional" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-medium text-slate-700" />
               </div>
             </div>
             
