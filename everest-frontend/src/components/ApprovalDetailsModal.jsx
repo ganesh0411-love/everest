@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, User, UserCircle, Phone, FileBadge, FileText, IdCard, ChevronRight, ArrowLeft, MapPin, Wallet, CheckCircle2, Eye, XCircle } from 'lucide-react';
 import { App } from '@capacitor/app';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onStayPending }) => {
   const [activeView, setActiveView] = useState('main'); // 'main' | 'centerDetails'
@@ -9,7 +11,23 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
   const viewSequence = ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc'];
 
+  const syncNomineeData = async () => {
+    if (activeView === 'nominee' && application?.id) {
+      try {
+        const appRef = doc(db, 'customers', application.id);
+        await updateDoc(appRef, {
+          nomineeDob: nomineeDob,
+          nomineeMaritalStatus: nomineeMaritalStatus,
+          nomineeAge: nomineeAge
+        });
+      } catch (err) {
+        console.error('Error syncing nominee data:', err);
+      }
+    }
+  };
+
   const handleNextView = () => {
+    syncNomineeData();
     const currentIndex = viewSequence.indexOf(activeView);
     if (currentIndex >= 0 && currentIndex < viewSequence.length - 1) {
       setActiveView(viewSequence[currentIndex + 1]);
@@ -19,6 +37,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   };
 
   const handlePrevView = () => {
+    syncNomineeData();
     const currentIndex = viewSequence.indexOf(activeView);
     if (currentIndex > 0) {
       setActiveView(viewSequence[currentIndex - 1]);
@@ -593,61 +612,61 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Previous Loans</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px] font-mono">1</span>
+                <span className="pt-[1px] font-bold text-slate-500">No Record Found</span>
               </div>
               
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Apply Date</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">12-04-2025</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Type</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">Business Loan</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Principal</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px] font-mono text-emerald-600">₹20,000</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Amount</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px] font-mono text-emerald-600">₹24,000</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Overdue Status</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">No</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Account Status</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">Settled</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Installment History</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px] font-mono">12 / 12</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Repayment Track</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">Good</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Closed Date</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">15-03-2026</span>
+                <span className="pt-[1px] text-slate-400">- - -</span>
               </div>
             </div>
           </div>
