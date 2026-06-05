@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square, X } from 'lucide-react';
 import OfflineImage from './OfflineImage';
-import femaleAvatar from '../assets/avatar-female.jpg';
-import maleAvatar from '../assets/avatar-male.jpg';
+import femaleAvatar from '../assets/avatar-female.png';
+import maleAvatar from '../assets/avatar-male.png';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
@@ -171,11 +171,11 @@ const CustomerDetail = ({ customer, onBack }) => {
            <div className="absolute w-[120px] h-[120px] bg-slate-50 rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-50"></div>
            
            <div className="relative z-10 flex flex-col items-center transform scale-110">
-              {centerAvatarSrc ? (
+               {centerAvatarSrc ? (
                 <img 
                   src={centerAvatarSrc} 
                   alt="Center Avatar" 
-                  className="w-48 h-48 sm:w-56 sm:h-56 object-contain mix-blend-multiply opacity-95 hover:scale-105 transition-transform duration-500 ease-in-out"
+                  className={`w-64 h-64 sm:w-72 sm:h-72 object-contain opacity-95 transition-transform duration-500 ease-in-out drop-shadow-[0_10px_15px_rgba(0,0,0,0.15)] ${isFemale ? 'hover:scale-105' : 'scale-[1.15] hover:scale-[1.2]'}`}
                   onError={(e) => { 
                     e.target.onerror = null; 
                     e.target.src = maleAvatar; // Fallback
