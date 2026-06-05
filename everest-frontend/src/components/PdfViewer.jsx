@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Capacitor } from '@capacitor/core';
+import { saveImageToIDB, getImageFromIDB } from '../utils/idbHelper';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -8,17 +9,65 @@ import 'react-pdf/dist/Page/TextLayer.css';
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const PdfViewer = ({ fileUrl }) => {
-  if (Capacitor.getPlatform() === 'web') {
-    return (
-      <div className="flex-1 w-full h-full bg-slate-800 rounded-lg overflow-hidden flex flex-col">
-        <iframe src={fileUrl} className="w-full h-full flex-1 border-0" title="PDF Viewer" />
-      </div>
-    );
-  }
-
+  const [localFileUrl, setLocalFileUrl] = useState(null);
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadPdf = async () => {
+      if (!fileUrl) return;
+      if (fileUrl.startsWith('blob:') || fileUrl.startsWith('data:')) {
+        if (isMounted) setLocalFileUrl(fileUrl);
+        return;
+      }
+      try {
+        const cachedBase64 = await getImageFromIDB(fileUrl);
+        if (cachedBase64) {
+          if (isMounted) setLocalFileUrl(cachedBase64);
+        } else if (navigator.onLine) {
+          try {
+            const response = await fetch(fileUrl);
+            if (response.ok) {
+              const blob = await response.blob();
+              const reader = new FileReader();
+              reader.onloadend = async () => {
+                const base64 = reader.result;
+                if (isMounted) setLocalFileUrl(base64);
+                await saveImageToIDB(fileUrl, base64);
+              };
+              reader.readAsDataURL(blob);
+            } else {
+              if (isMounted) setLocalFileUrl(fileUrl);
+            }
+          } catch (e) {
+            if (isMounted) setLocalFileUrl(fileUrl);
+          }
+        } else {
+          if (isMounted) setLocalFileUrl(fileUrl);
+        }
+      } catch (e) {
+        if (isMounted) setLocalFileUrl(fileUrl);
+      }
+    };
+    loadPdf();
+    return () => { isMounted = false; };
+  }, [fileUrl]);
+
+  if (Capacitor.getPlatform() === 'web') {
+    return (
+      <div className="flex-1 w-full h-full bg-slate-800 rounded-lg overflow-hidden flex flex-col">
+        {localFileUrl ? (
+          <iframe src={localFileUrl} className="w-full h-full flex-1 border-0" title="PDF Viewer" />
+        ) : (
+          <div className="flex items-center justify-center h-full text-slate-300 font-medium">
+            Loading PDF Document...
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
@@ -38,11 +87,11 @@ const PdfViewer = ({ fileUrl }) => {
   const nextPage = () => changePage(1);
 
   if (error) {
-    const isLocalUrl = fileUrl && (fileUrl.startsWith('blob:') || fileUrl.startsWith('data:'));
+    const isLocalUrl = localFileUrl && (localFileUrl.startsWith('blob:') || localFileUrl.startsWith('data:'));
     
-    if (!isLocalUrl && fileUrl) {
+    if (!isLocalUrl && localFileUrl) {
       // Fallback to Google Docs viewer for remote PDFs that have CORS issues
-      const googleDocsUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}`;
+      const googleDocsUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(localFileUrl)}`;
       return (
         <div className="flex-1 w-full h-full bg-slate-800 rounded-lg overflow-hidden flex flex-col">
           <div className="p-2 bg-slate-700 text-xs text-center text-slate-300 font-medium">
@@ -62,7 +111,7 @@ const PdfViewer = ({ fileUrl }) => {
         <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-rose-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         <h3 className="text-white text-xl font-bold mb-2">Error Loading PDF</h3>
         <p className="text-slate-300 mb-6 text-sm">We couldn't render this PDF directly in the preview.</p>
-        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-brand-blue hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg transition-colors inline-block">
+        <a href={localFileUrl || fileUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-brand-blue hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg transition-colors inline-block">
           Open PDF Externally
         </a>
       </div>
@@ -72,24 +121,31 @@ const PdfViewer = ({ fileUrl }) => {
   return (
     <div className="flex flex-col items-center h-full w-full bg-slate-900 rounded-lg overflow-hidden">
       <div className="flex-1 w-full overflow-auto flex justify-center py-4 bg-slate-800">
-        <Document
-          file={fileUrl}
-          onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={onDocumentLoadError}
-          loading={
-            <div className="flex items-center justify-center h-full text-slate-300 font-medium">
-              Loading PDF Document...
-            </div>
-          }
-        >
-          <Page 
-            pageNumber={pageNumber} 
-            renderTextLayer={false}
-            renderAnnotationLayer={false}
-            className="shadow-xl"
-            width={Math.min(window.innerWidth - 40, 800)}
-          />
-        </Document>
+        {localFileUrl && (
+          <Document
+            file={localFileUrl}
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={onDocumentLoadError}
+            loading={
+              <div className="flex items-center justify-center h-full text-slate-300 font-medium">
+                Loading PDF Document...
+              </div>
+            }
+          >
+            <Page 
+              pageNumber={pageNumber} 
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+              className="shadow-xl"
+              width={Math.min(window.innerWidth - 40, 800)}
+            />
+          </Document>
+        )}
+        {!localFileUrl && (
+          <div className="flex items-center justify-center h-full text-slate-300 font-medium">
+            Preparing PDF...
+          </div>
+        )}
       </div>
       
       {numPages && (

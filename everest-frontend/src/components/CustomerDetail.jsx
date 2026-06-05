@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square } from 'lucide-react';
+import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square, X } from 'lucide-react';
 import OfflineImage from './OfflineImage';
 
 const CustomerDetail = ({ customer, onBack }) => {
   const [showPhoneMenu, setShowPhoneMenu] = useState(false);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
   const phoneMenuRef = useRef(null);
 
   useEffect(() => {
@@ -226,7 +227,10 @@ const CustomerDetail = ({ customer, onBack }) => {
 
           {/* Pay Now (Center pop-up) */}
           <div className="relative -top-6 flex-shrink-0 mx-2 flex flex-col items-center">
-            <button className="bg-gradient-to-b from-[#19825b] to-[#125c40] border-[4px] border-[#f4f7f6] w-[70px] h-[70px] rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(18,75,51,0.5)] hover:scale-105 transition-transform group relative overflow-hidden z-10">
+            <button 
+              onClick={() => setShowCollectionModal(true)}
+              className="bg-gradient-to-b from-[#19825b] to-[#125c40] border-[4px] border-[#f4f7f6] w-[70px] h-[70px] rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(18,75,51,0.5)] hover:scale-105 transition-transform group relative overflow-hidden z-10"
+            >
                {/* Internal Glow */}
                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
                
@@ -248,6 +252,70 @@ const CustomerDetail = ({ customer, onBack }) => {
 
         </div>
       </div>
+
+      {/* Collection Entry Modal */}
+      {showCollectionModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={() => setShowCollectionModal(false)}></div>
+          
+          <div className="relative w-full max-w-[340px] bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl border-[1.5px] border-white/60 rounded-[2rem] p-6 shadow-[0_0_40px_rgba(20,83,56,0.6)] animate-in zoom-in-95 duration-200">
+            {/* Close Button */}
+            <button onClick={() => setShowCollectionModal(false)} className="absolute top-4 right-4 w-8 h-8 bg-slate-200/50 rounded-full flex items-center justify-center text-[#2d4a3e] hover:bg-slate-200 transition-colors shadow-sm">
+              <X className="w-4 h-4 stroke-[2.5]" />
+            </button>
+            
+            {/* Header */}
+            <h2 className="text-[22px] font-black text-[#2d4a3e] text-center uppercase tracking-wide mb-8 mt-2 drop-shadow-sm">Collection Entry</h2>
+            
+            {/* Content */}
+            <div className="space-y-6">
+              {/* Due Date */}
+              <div className="flex items-start gap-4">
+                 <div className="w-12 h-12 bg-[#2d4a3e]/10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
+                   <CalendarDays className="w-6 h-6 text-[#2d4a3e] stroke-[2]" />
+                 </div>
+                 <div className="flex flex-col">
+                   <div className="flex items-center gap-2">
+                     <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE DATE:</span>
+                     <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
+                     <span className="text-[#2d4a3e] font-black text-xl leading-none">26.05.2026</span>
+                   </div>
+                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">(Wednesday)</span>
+                 </div>
+              </div>
+
+              {/* Due Amount */}
+              <div className="flex items-start gap-4">
+                 <div className="w-12 h-12 bg-[#2d4a3e]/10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
+                   <div className="w-7 h-7 bg-[#2d4a3e] rounded-[40%_40%_15%_15%] flex items-center justify-center relative shadow-sm">
+                     <div className="absolute -top-1 w-3 h-1 bg-[#2d4a3e] rounded-t-sm"></div>
+                     <IndianRupee className="w-3.5 h-3.5 text-white mt-1" strokeWidth={3} />
+                   </div>
+                 </div>
+                 <div className="flex flex-col">
+                   <div className="flex items-center gap-2">
+                     <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE AMOUNT:</span>
+                     <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
+                     <span className="text-[#166534] font-black text-[22px] leading-none drop-shadow-sm">₹1,050</span>
+                   </div>
+                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">(Fourth Installment)</span>
+                 </div>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex gap-4 mt-10">
+              <div className="flex flex-col gap-3 flex-1">
+                <button className="bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] border-[2px] border-slate-300 ring-1 ring-black/20 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] text-white font-bold tracking-wider py-2.5 rounded-full w-full text-sm active:scale-95 transition-transform">PAY</button>
+                <button className="bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] border-[2px] border-slate-300 ring-1 ring-black/20 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] text-white font-bold tracking-wider py-2.5 rounded-full w-full text-sm active:scale-95 transition-transform">BOUNCE</button>
+              </div>
+              <div className="flex-1 flex">
+                <button className="bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] border-[2px] border-slate-300 ring-1 ring-black/20 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] text-white font-bold tracking-wider py-2.5 rounded-full w-full h-full text-base flex items-center justify-center active:scale-95 transition-transform">QUICK PAY</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -19,7 +19,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [appNumber] = useState(initialData?.appNumber || Math.floor(1000000000 + Math.random() * 9000000000));
   const [customerId] = useState(initialData?.id || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
   const [photo, setPhoto] = useState(initialData?.image || null);
-  const [branch, setBranch] = useState(initialData?.branch || 'Batlagundu');
+  const [branch, setBranch] = useState(initialData?.branch || 'BATLAGUNDU');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -589,17 +589,13 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
             </div>
             
             <div className="flex-1">
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Select Branch</label>
-              <select 
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Branch</label>
+              <input 
+                type="text"
                 value={branch} 
-                onChange={(e) => setBranch(e.target.value)}
-                className="w-full p-3 border border-slate-200 rounded-xl bg-white outline-none font-medium text-slate-700"
-              >
-                <option value="Batlagundu">Batlagundu</option>
-                <option value="Nilakottai">Nilakottai</option>
-                <option value="Sempatti">Sempatti</option>
-                <option value="Periyakulam">Periyakulam</option>
-              </select>
+                onChange={(e) => setBranch(e.target.value.toUpperCase())}
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 outline-none font-bold text-slate-800 tracking-wider uppercase focus:border-brand-blue transition-colors"
+              />
             </div>
           </div>
 
@@ -1137,10 +1133,16 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 Take Photo
               </button>
-              <button onClick={() => triggerMainCamera(CameraSource.Photos)} className="p-4 flex items-center justify-center gap-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+              <button onClick={() => triggerMainCamera(CameraSource.Photos)} className={`p-4 flex items-center justify-center gap-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors ${photo ? 'border-b border-slate-100' : ''}`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                 Choose Photo
               </button>
+              {photo && (
+                <button onClick={() => { setPhoto(null); setPhotoActionSheetOpen(false); }} className="p-4 flex items-center justify-center gap-3 font-bold text-rose-500 hover:bg-rose-50 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Cancel/Remove Photo
+                </button>
+              )}
             </div>
             <div className="p-3 bg-slate-50">
               <button onClick={() => setPhotoActionSheetOpen(false)} className="w-full p-3 text-center font-bold text-rose-500 rounded-xl hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors">

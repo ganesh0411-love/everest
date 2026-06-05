@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
-import getCroppedImg from '../utils/cropImage';
+import getCroppedImg, { removeBackgroundFromImage } from '../utils/cropImage';
+import { Eraser } from 'lucide-react';
 
 const ImageCropModal = ({ imageSrc, onCropComplete, onCancel }) => {
+  const [localImageSrc, setLocalImageSrc] = useState(imageSrc);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
@@ -15,10 +17,22 @@ const ImageCropModal = ({ imageSrc, onCropComplete, onCancel }) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
 
+  const handleRemoveBg = async () => {
+    setIsProcessing(true);
+    try {
+      const transparentImage = await removeBackgroundFromImage(localImageSrc);
+      setLocalImageSrc(transparentImage);
+    } catch (e) {
+      console.error('BG Removal Error', e);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setIsProcessing(true);
-      const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels);
+      const croppedImage = await getCroppedImg(localImageSrc, croppedAreaPixels);
       onCropComplete(croppedImage);
     } catch (e) {
       console.error(e);
@@ -32,7 +46,7 @@ const ImageCropModal = ({ imageSrc, onCropComplete, onCancel }) => {
     <div className="fixed inset-0 z-[300] bg-black flex flex-col animate-in fade-in duration-200">
       <div className="flex-1 relative">
         <Cropper
-          image={imageSrc}
+          image={localImageSrc}
           crop={crop}
           zoom={zoom}
           aspect={1}
@@ -55,19 +69,27 @@ const ImageCropModal = ({ imageSrc, onCropComplete, onCancel }) => {
             className="w-full accent-brand-blue"
           />
         </div>
-        <div className="flex justify-between gap-4">
+        <div className="flex justify-between gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 p-4 bg-slate-800 text-white rounded-xl font-bold active:bg-slate-700"
+            className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold active:bg-slate-700 text-sm sm:text-base"
           >
             Cancel
           </button>
           <button
+            onClick={handleRemoveBg}
+            disabled={isProcessing}
+            className="flex-[1.5] py-3 bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white rounded-xl font-bold active:scale-95 transition-transform flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] disabled:opacity-50 text-sm sm:text-base"
+          >
+            <Eraser className="w-4 h-4" />
+            Remove BG
+          </button>
+          <button
             onClick={handleSave}
             disabled={isProcessing}
-            className="flex-1 p-4 bg-brand-blue text-white rounded-xl font-bold active:bg-blue-600 disabled:opacity-50"
+            className="flex-1 py-3 bg-brand-blue text-white rounded-xl font-bold active:bg-blue-600 disabled:opacity-50 text-sm sm:text-base"
           >
-            {isProcessing ? 'Cropping...' : 'Confirm Crop'}
+            {isProcessing ? 'Saving...' : 'Confirm'}
           </button>
         </div>
       </div>
