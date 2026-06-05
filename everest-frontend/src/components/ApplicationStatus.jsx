@@ -36,8 +36,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
     }
   };
 
-  const updateStatus = (id, newStatus) => {
-    if (onUpdateStatus) onUpdateStatus(id, newStatus);
+  const updateStatus = (id, newStatus, extraData = {}) => {
+    if (onUpdateStatus) onUpdateStatus(id, newStatus, extraData);
     setActiveMenuId(null);
   };
 
@@ -97,7 +97,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
             <thead className="text-[10px] font-bold text-black uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="p-2 w-12 text-center">S.no</th>
-                <th className="p-2 w-24">Apply Date</th>
+                <th className="p-2 w-24">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
                 <th className="p-2 text-left truncate">CUSTOMER</th>
                 <th className="p-2 w-16 text-center">ACTIONS</th>
               </tr>
@@ -118,7 +118,9 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                   }}
                 >
                   <td className="p-2 font-bold text-slate-800 text-sm text-center">{index + 1}</td>
-                  <td className="p-2 font-semibold text-slate-600 text-xs">{formatDate(app.appDate)}</td>
+                  <td className="p-2 font-semibold text-slate-600 text-xs">
+                    {activeTab === 'Approved' ? formatDate(app.approvalDate || app.appDate) : formatDate(app.appDate)}
+                  </td>
                   <td className="p-2 truncate overflow-hidden">
                     <div className="flex items-center gap-2">
                       <img 
@@ -272,8 +274,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
         <ApprovalDetailsModal
           application={selectedPendingApp}
           onClose={() => setSelectedPendingApp(null)}
-          onApprove={(id) => {
-            updateStatus(id, 'Approved');
+          onApprove={(id, popupData) => {
+            updateStatus(id, 'Approved', popupData);
             setSelectedPendingApp(null);
           }}
           onReject={(id) => {

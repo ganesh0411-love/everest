@@ -31,6 +31,8 @@ import EMICalculator from './components/EMICalculator';
 import OfflineImage from './components/OfflineImage';
 import CustomerDetail from './components/CustomerDetail';
 
+const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
+
 function App() {
   const [user, setUser] = useState(null);
   const [customers, setCustomers] = useState(() => {
@@ -424,10 +426,10 @@ function App() {
           <div className="flex-1 overflow-y-auto flex flex-col">
             <ApplicationStatus 
               applications={customers}
-              onUpdateStatus={async (id, newStatus) => {
+              onUpdateStatus={async (id, newStatus, extraData = {}) => {
                 const nowIso = new Date().toISOString();
                 try {
-                  await updateDoc(doc(db, 'customers', id), { status: newStatus, lastUpdated: nowIso });
+                  await updateDoc(doc(db, 'customers', id), { status: newStatus, lastUpdated: nowIso, ...extraData });
                   // setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus, lastUpdated: nowIso } : c));
                 } catch(e) {
                   console.error('Update error', e);
@@ -497,94 +499,101 @@ function App() {
       default:
         return (
           <>
-            <div className="flex-shrink-0 z-30 bg-[#f8fafc] pb-2">
-              <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
-              <SearchBar 
-                onFilterClick={openFilter} 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                isFilterActive={activeCategory !== 'All' || activeSort !== 'Recent'}
-              />
-            </div>
-            
-            <main 
-              className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto bg-white"
-              onScroll={handleScroll}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              onTouchCancel={handleTouchEnd}
-            >
-              {processedCustomers.filter(c => c.status !== 'Rejected').length > 0 ? (
-                <div className="p-2 space-y-2 pb-24">
-                  <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider">
-                    Entries: {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').length}
-                  </div>
-                  {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').map(customer => (
-                    <div key={customer.id} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
-                      <div className="flex-1 min-w-0 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
-                          <OfflineImage src={customer.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer.name)}&background=random`} alt="Profile" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="min-w-0 pr-2">
-                          <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
-                          <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
-                        </div>
-                      </div>
-                      
-                      {/* Status Badges - Strict Fixed Width Column */}
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-                        <div className="flex flex-col items-center justify-center w-6 gap-1">
-                          {customer.status === 'Pending' && (
-                            <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                          )}
-                          {customer.status === 'Approved' && (
-                            <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right min-w-[70px]">
-                          <div className="text-sm font-bold text-red-600">₹{customer.repayAmount?.toLocaleString('en-IN') || '0'}</div>
-                        </div>
-                        <div className="relative">
-                          <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                            </svg>
-                          </button>
-                          {activeHomeMenuId === customer.id && (
-                            <div className="absolute right-0 top-8 w-32 bg-white rounded-lg shadow-lg border border-slate-100 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                              <button 
-                                onClick={async () => {
-                                  const nowIso = new Date().toISOString();
-                                  try {
-                                    await updateDoc(doc(db, 'customers', customer.id), { status: 'Recycled', previousStatus: customer.status, lastUpdated: nowIso });
-                                    // setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, status: 'Recycled', previousStatus: c.status, lastUpdated: nowIso } : c));
-                                  } catch(e) { console.error('Delete error', e); }
-                                  setActiveHomeMenuId(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
+            {customers.length === 0 ? (
+              <main className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto bg-white flex flex-col justify-center items-center h-full">
                 <EmptyState />
-              )}
-            </main>
+              </main>
+            ) : (
+              <>
+                <div className="flex-shrink-0 z-30 bg-[#f8fafc] pb-2">
+                  <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
+                  <SearchBar 
+                    onFilterClick={openFilter} 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    isFilterActive={activeCategory !== 'All' || activeSort !== 'Recent'}
+                  />
+                </div>
+                
+                <main 
+                  className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto bg-white flex flex-col"
+                  onScroll={handleScroll}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
+                >
+                  {processedCustomers.filter(c => c.status !== 'Rejected').length > 0 ? (
+                    <div className="p-2 space-y-2 pb-24">
+                      <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider">
+                        Entries: {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').length}
+                      </div>
+                      {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').map(customer => (
+                        <div key={customer.id} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
+                          <div className="flex-1 min-w-0 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
+                              <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="min-w-0 pr-2">
+                              <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
+                              <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
+                            </div>
+                          </div>
+                          
+                          {/* Status Badges - Strict Fixed Width Column */}
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                            <div className="flex flex-col items-center justify-center w-6 gap-1">
+                              {customer.status === 'Pending' && (
+                                <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                              )}
+                              {customer.status === 'Approved' && (
+                                <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right min-w-[70px]">
+                              <div className="text-sm font-bold text-red-600">₹{customer.repayAmount?.toLocaleString('en-IN') || '0'}</div>
+                            </div>
+                            <div className="relative">
+                              <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                </svg>
+                              </button>
+                              {activeHomeMenuId === customer.id && (
+                                <div className="absolute right-0 top-8 w-32 bg-white rounded-lg shadow-lg border border-slate-100 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                  <button 
+                                    onClick={async () => {
+                                      const nowIso = new Date().toISOString();
+                                      try {
+                                        await updateDoc(doc(db, 'customers', customer.id), { status: 'Recycled', previousStatus: customer.status, lastUpdated: nowIso });
+                                      } catch(e) { console.error('Delete error', e); }
+                                      setActiveHomeMenuId(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState />
+                  )}
+                </main>
+              </>
+            )}
             
             <div onClick={() => setIsAddCustomerOpen(true)}>
               <FloatingActionButton isScrolled={isScrolled} />

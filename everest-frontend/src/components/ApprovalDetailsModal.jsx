@@ -9,6 +9,22 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   const [toastMsg, setToastMsg] = useState('');
   const [isVerified, setIsVerified] = useState(false);
 
+  // Approval Popup State
+  const [showApprovalPopup, setShowApprovalPopup] = useState(false);
+  const [approvalDate, setApprovalDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [overrideDueDate, setOverrideDueDate] = useState('');
+
+  // Auto-calculate 7 days from approvalDate
+  const nextDueDate = React.useMemo(() => {
+    if (!approvalDate) return '';
+    const date = new Date(approvalDate);
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().split('T')[0];
+  }, [approvalDate]);
+
   const viewSequence = ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc'];
 
   const syncNomineeData = async () => {
@@ -849,7 +865,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
             {activeView === 'main' ? (
               <>
                 <button 
-                  onClick={() => onApprove && onApprove(application.id)}
+                  onClick={() => setShowApprovalPopup(true)}
                   disabled={!isVerified}
                   className={`flex-1 py-3.5 rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide ${isVerified ? 'bg-[#4ade80] hover:bg-[#22c55e] text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                 >
@@ -892,6 +908,81 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
           </div>
         )}
       </div>
+
+      {/* Approval Popup Modal */}
+      {showApprovalPopup && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setShowApprovalPopup(false)}
+        >
+          <div 
+            className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-800 text-[18px] tracking-tight">Confirm Approval</h3>
+              <button onClick={() => setShowApprovalPopup(false)} className="text-slate-400 hover:text-slate-600 bg-white p-1.5 rounded-full shadow-sm">
+                <X size={18} strokeWidth={2.5} />
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-5">
+              <div>
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">Approval Date</label>
+                <input 
+                  type="date" 
+                  value={approvalDate}
+                  onChange={(e) => setApprovalDate(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[15px] font-medium text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100/50">
+                <label className="block text-[13px] font-bold text-blue-700 mb-1">Next Due Date :</label>
+                <div className="text-[16px] font-mono font-bold text-blue-600">{nextDueDate}</div>
+              </div>
+
+              <div>
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">Set Date : (Override)</label>
+                <input 
+                  type="date" 
+                  value={overrideDueDate}
+                  onChange={(e) => setOverrideDueDate(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[15px] font-medium text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowApprovalPopup(false);
+                }}
+                className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 font-bold text-[14px] rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowApprovalPopup(false);
+                  onApprove && onApprove(application.id, { 
+                    approvalDate, 
+                    nextDueDate: overrideDueDate || nextDueDate 
+                  });
+                }}
+                className="flex-1 py-3 bg-emerald-500 text-white font-bold text-[14px] rounded-xl shadow-sm shadow-emerald-500/20 hover:bg-emerald-600 transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
