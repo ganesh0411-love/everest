@@ -175,7 +175,7 @@ const CustomerDetail = ({ customer, onBack }) => {
                 <img 
                   src={centerAvatarSrc} 
                   alt="Center Avatar" 
-                  className={`w-[280px] h-[280px] sm:w-[360px] sm:h-[360px] object-cover mix-blend-multiply opacity-95 transition-transform duration-500 ease-in-out ${isFemale ? 'scale-110 hover:scale-125' : 'scale-[1.35] hover:scale-[1.45]'}`}
+                  className="w-48 h-48 sm:w-56 sm:h-56 object-contain mix-blend-multiply opacity-95 hover:scale-105 transition-transform duration-500 ease-in-out"
                   onError={(e) => { 
                     e.target.onerror = null; 
                     e.target.src = maleAvatar; // Fallback
