@@ -5,6 +5,27 @@ import { App } from '@capacitor/app';
 const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onStayPending }) => {
   const [activeView, setActiveView] = useState('main'); // 'main' | 'centerDetails'
   const [toastMsg, setToastMsg] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
+
+  const viewSequence = ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc'];
+
+  const handleNextView = () => {
+    const currentIndex = viewSequence.indexOf(activeView);
+    if (currentIndex >= 0 && currentIndex < viewSequence.length - 1) {
+      setActiveView(viewSequence[currentIndex + 1]);
+    } else if (currentIndex === viewSequence.length - 1) {
+      setActiveView('main');
+    }
+  };
+
+  const handlePrevView = () => {
+    const currentIndex = viewSequence.indexOf(activeView);
+    if (currentIndex > 0) {
+      setActiveView(viewSequence[currentIndex - 1]);
+    } else {
+      setActiveView('main');
+    }
+  };
 
   const parseDateToInput = (dateString) => {
     if (!dateString) return '';
@@ -47,9 +68,11 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
       if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
         age--;
       }
-      setNomineeAge(age >= 0 ? age.toString() : '0');
+      const ageStr = age >= 0 ? age.toString() : '0';
+      setNomineeAge(ageStr);
+      if (application) application.nomineeAge = ageStr;
     }
-  }, [nomineeDob]);
+  }, [nomineeDob, application]);
 
   useEffect(() => {
     let listener = null;
@@ -91,7 +114,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
     {
       id: 'loanDetails',
       title: 'Loan Details',
-      subtitle: <span className="ml-10 inline-flex items-baseline whitespace-nowrap"><span className="text-[13px] text-slate-600 mr-1.5">Amount :</span><span className="text-emerald-600 font-extrabold text-[20px] font-mono tracking-tight leading-none">₹{application.loanAmount ? Number(application.loanAmount).toLocaleString('en-IN') : '0'}</span></span>,
+      subtitle: <span className="ml-10 inline-flex items-baseline whitespace-nowrap"><span className="text-[13px] text-slate-600 mr-1.5">Amount :</span><span className="text-emerald-600 font-extrabold text-[20px] tracking-tight leading-none" style={{ fontFamily: "'JetBrains Mono', 'Roboto Mono', monospace" }}>₹{application.loanAmount ? Number(application.loanAmount).toLocaleString('en-IN') : '0'}</span></span>,
       icon: <Wallet size={20} className="text-blue-600" />,
       bg: 'bg-blue-100',
     },
@@ -228,13 +251,14 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
           {/* Sub-View: Loan Details */}
           <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'loanDetails' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="mb-2">
+            <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-3">
               <button 
                 onClick={() => setActiveView('main')} 
-                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
               >
                 <ArrowLeft size={20} strokeWidth={2.5} />
               </button>
+              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">1. Loan Details</h2>
             </div>
 
             <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
@@ -278,13 +302,14 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
           {/* Sub-View: Center Details */}
           <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'centerDetails' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="mb-2">
+            <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-3">
               <button 
                 onClick={() => setActiveView('main')} 
-                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
               >
                 <ArrowLeft size={20} strokeWidth={2.5} />
               </button>
+              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">2. Center Details</h2>
             </div>
 
             <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
@@ -351,13 +376,14 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
           {/* Sub-View: Staff Details */}
           <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'staff' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="mb-2">
+            <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-3">
               <button 
                 onClick={() => setActiveView('main')} 
-                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
               >
                 <ArrowLeft size={20} strokeWidth={2.5} />
               </button>
+              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">3. Staff</h2>
             </div>
 
             <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
@@ -389,13 +415,14 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
           {/* Sub-View: Personal Details */}
           <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'personal' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="mb-2">
+            <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-3">
               <button 
                 onClick={() => setActiveView('main')} 
-                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
               >
                 <ArrowLeft size={20} strokeWidth={2.5} />
               </button>
+              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">4. Personal & Contact Details</h2>
             </div>
 
             <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
@@ -447,8 +474,8 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Location</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                 <div className="flex items-center">
-                  {application.locationUrl ? (
-                    <a href={application.locationUrl} target="_blank" rel="noreferrer" className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm border border-emerald-100 inline-flex">
+                  {(application.customerLocationUrl || application.locationUrl) ? (
+                    <a href={application.customerLocationUrl || application.locationUrl} target="_blank" rel="noreferrer" className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm border border-emerald-100 inline-flex">
                       <MapPin size={18} strokeWidth={2.5} />
                     </a>
                   ) : (
@@ -469,13 +496,14 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
           {/* Sub-View: Nominee & Contact Details */}
           <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'nominee' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="mb-2">
+            <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-3">
               <button 
                 onClick={() => setActiveView('main')} 
-                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
               >
                 <ArrowLeft size={20} strokeWidth={2.5} />
               </button>
+              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">5. Nominee & Contact Details</h2>
             </div>
 
             <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
@@ -497,7 +525,10 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                 <select 
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[14px] text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   value={nomineeMaritalStatus}
-                  onChange={(e) => setNomineeMaritalStatus(e.target.value)}
+                  onChange={(e) => {
+                    setNomineeMaritalStatus(e.target.value);
+                    if (application) application.nomineeMaritalStatus = e.target.value;
+                  }}
                 >
                   <option value="Single">Single</option>
                   <option value="Married">Married</option>
@@ -513,7 +544,10 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   type="date"
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[14px] text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   value={nomineeDob}
-                  onChange={(e) => setNomineeDob(e.target.value)}
+                  onChange={(e) => {
+                    setNomineeDob(e.target.value);
+                    if (application) application.nomineeDob = e.target.value;
+                  }}
                 />
               </div>
 
@@ -545,13 +579,14 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
           {/* Sub-View: Previous Record */}
           <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'pastLoans' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="mb-2">
+            <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-3">
               <button 
                 onClick={() => setActiveView('main')} 
-                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
               >
                 <ArrowLeft size={20} strokeWidth={2.5} />
               </button>
+              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">6. Previous Record</h2>
             </div>
 
             <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
@@ -619,13 +654,14 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
           
           {/* Sub-View: KYC Details */}
           <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'kyc' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="mb-2">
+            <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-3">
               <button 
                 onClick={() => setActiveView('main')} 
-                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
               >
                 <ArrowLeft size={20} strokeWidth={2.5} />
               </button>
+              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">7. KYC Details</h2>
             </div>
 
             <div className="space-y-5 text-[14px] text-slate-800 font-medium tracking-tight pb-6">
@@ -774,25 +810,58 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
         </div>
 
         {/* Bottom Action Buttons - Stationary */}
-        <div className="p-4 bg-white rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] border-t border-slate-100 flex gap-2 justify-between z-10 pb-safe shrink-0">
-          <button 
-            onClick={() => onApprove && onApprove(application.id)}
-            className="flex-1 py-3.5 bg-[#4ade80] hover:bg-[#22c55e] text-white rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide"
-          >
-            APPROVE
-          </button>
-          <button 
-            onClick={() => onReject && onReject(application.id)}
-            className="flex-1 py-3.5 bg-[#ef4444] hover:bg-[#dc2626] text-white rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide"
-          >
-            REJECT
-          </button>
-          <button 
-            onClick={() => onStayPending && onStayPending(application.id)}
-            className="flex-1 py-3.5 bg-slate-500 hover:bg-slate-600 text-white rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide whitespace-nowrap px-2"
-          >
-            STAY PENDING
-          </button>
+        <div className="p-4 bg-white rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] border-t border-slate-100 flex flex-col gap-3 z-10 pb-safe shrink-0">
+          {activeView === 'main' && (
+            <div className="flex items-center gap-2.5 px-2">
+              <input 
+                type="checkbox" 
+                id="verifyData" 
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                checked={isVerified}
+                onChange={(e) => setIsVerified(e.target.checked)}
+              />
+              <label htmlFor="verifyData" className="text-[13px] font-bold text-slate-700 leading-snug cursor-pointer select-none">
+                I have read and verified all the data above
+              </label>
+            </div>
+          )}
+          
+          <div className="flex gap-2 justify-between w-full">
+            {activeView === 'main' ? (
+              <>
+                <button 
+                  onClick={() => onApprove && onApprove(application.id)}
+                  disabled={!isVerified}
+                  className={`flex-1 py-3.5 rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide ${isVerified ? 'bg-[#4ade80] hover:bg-[#22c55e] text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                >
+                  APPROVE
+                </button>
+                <button 
+                  onClick={() => onReject && onReject(application.id)}
+                  disabled={!isVerified}
+                  className={`flex-1 py-3.5 rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide ${isVerified ? 'bg-[#ef4444] hover:bg-[#dc2626] text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                >
+                  REJECT
+                </button>
+              </>
+            ) : (
+              <div className="flex justify-between w-full">
+                <button
+                  onClick={handlePrevView}
+                  className="p-3.5 bg-rose-50 text-rose-600 rounded-xl shadow-sm hover:bg-rose-100 transition-colors flex items-center justify-center border border-rose-100"
+                  title="Previous Step"
+                >
+                  <ArrowLeft size={20} strokeWidth={3} />
+                </button>
+                <button
+                  onClick={handleNextView}
+                  className="py-3.5 px-10 bg-blue-600 text-white rounded-xl font-bold text-[14px] shadow-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  NEXT <ChevronRight size={18} strokeWidth={2.5} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Custom Toast Notification Overlay */}

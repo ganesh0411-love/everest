@@ -761,6 +761,7 @@ function App() {
               // setCustomers(prev => [customerToSave, ...prev]);
             } catch(e) {
               console.error('Error adding customer', e);
+              throw e;
             }
           }}
         />

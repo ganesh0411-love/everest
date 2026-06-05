@@ -353,8 +353,59 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const confirmSubmit = async () => {
     setIsSubmitting(true);
     try {
-      let finalPhoto = photo;
+      // 1. Upload profile photo if needed
+      let updatedProfilePic = photo;
+      if (photo && !photo.includes('firebasestorage.googleapis.com') && !photo.includes('supabase.co')) {
+         try {
+            updatedProfilePic = await uploadImageToStorage(photo, 'profile_pics', `${customerId}_profile`);
+         } catch (imgError) {
+            console.warn('Could not upload profile photo, keeping base64:', imgError);
+         }
+      }
 
+      // 2. Upload Customer KYC Docs
+      let finalKycDocs = { ...kycDocs };
+      const uploadKycDocs = async (type, prefix) => {
+        if (finalKycDocs[type]) {
+          finalKycDocs[type] = await Promise.all(finalKycDocs[type].map(async (docObj, idx) => {
+            if (docObj.url && !docObj.url.includes('firebasestorage.googleapis.com') && !docObj.url.includes('supabase.co')) {
+               const target = docObj.fileObj || docObj.url;
+               const newUrl = await uploadImageToStorage(target, `kyc_${prefix}`, `${customerId}_${prefix}_${idx}`);
+               return { ...docObj, url: newUrl };
+            }
+            return docObj;
+          }));
+        }
+      };
+      
+      await Promise.all([
+         uploadKycDocs('aadhaar', 'aadhaar'),
+         uploadKycDocs('pan', 'pan'),
+         uploadKycDocs('voter', 'voter_id'),
+         uploadKycDocs('smartCard', 'smart_card')
+      ]);
+
+      // 3. Upload Nominee KYC Docs
+      let finalNomineeKycDocs = { ...nomineeKycDocs };
+      const uploadNomineeKycDocs = async (key, prefix) => {
+        if (finalNomineeKycDocs[key] && finalNomineeKycDocs[key].length > 0) {
+          finalNomineeKycDocs[key] = await Promise.all(finalNomineeKycDocs[key].map(async (docObj, idx) => {
+            if (docObj.url && !docObj.url.includes('firebasestorage.googleapis.com') && !docObj.url.includes('supabase.co')) {
+               const target = docObj.fileObj || docObj.url;
+               const newUrl = await uploadImageToStorage(target, `customers/${customerId}/nominee_${prefix}`, `${Date.now()}_${idx}`);
+               return { ...docObj, url: newUrl };
+            }
+            return docObj;
+          }));
+        }
+      };
+
+      await Promise.all([
+         uploadNomineeKycDocs('aadhaar', 'aadhaar'),
+         uploadNomineeKycDocs('pan', 'pan'),
+         uploadNomineeKycDocs('voter', 'voter_id'),
+         uploadNomineeKycDocs('smartCard', 'smart_card')
+      ]);
 
       // Strip fileObj from kycDocs to prevent Firestore 'custom object' errors
       const cleanKycDocs = (docs) => {
@@ -379,89 +430,22 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         repayAmount: parseFloat(repayAmount) || 0,
         category: 'Upcoming',
         // Schema Verification: Explicit mapping
-        appDate, appDay, appNumber, image: finalPhoto, branch,
+        appDate, appDay, appNumber, image: updatedProfilePic, branch,
         center, city, district, nameTitle, customerName,
         phone, altPhone, customerStatus, dob, age,
         gender, maritalStatus, religion: '', caste: '', education: '', occupation,
         idsChecked, loanType, tenureVal, tenureUnit, interestPercent,
         nomineeName, nomineeRelation, address, pincode: pincode.join(''),
-        aadhaar: aadhaar.join(''), pan, voterId, smartCard, kycDocs: cleanKycDocs(kycDocs), 
+        aadhaar: aadhaar.join(''), pan, voterId, smartCard, kycDocs: cleanKycDocs(finalKycDocs), 
         customerLocationUrl, centerLocationUrl, centerLeaderName, leaderCustomerId, groupName,
-        nomineeOccupation, nomineeIdsChecked, nomineeAadhaar: nomineeAadhaar.join(''), nomineePan, nomineeVoterId, nomineeSmartCard, nomineeKycDocs: cleanKycDocs(nomineeKycDocs)
+        nomineeOccupation, nomineeIdsChecked, nomineeAadhaar: nomineeAadhaar.join(''), nomineePan, nomineeVoterId, nomineeSmartCard, nomineeKycDocs: cleanKycDocs(finalNomineeKycDocs)
       };
       
       if (onAddCustomer) {
-        onAddCustomer(newCustomer);
+        await onAddCustomer(newCustomer);
       }
       
       setStep('success');
-
-      // Background Upload Task (KYC Only)
-      setTimeout(async () => {
-        try {
-          let finalKycDocs = { ...kycDocs };
-          const uploadKycDocs = async (type, prefix) => {
-            if (finalKycDocs[type]) {
-              const uploaded = await Promise.all(finalKycDocs[type].map(async (docObj, idx) => {
-                if (!docObj.url.includes('firebasestorage.googleapis.com')) {
-                   const target = docObj.fileObj || docObj.url;
-                   const newUrl = await uploadImageToStorage(target, `kyc_${prefix}`, `${customerId}_${prefix}_${idx}`);
-                   return { ...docObj, url: newUrl };
-                }
-                return docObj;
-              }));
-              finalKycDocs[type] = uploaded;
-            }
-          };
-          
-          await Promise.all([
-             uploadKycDocs('aadhaar', 'aadhaar'),
-             uploadKycDocs('pan', 'pan'),
-             uploadKycDocs('voter', 'voter_id'),
-             uploadKycDocs('smartCard', 'smart_card')
-          ]);
-          const uploadNomineeKycDocs = async (key, prefix) => {
-            if (nomineeKycDocs[key] && nomineeKycDocs[key].length > 0) {
-              const urls = [];
-              for (let i = 0; i < nomineeKycDocs[key].length; i++) {
-                const doc = nomineeKycDocs[key][i];
-                if (doc.fileObj) {
-                  const url = await uploadImageToStorage(doc.fileObj, `customers/${customerId}/nominee_${prefix}_${Date.now()}_${i}`);
-                  urls.push({ name: doc.name, url });
-                } else {
-                  urls.push({ name: doc.name, url: doc.url });
-                }
-              }
-              newCustomer.nomineeKycDocs[key] = urls;
-            }
-          };
-
-          await Promise.all([
-             uploadNomineeKycDocs('aadhaar', 'aadhaar'),
-             uploadNomineeKycDocs('pan', 'pan'),
-             uploadNomineeKycDocs('voter', 'voter_id'),
-             uploadNomineeKycDocs('smartCard', 'smart_card')
-          ]);
-
-          let updatedProfilePic = finalPhoto;
-          if (photo && !photo.includes('firebasestorage.googleapis.com')) {
-             try {
-                updatedProfilePic = await uploadImageToStorage(photo, 'profile_pics', `${customerId}_profile`);
-             } catch (imgError) {
-                console.warn('Could not upload profile photo, keeping base64:', imgError);
-             }
-          }
-
-          const { doc, updateDoc } = await import('firebase/firestore');
-          const { db } = await import('../firebase');
-          await updateDoc(doc(db, 'customers', customerId), {
-            image: updatedProfilePic,
-            kycDocs: cleanKycDocs(finalKycDocs)
-          });
-        } catch (e) {
-          console.error('Background upload failed for', customerId, e);
-        }
-      }, 50);
 
     } catch (error) {
       console.error("Save failed:", error);
