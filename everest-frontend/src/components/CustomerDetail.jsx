@@ -47,17 +47,17 @@ const CustomerDetail = ({ customer, onBack }) => {
             </div>
             
             <div className="flex flex-col items-center mt-12 sm:mt-14 w-full min-w-0">
-              <p className="text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-widest mb-0.5 text-center w-auto max-w-full overflow-visible break-words px-1 bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.5)', textShadow: '0 0 2px rgba(255,255,255,0.2)' }}>Loan Amount</p>
-              <h3 className="text-[16px] sm:text-[22px] font-extrabold text-emerald-400 tracking-tight flex items-center justify-center text-center w-auto max-w-full overflow-visible break-words px-1 bg-transparent" style={{ WebkitTextStroke: '0.5px rgba(52,211,153,0.6)', textShadow: '0 0 8px rgba(52,211,153,0.8), 0 0 15px rgba(52,211,153,0.4)' }}>
-                <IndianRupee className="w-[14px] h-[14px] sm:w-[18px] sm:h-[18px] mr-[1px] stroke-[3] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 6px rgba(52,211,153,0.8))' }} />
-                <span className="overflow-visible pr-1">{loanAmount.toLocaleString('en-IN')}</span>
+              <p className="text-[9px] min-[360px]:text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-wider mb-0.5 text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.6)', textShadow: '0 1px 1px rgba(0,0,0,0.5)' }}>Loan Amount</p>
+              <h3 className="text-[20px] sm:text-[26px] font-extrabold text-[#4ade80] tracking-tighter flex items-center justify-center text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.8px rgba(0,0,0,0.9)', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                <IndianRupee className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mr-[1px] stroke-[3] flex-shrink-0" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }} />
+                <span>{loanAmount.toLocaleString('en-IN')}</span>
               </h3>
             </div>
           </div>
 
           {/* Center: Profile Card & Due Date */}
           <div className="flex flex-col items-center">
-            <div className="w-[140px] sm:w-[170px] bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-2xl border-[1.5px] border-[#4ade80]/40 rounded-2xl sm:rounded-[1.5rem] p-2 sm:p-3 flex flex-col items-center shadow-[0_0_40px_rgba(52,211,153,0.3)] relative overflow-hidden z-30 mx-auto">
+            <div className="w-[115px] min-[360px]:w-[140px] sm:w-[170px] bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-2xl border-[1.5px] border-[#4ade80]/40 rounded-2xl sm:rounded-[1.5rem] p-2 sm:p-3 flex flex-col items-center shadow-[0_0_40px_rgba(52,211,153,0.3)] relative overflow-hidden z-30 mx-auto">
               {/* Glow effect inside card */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-gradient-to-b from-emerald-300/30 to-transparent pointer-events-none"></div>
               
@@ -87,10 +87,10 @@ const CustomerDetail = ({ customer, onBack }) => {
             </div>
 
             <div className="flex flex-col items-center mt-12 sm:mt-14 w-full min-w-0">
-              <p className="text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-widest mb-0.5 text-center w-auto max-w-full overflow-visible break-words px-1 bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.5)', textShadow: '0 0 2px rgba(255,255,255,0.2)' }}>Outstanding</p>
-              <h3 className="text-[16px] sm:text-[22px] font-extrabold text-red-500 tracking-tight flex items-center justify-center text-center w-auto max-w-full overflow-visible break-words px-1 bg-transparent" style={{ WebkitTextStroke: '0.5px rgba(239,68,68,0.6)', textShadow: '0 0 8px rgba(239,68,68,0.8), 0 0 15px rgba(239,68,68,0.4)' }}>
-                <IndianRupee className="w-[14px] h-[14px] sm:w-[18px] sm:h-[18px] mr-[1px] stroke-[3] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 6px rgba(239,68,68,0.8))' }} />
-                <span className="overflow-visible pr-1">{repayAmount.toLocaleString('en-IN')}</span>
+              <p className="text-[9px] min-[360px]:text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-wider mb-0.5 text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.6)', textShadow: '0 1px 1px rgba(0,0,0,0.5)' }}>Outstanding</p>
+              <h3 className="text-[20px] sm:text-[26px] font-extrabold text-[#ef4444] tracking-tighter flex items-center justify-center text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.8px rgba(0,0,0,0.9)', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                <IndianRupee className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mr-[1px] stroke-[3] flex-shrink-0" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }} />
+                <span>{repayAmount.toLocaleString('en-IN')}</span>
               </h3>
             </div>
           </div>
