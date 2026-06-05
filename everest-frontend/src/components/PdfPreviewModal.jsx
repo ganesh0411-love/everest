@@ -313,6 +313,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
 
   // Safe fallback UI rendering values
   const appNo = application?.appNumber ? String(application.appNumber).padStart(2, '0') : '01';
+  const branchName = application?.branch || 'BATLAGUNDU';
   const formatDateToDDMMYYYY = (dateStr) => {
     if (!dateStr) return '';
     if (dateStr.includes('-')) {
@@ -426,9 +427,10 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
           {/* PDF CONTENT BOUNDARY */}
           <div className="relative z-10 w-full h-full px-8 pt-4 pb-8 flex flex-col font-sans">
             
-            {/* Top Right Text */}
-            <div className="text-center w-full mb-2 relative">
-              <span className="font-bold text-lg" style={{ color: cyanBlue }}>APPLICATION NO : {appNo}</span>
+            {/* Top Header (Branch & App No) */}
+            <div className="flex justify-between w-full mb-2 relative z-20">
+              <span className="font-bold text-lg uppercase" style={{ color: cyanBlue }}>BRANCH : {branchName}</span>
+              <span className="font-bold text-lg uppercase" style={{ color: cyanBlue }}>APPLICATION NO : {appNo}</span>
             </div>
 
             {/* Header Section */}
