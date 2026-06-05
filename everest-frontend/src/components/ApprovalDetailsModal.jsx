@@ -1,7 +1,79 @@
-import React from 'react';
-import { X, Building2, User, UserCircle, Phone, FileBadge, FileText, IdCard, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Building2, User, UserCircle, Phone, FileBadge, FileText, IdCard, ChevronRight, ArrowLeft, MapPin, Wallet, CheckCircle2, Eye, XCircle } from 'lucide-react';
+import { App } from '@capacitor/app';
 
 const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onStayPending }) => {
+  const [activeView, setActiveView] = useState('main'); // 'main' | 'centerDetails'
+  const [toastMsg, setToastMsg] = useState('');
+
+  const parseDateToInput = (dateString) => {
+    if (!dateString) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString;
+    if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
+      const [dd, mm, yyyy] = dateString.split('-');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    const d = new Date(dateString);
+    if (!isNaN(d)) return d.toISOString().split('T')[0];
+    return '';
+  };
+
+  const handleOpenDoc = (docs) => {
+    if (!docs || docs.length === 0) {
+      setToastMsg('No document file attached.');
+      setTimeout(() => setToastMsg(''), 3000);
+      return;
+    }
+    const doc = docs[0];
+    const url = typeof doc === 'string' ? doc : doc.url || doc.fileUrl || doc.preview;
+    if (url) {
+      window.open(url, '_blank');
+    } else {
+      setToastMsg('Document file cannot be read.');
+      setTimeout(() => setToastMsg(''), 3000);
+    }
+  };
+
+  const [nomineeDob, setNomineeDob] = useState(parseDateToInput(application?.nomineeDob));
+  const [nomineeMaritalStatus, setNomineeMaritalStatus] = useState(application?.nomineeMaritalStatus || 'Single');
+  const [nomineeAge, setNomineeAge] = useState(application?.nomineeAge || '');
+
+  useEffect(() => {
+    if (nomineeDob) {
+      const dobDate = new Date(nomineeDob);
+      const today = new Date();
+      let age = today.getFullYear() - dobDate.getFullYear();
+      const m = today.getMonth() - dobDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+        age--;
+      }
+      setNomineeAge(age >= 0 ? age.toString() : '0');
+    }
+  }, [nomineeDob]);
+
+  useEffect(() => {
+    let listener = null;
+    const setupBackButton = async () => {
+      listener = await App.addListener('backButton', () => {
+        if (activeView !== 'main') {
+          // If in sub-view, go back to main menu inside modal
+          setActiveView('main');
+        } else {
+          // If in main menu, close the modal entirely
+          onClose();
+        }
+      });
+    };
+    
+    setupBackButton();
+    
+    return () => {
+      if (listener) {
+        listener.remove();
+      }
+    };
+  }, [activeView, onClose]);
+
   if (!application) return null;
 
   const formatDate = (dateString) => {
@@ -17,109 +89,692 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
   const infoRows = [
     {
+      id: 'loanDetails',
+      title: 'Loan Details',
+      subtitle: <span className="ml-10 inline-flex items-baseline whitespace-nowrap"><span className="text-[13px] text-slate-600 mr-1.5">Amount :</span><span className="text-emerald-600 font-extrabold text-[20px] font-mono tracking-tight leading-none">₹{application.loanAmount ? Number(application.loanAmount).toLocaleString('en-IN') : '0'}</span></span>,
+      icon: <Wallet size={20} className="text-blue-600" />,
+      bg: 'bg-blue-100',
+    },
+    {
+      id: 'centerDetails',
       title: 'Center Details',
-      subtitle: `Branch: ${application.branch || 'Anna Nagar'}`,
+      subtitle: `Branch : ${application.branch || 'BATLAGUNDU'}`,
       icon: <Building2 size={20} className="text-emerald-600" />,
       bg: 'bg-emerald-100',
     },
     {
+      id: 'staff',
       title: 'Staff',
-      subtitle: `Staff Name: ${application.staffName || 'Ramesh'}`,
+      subtitle: `Staff Name : ${application.staffName || 'Ramesh'}`,
       icon: <User size={20} className="text-rose-500" />,
       bg: 'bg-rose-100',
     },
     {
-      title: 'Personal Details',
-      subtitle: `DOB: ${application.dob || '12-04-1998'}`,
+      id: 'personal',
+      title: 'Personal & Contact Details',
+      subtitle: `DOB : ${application.dob ? formatDate(application.dob) : '--'}`,
       icon: <UserCircle size={20} className="text-amber-500" />,
       bg: 'bg-amber-100',
     },
     {
-      title: 'Contact',
-      subtitle: `Phone: +91 ${application.phone || '9988776655'}`,
-      icon: <Phone size={20} className="text-blue-500" />,
-      bg: 'bg-blue-100',
-    },
-    {
-      title: 'Nominee Details',
-      subtitle: `Nominee: ${application.nomineeName || 'Geetha'}`,
+      id: 'nominee',
+      title: 'Nominee & Contact Details',
+      subtitle: `Nominee : ${application.nomineeName || 'Geetha'}`,
       icon: <FileBadge size={20} className="text-purple-600" />,
       bg: 'bg-purple-100',
     },
     {
+      id: 'pastLoans',
       title: 'Previous Record',
-      subtitle: `Past Loans: ${application.pastLoans || '2 (Closed)'}`,
+      subtitle: `Past Loans : ${application.pastLoans || '2 (Closed)'}`,
       icon: <FileText size={20} className="text-rose-600" />,
       bg: 'bg-rose-100',
     },
     {
+      id: 'kyc',
       title: 'KYC Details',
-      subtitle: `Aadhar: ${maskedAadhar}`,
+      subtitle: `Aadhar : ${maskedAadhar}`,
       icon: <IdCard size={20} className="text-indigo-600" />,
       bg: 'bg-indigo-100',
     }
   ];
 
+  const handleRowClick = (rowId) => {
+    if (rowId === 'loanDetails') {
+      setActiveView('loanDetails');
+    } else if (rowId === 'centerDetails') {
+      setActiveView('centerDetails');
+    } else if (rowId === 'staff') {
+      setActiveView('staff');
+    } else if (rowId === 'personal') {
+      setActiveView('personal');
+    } else if (rowId === 'nominee') {
+      setActiveView('nominee');
+    } else if (rowId === 'pastLoans') {
+      setActiveView('pastLoans');
+    } else if (rowId === 'kyc') {
+      setActiveView('kyc');
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
       <div 
-        className="bg-[#f8fafc] w-full max-w-sm rounded-3xl overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-in slide-in-from-bottom-8 duration-300"
+        className="bg-[#f8fafc] w-full max-w-sm rounded-3xl overflow-hidden flex flex-col h-[85vh] shadow-2xl animate-in slide-in-from-bottom-8 duration-300"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header Profile Section */}
-        <div className="p-4 bg-white relative rounded-t-3xl shadow-sm z-10 flex items-start gap-4 pt-6 pb-4">
+        {/* Header Profile Section - Stationary */}
+        <div className="p-4 bg-white relative rounded-t-3xl shadow-sm z-10 pt-6 pb-4 shrink-0">
           <button 
             onClick={onClose}
-            className="absolute top-4 right-4 text-emerald-600 hover:text-emerald-800 transition-colors"
+            className="absolute top-4 right-4 text-emerald-600 hover:text-emerald-800 transition-colors z-20"
           >
             <X size={24} strokeWidth={2.5} />
           </button>
           
-          <div className="w-20 h-24 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border border-slate-100 bg-slate-50">
-            {application.image ? (
-              <img src={application.image} alt={application.customerName} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-300">
-                <UserCircle size={40} />
+          <div className="flex items-start gap-4">
+            <div className="w-20 h-24 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border border-slate-100 bg-slate-50">
+              {application.image ? (
+                <img src={application.image} alt={application.customerName} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-300">
+                  <UserCircle size={40} />
+                </div>
+              )}
+            </div>
+            
+            <div className="flex flex-col h-24 flex-1 min-w-0 relative">
+              <div className="absolute top-0 right-7 flex flex-col items-end">
+                <span className="text-[11px] font-medium text-emerald-600 leading-tight">Apply Date:</span>
+                <span className="text-[13px] font-semibold text-blue-700">{formatDate(application.appDate)}</span>
               </div>
-            )}
-          </div>
-          
-          <div className="flex-1 pt-1">
-            <h2 className="text-xl font-bold text-slate-900 leading-tight">
-              {application.customerName || 'Vignesh K'}
-            </h2>
-            <p className="text-[13px] text-slate-700 mt-1 font-medium">
-              Employee ID: - {application.employeeId || 'F00672'}
-            </p>
-          </div>
-
-          <div className="flex flex-col items-end pt-1 pr-8">
-            <span className="text-[11px] font-medium text-emerald-600">Apply Date:</span>
-            <span className="text-[13px] font-semibold text-emerald-600">{formatDate(application.appDate)}</span>
-          </div>
-        </div>
-
-        {/* Scrollable Info Rows */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-[#f8fafc] scrollbar-hide">
-          {infoRows.map((row, index) => (
-            <div key={index} className="bg-white rounded-2xl p-3 flex items-center gap-4 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] border border-slate-50 cursor-pointer active:scale-[0.98] transition-transform">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${row.bg}`}>
-                {row.icon}
-              </div>
-              <div className="flex-1">
-                <h3 className="text-[15px] font-bold text-slate-900 leading-tight mb-0.5">{row.title}</h3>
-                <p className="text-[13px] text-slate-600 font-medium">{row.subtitle}</p>
-              </div>
-              <div className="text-blue-600 flex-shrink-0 pr-1">
-                <ChevronRight size={22} strokeWidth={2.5} />
+              
+              <div className="mt-auto flex flex-col pr-20 min-w-0 pb-[1px]">
+                <h2 className="text-[22px] uppercase font-bold text-slate-900 leading-none truncate mb-1">
+                  {application.customerName || 'Vignesh K'}
+                </h2>
+                <p className="text-[13px] text-slate-700 font-bold whitespace-nowrap truncate">
+                  ID: {application.id || '--'}
+                </p>
               </div>
             </div>
-          ))}
+          </div>
         </div>
 
-        {/* Bottom Action Buttons */}
-        <div className="p-4 bg-white rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] border-t border-slate-100 flex gap-2 justify-between z-10 pb-safe">
+        {/* Dynamic Center Area Container */}
+        <div className="flex-1 relative overflow-hidden bg-[#f8fafc]">
+          
+          {/* Main View List */}
+          <div className={`absolute inset-0 w-full h-full overflow-y-auto px-4 py-4 space-y-3 scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'main' ? 'translate-x-0' : '-translate-x-full'}`}>
+            {infoRows.map((row, index) => (
+              <div 
+                key={index} 
+                onClick={() => handleRowClick(row.id)}
+                className="bg-white rounded-2xl p-3 flex items-center gap-4 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] border border-slate-50 cursor-pointer active:scale-[0.98] transition-transform"
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${row.bg}`}>
+                  {row.icon}
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-slate-900 leading-tight mb-0.5">{row.title}</h3>
+                  <p className="text-[13px] text-slate-600 font-medium">{row.subtitle}</p>
+                </div>
+                <div className="text-blue-600 flex-shrink-0 pr-1">
+                  <ChevronRight size={22} strokeWidth={2.5} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Sub-View: Loan Details */}
+          <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'loanDetails' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="mb-2">
+              <button 
+                onClick={() => setActiveView('main')} 
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Application Number</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.appNumber || '--'}</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Type</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.loanType || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Requested Amount</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">₹{application.loanAmount || '0'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Interest Rate</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.interestPercent ? `${application.interestPercent}%` : '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Amount</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">₹{application.repayAmount || '0'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Payable Amount</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">₹{application.repayAmount || '0'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-View: Center Details */}
+          <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'centerDetails' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="mb-2">
+              <button 
+                onClick={() => setActiveView('main')} 
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Branch Name</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">BATLAGUNDU</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Group Leader</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.centerLeaderName || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>ID</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.leaderCustomerId || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Center Name</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.center || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Group Name</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.groupName || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Total Member</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">NIL</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-center">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Center Location</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <div className="flex items-center">
+                  {application.centerLocationUrl ? (
+                    <a href={application.centerLocationUrl} target="_blank" rel="noreferrer" className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm border border-emerald-100 inline-flex">
+                      <MapPin size={18} strokeWidth={2.5} />
+                    </a>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        setToastMsg('GPS data is not available for this center.');
+                        setTimeout(() => setToastMsg(''), 3000);
+                      }}
+                      className="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors shadow-sm border border-rose-100 inline-flex active:scale-95"
+                    >
+                      <MapPin size={18} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-View: Staff Details */}
+          <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'staff' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="mb-2">
+              <button 
+                onClick={() => setActiveView('main')} 
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff ID</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.staffId || 'STF001'}</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff Name</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.staffName || 'Ramesh'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Designation</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.staffDesignation || 'Field Officer'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Contact Number</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.staffContact || '7200312058'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-View: Personal Details */}
+          <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'personal' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="mb-2">
+              <button 
+                onClick={() => setActiveView('main')} 
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Customer Name</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.customerName || '--'}</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Date of Birth</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.dob ? formatDate(application.dob) : '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Age</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.age || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Marital Status</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.maritalStatus || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Occupation</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.occupation || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Phone</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.phone || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Address</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px] leading-tight pr-2">
+                  {application.address ? `${application.address}, ${application.city || ''}, ${application.district || ''} - ${application.pincode || ''}` : '--'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-center">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Location</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <div className="flex items-center">
+                  {application.locationUrl ? (
+                    <a href={application.locationUrl} target="_blank" rel="noreferrer" className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm border border-emerald-100 inline-flex">
+                      <MapPin size={18} strokeWidth={2.5} />
+                    </a>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        setToastMsg('GPS data is not available for this customer.');
+                        setTimeout(() => setToastMsg(''), 3000);
+                      }}
+                      className="p-1.5 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors shadow-sm border border-rose-100 inline-flex active:scale-95"
+                    >
+                      <MapPin size={18} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-View: Nominee & Contact Details */}
+          <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'nominee' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="mb-2">
+              <button 
+                onClick={() => setActiveView('main')} 
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Nominee Name</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.nomineeName || '--'}</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Relationship</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.nomineeRelation || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-center">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Marital Status</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <select 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[14px] text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  value={nomineeMaritalStatus}
+                  onChange={(e) => setNomineeMaritalStatus(e.target.value)}
+                >
+                  <option value="Single">Single</option>
+                  <option value="Married">Married</option>
+                  <option value="Widow">Widow</option>
+                  <option value="Divorced">Divorced</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-center">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Date of Birth</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <input 
+                  type="date"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[14px] text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  value={nomineeDob}
+                  onChange={(e) => setNomineeDob(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-center">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Age</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <input 
+                  type="text"
+                  disabled
+                  className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 text-[14px] font-bold text-slate-500 cursor-not-allowed"
+                  value={nomineeAge}
+                  placeholder="Auto-calculated"
+                />
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Occupation</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.nomineeOccupation || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Phone</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.altPhone || '--'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-View: Previous Record */}
+          <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'pastLoans' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="mb-2">
+              <button 
+                onClick={() => setActiveView('main')} 
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Previous Loans</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px] font-mono">1</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Apply Date</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">12-04-2025</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Type</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">Business Loan</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Principal</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px] font-mono text-emerald-600">₹20,000</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Amount</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px] font-mono text-emerald-600">₹24,000</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Overdue Status</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">No</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Account Status</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">Settled</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Installment History</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px] font-mono">12 / 12</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Repayment Track</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">Good</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Closed Date</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">15-03-2026</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Sub-View: KYC Details */}
+          <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'kyc' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="mb-2">
+              <button 
+                onClick={() => setActiveView('main')} 
+                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div className="space-y-5 text-[14px] text-slate-800 font-medium tracking-tight pb-6">
+              
+              {/* Customer KYC Section */}
+              <div className="space-y-3.5">
+                <div className="font-extrabold text-[13px] text-slate-500 uppercase tracking-wider mb-2 border-b border-slate-100 pb-1">Customer KYC</div>
+                
+                <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                  <span className="font-bold text-[15px] flex items-center gap-1.5" style={{ color: '#23b3e3' }}>
+                    {application.aadhaar ? <CheckCircle2 size={16} className="text-emerald-500" strokeWidth={3} /> : <XCircle size={16} className="text-rose-500" strokeWidth={3} />} 
+                    Aadhar
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                  <div className="flex items-center justify-between min-h-[28px]">
+                    <span className="pt-[1px]">{application.aadhaar ? application.aadhaar : <span className="text-slate-500">Not Provided</span>}</span>
+                    {application.aadhaar && (
+                      <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.kycDocs?.aadhaar)}>
+                        <Eye size={18} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                  <span className="font-bold text-[15px] flex items-center gap-1.5" style={{ color: '#23b3e3' }}>
+                    {application.pan ? <CheckCircle2 size={16} className="text-emerald-500" strokeWidth={3} /> : <XCircle size={16} className="text-rose-500" strokeWidth={3} />} 
+                    PAN
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                  <div className="flex items-center justify-between min-h-[28px]">
+                    <span className="pt-[1px]">{application.pan ? application.pan : <span className="text-slate-500">Not Provided</span>}</span>
+                    {application.pan && (
+                      <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.kycDocs?.pan)}>
+                        <Eye size={18} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                  <span className="font-bold text-[15px] flex items-center gap-1.5" style={{ color: '#23b3e3' }}>
+                    {application.voterId ? <CheckCircle2 size={16} className="text-emerald-500" strokeWidth={3} /> : <XCircle size={16} className="text-rose-500" strokeWidth={3} />} 
+                    Voter ID
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                  <div className="flex items-center justify-between min-h-[28px]">
+                    <span className="pt-[1px]">{application.voterId ? application.voterId : <span className="text-slate-500">Not Provided</span>}</span>
+                    {application.voterId && (
+                      <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.kycDocs?.voter)}>
+                        <Eye size={18} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                  <span className="font-bold text-[15px] flex items-center gap-1.5" style={{ color: '#23b3e3' }}>
+                    {application.smartCard ? <CheckCircle2 size={16} className="text-emerald-500" strokeWidth={3} /> : <XCircle size={16} className="text-rose-500" strokeWidth={3} />} 
+                    Smart Card
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                  <div className="flex items-center justify-between min-h-[28px]">
+                    <span className="pt-[1px]">{application.smartCard ? application.smartCard : <span className="text-slate-500">Not Provided</span>}</span>
+                    {application.smartCard && (
+                      <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.kycDocs?.smartCard)}>
+                        <Eye size={18} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Nominee KYC Section */}
+              <div className="space-y-3.5 pt-2">
+                <div className="font-extrabold text-[13px] text-slate-500 uppercase tracking-wider mb-2 border-b border-slate-100 pb-1">Nominee KYC</div>
+                
+                <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                  <span className="font-bold text-[15px] flex items-center gap-1.5" style={{ color: '#23b3e3' }}>
+                    {application.nomineeAadhaar ? <CheckCircle2 size={16} className="text-emerald-500" strokeWidth={3} /> : <XCircle size={16} className="text-rose-500" strokeWidth={3} />} 
+                    Aadhar
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                  <div className="flex items-center justify-between min-h-[28px]">
+                    <span className="pt-[1px]">{application.nomineeAadhaar ? application.nomineeAadhaar : <span className="text-slate-500">Not Provided</span>}</span>
+                    {application.nomineeAadhaar && (
+                      <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.nomineeKycDocs?.aadhaar)}>
+                        <Eye size={18} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                  <span className="font-bold text-[15px] flex items-center gap-1.5" style={{ color: '#23b3e3' }}>
+                    {application.nomineePan ? <CheckCircle2 size={16} className="text-emerald-500" strokeWidth={3} /> : <XCircle size={16} className="text-rose-500" strokeWidth={3} />} 
+                    PAN
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                  <div className="flex items-center justify-between min-h-[28px]">
+                    <span className="pt-[1px]">{application.nomineePan ? application.nomineePan : <span className="text-slate-500">Not Provided</span>}</span>
+                    {application.nomineePan && (
+                      <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.nomineeKycDocs?.pan)}>
+                        <Eye size={18} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                  <span className="font-bold text-[15px] flex items-center gap-1.5" style={{ color: '#23b3e3' }}>
+                    {application.nomineeVoterId ? <CheckCircle2 size={16} className="text-emerald-500" strokeWidth={3} /> : <XCircle size={16} className="text-rose-500" strokeWidth={3} />} 
+                    Voter ID
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                  <div className="flex items-center justify-between min-h-[28px]">
+                    <span className="pt-[1px]">{application.nomineeVoterId ? application.nomineeVoterId : <span className="text-slate-500">Not Provided</span>}</span>
+                    {application.nomineeVoterId && (
+                      <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.nomineeKycDocs?.voter)}>
+                        <Eye size={18} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                  <span className="font-bold text-[15px] flex items-center gap-1.5" style={{ color: '#23b3e3' }}>
+                    {application.nomineeSmartCard ? <CheckCircle2 size={16} className="text-emerald-500" strokeWidth={3} /> : <XCircle size={16} className="text-rose-500" strokeWidth={3} />} 
+                    Smart Card
+                  </span>
+                  <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                  <div className="flex items-center justify-between min-h-[28px]">
+                    <span className="pt-[1px]">{application.nomineeSmartCard ? application.nomineeSmartCard : <span className="text-slate-500">Not Provided</span>}</span>
+                    {application.nomineeSmartCard && (
+                      <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.nomineeKycDocs?.smartCard)}>
+                        <Eye size={18} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          
+        </div>
+
+        {/* Bottom Action Buttons - Stationary */}
+        <div className="p-4 bg-white rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] border-t border-slate-100 flex gap-2 justify-between z-10 pb-safe shrink-0">
           <button 
             onClick={() => onApprove && onApprove(application.id)}
             className="flex-1 py-3.5 bg-[#4ade80] hover:bg-[#22c55e] text-white rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide"
@@ -139,6 +794,15 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
             STAY PENDING
           </button>
         </div>
+
+        {/* Custom Toast Notification Overlay */}
+        {toastMsg && (
+          <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+            <div className="bg-slate-900 text-white px-5 py-3 rounded-full shadow-lg text-sm font-medium whitespace-nowrap tracking-wide border border-slate-700">
+              {toastMsg}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

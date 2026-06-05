@@ -385,8 +385,9 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         gender, maritalStatus, religion: '', caste: '', education: '', occupation,
         idsChecked, loanType, tenureVal, tenureUnit, interestPercent,
         nomineeName, nomineeRelation, address, pincode: pincode.join(''),
-        aadhaar: aadhaar.join(''), pan, voterId, smartCard, kycDocs: cleanKycDocs(kycDocs), locationUrl
-        ,nomineeOccupation, nomineeIdsChecked, nomineeAadhaar: nomineeAadhaar.join(''), nomineePan, nomineeVoterId, nomineeSmartCard, nomineeKycDocs: cleanKycDocs(nomineeKycDocs)
+        aadhaar: aadhaar.join(''), pan, voterId, smartCard, kycDocs: cleanKycDocs(kycDocs), 
+        customerLocationUrl, centerLocationUrl, centerLeaderName, leaderCustomerId, groupName,
+        nomineeOccupation, nomineeIdsChecked, nomineeAadhaar: nomineeAadhaar.join(''), nomineePan, nomineeVoterId, nomineeSmartCard, nomineeKycDocs: cleanKycDocs(nomineeKycDocs)
       };
       
       if (onAddCustomer) {
