@@ -427,10 +427,9 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
           {/* PDF CONTENT BOUNDARY */}
           <div className="relative z-10 w-full h-full px-8 pt-4 pb-8 flex flex-col font-sans">
             
-            {/* Top Header (Branch & App No) */}
-            <div className="flex justify-between w-full mb-2 relative z-20">
-              <span className="font-bold text-lg uppercase" style={{ color: cyanBlue }}>BRANCH : {branchName}</span>
-              <span className="font-bold text-lg uppercase" style={{ color: cyanBlue }}>APPLICATION NO : {appNo}</span>
+            {/* Top Right Text */}
+            <div className="text-center w-full mb-2 relative">
+              <span className="font-bold text-lg" style={{ color: cyanBlue }}>APPLICATION NO : {appNo}</span>
             </div>
 
             {/* Header Section */}
@@ -441,13 +440,16 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
               </div>
 
               {/* Header Text */}
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center mt-2">
                 <h1 className="text-3xl font-black tracking-widest uppercase m-0 leading-none" style={{ color: darkBlue, fontFamily: 'Arial Black, Impact, sans-serif' }}>
                   EVEREST MICROFINANCE
                 </h1>
                 <h2 className="text-lg font-bold tracking-widest mt-1 uppercase" style={{ color: darkBlue }}>
                   APPLICATION FORM
                 </h2>
+                <h3 className="text-sm font-bold tracking-widest mt-1 uppercase" style={{ color: cyanBlue }}>
+                  BRANCH : {branchName}
+                </h3>
               </div>
             </div>
 

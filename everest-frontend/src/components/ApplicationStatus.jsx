@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import PdfPreviewModal from './PdfPreviewModal';
 import AddCustomerModal from './AddCustomerModal';
+import ApprovalDetailsModal from './ApprovalDetailsModal';
 
 const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer }) => {
   const [activeTab, setActiveTab] = useState('Pending');
@@ -11,6 +12,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const [activePdfApp, setActivePdfApp] = useState(null);
   const [pdfAutoMode, setPdfAutoMode] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedPendingApp, setSelectedPendingApp] = useState(null);
 
   const tabs = [
     { id: 'Pending', label: 'Pending', activeClass: 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' },
@@ -106,7 +108,15 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                   <td colSpan="4" className="p-6 text-center text-slate-500 text-sm">No applications in this status.</td>
                 </tr>
               ) : currentApps.map((app, index) => (
-                <tr key={app.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors w-full overflow-hidden">
+                <tr 
+                  key={app.id} 
+                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors w-full overflow-hidden ${activeTab === 'Pending' ? 'cursor-pointer' : ''}`}
+                  onClick={() => {
+                    if (activeTab === 'Pending') {
+                      setSelectedPendingApp(app);
+                    }
+                  }}
+                >
                   <td className="p-2 font-bold text-slate-800 text-sm text-center">{index + 1}</td>
                   <td className="p-2 font-semibold text-slate-600 text-xs">{formatDate(app.appDate)}</td>
                   <td className="p-2 truncate overflow-hidden">
@@ -254,6 +264,23 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
           initialData={isEditing} 
           onAddCustomer={onUpdateCustomer}
           onClose={() => setIsEditing(null)} 
+        />
+      )}
+
+      {/* Approval Details Modal Overlay */}
+      {selectedPendingApp && (
+        <ApprovalDetailsModal
+          application={selectedPendingApp}
+          onClose={() => setSelectedPendingApp(null)}
+          onApprove={(id) => {
+            updateStatus(id, 'Approved');
+            setSelectedPendingApp(null);
+          }}
+          onReject={(id) => {
+            updateStatus(id, 'Rejected');
+            setSelectedPendingApp(null);
+          }}
+          onStayPending={() => setSelectedPendingApp(null)}
         />
       )}
     </div>

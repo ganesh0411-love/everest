@@ -18,6 +18,9 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [appDay, setAppDay] = useState(initialData?.appDay || '');
   const [appNumber] = useState(initialData?.appNumber || Math.floor(1000000000 + Math.random() * 9000000000));
   const [customerId] = useState(initialData?.id || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
+  const [centerLeaderName, setCenterLeaderName] = useState(initialData?.centerLeaderName || '');
+  const [leaderCustomerId, setLeaderCustomerId] = useState(initialData?.leaderCustomerId || '');
+  const [groupName, setGroupName] = useState(initialData?.groupName || '');
   const [photo, setPhoto] = useState(initialData?.image || null);
   const [branch, setBranch] = useState(initialData?.branch || 'BATLAGUNDU');
   const fileInputRef = useRef(null);
@@ -149,8 +152,10 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   // 4. Address, Location & ID
   const [address, setAddress] = useState(initialData?.address || '');
   const [pincode, setPincode] = useState(initialData?.pincode ? initialData.pincode.split('').slice(0, 6) : Array(6).fill(''));
-  const [locationUrl, setLocationUrl] = useState(initialData?.locationUrl || '');
-  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [customerLocationUrl, setCustomerLocationUrl] = useState(initialData?.customerLocationUrl || initialData?.locationUrl || '');
+  const [isFetchingCustomerLocation, setIsFetchingCustomerLocation] = useState(false);
+  const [centerLocationUrl, setCenterLocationUrl] = useState(initialData?.centerLocationUrl || '');
+  const [isFetchingCenterLocation, setIsFetchingCenterLocation] = useState(false);
   
   const handlePincodeChange = (index, val) => {
     if (!/^\d*$/.test(val)) return;
@@ -160,8 +165,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
     if (val && index < 5) document.getElementById(`pin-${index + 1}`)?.focus();
   };
 
-  const handleGetLocation = async () => {
-    setIsFetchingLocation(true);
+  const handleGetLocation = async (type = 'customer') => {
+    const setIsFetching = type === 'customer' ? setIsFetchingCustomerLocation : setIsFetchingCenterLocation;
+    const setUrl = type === 'customer' ? setCustomerLocationUrl : setCenterLocationUrl;
+    
+    setIsFetching(true);
     try {
       try {
         const permissions = await Geolocation.checkPermissions();
@@ -169,14 +177,14 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
           const request = await Geolocation.requestPermissions();
           if (request.location !== 'granted') {
             alert('Location permission denied. Cannot fetch accurate location.');
-            setIsFetchingLocation(false);
+            setIsFetching(false);
             return;
           }
         } else if (permissions.location === 'prompt') {
           const request = await Geolocation.requestPermissions();
           if (request.location !== 'granted') {
             alert('Location permission denied. Cannot fetch accurate location.');
-            setIsFetchingLocation(false);
+            setIsFetching(false);
             return;
           }
         }
@@ -204,12 +212,12 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
       }
       
       const { latitude, longitude } = position.coords;
-      setLocationUrl(`https://maps.google.com/?q=${latitude},${longitude}`);
+      setUrl(`https://maps.google.com/?q=${latitude},${longitude}`);
     } catch (error) {
       console.error("Error fetching location", error);
       alert('Failed to fetch location: ' + error.message + '\n\nTip: Ensure GPS is ON and you have clear sky visibility for a precise lock.');
     } finally {
-      setIsFetchingLocation(false);
+      setIsFetching(false);
     }
   };
 
@@ -284,7 +292,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   // 5. Financial Details
   const [loanType, setLoanType] = useState(initialData?.loanType || 'Micro Finance');
   const [tenureVal, setTenureVal] = useState(initialData?.tenureVal || '');
-  const [tenureUnit, setTenureUnit] = useState(initialData?.tenureUnit || 'Months');
+  const [tenureUnit, setTenureUnit] = useState(initialData?.tenureUnit || 'Weeks');
   const [loanAmount, setLoanAmount] = useState(initialData?.loanAmount || '');
   const [repayAmount, setRepayAmount] = useState(initialData?.repayAmount || '');
   const [interestPercent, setInterestPercent] = useState(initialData?.interestPercent || '');
@@ -529,7 +537,8 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
               pincode: pincode.join(''),
               aadhaar: aadhaar.join(''),
               pan: pan,
-              locationUrl: locationUrl
+              locationUrl: customerLocationUrl,
+              centerLocationUrl: centerLocationUrl
             }}
             onClose={() => { setShowPdf(false); setPdfAutoMode(null); }}
             autoMode={pdfAutoMode}
@@ -685,6 +694,74 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
                   "Vellore", "Viluppuram", "Virudhunagar"
                 ].map(d => <option key={d} value={d}>{d}</option>)}
               </select>
+            </div>
+          </div>
+        </section>
+
+        {/* New Section: Center Details */}
+        <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">CENTER DETAILS</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Add Group / Center Leader Name</label>
+              <input type="text" value={centerLeaderName} onChange={e => setCenterLeaderName(e.target.value)} placeholder="Leader Name" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-medium text-slate-700 focus:border-brand-blue transition-colors" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Customer ID</label>
+              <input type="text" value={leaderCustomerId} onChange={e => setLeaderCustomerId(e.target.value)} placeholder="Leader's Customer ID" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-medium text-slate-700 focus:border-brand-blue transition-colors" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Group Name</label>
+              <input type="text" value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Group Name" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-medium text-slate-700 focus:border-brand-blue transition-colors" />
+            </div>
+
+            <div className="pt-2">
+              <button 
+                type="button"
+                onClick={() => handleGetLocation('center')} 
+                disabled={isFetchingCenterLocation}
+                className={`w-full py-3.5 rounded-xl font-bold text-[13px] flex items-center justify-center gap-2 transition-colors shadow-sm
+                  ${isFetchingCenterLocation 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' 
+                    : centerLocationUrl 
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100' 
+                      : 'bg-brand-blue text-white hover:bg-blue-700'
+                  }`}
+              >
+                {isFetchingCenterLocation ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                    Fetching Location...
+                  </>
+                ) : centerLocationUrl ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Center Location Locked
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                    </svg>
+                    Get Center Location
+                  </>
+                )}
+              </button>
+              {centerLocationUrl && (
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <p className="text-[10px] text-slate-500 text-center break-all">{centerLocationUrl}</p>
+                  <button onClick={() => setCenterLocationUrl('')} className="p-1 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -878,11 +955,20 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Location GPS Coordinates</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Customer Location GPS</label>
               <div className="flex gap-2">
-                <input type="text" readOnly value={locationUrl} placeholder="Auto-filled URL" className="flex-1 p-3 border border-slate-200 rounded-xl bg-slate-50 outline-none text-sm text-blue-500" />
-                <button onClick={handleGetLocation} disabled={isFetchingLocation} className={`px-3 py-2 rounded-xl font-semibold text-xs border ${isFetchingLocation ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-blue-100 text-brand-blue border-blue-200'}`}>
-                  {isFetchingLocation ? 'Fetching...' : 'Get Location'}
+                <div className="flex-1 relative">
+                  <input type="text" readOnly value={customerLocationUrl} placeholder="Auto-filled URL" className="w-full p-3 pr-10 border border-slate-200 rounded-xl bg-slate-50 outline-none text-sm text-blue-500" />
+                  {customerLocationUrl && (
+                    <button onClick={() => setCustomerLocationUrl('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <button onClick={() => handleGetLocation('customer')} disabled={isFetchingCustomerLocation} className={`px-3 py-2 rounded-xl font-semibold text-xs border ${isFetchingCustomerLocation ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-blue-100 text-brand-blue border-blue-200 hover:bg-blue-200'}`}>
+                  {isFetchingCustomerLocation ? 'Fetching...' : 'Get Location'}
                 </button>
               </div>
             </div>
