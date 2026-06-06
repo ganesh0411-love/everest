@@ -356,7 +356,7 @@ const CustomerDetail = ({ customer, onBack }) => {
               <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center min-h-[15px] sm:min-h-[16.5px]">{customer.center || customer.area || '\u00A0'}</p>
             </div>
             
-            <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Due : {formattedDueDate}</p>
+            <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Next Due : {nextFormattedDueDate}</p>
           </div>
 
           {/* Right: MapPin, Settings & Outstanding Amount */}
@@ -503,7 +503,7 @@ const CustomerDetail = ({ customer, onBack }) => {
 
                <IndianRupee className="w-7 h-7 text-white stroke-[2.5] drop-shadow-md z-10 relative" />
             </button>
-            <span className="absolute -bottom-5 text-[10px] text-slate-800 font-extrabold tracking-widest uppercase bg-white px-2 py-0.5 rounded-full shadow-sm z-20 border border-slate-200">Pay Now</span>
+            <span className="absolute -bottom-5 text-[10px] text-slate-800 font-extrabold tracking-widest uppercase bg-white px-2 py-0.5 rounded-full shadow-sm z-20 border border-slate-200">Entry</span>
           </div>
 
           {/* Report */}
@@ -581,7 +581,7 @@ const CustomerDetail = ({ customer, onBack }) => {
               {/* Actions */}
             <div className="flex gap-4 mt-10">
               <div className="flex flex-col gap-3 flex-1">
-                <button className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} disabled={isModalFutureDate}>PAY</button>
+                <button className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} disabled={isModalFutureDate}>ENTRY</button>
                 <button 
                   onClick={handleBounce}
                   className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} 
@@ -596,7 +596,7 @@ const CustomerDetail = ({ customer, onBack }) => {
                   disabled={isModalFutureDate}
                   className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full h-full text-base flex items-center justify-center transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`}
                 >
-                  QUICK PAY
+                  QUICK ENTRY
                 </button>
               </div>
             </div>

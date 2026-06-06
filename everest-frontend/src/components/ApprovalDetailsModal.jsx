@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, User, UserCircle, Phone, FileBadge, FileText, IdCard, ChevronRight, ArrowLeft, MapPin, Wallet, CheckCircle2, Eye, XCircle } from 'lucide-react';
+import { X, Building2, User, UserCircle, Phone, FileBadge, FileText, IdCard, ChevronRight, ArrowLeft, MapPin, Wallet, CheckCircle2, Eye, XCircle, Settings, Trash2 } from 'lucide-react';
 import { App } from '@capacitor/app';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -8,6 +8,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   const [activeView, setActiveView] = useState('main'); // 'main' | 'centerDetails'
   const [toastMsg, setToastMsg] = useState('');
   const [isVerified, setIsVerified] = useState(false);
+  const [isNomineeOk, setIsNomineeOk] = useState(false);
 
   // Approval Popup State
   const [showApprovalPopup, setShowApprovalPopup] = useState(false);
@@ -17,6 +18,49 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   });
   const [overrideDueDate, setOverrideDueDate] = useState('');
 
+  // User Settings State
+  const [usernameInput, setUsernameInput] = useState(application?.phone || application?.mobile || '');
+  const [passwordInput, setPasswordInput] = useState(() => {
+    const rawDob = application?.dob || '';
+    if (!rawDob) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rawDob)) {
+      const parts = rawDob.split('-');
+      return `${parts[2]}${parts[1]}${parts[0]}`;
+    }
+    if (/^\d{2}-\d{2}-\d{4}$/.test(rawDob)) {
+      const parts = rawDob.split('-');
+      return `${parts[0]}${parts[1]}${parts[2]}`;
+    }
+    const d = new Date(rawDob);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}${mm}${yyyy}`;
+    }
+    return rawDob.replace(/[^0-9]/g, '');
+  });
+
+  const handleCredentialChange = async () => {
+    if (application?.id) {
+      try {
+        const appRef = doc(db, 'customers', application.id);
+        await updateDoc(appRef, {
+          phone: usernameInput,
+          dob: passwordInput,
+          password: passwordInput
+        });
+        setToastMsg('Credentials updated successfully!');
+        setTimeout(() => setToastMsg(''), 3000);
+      } catch (err) {
+        console.error('Error updating credentials:', err);
+        setToastMsg('Failed to update credentials.');
+        setTimeout(() => setToastMsg(''), 3000);
+      }
+    }
+  };
+
+
   // Auto-calculate 7 days from approvalDate
   const nextDueDate = React.useMemo(() => {
     if (!approvalDate) return '';
@@ -25,7 +69,9 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
     return date.toISOString().split('T')[0];
   }, [approvalDate]);
 
-  const viewSequence = ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc'];
+  const viewSequence = isReadOnly 
+    ? ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc', 'userSettings']
+    : ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc'];
 
   const syncNomineeData = async () => {
     if (activeView === 'nominee' && application?.id) {
@@ -43,6 +89,11 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   };
 
   const handleNextView = () => {
+    if (!isReadOnly && activeView === 'nominee' && !isNomineeOk) {
+      setToastMsg('Please click OK to save Nominee Details first.');
+      setTimeout(() => setToastMsg(''), 3000);
+      return;
+    }
     syncNomineeData();
     const currentIndex = viewSequence.indexOf(activeView);
     if (currentIndex >= 0 && currentIndex < viewSequence.length - 1) {
@@ -196,7 +247,14 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
       subtitle: `Aadhar : ${maskedAadhar}`,
       icon: <IdCard size={20} className="text-indigo-600" />,
       bg: 'bg-indigo-100',
-    }
+    },
+    ...(isReadOnly ? [{
+      id: 'userSettings',
+      title: 'User Setting',
+      subtitle: 'Manage account & deletion',
+      icon: <Settings size={20} className="text-slate-600" />,
+      bg: 'bg-slate-200',
+    }] : [])
   ];
 
   const handleRowClick = (rowId) => {
@@ -214,6 +272,8 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
       setActiveView('pastLoans');
     } else if (rowId === 'kyc') {
       setActiveView('kyc');
+    } else if (rowId === 'userSettings') {
+      setActiveView('userSettings');
     }
   };
 
@@ -245,8 +305,8 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
             
             <div className="flex flex-col h-24 flex-1 min-w-0 relative">
               <div className="absolute top-0 right-7 flex flex-col items-end">
-                <span className="text-[11px] font-medium text-emerald-600 leading-tight">Approval Date:</span>
-                <span className="text-[13px] font-semibold text-blue-700">{formatDate(application.approvalDate || application.appDate)}</span>
+                <span className="text-[11px] font-medium text-emerald-600 leading-tight">{isReadOnly ? 'Approval Date:' : 'Applied Date:'}</span>
+                <span className="text-[13px] font-semibold text-blue-700">{formatDate(isReadOnly ? (application.approvalDate || application.appDate) : application.appDate)}</span>
               </div>
               
               <div className="mt-auto flex flex-col pr-20 min-w-0 pb-[1px]">
@@ -315,6 +375,12 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Type</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                 <span className="pt-[1px]">{application.loanType || '--'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Tenure</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.tenureVal ? `${application.tenureVal} ${application.tenureUnit || 'Weeks'}` : (application.weeks || application.tenure ? `${application.weeks || application.tenure} Weeks` : '--')}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
@@ -617,6 +683,39 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                 <span className="pt-[1px]">{application.altPhone || '--'}</span>
               </div>
+
+              {/* Scope 1: Customer Profile Save Button */}
+              {isReadOnly && (
+                <div className="pt-4 border-t border-slate-200 mt-4">
+                  <button 
+                    onClick={async () => {
+                      await syncNomineeData();
+                      setToastMsg('Nominee details saved successfully!');
+                      setTimeout(() => setToastMsg(''), 3000);
+                    }}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-[14px] shadow-sm tracking-wide transition-colors"
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+
+              {/* Scope 2: Pending List OK Button */}
+              {!isReadOnly && (
+                <div className="pt-4 border-t border-slate-200 mt-4 flex gap-3">
+                  <button 
+                    onClick={async () => {
+                      await syncNomineeData();
+                      setIsNomineeOk(true);
+                      setToastMsg('Nominee locked securely!');
+                      setTimeout(() => setToastMsg(''), 3000);
+                    }}
+                    className={`flex-1 py-3 rounded-xl font-bold text-[14px] shadow-sm tracking-wide transition-colors ${isNomineeOk ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}
+                  >
+                    {isNomineeOk ? 'LOCKED' : 'OK'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -849,21 +948,76 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
             </div>
           </div>
+          {/* User Settings Sub-View */}
+          <div className={`absolute inset-0 w-full h-full bg-[#f8fafc] px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'userSettings' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="mb-6 flex items-center gap-3 border-b border-slate-200 pb-3">
+              <button 
+                onClick={() => setActiveView('main')} 
+                className="p-1.5 -ml-1.5 bg-slate-200 hover:bg-slate-300 rounded-full transition-colors text-slate-700 shrink-0"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">User Setting</h2>
+            </div>
+
+            <div className="flex flex-col gap-6 mt-4 pb-10">
+              {/* Customer Criteria / User Matrix */}
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h3 className="text-[15px] font-extrabold text-slate-800 mb-4 border-b border-slate-100 pb-2">Customer Criteria / User</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Username</label>
+                    <input 
+                      type="text" 
+                      value={usernameInput} 
+                      onChange={(e) => setUsernameInput(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[15px] font-bold text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
+                    <input 
+                      type="text" 
+                      value={passwordInput} 
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[15px] font-bold text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  
+                  <button 
+                    onClick={handleCredentialChange}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-[14px] shadow-sm tracking-wide transition-colors mt-2"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+
+              {/* Delete Account Anchor */}
+              <div className="flex flex-col items-center justify-center mt-6 pt-6 border-t border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Account</h3>
+                <p className="text-center text-[13px] text-slate-600 font-medium mb-6 max-w-[250px]">
+                  This will soft-delete the customer profile and move all their data to the Recycle Bin.
+                </p>
+                
+                <button 
+                  onClick={() => onDelete && onDelete(application.id)}
+                  className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold text-[14px] shadow-sm tracking-wide transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 size={18} strokeWidth={2.5} /> DELETE ACCOUNT
+                </button>
+              </div>
+            </div>
+          </div>
           
         </div>
 
         {/* Bottom Action Buttons - Stationary */}
-        {(!isReadOnly || activeView === 'main') && (
+        {!isReadOnly && (
           <div className="p-4 bg-white rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] border-t border-slate-100 flex flex-col gap-3 z-10 pb-safe shrink-0">
             {activeView === 'main' ? (
-              isReadOnly ? (
-                <button 
-                  onClick={() => onDelete && onDelete(application.id)}
-                  className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold text-[14px] shadow-sm tracking-wide transition-colors"
-                >
-                  MOVE TO RECYCLE BIN
-                </button>
-            ) : (
               <>
                 <div className="flex items-center gap-2.5 px-2">
                   <input 
@@ -894,8 +1048,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   </button>
                 </div>
               </>
-            )
-          ) : (
+            ) : (
             <div className="flex justify-between w-full">
               <button
                 onClick={handlePrevView}
