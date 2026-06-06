@@ -3,13 +3,40 @@ import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileTe
 import OfflineImage from './OfflineImage';
 import femaleAvatar from '../assets/avatar-female.png';
 import maleAvatar from '../assets/avatar-male.png';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import ApprovalDetailsModal from './ApprovalDetailsModal';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
 const CustomerDetail = ({ customer, onBack }) => {
   const [showPhoneMenu, setShowPhoneMenu] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const phoneMenuRef = useRef(null);
+
+  const [installments, setInstallments] = useState(() => {
+    if (!customer || !customer.id) return [];
+    if (customer.installments && Array.isArray(customer.installments) && customer.installments.length > 0) return customer.installments;
+    try {
+      const saved = localStorage.getItem(`everest_ledger_${customer.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (customer && customer.installments && Array.isArray(customer.installments)) {
+      setInstallments(customer.installments);
+    }
+  }, [customer?.installments]);
+
+  useEffect(() => {
+    if (customer && customer.id) {
+      localStorage.setItem(`everest_ledger_${customer.id}`, JSON.stringify(installments));
+    }
+  }, [installments, customer]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -23,9 +50,13 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   if (!customer) return null;
 
-  const loanAmount = customer.loanAmount || 10000;
-  const repayAmount = customer.repayAmount || 12600;
-  const netBalance = repayAmount; // According to the screenshot
+  const loanAmount = customer.loanAmount !== undefined && customer.loanAmount !== '' ? Number(customer.loanAmount) : 0;
+  const repayAmount = customer.repayAmount !== undefined && customer.repayAmount !== '' ? Number(customer.repayAmount) : 0;
+  
+  const numberOfWeeks = customer.weeks !== undefined && customer.weeks !== '' ? Number(customer.weeks) : 12;
+  const emiAmount = repayAmount > 0 ? Math.round(repayAmount / numberOfWeeks) : 0;
+
+  const netBalance = repayAmount; 
   const rawDueDate = customer.nextDueDate || customer.dueDate || '26-05-2026';
 
   const formatName = (name) => {
@@ -33,26 +64,50 @@ const CustomerDetail = ({ customer, onBack }) => {
     return name.replace(/^(Mr\.|Mrs\.|Miss\.|Mr|Mrs|Miss|Ms)\s*/i, '').trim();
   };
 
+  const parseDate = (dStr) => {
+    if (!dStr) return new Date();
+    if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
+      const parts = dStr.split('-');
+      return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    }
+    return new Date(dStr);
+  };
+
+  const baseDateObj = parseDate(rawDueDate);
+  const nextDueDateObj = new Date(baseDateObj);
+  nextDueDateObj.setDate(nextDueDateObj.getDate() + (installments.length * 7));
+
+  const dd = String(nextDueDateObj.getDate()).padStart(2, '0');
+  const mm = String(nextDueDateObj.getMonth() + 1).padStart(2, '0');
+  const yyyy = nextDueDateObj.getFullYear();
+  const nextFormattedDueDate = `${dd}-${mm}-${yyyy}`;
+  const nextFormattedWeekday = nextDueDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  // Zero out nextDueDateObj time for pure date comparison
+  const targetDateForCompare = new Date(nextDueDateObj);
+  targetDateForCompare.setHours(0,0,0,0);
+  
+  const isFutureDate = targetDateForCompare > now;
+
   const formattedDueDate = (() => {
     if (!rawDueDate) return '';
     if (rawDueDate.includes('-') && rawDueDate.split('-')[0].length === 2) {
-      // already DD-MM-YYYY format
       return rawDueDate;
     } else {
-      // YYYY-MM-DD format
       const d = new Date(rawDueDate);
       if (isNaN(d.getTime())) return rawDueDate;
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yyyy = d.getFullYear();
-      return `${dd}-${mm}-${yyyy}`;
+      const fdd = String(d.getDate()).padStart(2, '0');
+      const fmm = String(d.getMonth() + 1).padStart(2, '0');
+      const fyyyy = d.getFullYear();
+      return `${fdd}-${fmm}-${fyyyy}`;
     }
   })();
 
   const isFemale = (() => {
     try {
       if (!customer) return false;
-      
       let isFem = false;
       if (customer.name && typeof customer.name === 'string') {
         const lowerName = customer.name.toLowerCase().trim();
@@ -60,21 +115,101 @@ const CustomerDetail = ({ customer, onBack }) => {
           isFem = true;
         }
       }
-      
       if (!isFem && customer.gender && typeof customer.gender === 'string') {
         if (customer.gender.toLowerCase() === 'female') {
           isFem = true;
         }
       }
-      
       return isFem;
     } catch (err) {
-      console.error('Error parsing customer gender:', err);
-      return false; // Safe fallback
+      return false;
     }
   })();
 
   const centerAvatarSrc = isFemale ? femaleAvatar : maleAvatar;
+
+  const getOrdinal = (n) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+
+  const handleQuickPay = () => {
+    if (isFutureDate) return;
+
+    const nextId = installments.length + 1;
+    const nextNumber = getOrdinal(nextId);
+    
+    // Append to bottom of ledger
+    const newInstallment = {
+      id: nextId,
+      date: nextFormattedDueDate,
+      number: nextNumber,
+      status: 'PAID',
+      amount: emiAmount
+    };
+    
+    const updatedInstallments = [...installments, newInstallment];
+    setInstallments(updatedInstallments);
+    setShowCollectionModal(false);
+
+    // Cloud Sync
+    if (customer && customer.id) {
+      try {
+        const customerRef = doc(db, 'customers', customer.id);
+        updateDoc(customerRef, { installments: updatedInstallments }).catch(err => console.error("Cloud sync failed:", err));
+      } catch(err) {
+        console.error("Firestore error:", err);
+      }
+    }
+  };
+
+  const handleBounce = () => {
+    if (isFutureDate) return;
+
+    const nextId = installments.length + 1;
+    const nextNumber = getOrdinal(nextId);
+    
+    // Append to bottom of ledger
+    const newInstallment = {
+      id: nextId,
+      date: nextFormattedDueDate,
+      number: nextNumber,
+      status: 'BOUNCED',
+      amount: emiAmount
+    };
+    
+    const updatedInstallments = [...installments, newInstallment];
+    setInstallments(updatedInstallments);
+    setShowCollectionModal(false);
+
+    // Cloud Sync
+    if (customer && customer.id) {
+      try {
+        const customerRef = doc(db, 'customers', customer.id);
+        updateDoc(customerRef, { installments: updatedInstallments }).catch(err => console.error("Cloud sync failed:", err));
+      } catch(err) {
+        console.error("Firestore error:", err);
+      }
+    }
+  };
+
+  const handleDeleteCustomer = async (id) => {
+    if (!window.confirm("Are you sure you want to move this customer to the Recycle Bin?")) return;
+    try {
+      const customerRef = doc(db, 'customers', id);
+      await updateDoc(customerRef, {
+        status: 'Recycled',
+        previousStatus: customer.status || 'Approved',
+        lastUpdated: new Date().toISOString()
+      });
+      setShowVerificationModal(false);
+      onBack();
+    } catch (err) {
+      console.error("Move to recycle bin failed:", err);
+      alert("Failed to move customer to recycle bin.");
+    }
+  };
 
   return (
     <div className="flex flex-col h-[100dvh] bg-gradient-to-b from-[#115e41] via-[#1b7c58] to-[#f4f7f6] overflow-hidden relative font-sans w-full max-w-md mx-auto shadow-2xl">
@@ -97,14 +232,16 @@ const CustomerDetail = ({ customer, onBack }) => {
                 </button>
                 {showPhoneMenu && (
                   <div className="absolute top-full left-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-lg p-1.5 shadow-2xl z-50 min-w-[140px] flex flex-col gap-0.5">
-                    <a href={`tel:${customer.mobile || '9876543210'}`} className="flex items-center gap-2 text-white hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors text-[11px] sm:text-xs font-semibold whitespace-nowrap">
+                    <a href={`tel:${customer.phone || customer.mobile || ''}`} className="flex items-center gap-2 text-white hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors text-[11px] sm:text-xs font-semibold whitespace-nowrap">
                       <Star className="w-3 h-3 text-emerald-400 fill-emerald-400 flex-shrink-0" />
-                      <span>{customer.mobile || '9876543210'}</span>
+                      <span>{customer.phone || customer.mobile || 'No Primary Phone'}</span>
                     </a>
-                    <a href={`tel:${customer.alternateMobile || '8765432109'}`} className="flex items-center gap-2 text-slate-300 hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors text-[11px] sm:text-xs font-medium whitespace-nowrap">
-                      <Square className="w-2.5 h-2.5 text-slate-400 fill-slate-400 flex-shrink-0 ml-[1px]" />
-                      <span>{customer.alternateMobile || '8765432109'}</span>
-                    </a>
+                    {(customer.altPhone || customer.alternateMobile) && (
+                      <a href={`tel:${customer.altPhone || customer.alternateMobile}`} className="flex items-center gap-2 text-slate-300 hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors text-[11px] sm:text-xs font-medium whitespace-nowrap">
+                        <Square className="w-2.5 h-2.5 text-slate-400 fill-slate-400 flex-shrink-0 ml-[1px]" />
+                        <span>{customer.altPhone || customer.alternateMobile}</span>
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
@@ -122,7 +259,6 @@ const CustomerDetail = ({ customer, onBack }) => {
           {/* Center: Profile Card & Due Date */}
           <div className="flex flex-col items-center">
             <div className="w-[115px] min-[360px]:w-[140px] sm:w-[170px] bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-2xl border-[1.5px] border-[#4ade80]/40 rounded-2xl sm:rounded-[1.5rem] p-2 sm:p-3 flex flex-col items-center shadow-[0_0_40px_rgba(52,211,153,0.3)] relative overflow-hidden z-30 mx-auto">
-              {/* Glow effect inside card */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-gradient-to-b from-emerald-300/30 to-transparent pointer-events-none"></div>
               
               <div className="w-[56px] h-[56px] sm:w-[68px] sm:h-[68px] rounded-full border-[3px] border-white/50 overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.4)] mb-2 relative z-10 bg-slate-200 flex-shrink-0">
@@ -130,7 +266,6 @@ const CustomerDetail = ({ customer, onBack }) => {
               </div>
               <h2 className="text-base sm:text-lg font-bold text-white mb-1 relative z-10 text-center tracking-tight leading-tight whitespace-normal break-words">{formatName(customer.name)}</h2>
               
-              {/* Glowing line */}
               <div className="w-[85%] h-[1.5px] bg-gradient-to-r from-transparent via-emerald-300 to-transparent mb-1 shadow-[0_0_15px_rgba(110,231,183,1)] relative z-10"></div>
               
               <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center min-h-[15px] sm:min-h-[16.5px]">{customer.center || customer.area || '\u00A0'}</p>
@@ -142,10 +277,13 @@ const CustomerDetail = ({ customer, onBack }) => {
           {/* Right: MapPin, Settings & Outstanding Amount */}
           <div className="flex flex-col gap-3 justify-start items-end min-w-0">
             <div className="flex gap-1 sm:gap-3">
-              <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0">
+              <a href={customer.locationUrl || customer.customerLocationUrl || `https://maps.google.com/?q=${customer.city || customer.address || ''}`} target="_blank" rel="noopener noreferrer" className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0 flex items-center justify-center">
                 <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-              </button>
-              <button className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0">
+              </a>
+              <button 
+                onClick={() => setShowVerificationModal(true)}
+                className="bg-white/10 backdrop-blur-xl border border-[#4ade80]/40 p-2 sm:p-2.5 rounded-xl shadow-[0_0_15px_rgba(74,222,128,0.15)] hover:bg-white/20 transition-colors z-20 mt-0.5 flex-shrink-0"
+              >
                 <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </button>
             </div>
@@ -161,29 +299,86 @@ const CustomerDetail = ({ customer, onBack }) => {
         </div>
       </div>
 
-      {/* Metrics & Details Section */}
-      <div className="flex-1 bg-[#f8fafc] rounded-t-[2.5rem] pt-8 px-6 relative z-20 flex flex-col items-center shadow-[0_-10px_30px_rgba(0,0,0,0.15)] mt-4">        
-        {/* Center Illustration - Dynamic Avatar */}
-        <div className="flex-1 flex flex-col items-center justify-center relative w-full pb-24">
-           {/* Abstract dashed circles */}
-           <div className="absolute w-[280px] h-[280px] border border-slate-200/80 rounded-full border-dashed opacity-70 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-           <div className="absolute w-[200px] h-[200px] border border-slate-200/80 rounded-full border-dashed opacity-70 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-           <div className="absolute w-[120px] h-[120px] bg-slate-50 rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-50"></div>
-           
-           <div className="relative z-10 flex flex-col items-center transform scale-110">
-               {centerAvatarSrc ? (
-                <img 
-                  src={centerAvatarSrc} 
-                  alt="Center Avatar" 
-                  className={`w-64 h-64 sm:w-72 sm:h-72 object-contain opacity-95 transition-transform duration-500 ease-in-out drop-shadow-[0_10px_15px_rgba(0,0,0,0.15)] ${isFemale ? 'hover:scale-105' : 'scale-[1.15] hover:scale-[1.2]'}`}
-                  onError={(e) => { 
-                    e.target.onerror = null; 
-                    e.target.src = maleAvatar; // Fallback
-                    e.target.style.opacity = '0.5';
-                  }}
-                />
-              ) : null}
-           </div>
+      {/* Metrics & Ledger Section */}
+      <div className="flex-1 bg-[#f8fafc] rounded-t-[2.5rem] pt-6 px-4 relative z-20 flex flex-col shadow-[0_-10px_30px_rgba(0,0,0,0.15)] mt-4 overflow-hidden">        
+        
+        {/* Background Avatar Watermark */}
+        {centerAvatarSrc && (
+          <div className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-700 ${installments.length === 0 ? 'opacity-100 z-10' : 'opacity-[0.08] z-0'}`}>
+            <img 
+              src={centerAvatarSrc} 
+              alt="Background Watermark" 
+              className={`w-[400px] h-[400px] object-contain transition-transform duration-500 ${isFemale ? '' : 'scale-110'}`}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          </div>
+        )}
+
+        {/* Empty State Message */}
+        {installments.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none translate-y-32">
+            <p className="text-slate-600 font-bold text-sm leading-relaxed max-w-[260px] text-center drop-shadow-sm bg-white/40 backdrop-blur-md py-3 px-4 rounded-2xl border border-white/60">
+              No transactions initiated yet! Press <strong className="text-[#1b7c58]">'Pay Now'</strong> to record your first installment.
+            </p>
+          </div>
+        )}
+
+        {/* Live Installment Ledger Table */}
+        <div className="relative z-10 flex-1 overflow-y-auto pb-28 custom-scrollbar flex flex-col">
+          {installments.length > 0 && (
+            <div className="flex items-center justify-between px-2 pb-1 bg-[#f8fafc] sticky top-0 z-30">
+              <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest bg-slate-200 px-2.5 py-1 rounded-md border border-slate-300 shadow-sm">
+                Entries: {installments.length}
+              </span>
+            </div>
+          )}
+          <table className="w-full text-center border-collapse">
+            {installments.length > 0 && (
+              <thead className="sticky top-0 bg-[#f8fafc] z-20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                <tr>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider">DUE</th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider">STATUS</th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider text-right pr-4">EMI</th>
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {installments.map((inst, index) => (
+                <tr key={index} className="border-b border-slate-200/60 hover:bg-white/40 transition-colors whitespace-nowrap text-[11px] sm:text-[13px]">
+                  <td className="py-3.5 px-1 font-bold text-slate-800">
+                    <div className="flex flex-col items-center justify-center leading-tight">
+                      <span>{inst.date}</span>
+                      <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500">({inst.number})</span>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-1">
+                    <span className={`inline-flex items-center justify-center px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-extrabold text-white tracking-widest shadow-sm min-w-[70px] sm:min-w-[85px]
+                      ${inst.status === 'PAID' ? 'bg-[#22c55e]' : 
+                        inst.status === 'BOUNCED' ? 'bg-[#f97316]' : 
+                        inst.status === 'O.D.' ? 'bg-[#ef4444]' : 'bg-slate-400'}`}
+                    >
+                      {inst.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-1 font-black text-[#1b7c58] text-right pr-4 text-[12px] sm:text-[14px]">
+                    ₹{inst.amount ? inst.amount.toLocaleString('en-IN') : '--'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            {installments.length > 0 && (
+              <tfoot className="bg-slate-50 border-t border-slate-200/80 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] sticky bottom-0 z-20">
+                <tr>
+                  <td colSpan="2" className="py-3.5 px-2 text-right text-[13px] sm:text-[14px] font-black text-slate-900 uppercase tracking-widest drop-shadow-sm">
+                    Sub-total
+                  </td>
+                  <td className="py-3.5 px-1 text-[15px] sm:text-[16px] font-black text-[#1b7c58] text-right pr-4 tracking-tight drop-shadow-sm">
+                    ₹{installments.reduce((sum, inst) => sum + (inst.amount || 0), 0).toLocaleString('en-IN')}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
         </div>
       </div>
 
@@ -252,9 +447,12 @@ const CustomerDetail = ({ customer, onBack }) => {
                    <div className="flex items-center gap-2">
                      <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE DATE:</span>
                      <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
-                     <span className="text-[#2d4a3e] font-black text-xl leading-none">26.05.2026</span>
+                     <div className="flex items-baseline gap-1.5">
+                       <span className="text-[#2d4a3e] font-black text-xl leading-none">{nextFormattedDueDate.replace(/-/g, '.')}</span>
+                       <span className="text-[#2d4a3e]/80 font-bold text-[11px] tracking-widest">{nextFormattedWeekday}</span>
+                     </div>
                    </div>
-                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">(Wednesday)</span>
+                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">({getOrdinal(installments.length + 1)} Installment)</span>
                  </div>
               </div>
 
@@ -270,25 +468,54 @@ const CustomerDetail = ({ customer, onBack }) => {
                    <div className="flex items-center gap-2">
                      <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE AMOUNT:</span>
                      <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
-                     <span className="text-[#166534] font-black text-[22px] leading-none drop-shadow-sm">₹1,050</span>
+                     <span className="text-[#166534] font-black text-[22px] leading-none drop-shadow-sm">₹{emiAmount.toLocaleString('en-IN')}</span>
                    </div>
-                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">(Fourth Installment)</span>
+                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">(Calculated EMI)</span>
                  </div>
               </div>
             </div>
             
-            {/* Actions */}
+              {/* Actions */}
             <div className="flex gap-4 mt-10">
               <div className="flex flex-col gap-3 flex-1">
-                <button className="bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] border-[2px] border-slate-300 ring-1 ring-black/20 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] text-white font-bold tracking-wider py-2.5 rounded-full w-full text-sm active:scale-95 transition-transform">PAY</button>
-                <button className="bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] border-[2px] border-slate-300 ring-1 ring-black/20 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] text-white font-bold tracking-wider py-2.5 rounded-full w-full text-sm active:scale-95 transition-transform">BOUNCE</button>
+                <button className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} disabled={isFutureDate}>PAY</button>
+                <button 
+                  onClick={handleBounce}
+                  className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} 
+                  disabled={isFutureDate}
+                >
+                  BOUNCE
+                </button>
               </div>
-              <div className="flex-1 flex">
-                <button className="bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] border-[2px] border-slate-300 ring-1 ring-black/20 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] text-white font-bold tracking-wider py-2.5 rounded-full w-full h-full text-base flex items-center justify-center active:scale-95 transition-transform">QUICK PAY</button>
+              <div className="flex-1 flex flex-col items-center">
+                <button 
+                  onClick={handleQuickPay}
+                  disabled={isFutureDate}
+                  className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full h-full text-base flex items-center justify-center transition-transform ${isFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`}
+                >
+                  QUICK PAY
+                </button>
               </div>
             </div>
+            
+            {/* Future Date Warning */}
+            {isFutureDate && (
+              <div className="mt-4 bg-rose-50 border border-rose-200 text-rose-600 px-3 py-2 rounded-xl text-xs font-bold text-center">
+                Action Blocked: The scheduled date ({nextFormattedDueDate}) has not yet arrived.
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {/* Profile Verification Modal */}
+      {showVerificationModal && (
+        <ApprovalDetailsModal
+          application={customer}
+          onClose={() => setShowVerificationModal(false)}
+          isReadOnly={true}
+          onDelete={handleDeleteCustomer}
+        />
       )}
     </div>
   );

@@ -19,11 +19,15 @@ const CustomerList = ({ customers, onSubmitApplication, activeBranch }) => {
   const totalPrincipal = customers.reduce((sum, c) => sum + (Number(c.loanAmount) || 0), 0);
   const totalOutstanding = customers.reduce((sum, c) => sum + (Number(c.repayAmount) || 0), 0);
 
-  const filteredCustomers = customers.filter(c => 
-    (c.customerName?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (c.customerId?.toString().includes(searchQuery)) ||
-    (c.phone?.toString().includes(searchQuery))
-  );
+  const filteredCustomers = customers.filter(c => {
+    // Strictly show only approved profiles
+    const isApproved = c.status === 'approved' || c.applicationStatus === 'approved' || c.status === 'Approved';
+    if (!isApproved) return false;
+
+    return (c.customerName?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+           (c.customerId?.toString().includes(searchQuery)) ||
+           (c.phone?.toString().includes(searchQuery));
+  });
 
   return (
     <div className="customer-list-container">

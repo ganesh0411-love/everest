@@ -523,12 +523,12 @@ function App() {
                   onTouchEnd={handleTouchEnd}
                   onTouchCancel={handleTouchEnd}
                 >
-                  {processedCustomers.filter(c => c.status !== 'Rejected').length > 0 ? (
+                  {processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved').length > 0 ? (
                     <div className="p-2 space-y-2 pb-24">
                       <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider">
-                        Entries: {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').length}
+                        Entries: {processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved').length}
                       </div>
-                      {processedCustomers.filter(c => c.status !== 'Rejected' && c.status !== 'Recycled').map(customer => (
+                      {processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved').map(customer => (
                         <div key={customer.id} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
                           <div className="flex-1 min-w-0 flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">

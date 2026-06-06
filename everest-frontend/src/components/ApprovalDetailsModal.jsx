@@ -4,7 +4,7 @@ import { App } from '@capacitor/app';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
-const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onStayPending }) => {
+const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onStayPending, isReadOnly, onDelete }) => {
   const [activeView, setActiveView] = useState('main'); // 'main' | 'centerDetails'
   const [toastMsg, setToastMsg] = useState('');
   const [isVerified, setIsVerified] = useState(false);
@@ -184,7 +184,9 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
     {
       id: 'pastLoans',
       title: 'Previous Record',
-      subtitle: `Past Loans : ${application.pastLoans || '2 (Closed)'}`,
+      subtitle: (Array.isArray(application.pastLoans) && application.pastLoans.length > 0) 
+        ? `Past Loans : ${application.pastLoans.length} (${application.pastLoans[0].status || 'Closed'})`
+        : 'No Records Found',
       icon: <FileText size={20} className="text-rose-600" />,
       bg: 'bg-rose-100',
     },
@@ -243,8 +245,8 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
             
             <div className="flex flex-col h-24 flex-1 min-w-0 relative">
               <div className="absolute top-0 right-7 flex flex-col items-end">
-                <span className="text-[11px] font-medium text-emerald-600 leading-tight">Apply Date:</span>
-                <span className="text-[13px] font-semibold text-blue-700">{formatDate(application.appDate)}</span>
+                <span className="text-[11px] font-medium text-emerald-600 leading-tight">Approval Date:</span>
+                <span className="text-[13px] font-semibold text-blue-700">{formatDate(application.approvalDate || application.appDate)}</span>
               </div>
               
               <div className="mt-auto flex flex-col pr-20 min-w-0 pb-[1px]">
@@ -297,6 +299,12 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
             </div>
 
             <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Apply Date</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{application.appDate ? formatDate(application.appDate) : '--'}</span>
+              </div>
+
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Application Number</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
@@ -628,7 +636,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Previous Loans</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px] font-bold text-slate-500">No Record Found</span>
+                <span className="pt-[1px] font-bold text-slate-500">{(Array.isArray(application.pastLoans) && application.pastLoans.length > 0) ? application.pastLoans.length : 'No Record Found'}</span>
               </div>
               
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
@@ -713,7 +721,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                   <div className="flex items-center justify-between min-h-[28px]">
                     <span className="pt-[1px]">{application.aadhaar ? application.aadhaar : <span className="text-slate-500">Not Provided</span>}</span>
-                    {application.aadhaar && (
+                    {application.kycDocs?.aadhaar && (
                       <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.kycDocs?.aadhaar)}>
                         <Eye size={18} strokeWidth={2.5} />
                       </button>
@@ -729,7 +737,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                   <div className="flex items-center justify-between min-h-[28px]">
                     <span className="pt-[1px]">{application.pan ? application.pan : <span className="text-slate-500">Not Provided</span>}</span>
-                    {application.pan && (
+                    {application.kycDocs?.pan && (
                       <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.kycDocs?.pan)}>
                         <Eye size={18} strokeWidth={2.5} />
                       </button>
@@ -745,7 +753,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                   <div className="flex items-center justify-between min-h-[28px]">
                     <span className="pt-[1px]">{application.voterId ? application.voterId : <span className="text-slate-500">Not Provided</span>}</span>
-                    {application.voterId && (
+                    {application.kycDocs?.voter && (
                       <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.kycDocs?.voter)}>
                         <Eye size={18} strokeWidth={2.5} />
                       </button>
@@ -761,7 +769,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                   <div className="flex items-center justify-between min-h-[28px]">
                     <span className="pt-[1px]">{application.smartCard ? application.smartCard : <span className="text-slate-500">Not Provided</span>}</span>
-                    {application.smartCard && (
+                    {application.kycDocs?.smartCard && (
                       <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.kycDocs?.smartCard)}>
                         <Eye size={18} strokeWidth={2.5} />
                       </button>
@@ -782,7 +790,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                   <div className="flex items-center justify-between min-h-[28px]">
                     <span className="pt-[1px]">{application.nomineeAadhaar ? application.nomineeAadhaar : <span className="text-slate-500">Not Provided</span>}</span>
-                    {application.nomineeAadhaar && (
+                    {application.nomineeKycDocs?.aadhaar && (
                       <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.nomineeKycDocs?.aadhaar)}>
                         <Eye size={18} strokeWidth={2.5} />
                       </button>
@@ -798,7 +806,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                   <div className="flex items-center justify-between min-h-[28px]">
                     <span className="pt-[1px]">{application.nomineePan ? application.nomineePan : <span className="text-slate-500">Not Provided</span>}</span>
-                    {application.nomineePan && (
+                    {application.nomineeKycDocs?.pan && (
                       <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.nomineeKycDocs?.pan)}>
                         <Eye size={18} strokeWidth={2.5} />
                       </button>
@@ -814,7 +822,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                   <div className="flex items-center justify-between min-h-[28px]">
                     <span className="pt-[1px]">{application.nomineeVoterId ? application.nomineeVoterId : <span className="text-slate-500">Not Provided</span>}</span>
-                    {application.nomineeVoterId && (
+                    {application.nomineeKycDocs?.voter && (
                       <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.nomineeKycDocs?.voter)}>
                         <Eye size={18} strokeWidth={2.5} />
                       </button>
@@ -830,7 +838,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
                   <div className="flex items-center justify-between min-h-[28px]">
                     <span className="pt-[1px]">{application.nomineeSmartCard ? application.nomineeSmartCard : <span className="text-slate-500">Not Provided</span>}</span>
-                    {application.nomineeSmartCard && (
+                    {application.nomineeKycDocs?.smartCard && (
                       <button className="text-slate-400 hover:text-blue-500 transition-colors p-1" onClick={() => handleOpenDoc(application.nomineeKycDocs?.smartCard)}>
                         <Eye size={18} strokeWidth={2.5} />
                       </button>
@@ -845,49 +853,57 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
         </div>
 
         {/* Bottom Action Buttons - Stationary */}
-        <div className="p-4 bg-white rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] border-t border-slate-100 flex flex-col gap-3 z-10 pb-safe shrink-0">
-          {activeView === 'main' && (
-            <div className="flex items-center gap-2.5 px-2">
-              <input 
-                type="checkbox" 
-                id="verifyData" 
-                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                checked={isVerified}
-                onChange={(e) => setIsVerified(e.target.checked)}
-              />
-              <label htmlFor="verifyData" className="text-[13px] font-bold text-slate-700 leading-snug cursor-pointer select-none">
-                I have read and verified all the data above
-              </label>
-            </div>
-          )}
-          
-          <div className="flex gap-2 justify-between w-full">
+        {(!isReadOnly || activeView === 'main') && (
+          <div className="p-4 bg-white rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] border-t border-slate-100 flex flex-col gap-3 z-10 pb-safe shrink-0">
             {activeView === 'main' ? (
-              <>
+              isReadOnly ? (
                 <button 
-                  onClick={() => setShowApprovalPopup(true)}
-                  disabled={!isVerified}
-                  className={`flex-1 py-3.5 rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide ${isVerified ? 'bg-[#4ade80] hover:bg-[#22c55e] text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                  onClick={() => onDelete && onDelete(application.id)}
+                  className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-bold text-[14px] shadow-sm tracking-wide transition-colors"
                 >
-                  APPROVE
+                  MOVE TO RECYCLE BIN
                 </button>
-                <button 
-                  onClick={() => onReject && onReject(application.id)}
-                  disabled={!isVerified}
-                  className={`flex-1 py-3.5 rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide ${isVerified ? 'bg-[#ef4444] hover:bg-[#dc2626] text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                >
-                  REJECT
-                </button>
-              </>
             ) : (
-              <div className="flex justify-between w-full">
-                <button
-                  onClick={handlePrevView}
-                  className="p-3.5 bg-rose-50 text-rose-600 rounded-xl shadow-sm hover:bg-rose-100 transition-colors flex items-center justify-center border border-rose-100"
-                  title="Previous Step"
-                >
-                  <ArrowLeft size={20} strokeWidth={3} />
-                </button>
+              <>
+                <div className="flex items-center gap-2.5 px-2">
+                  <input 
+                    type="checkbox" 
+                    id="verifyData" 
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    checked={isVerified}
+                    onChange={(e) => setIsVerified(e.target.checked)}
+                  />
+                  <label htmlFor="verifyData" className="text-[13px] font-bold text-slate-700 leading-snug cursor-pointer select-none">
+                    I have read and verified all the data above
+                  </label>
+                </div>
+                <div className="flex gap-2 justify-between w-full">
+                  <button 
+                    onClick={() => setShowApprovalPopup(true)}
+                    disabled={!isVerified}
+                    className={`flex-1 py-3.5 rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide ${isVerified ? 'bg-[#4ade80] hover:bg-[#22c55e] text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                  >
+                    APPROVE
+                  </button>
+                  <button 
+                    onClick={() => onReject && onReject(application.id)}
+                    disabled={!isVerified}
+                    className={`flex-1 py-3.5 rounded-xl font-bold text-[13px] transition-colors shadow-sm tracking-wide ${isVerified ? 'bg-[#ef4444] hover:bg-[#dc2626] text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                  >
+                    REJECT
+                  </button>
+                </div>
+              </>
+            )
+          ) : (
+            <div className="flex justify-between w-full">
+              <button
+                onClick={handlePrevView}
+                className="p-3.5 bg-rose-50 text-rose-600 rounded-xl shadow-sm hover:bg-rose-100 transition-colors flex items-center justify-center border border-rose-100"
+                title="Previous Step"
+              >
+                <ArrowLeft size={20} strokeWidth={3} />
+              </button>
                 <button
                   onClick={handleNextView}
                   className="py-3.5 px-10 bg-blue-600 text-white rounded-xl font-bold text-[14px] shadow-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
@@ -897,7 +913,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
               </div>
             )}
           </div>
-        </div>
+        )}
 
         {/* Custom Toast Notification Overlay */}
         {toastMsg && (
