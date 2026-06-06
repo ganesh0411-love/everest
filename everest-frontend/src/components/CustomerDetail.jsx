@@ -12,8 +12,16 @@ const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 const CustomerDetail = ({ customer, onBack }) => {
   const [showPhoneMenu, setShowPhoneMenu] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [collectionDate, setCollectionDate] = useState("");
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+  
+  // Transaction Edit Modal States
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [isEditTransactionMode, setIsEditTransactionMode] = useState(false);
+  const [transactionEditData, setTransactionEditData] = useState({ date: '', number: '', amount: '' });
+  
   const phoneMenuRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
   const [installments, setInstallments] = useState(() => {
     if (!customer || !customer.id) return [];
@@ -25,6 +33,20 @@ const CustomerDetail = ({ customer, onBack }) => {
       return [];
     }
   });
+
+  useEffect(() => {
+    if (installments.length > 0 && scrollContainerRef.current) {
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          try {
+            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+          } catch (e) {
+            console.error("Scroll error:", e);
+          }
+        }
+      }, 50);
+    }
+  }, [installments]);
 
   useEffect(() => {
     if (customer && customer.installments && Array.isArray(customer.installments)) {
@@ -56,7 +78,8 @@ const CustomerDetail = ({ customer, onBack }) => {
   const numberOfWeeks = customer.weeks !== undefined && customer.weeks !== '' ? Number(customer.weeks) : 12;
   const emiAmount = repayAmount > 0 ? Math.round(repayAmount / numberOfWeeks) : 0;
 
-  const netBalance = repayAmount; 
+  const runningSubTotal = installments.reduce((sum, inst) => sum + (inst.amount || 0), 0);
+  const netBalance = Math.max(0, repayAmount - runningSubTotal);
   const rawDueDate = customer.nextDueDate || customer.dueDate || '26-05-2026';
 
   const formatName = (name) => {
@@ -73,9 +96,10 @@ const CustomerDetail = ({ customer, onBack }) => {
     return new Date(dStr);
   };
 
+  const effectiveInstallmentCount = installments.filter(inst => inst.status !== 'BOUNCED').length;
   const baseDateObj = parseDate(rawDueDate);
   const nextDueDateObj = new Date(baseDateObj);
-  nextDueDateObj.setDate(nextDueDateObj.getDate() + (installments.length * 7));
+  nextDueDateObj.setDate(nextDueDateObj.getDate() + (effectiveInstallmentCount * 7));
 
   const dd = String(nextDueDateObj.getDate()).padStart(2, '0');
   const mm = String(nextDueDateObj.getMonth() + 1).padStart(2, '0');
@@ -134,16 +158,36 @@ const CustomerDetail = ({ customer, onBack }) => {
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
 
+  const nextLogicalNumber = effectiveInstallmentCount + 1;
+  const nextNumber = getOrdinal(nextLogicalNumber);
+
+  const lastInstallment = installments[installments.length - 1];
+  const isRetrySequence = lastInstallment && lastInstallment.status === 'BOUNCED';
+
+  const getModalDateCompare = () => {
+    if (!showCollectionModal) return false;
+    const dObj = parseDate(collectionDate || nextFormattedDueDate);
+    dObj.setHours(0,0,0,0);
+    const nowObj = new Date();
+    nowObj.setHours(0,0,0,0);
+    return dObj > nowObj;
+  };
+  const isModalFutureDate = getModalDateCompare();
+
+  const handleOpenCollectionModal = () => {
+    setCollectionDate(nextFormattedDueDate);
+    setShowCollectionModal(true);
+  };
+
   const handleQuickPay = () => {
-    if (isFutureDate) return;
+    if (isModalFutureDate) return;
 
     const nextId = installments.length + 1;
-    const nextNumber = getOrdinal(nextId);
     
     // Append to bottom of ledger
     const newInstallment = {
       id: nextId,
-      date: nextFormattedDueDate,
+      date: collectionDate || nextFormattedDueDate,
       number: nextNumber,
       status: 'PAID',
       amount: emiAmount
@@ -165,18 +209,17 @@ const CustomerDetail = ({ customer, onBack }) => {
   };
 
   const handleBounce = () => {
-    if (isFutureDate) return;
+    if (isModalFutureDate) return;
 
     const nextId = installments.length + 1;
-    const nextNumber = getOrdinal(nextId);
     
     // Append to bottom of ledger
     const newInstallment = {
       id: nextId,
-      date: nextFormattedDueDate,
+      date: collectionDate || nextFormattedDueDate,
       number: nextNumber,
       status: 'BOUNCED',
-      amount: emiAmount
+      amount: 0
     };
     
     const updatedInstallments = [...installments, newInstallment];
@@ -208,6 +251,48 @@ const CustomerDetail = ({ customer, onBack }) => {
     } catch (err) {
       console.error("Move to recycle bin failed:", err);
       alert("Failed to move customer to recycle bin.");
+    }
+  };
+
+  const handleSaveTransaction = async () => {
+    if (!selectedTransaction) return;
+    try {
+      const updatedInstallments = installments.map(inst => 
+        inst.id === selectedTransaction.id 
+          ? { ...inst, date: transactionEditData.date, number: transactionEditData.number, amount: parseFloat(transactionEditData.amount) || 0 } 
+          : inst
+      );
+      setInstallments(updatedInstallments);
+      const customerRef = doc(db, 'customers', customer.id);
+      await updateDoc(customerRef, { installments: updatedInstallments });
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error('Error saving transaction', error);
+      alert('Failed to update transaction.');
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    if (!selectedTransaction) return;
+    if (!window.confirm('Are you sure you want to delete this log?')) return;
+    
+    try {
+      const updatedInstallments = installments.filter(inst => inst.id !== selectedTransaction.id);
+      const deletedInst = { ...selectedTransaction, deletedAt: new Date().toISOString() };
+      
+      const currentDeleted = customer.deletedInstallments || [];
+      const updatedDeleted = [...currentDeleted, deletedInst];
+      
+      setInstallments(updatedInstallments);
+      const customerRef = doc(db, 'customers', customer.id);
+      await updateDoc(customerRef, { 
+        installments: updatedInstallments,
+        deletedInstallments: updatedDeleted
+      });
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error('Error deleting transaction', error);
+      alert('Failed to delete transaction.');
     }
   };
 
@@ -292,7 +377,7 @@ const CustomerDetail = ({ customer, onBack }) => {
               <p className="text-[9px] min-[360px]:text-[10px] sm:text-xs text-slate-300 font-bold uppercase tracking-wider mb-0.5 text-center whitespace-nowrap bg-transparent" style={{ WebkitTextStroke: '0.3px rgba(255,255,255,0.6)', textShadow: '0 1px 1px rgba(0,0,0,0.5)' }}>Outstanding</p>
               <h3 className="text-[20px] sm:text-[26px] font-black text-[#ef4444] tracking-tighter flex items-center justify-center text-center whitespace-nowrap bg-transparent drop-shadow-md">
                 <IndianRupee className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] mr-[1px] stroke-[3] flex-shrink-0 drop-shadow-sm" />
-                <span>{repayAmount.toLocaleString('en-IN')}</span>
+                <span>{netBalance.toLocaleString('en-IN')}</span>
               </h3>
             </div>
           </div>
@@ -324,7 +409,7 @@ const CustomerDetail = ({ customer, onBack }) => {
         )}
 
         {/* Live Installment Ledger Table */}
-        <div className="relative z-10 flex-1 overflow-y-auto pb-28 custom-scrollbar flex flex-col">
+        <div ref={scrollContainerRef} className="relative z-10 flex-1 overflow-y-auto mb-[80px] custom-scrollbar flex flex-col">
           {installments.length > 0 && (
             <div className="flex items-center justify-between px-2 pb-1 bg-[#f8fafc] sticky top-0 z-30">
               <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest bg-slate-200 px-2.5 py-1 rounded-md border border-slate-300 shadow-sm">
@@ -336,21 +421,31 @@ const CustomerDetail = ({ customer, onBack }) => {
             {installments.length > 0 && (
               <thead className="sticky top-0 bg-[#f8fafc] z-20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
                 <tr>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider">DATE</th>
                   <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider">DUE</th>
                   <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider">STATUS</th>
-                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider text-right pr-4">EMI</th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider text-right pr-4"></th>
                 </tr>
               </thead>
             )}
             <tbody>
               {installments.map((inst, index) => (
-                <tr key={index} className="border-b border-slate-200/60 hover:bg-white/40 transition-colors whitespace-nowrap text-[11px] sm:text-[13px]">
-                  <td className="py-3.5 px-1 font-bold text-slate-800">
-                    <div className="flex flex-col items-center justify-center leading-tight">
+                <tr 
+                  key={inst.id || index} 
+                  onClick={() => {
+                    setSelectedTransaction(inst);
+                    setTransactionEditData({ date: inst.date, number: inst.number, amount: inst.amount || '' });
+                    setIsEditTransactionMode(false);
+                  }}
+                  className="border-b border-slate-200/60 hover:bg-slate-100 transition-colors whitespace-nowrap text-[11px] sm:text-[13px] cursor-pointer"
+                >
+                  <td className="py-3.5 px-1 font-bold text-slate-800 text-left pl-2">
+                    <div className="flex flex-col">
                       <span>{inst.date}</span>
-                      <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500">({inst.number})</span>
+                      <span className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">({parseDate(inst.date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()})</span>
                     </div>
                   </td>
+                  <td className="py-3.5 px-1 font-semibold text-slate-600">{inst.number.replace(/[()]/g, '')}</td>
                   <td className="py-3.5 px-1">
                     <span className={`inline-flex items-center justify-center px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-extrabold text-white tracking-widest shadow-sm min-w-[70px] sm:min-w-[85px]
                       ${inst.status === 'PAID' ? 'bg-[#22c55e]' : 
@@ -361,7 +456,7 @@ const CustomerDetail = ({ customer, onBack }) => {
                     </span>
                   </td>
                   <td className="py-3.5 px-1 font-black text-[#1b7c58] text-right pr-4 text-[12px] sm:text-[14px]">
-                    ₹{inst.amount ? inst.amount.toLocaleString('en-IN') : '--'}
+                    {inst.amount ? `₹${inst.amount.toLocaleString('en-IN')}` : '₹ --'}
                   </td>
                 </tr>
               ))}
@@ -369,7 +464,7 @@ const CustomerDetail = ({ customer, onBack }) => {
             {installments.length > 0 && (
               <tfoot className="bg-slate-50 border-t border-slate-200/80 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] sticky bottom-0 z-20">
                 <tr>
-                  <td colSpan="2" className="py-3.5 px-2 text-right text-[13px] sm:text-[14px] font-black text-slate-900 uppercase tracking-widest drop-shadow-sm">
+                  <td colSpan="3" className="py-3.5 px-2 text-right text-[13px] sm:text-[14px] font-black text-slate-900 uppercase tracking-widest drop-shadow-sm">
                     Sub-total
                   </td>
                   <td className="py-3.5 px-1 text-[15px] sm:text-[16px] font-black text-[#1b7c58] text-right pr-4 tracking-tight drop-shadow-sm">
@@ -397,7 +492,7 @@ const CustomerDetail = ({ customer, onBack }) => {
           {/* Pay Now (Center pop-up) */}
           <div className="relative -top-6 flex-shrink-0 mx-2 flex flex-col items-center">
             <button 
-              onClick={() => setShowCollectionModal(true)}
+              onClick={handleOpenCollectionModal}
               className="bg-gradient-to-b from-[#19825b] to-[#125c40] border-[4px] border-[#f4f7f6] w-[70px] h-[70px] rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(18,75,51,0.5)] hover:scale-105 transition-transform group relative overflow-hidden z-10"
             >
                {/* Internal Glow */}
@@ -448,11 +543,20 @@ const CustomerDetail = ({ customer, onBack }) => {
                      <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE DATE:</span>
                      <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
                      <div className="flex items-baseline gap-1.5">
-                       <span className="text-[#2d4a3e] font-black text-xl leading-none">{nextFormattedDueDate.replace(/-/g, '.')}</span>
-                       <span className="text-[#2d4a3e]/80 font-bold text-[11px] tracking-widest">{nextFormattedWeekday}</span>
+                       {isRetrySequence ? (
+                         <input 
+                           type="text"
+                           className="bg-white/50 border border-[#2d4a3e]/40 rounded px-2 py-0.5 text-xl font-black text-[#2d4a3e] w-32 outline-none focus:ring-2 focus:ring-[#1b7c58] transition-all"
+                           value={collectionDate}
+                           onChange={(e) => setCollectionDate(e.target.value)}
+                         />
+                       ) : (
+                         <span className="text-[#2d4a3e] font-black text-xl leading-none">{(collectionDate || nextFormattedDueDate).replace(/-/g, '.')}</span>
+                       )}
+                       {!isRetrySequence && <span className="text-[#2d4a3e]/80 font-bold text-[11px] tracking-widest">{nextFormattedWeekday}</span>}
                      </div>
                    </div>
-                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">({getOrdinal(installments.length + 1)} Installment)</span>
+                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">({nextNumber} Installment)</span>
                  </div>
               </div>
 
@@ -470,7 +574,6 @@ const CustomerDetail = ({ customer, onBack }) => {
                      <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
                      <span className="text-[#166534] font-black text-[22px] leading-none drop-shadow-sm">₹{emiAmount.toLocaleString('en-IN')}</span>
                    </div>
-                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">(Calculated EMI)</span>
                  </div>
               </div>
             </div>
@@ -478,11 +581,11 @@ const CustomerDetail = ({ customer, onBack }) => {
               {/* Actions */}
             <div className="flex gap-4 mt-10">
               <div className="flex flex-col gap-3 flex-1">
-                <button className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} disabled={isFutureDate}>PAY</button>
+                <button className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} disabled={isModalFutureDate}>PAY</button>
                 <button 
                   onClick={handleBounce}
-                  className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} 
-                  disabled={isFutureDate}
+                  className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} 
+                  disabled={isModalFutureDate}
                 >
                   BOUNCE
                 </button>
@@ -490,8 +593,8 @@ const CustomerDetail = ({ customer, onBack }) => {
               <div className="flex-1 flex flex-col items-center">
                 <button 
                   onClick={handleQuickPay}
-                  disabled={isFutureDate}
-                  className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full h-full text-base flex items-center justify-center transition-transform ${isFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`}
+                  disabled={isModalFutureDate}
+                  className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full h-full text-base flex items-center justify-center transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`}
                 >
                   QUICK PAY
                 </button>
@@ -499,9 +602,9 @@ const CustomerDetail = ({ customer, onBack }) => {
             </div>
             
             {/* Future Date Warning */}
-            {isFutureDate && (
+            {isModalFutureDate && (
               <div className="mt-4 bg-rose-50 border border-rose-200 text-rose-600 px-3 py-2 rounded-xl text-xs font-bold text-center">
-                Action Blocked: The scheduled date ({nextFormattedDueDate}) has not yet arrived.
+                Action Blocked: The targeted date has not yet arrived.
               </div>
             )}
           </div>
@@ -516,6 +619,65 @@ const CustomerDetail = ({ customer, onBack }) => {
           isReadOnly={true}
           onDelete={handleDeleteCustomer}
         />
+      )}
+
+      {/* Transaction Detail & Edit Modal */}
+      {selectedTransaction && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={() => setSelectedTransaction(null)}></div>
+          
+          <div className="relative w-full max-w-[340px] bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl border-[1.5px] border-white/60 rounded-[2rem] p-6 shadow-[0_0_40px_rgba(20,83,56,0.6)] animate-in zoom-in-95 duration-200">
+            {/* Close Button */}
+            <button onClick={() => setSelectedTransaction(null)} className="absolute top-4 right-4 w-8 h-8 bg-slate-200/50 rounded-full flex items-center justify-center text-[#2d4a3e] hover:bg-slate-200 transition-colors shadow-sm">
+              <X className="w-4 h-4 stroke-[2.5]" />
+            </button>
+            
+            <h2 className="text-[20px] font-black text-[#2d4a3e] text-center uppercase tracking-wide mb-6 mt-2 drop-shadow-sm">Transaction Details</h2>
+            
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Date</label>
+                {isEditTransactionMode ? (
+                  <input type="text" className="w-full bg-white/50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-[#1b7c58] outline-none" value={transactionEditData.date} onChange={e => setTransactionEditData({...transactionEditData, date: e.target.value})} />
+                ) : (
+                  <div className="text-[15px] font-bold text-slate-800">{selectedTransaction.date}</div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Installment Number</label>
+                {isEditTransactionMode ? (
+                  <input type="text" className="w-full bg-white/50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-[#1b7c58] outline-none" value={transactionEditData.number} onChange={e => setTransactionEditData({...transactionEditData, number: e.target.value})} />
+                ) : (
+                  <div className="text-[15px] font-bold text-slate-800">{selectedTransaction.number.replace(/[()]/g, '')}</div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Amount</label>
+                {isEditTransactionMode ? (
+                  <input type="number" className="w-full bg-white/50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-[#1b7c58] outline-none" value={transactionEditData.amount} onChange={e => setTransactionEditData({...transactionEditData, amount: e.target.value})} />
+                ) : (
+                  <div className="text-[20px] font-black text-[#1b7c58]">₹{(selectedTransaction.amount || 0).toLocaleString('en-IN')}</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              {isEditTransactionMode ? (
+                <>
+                  <button onClick={() => setIsEditTransactionMode(false)} className="flex-1 py-2.5 rounded-full border-[2px] border-slate-300 text-slate-600 font-bold tracking-wider text-sm hover:bg-slate-100 transition-colors">CANCEL</button>
+                  <button onClick={handleSaveTransaction} className="flex-1 py-2.5 rounded-full border-[2px] border-slate-300 bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white font-bold tracking-wider text-sm hover:opacity-90 transition-opacity">SAVE</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={handleDeleteTransaction} className="flex-1 py-2.5 rounded-full border-[2px] border-rose-200 bg-rose-50 text-rose-600 font-bold tracking-wider text-sm hover:bg-rose-100 transition-colors shadow-sm">DELETE</button>
+                  <button onClick={() => setIsEditTransactionMode(true)} className="flex-1 py-2.5 rounded-full border-[2px] border-slate-300 bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white font-bold tracking-wider text-sm hover:opacity-90 transition-opacity shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)]">EDIT</button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

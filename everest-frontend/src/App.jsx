@@ -316,7 +316,12 @@ function App() {
 
   // Process Customers List
   const processedCustomers = useMemo(() => {
-    let filtered = [...customers];
+    let filtered = customers.map(c => {
+      const repay = parseFloat(c.repayAmount) || 0;
+      const insts = Array.isArray(c.installments) ? c.installments : [];
+      const sub = insts.reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0);
+      return { ...c, dynamicOutstanding: Math.max(0, repay - sub) };
+    });
     
     if (activeCategory !== 'All') {
       const loanTypeCategories = ['Microfinance', 'Personal Loan', 'Agri Loan', 'Weekly Loan'];
@@ -363,11 +368,11 @@ function App() {
 
   // Aggregate Financials (Dynamic Based on UI Stream)
   const { totalLoan, totalOutstanding } = useMemo(() => {
-    const activeStream = processedCustomers.filter(c => c.status === 'Approved');
+    const activeStream = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
     return activeStream.reduce((acc, curr) => {
       const repay = parseFloat(curr.repayAmount) || 0;
       acc.totalLoan += repay;
-      acc.totalOutstanding += repay;
+      acc.totalOutstanding += (curr.dynamicOutstanding !== undefined ? curr.dynamicOutstanding : repay);
       return acc;
     }, { totalLoan: 0, totalOutstanding: 0 });
   }, [processedCustomers]);
@@ -469,8 +474,34 @@ function App() {
               onPermanentDelete={async (id) => {
                 try {
                   await deleteDoc(doc(db, 'customers', id));
-                  // setCustomers(prev => prev.filter(c => c.id !== id));
                 } catch(e) { console.error('Perm delete error', e); }
+              }}
+              onRestoreEntry={async (customerId, entryId) => {
+                const c = customers.find(x => x.id === customerId);
+                if (!c) return;
+                const entryToRestore = (c.deletedInstallments || []).find(e => e.id === entryId);
+                if (!entryToRestore) return;
+                
+                const { deletedAt, ...originalEntry } = entryToRestore;
+                const updatedDeleted = c.deletedInstallments.filter(e => e.id !== entryId);
+                const updatedInstallments = [...(c.installments || []), originalEntry].sort((a, b) => a.id - b.id);
+                
+                try {
+                  await updateDoc(doc(db, 'customers', customerId), {
+                    installments: updatedInstallments,
+                    deletedInstallments: updatedDeleted
+                  });
+                } catch(e) { console.error('Restore entry error', e); }
+              }}
+              onPermanentDeleteEntry={async (customerId, entryId) => {
+                const c = customers.find(x => x.id === customerId);
+                if (!c) return;
+                const updatedDeleted = (c.deletedInstallments || []).filter(e => e.id !== entryId);
+                try {
+                  await updateDoc(doc(db, 'customers', customerId), {
+                    deletedInstallments: updatedDeleted
+                  });
+                } catch(e) { console.error('Perm delete entry error', e); }
               }}
             />
           </div>
@@ -559,7 +590,7 @@ function App() {
                               )}
                             </div>
                             <div className="text-right min-w-[70px]">
-                              <div className="text-sm font-bold text-red-600">₹{customer.repayAmount?.toLocaleString('en-IN') || '0'}</div>
+                              <div className="text-sm font-bold text-red-600">₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}</div>
                             </div>
                             <div className="relative">
                               <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
