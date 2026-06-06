@@ -411,20 +411,20 @@ const CustomerDetail = ({ customer, onBack }) => {
         {/* Live Installment Ledger Table */}
         <div ref={scrollContainerRef} className="relative z-10 flex-1 overflow-y-auto mb-[80px] custom-scrollbar flex flex-col">
           {installments.length > 0 && (
-            <div className="flex items-center justify-between px-2 pb-1 bg-[#f8fafc] sticky top-0 z-30">
+            <div className="flex items-center justify-between px-2 pb-1 bg-[#f8fafc] relative z-30">
               <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest bg-slate-200 px-2.5 py-1 rounded-md border border-slate-300 shadow-sm">
                 Entries: {installments.length}
               </span>
             </div>
           )}
-          <table className="w-full text-center border-collapse">
+          <table className="w-full text-center border-collapse relative">
             {installments.length > 0 && (
-              <thead className="sticky top-0 bg-[#f8fafc] z-20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+              <thead className="sticky top-0 bg-[#f8fafc] z-20 shadow-sm outline outline-1 outline-slate-200/50">
                 <tr>
-                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider">DATE</th>
-                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider">DUE</th>
-                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider">STATUS</th>
-                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider text-right pr-4"></th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider bg-[#f8fafc]">DATE</th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider bg-[#f8fafc]">DUE</th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider bg-[#f8fafc]">STATUS</th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider text-right pr-4 bg-[#f8fafc]">AMOUNT</th>
                 </tr>
               </thead>
             )}
@@ -456,7 +456,7 @@ const CustomerDetail = ({ customer, onBack }) => {
                     </span>
                   </td>
                   <td className="py-3.5 px-1 font-black text-[#1b7c58] text-right pr-4 text-[12px] sm:text-[14px]">
-                    {inst.amount ? `₹${inst.amount.toLocaleString('en-IN')}` : '₹ --'}
+                    {inst.amount ? `₹${inst.amount.toLocaleString('en-IN')}` : '--'}
                   </td>
                 </tr>
               ))}
