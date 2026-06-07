@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square, X } from 'lucide-react';
+import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square, X, Camera as CameraIcon } from 'lucide-react';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import OfflineImage from './OfflineImage';
 import femaleAvatar from '../assets/avatar-female.png';
 import maleAvatar from '../assets/avatar-male.png';
@@ -20,6 +21,16 @@ const CustomerDetail = ({ customer, onBack }) => {
   const [isEditTransactionMode, setIsEditTransactionMode] = useState(false);
   const [transactionEditData, setTransactionEditData] = useState({ date: '', number: '', amount: '' });
   
+  // Advanced Entry & Denomination States
+  const [isManualEntryMode, setIsManualEntryMode] = useState(false);
+  const [isDenominationMode, setIsDenominationMode] = useState(false);
+  const [isUpiPhotoSelectionMode, setIsUpiPhotoSelectionMode] = useState(false);
+  const [tempUpiPhoto, setTempUpiPhoto] = useState(null);
+  const [manualCash, setManualCash] = useState('');
+  const [manualUpi, setManualUpi] = useState('');
+  const [denomCounts, setDenomCounts] = useState({ '500': '', '200': '', '100': '', '50': '', '20': '', '10': '', 'Coins': '' });
+  const [upiPhoto, setUpiPhoto] = useState(null);
+
   const phoneMenuRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
@@ -176,8 +187,80 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const handleOpenCollectionModal = () => {
     setCollectionDate(nextFormattedDueDate);
+    setIsManualEntryMode(false);
+    setIsDenominationMode(false);
+    setIsUpiPhotoSelectionMode(false);
+    setTempUpiPhoto(null);
+    setManualCash('');
+    setManualUpi('');
+    setUpiPhoto(null);
+    setDenomCounts({ '500': '', '200': '', '100': '', '50': '', '20': '', '10': '', 'Coins': '' });
     setShowCollectionModal(true);
   };
+
+  // Denom Math
+  const getDenomTotal = () => {
+    return (Number(denomCounts['500']) * 500) +
+           (Number(denomCounts['200']) * 200) +
+           (Number(denomCounts['100']) * 100) +
+           (Number(denomCounts['50']) * 50) +
+           (Number(denomCounts['20']) * 20) +
+           (Number(denomCounts['10']) * 10) +
+           (Number(denomCounts['Coins']) || 0);
+  };
+
+  const handleCapturePhoto = async (sourceType) => {
+    try {
+      const check = await Camera.checkPermissions();
+      if (check.camera !== 'granted' && check.photos !== 'granted') {
+        await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+      }
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: sourceType
+      });
+      setTempUpiPhoto(`data:image/jpeg;base64,${image.base64String}`);
+    } catch (e) {
+      console.error("User cancelled or camera error", e);
+    }
+  };
+
+  const grandTotal = Number(manualCash || 0) + Number(manualUpi || 0);
+  const manualPending = emiAmount - grandTotal;
+
+  const handleManualQuickPay = () => {
+    if (isModalFutureDate) return;
+    const nextId = installments.length + 1;
+    
+    const newInstallment = {
+      id: nextId,
+      date: collectionDate || nextFormattedDueDate,
+      number: nextNumber,
+      status: 'PAID',
+      amount: grandTotal,
+      timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase(),
+      upiPhoto: upiPhoto
+    };
+    
+    const updatedInstallments = [...installments, newInstallment];
+    setInstallments(updatedInstallments);
+    setShowCollectionModal(false);
+
+    if (customer && customer.id) {
+      try {
+        const customerRef = doc(db, 'customers', customer.id);
+        updateDoc(customerRef, { 
+          installments: updatedInstallments,
+          lastUpdated: new Date().toISOString()
+        }).catch(err => console.error("Cloud sync failed:", err));
+      } catch(err) {
+        console.error("Firestore error:", err);
+      }
+    }
+  };
+
 
   const handleQuickPay = () => {
     if (isModalFutureDate) return;
@@ -541,77 +624,237 @@ const CustomerDetail = ({ customer, onBack }) => {
             </button>
             
             {/* Header */}
-            <h2 className="text-[22px] font-black text-[#2d4a3e] text-center uppercase tracking-wide mb-8 mt-2 drop-shadow-sm">Collection Entry</h2>
+            {/* Header */}
+            <h2 className="text-[22px] font-black text-[#2d4a3e] text-center uppercase tracking-wide mb-8 mt-2 drop-shadow-sm">
+              {isUpiPhotoSelectionMode ? 'UPI Screenshot' : isDenominationMode ? 'Denomination' : 'Collection Entry'}
+            </h2>
             
-            {/* Content */}
-            <div className="space-y-6">
-              {/* Due Date */}
-              <div className="flex items-start gap-4">
-                 <div className="w-12 h-12 bg-[#2d4a3e]/10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
-                   <CalendarDays className="w-6 h-6 text-[#2d4a3e] stroke-[2]" />
-                 </div>
-                 <div className="flex flex-col">
-                   <div className="flex items-center gap-2">
-                     <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE DATE:</span>
-                     <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
-                     <div className="flex items-baseline gap-1.5">
-                       {isRetrySequence ? (
-                         <input 
-                           type="text"
-                           className="bg-white/50 border border-[#2d4a3e]/40 rounded px-2 py-0.5 text-xl font-black text-[#2d4a3e] w-32 outline-none focus:ring-2 focus:ring-[#1b7c58] transition-all"
-                           value={collectionDate}
-                           onChange={(e) => setCollectionDate(e.target.value)}
-                         />
-                       ) : (
-                         <span className="text-[#2d4a3e] font-black text-xl leading-none">{(collectionDate || nextFormattedDueDate).replace(/-/g, '.')}</span>
-                       )}
-                       {!isRetrySequence && <span className="text-[#2d4a3e]/80 font-bold text-[11px] tracking-widest">{nextFormattedWeekday}</span>}
-                     </div>
-                   </div>
-                   <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">({nextNumber} Installment)</span>
-                 </div>
-              </div>
+            {!isManualEntryMode && !isDenominationMode && !isUpiPhotoSelectionMode && (
+              <>
+                {/* Content */}
+                <div className="space-y-6">
+                  {/* Due Date */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-[#2d4a3e]/10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
+                      <CalendarDays className="w-6 h-6 text-[#2d4a3e] stroke-[2]" />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE DATE:</span>
+                        <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
+                        <div className="flex items-baseline gap-1.5">
+                          {isRetrySequence ? (
+                            <input 
+                              type="text"
+                              className="bg-white/50 border border-[#2d4a3e]/40 rounded px-2 py-0.5 text-xl font-black text-[#2d4a3e] w-32 outline-none focus:ring-2 focus:ring-[#1b7c58] transition-all"
+                              value={collectionDate}
+                              onChange={(e) => setCollectionDate(e.target.value)}
+                            />
+                          ) : (
+                            <span className="text-[#2d4a3e] font-black text-xl leading-none">{(collectionDate || nextFormattedDueDate).replace(/-/g, '.')}</span>
+                          )}
+                          {!isRetrySequence && <span className="text-[#2d4a3e]/80 font-bold text-[11px] tracking-widest">{nextFormattedWeekday}</span>}
+                        </div>
+                      </div>
+                      <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">({nextNumber} Installment)</span>
+                    </div>
+                  </div>
 
-              {/* Due Amount */}
-              <div className="flex items-start gap-4">
-                 <div className="w-12 h-12 bg-[#2d4a3e]/10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
-                   <div className="w-7 h-7 bg-[#2d4a3e] rounded-[40%_40%_15%_15%] flex items-center justify-center relative shadow-sm">
-                     <div className="absolute -top-1 w-3 h-1 bg-[#2d4a3e] rounded-t-sm"></div>
-                     <IndianRupee className="w-3.5 h-3.5 text-white mt-1" strokeWidth={3} />
-                   </div>
-                 </div>
-                 <div className="flex flex-col">
-                   <div className="flex items-center gap-2">
-                     <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE AMOUNT:</span>
-                     <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
-                     <span className="text-[#166534] font-black text-[22px] leading-none drop-shadow-sm">₹{emiAmount.toLocaleString('en-IN')}</span>
-                   </div>
-                 </div>
-              </div>
-            </div>
-            
-              {/* Actions */}
-            <div className="flex gap-4 mt-10">
-              <div className="flex flex-col gap-3 flex-1">
-                <button className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} disabled={isModalFutureDate}>ENTRY</button>
+                  {/* Due Amount */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-[#2d4a3e]/10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
+                      <div className="w-7 h-7 bg-[#2d4a3e] rounded-[40%_40%_15%_15%] flex items-center justify-center relative shadow-sm">
+                        <div className="absolute -top-1 w-3 h-1 bg-[#2d4a3e] rounded-t-sm"></div>
+                        <IndianRupee className="w-3.5 h-3.5 text-white mt-1" strokeWidth={3} />
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE AMOUNT:</span>
+                        <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
+                        <span className="text-[#166534] font-black text-[22px] leading-none drop-shadow-sm">₹{emiAmount.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Actions */}
+                <div className="flex gap-4 mt-10">
+                  <div className="flex flex-col gap-3 flex-1">
+                    <button 
+                      onClick={() => setIsManualEntryMode(true)}
+                      className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} disabled={isModalFutureDate}>
+                      ENTRY
+                    </button>
+                    <button 
+                      onClick={handleBounce}
+                      className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} 
+                      disabled={isModalFutureDate}
+                    >
+                      BOUNCE
+                    </button>
+                  </div>
+                  <div className="flex-1 flex flex-col items-center">
+                    <button 
+                      onClick={handleQuickPay}
+                      disabled={isModalFutureDate}
+                      className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full h-full text-base flex items-center justify-center transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`}
+                    >
+                      QUICK ENTRY
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {isManualEntryMode && !isDenominationMode && !isUpiPhotoSelectionMode && (
+              <div className="space-y-4 animate-in slide-in-from-right-4 duration-200">
+                {/* Entry Date */}
+                <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200/60 shadow-sm">
+                  <span className="text-[12px] font-black text-slate-600 tracking-wider">ENTRY DATE</span>
+                  <input 
+                    type="text" 
+                    value={collectionDate || nextFormattedDueDate} 
+                    onChange={(e) => setCollectionDate(e.target.value)}
+                    className="bg-white border border-slate-300 rounded px-2 py-1 text-sm font-bold text-slate-800 w-28 text-right outline-none focus:border-[#1b7c58]"
+                  />
+                </div>
+                
+                {/* Cash Input */}
+                <div className="flex items-center justify-between bg-emerald-50/50 p-3 rounded-xl border border-emerald-200/60 shadow-sm">
+                  <span className="text-[12px] font-black text-slate-600 tracking-wider">CASH</span>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      inputMode="numeric"
+                      value={manualCash} 
+                      onChange={(e) => setManualCash(e.target.value)}
+                      placeholder="0"
+                      className="bg-white border border-emerald-300 rounded px-2 py-1 text-lg font-black text-emerald-800 w-24 text-right outline-none focus:border-emerald-500"
+                    />
+                    <button onClick={() => setIsDenominationMode(true)} className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 hover:bg-emerald-200 transition-colors shadow-sm font-bold text-lg leading-none pb-0.5">
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* UPI Input */}
+                <div className="flex items-center justify-between bg-blue-50/50 p-3 rounded-xl border border-blue-200/60 shadow-sm">
+                  <span className="text-[12px] font-black text-slate-600 tracking-wider">UPI</span>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      inputMode="numeric"
+                      value={manualUpi} 
+                      onChange={(e) => setManualUpi(e.target.value)}
+                      placeholder="0"
+                      className="bg-white border border-blue-300 rounded px-2 py-1 text-lg font-black text-blue-800 w-24 text-right outline-none focus:border-blue-500"
+                    />
+                    <button onClick={() => { setTempUpiPhoto(upiPhoto); setIsUpiPhotoSelectionMode(true); }} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm ${upiPhoto ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
+                      <CameraIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between px-2 pt-2">
+                  <span className="text-[11px] font-black text-slate-500 tracking-wider">PENDING: <span className={manualPending > 0 ? "text-red-500" : "text-slate-700"}>₹{manualPending.toLocaleString('en-IN')}</span></span>
+                  <span className="text-[14px] font-black text-[#1b7c58] tracking-wider">TOTAL: ₹{grandTotal.toLocaleString('en-IN')}</span>
+                </div>
+
                 <button 
-                  onClick={handleBounce}
-                  className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full text-sm transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`} 
+                  onClick={handleManualQuickPay}
                   disabled={isModalFutureDate}
+                  className={`mt-4 border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-3 rounded-full w-full text-base transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`}
                 >
-                  BOUNCE
+                  ENTER
                 </button>
               </div>
-              <div className="flex-1 flex flex-col items-center">
+            )}
+
+            {isDenominationMode && (
+              <div className="space-y-3 animate-in slide-in-from-right-4 duration-200">
+                {['500', '200', '100', '50', '20', '10', 'Coins'].map((note) => (
+                  <div key={note} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <span className="text-[13px] font-black text-slate-700 w-12">{note} x</span>
+                    <input 
+                      type="number" 
+                      inputMode="numeric"
+                      value={denomCounts[note]} 
+                      onChange={(e) => setDenomCounts({...denomCounts, [note]: e.target.value})}
+                      placeholder="0"
+                      className="bg-white border border-slate-300 rounded px-2 py-1 text-sm font-bold text-slate-800 w-16 text-center outline-none focus:border-[#1b7c58]"
+                    />
+                    <span className="text-[14px] font-black text-[#1b7c58] w-20 text-right">
+                      ₹{note === 'Coins' ? (Number(denomCounts[note]) || 0).toLocaleString('en-IN') : (Number(denomCounts[note]) * Number(note) || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ))}
+                
+                <div className="flex items-center justify-between pt-4 border-t border-slate-200 mt-4 px-2">
+                  <span className="text-[14px] font-black text-slate-600 tracking-wider">TOTAL</span>
+                  <span className="text-[18px] font-black text-[#1b7c58]">₹{getDenomTotal().toLocaleString('en-IN')}</span>
+                </div>
+
                 <button 
-                  onClick={handleQuickPay}
-                  disabled={isModalFutureDate}
-                  className={`border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-2.5 rounded-full w-full h-full text-base flex items-center justify-center transition-transform ${isModalFutureDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60' : 'bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95'}`}
+                  onClick={() => {
+                    setManualCash(getDenomTotal().toString());
+                    setIsDenominationMode(false);
+                  }}
+                  className="mt-6 border-[2px] border-slate-300 ring-1 ring-black/20 font-bold tracking-wider py-3 rounded-full w-full text-base bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95 transition-transform"
                 >
-                  QUICK ENTRY
+                  OK
                 </button>
               </div>
-            </div>
+            )}
+
+            {isUpiPhotoSelectionMode && (
+              <div className="space-y-4 animate-in slide-in-from-right-4 duration-200 flex flex-col items-center">
+                
+                <button 
+                  onClick={() => handleCapturePhoto(CameraSource.Camera)}
+                  className="w-full bg-white border-2 border-slate-200 py-3 rounded-xl font-bold text-slate-700 flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  <CameraIcon className="w-5 h-5 text-slate-500" />
+                  Camera
+                </button>
+                
+                <button 
+                  onClick={() => handleCapturePhoto(CameraSource.Photos)}
+                  className="w-full bg-white border-2 border-slate-200 py-3 rounded-xl font-bold text-slate-700 flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  <FileText className="w-5 h-5 text-slate-500" />
+                  Upload from device
+                </button>
+
+                {tempUpiPhoto && (
+                  <div className="mt-4 flex flex-col items-center">
+                    <span className="text-[12px] font-black text-[#1b7c58] tracking-wider mb-2">IMAGE CAPTURED</span>
+                    <img src={tempUpiPhoto} alt="UPI Screenshot" className="w-24 h-24 object-cover rounded-xl border border-slate-300 shadow-sm" />
+                  </div>
+                )}
+                
+                <div className="flex gap-4 mt-6 w-full pt-4 border-t border-slate-200">
+                  <button 
+                    onClick={() => {
+                      setTempUpiPhoto(null);
+                      setIsUpiPhotoSelectionMode(false);
+                    }}
+                    className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-full hover:bg-slate-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setUpiPhoto(tempUpiPhoto);
+                      setIsUpiPhotoSelectionMode(false);
+                    }}
+                    className="flex-1 bg-gradient-to-b from-[#3a614d] to-[#1e3c2d] text-white font-bold py-3 rounded-full shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),0_4px_8px_rgba(0,0,0,0.4)] active:scale-95 transition-transform"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            )}
             
             {/* Future Date Warning */}
             {isModalFutureDate && (
