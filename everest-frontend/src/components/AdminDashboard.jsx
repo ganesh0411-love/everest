@@ -2,6 +2,172 @@ import React from 'react';
 
 const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
+  const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);
+  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu');
+  
+  // Engine A: Patta Land Area Converter
+  const [hectare, setHectare] = React.useState('');
+  const [ares, setAres] = React.useState('');
+  const [topCent, setTopCent] = React.useState('');
+  
+  const [acreOutput, setAcreOutput] = React.useState('');
+  const [centOutput, setCentOutput] = React.useState('');
+  const [sqftOutput, setSqftOutput] = React.useState('');
+  const [sqmOutput, setSqmOutput] = React.useState('');
+
+  const calculateFromTop = (h_val, a_val, c_val) => {
+    const h = parseFloat(h_val) || 0;
+    const a = parseFloat(a_val) || 0;
+    const c = parseFloat(c_val) || 0;
+    const totalSqFt = (h * 107639.1) + ((a / 100) * 107639.1) + (c * 435.6);
+    const totalH = totalSqFt / 107639.1;
+    setAcreOutput(totalSqFt > 0 ? (totalH * 2.47105).toFixed(4) : '');
+    setCentOutput(totalSqFt > 0 ? (totalSqFt / 435.6).toFixed(2) : '');
+    setSqftOutput(totalSqFt > 0 ? totalSqFt.toFixed(2) : '');
+    setSqmOutput(totalSqFt > 0 ? (totalH * 10000).toFixed(2) : '');
+  };
+
+  const handleHectareChange = (val) => { setHectare(val); calculateFromTop(val, ares, topCent); };
+  const handleAresChange = (val) => { setAres(val); calculateFromTop(hectare, val, topCent); };
+  const handleTopCentChange = (val) => { setTopCent(val); calculateFromTop(hectare, ares, val); };
+
+  const applyReverse = (totalH, source) => {
+    if (totalH <= 0) {
+      setHectare(''); setAres(''); setTopCent('');
+      if (source !== 'acre') setAcreOutput('');
+      if (source !== 'centOut') setCentOutput('');
+      if (source !== 'sqft') setSqftOutput('');
+      if (source !== 'sqm') setSqmOutput('');
+      return;
+    }
+    const h = Math.floor(totalH);
+    const a = (totalH - h) * 100;
+    setHectare(h > 0 ? h.toString() : '');
+    setAres(a > 0 ? a.toFixed(2) : '');
+    setTopCent(''); // Cleared when inversely calculated from absolute totals
+
+    const totalSqFt = totalH * 107639.1;
+    if (source !== 'acre') setAcreOutput((totalH * 2.47105).toFixed(4));
+    if (source !== 'centOut') setCentOutput((totalSqFt / 435.6).toFixed(2));
+    if (source !== 'sqft') setSqftOutput(totalSqFt.toFixed(2));
+    if (source !== 'sqm') setSqmOutput((totalH * 10000).toFixed(2));
+  };
+
+  const handleAcreChange = (val) => { setAcreOutput(val); applyReverse((parseFloat(val) || 0) / 2.47105, 'acre'); };
+  const handleCentOutChange = (val) => { setCentOutput(val); applyReverse(((parseFloat(val) || 0) * 435.6) / 107639.1, 'centOut'); };
+  const handleSqftChange = (val) => { setSqftOutput(val); applyReverse((parseFloat(val) || 0) / 107639.1, 'sqft'); };
+  const handleSqmChange = (val) => { setSqmOutput(val); applyReverse((parseFloat(val) || 0) / 10000, 'sqm'); };
+
+  // Engine B: Length Converter
+  const [lengthVal1, setLengthVal1] = React.useState('');
+  const [lengthVal2, setLengthVal2] = React.useState('');
+  const [lengthMode, setLengthMode] = React.useState('Feet');
+
+  // Engine C: FMB Vector Canvas Engine
+  const [fmbTop, setFmbTop] = React.useState('');
+  const [fmbBottom, setFmbBottom] = React.useState('');
+  const [fmbLeft, setFmbLeft] = React.useState('');
+  const [fmbRight, setFmbRight] = React.useState('');
+  const [fmbUnit, setFmbUnit] = React.useState('Meter');
+  const [fmbScale, setFmbScale] = React.useState(1);
+  const [fmbRotation, setFmbRotation] = React.useState(0);
+  const [fmbPanX, setFmbPanX] = React.useState(0);
+  const [fmbPanY, setFmbPanY] = React.useState(0);
+  const [isFmbFullScreen, setIsFmbFullScreen] = React.useState(false);
+  const initialTouchRef = React.useRef(null);
+  
+  const handleTouchStartFMB = (e) => {
+    if (e.touches.length === 2) {
+      if (e.cancelable) e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const distance = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      initialTouchRef.current = { type: 'pinch', distance, angle, scale: fmbScale, rotation: fmbRotation };
+    } else if (e.touches.length === 1) {
+      initialTouchRef.current = {
+        type: 'pan',
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+        panX: fmbPanX,
+        panY: fmbPanY
+      };
+    }
+  };
+
+  const handleTouchMoveFMB = (e) => {
+    if (e.touches.length === 2 && initialTouchRef.current?.type === 'pinch') {
+      if (e.cancelable) e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const distance = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      
+      const scaleFactor = distance / initialTouchRef.current.distance;
+      let newScale = initialTouchRef.current.scale * scaleFactor;
+      if (newScale < 0.2) newScale = 0.2;
+      if (newScale > 5) newScale = 5;
+      
+      let angleDiff = angle - initialTouchRef.current.angle;
+      let newRotation = initialTouchRef.current.rotation + angleDiff;
+      
+      setFmbScale(newScale);
+      setFmbRotation(newRotation);
+    } else if (e.touches.length === 1 && initialTouchRef.current?.type === 'pan') {
+      if (e.cancelable) e.preventDefault();
+      const dx = e.touches[0].clientX - initialTouchRef.current.startX;
+      const dy = e.touches[0].clientY - initialTouchRef.current.startY;
+      setFmbPanX(initialTouchRef.current.panX + dx);
+      setFmbPanY(initialTouchRef.current.panY + dy);
+    }
+  };
+
+  const handleTouchEndFMB = () => {
+    initialTouchRef.current = null;
+  };
+
+  const handleResetFMB = () => {
+    setFmbTop('');
+    setFmbBottom('');
+    setFmbLeft('');
+    setFmbRight('');
+    setFmbScale(1);
+    setFmbRotation(0);
+    setFmbPanX(0);
+    setFmbPanY(0);
+  };
+
+  const handleLength1Change = (val, mode = lengthMode) => {
+    setLengthVal1(val);
+    if (!val) { setLengthVal2(''); return; }
+    const v = parseFloat(val);
+    if (isNaN(v)) { setLengthVal2(''); return; }
+    if (mode === 'Feet') setLengthVal2((v * 0.3048).toFixed(4));
+    else if (mode === 'Inches') setLengthVal2((v * 0.0254).toFixed(4));
+    else if (mode === 'Yards') setLengthVal2((v * 0.9144).toFixed(4));
+    else if (mode === 'Centimeter') setLengthVal2((v / 100).toFixed(4));
+  };
+
+  const handleLength2Change = (val, mode = lengthMode) => {
+    setLengthVal2(val);
+    if (!val) { setLengthVal1(''); return; }
+    const v = parseFloat(val);
+    if (isNaN(v)) { setLengthVal1(''); return; }
+    if (mode === 'Feet') setLengthVal1((v / 0.3048).toFixed(4));
+    else if (mode === 'Inches') setLengthVal1((v / 0.0254).toFixed(4));
+    else if (mode === 'Yards') setLengthVal1((v / 0.9144).toFixed(4));
+    else if (mode === 'Centimeter') setLengthVal1((v * 100).toFixed(4));
+  };
+
+  const handleLengthModeChange = (mode) => {
+    setLengthMode(mode);
+    handleLength1Change(lengthVal1, mode); // Re-evaluate based on new mode
+  };
+
+  const closeLandSurvey = () => {
+    setShowLandSurveyDashboard(false);
+    setActiveLandSurveyView('menu');
+  };
 
   const [staffImages, setStaffImages] = React.useState({
     vignesh: "https://ui-avatars.com/api/?name=Vignesh&background=random",
@@ -325,11 +491,14 @@ const AdminDashboard = ({ setCurrentView }) => {
           </svg>
           <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Collection<br/>Reports</div>
         </div>
-        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
+        <div 
+          className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}
+          onClick={() => setShowLandSurveyDashboard(true)}
+        >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Branch<br/>Details</div>
+          <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Land<br/>Survey</div>
         </div>
         <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -338,6 +507,330 @@ const AdminDashboard = ({ setCurrentView }) => {
           <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Attendance</div>
         </div>
       </div>
+
+      {/* Land Survey Dashboard Overlay Route */}
+      {showLandSurveyDashboard && (
+        <div className="fixed inset-0 z-[120] bg-[#f8fafc] flex flex-col animate-in slide-in-from-right-full duration-300">
+          <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-10">
+            <button 
+              onClick={closeLandSurvey}
+              className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-600 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight mt-0.5">Land Survey</h2>
+          </div>
+
+          {activeLandSurveyView === 'menu' ? (
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+              {/* Card 1 */}
+              <div 
+                className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
+                onClick={() => setActiveLandSurveyView('simple')}
+              >
+                <div>
+                  <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Simple Lands View</h3>
+                  <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">View basic land parameters</p>
+                </div>
+                <div className="w-10 h-10 bg-sky-50 rounded-full flex items-center justify-center text-sky-600 shadow-inner">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </div>
+              </div>
+
+              {/* Card 2 */}
+              <div 
+                className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
+                onClick={() => setActiveLandSurveyView('fmb')}
+              >
+                <div>
+                  <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Field Measurement Book</h3>
+                  <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">Access master measurements</p>
+                </div>
+                <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 shadow-inner">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </div>
+              </div>
+
+              {/* Card 3 */}
+              <div className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer">
+                <div>
+                  <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Recreate FMB</h3>
+                  <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">Draft new measurement layouts</p>
+                </div>
+                <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 shadow-inner">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </div>
+              </div>
+            </div>
+          ) : activeLandSurveyView === 'simple' ? (
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5 animate-in slide-in-from-right-8 duration-300">
+              {/* Top Bar for Back */}
+              <div className="flex items-center gap-3 mb-2 cursor-pointer w-max active:scale-95 transition-transform" onClick={() => setActiveLandSurveyView('menu')}>
+                <div className="w-7 h-7 bg-white shadow-sm rounded-full flex items-center justify-center text-[#0369a1]">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
+                </div>
+                <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Simple Lands View</h3>
+              </div>
+
+              {/* Engine A: Patta Land Area Converter */}
+              <div className="bg-white p-4 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-slate-800 text-[12px] uppercase tracking-wide">Land Area Converter</h4>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Hectare</label>
+                    <input type="number" value={hectare} onChange={e => handleHectareChange(e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Ares</label>
+                    <input type="number" value={ares} onChange={e => handleAresChange(e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Cent</label>
+                    <input type="number" value={topCent} onChange={e => handleTopCentChange(e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-1">
+                  <div>
+                    <label className="text-[10px] text-emerald-600 font-black mb-1 block uppercase">Acre (Inverse)</label>
+                    <input type="number" value={acreOutput} onChange={e => handleAcreChange(e.target.value)} className="w-full bg-[#f8fafc] border border-emerald-200/50 rounded-xl px-3 py-2 text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-colors shadow-inner" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-emerald-600 font-black mb-1 block uppercase">Cent (Inverse)</label>
+                    <input type="number" value={centOutput} onChange={e => handleCentOutChange(e.target.value)} className="w-full bg-[#f8fafc] border border-emerald-200/50 rounded-xl px-3 py-2 text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-colors shadow-inner" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-emerald-600 font-black mb-1 block uppercase">Square Feet</label>
+                    <input type="number" value={sqftOutput} onChange={e => handleSqftChange(e.target.value)} className="w-full bg-[#f8fafc] border border-emerald-200/50 rounded-xl px-3 py-2 text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-colors shadow-inner" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-emerald-600 font-black mb-1 block uppercase">Square Meter</label>
+                    <input type="number" value={sqmOutput} onChange={e => handleSqmChange(e.target.value)} className="w-full bg-[#f8fafc] border border-emerald-200/50 rounded-xl px-3 py-2 text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-colors shadow-inner" placeholder="0.00" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Engine B: Plot Length Converter */}
+              <div className="bg-white p-4 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-slate-800 text-[12px] uppercase tracking-wide">Plot Length Converter</h4>
+                  <select 
+                    value={lengthMode}
+                    onChange={(e) => handleLengthModeChange(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-slate-700 text-[10px] font-bold rounded-lg px-2 py-1.5 outline-none shadow-sm focus:border-[#0369a1]"
+                  >
+                    <option value="Feet">Feet &lt;-&gt; Meter</option>
+                    <option value="Inches">Inches &lt;-&gt; Meter</option>
+                    <option value="Yards">Yards &lt;-&gt; Meter</option>
+                    <option value="Centimeter">Centimeter &lt;-&gt; Meter</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">{lengthMode}</label>
+                    <input type="number" value={lengthVal1} onChange={e => handleLength1Change(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
+                  </div>
+                  <div className="mt-5 text-slate-300 shrink-0 px-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h8M8 17h8M12 4v16" /></svg>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] text-amber-600 font-black mb-1 block uppercase">Meter</label>
+                    <input type="number" value={lengthVal2} onChange={e => handleLength2Change(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-amber-500 transition-colors shadow-inner" placeholder="0" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : activeLandSurveyView === 'fmb' ? (
+            <div className={`flex flex-col bg-slate-50 overflow-y-auto animate-in slide-in-from-right-8 duration-300 ${isFmbFullScreen ? 'fixed inset-0 z-[150] h-full' : 'flex-1 h-full relative'}`}>
+              {/* Back Button Overlay */}
+              {!isFmbFullScreen && (
+                <div 
+                  className="absolute top-4 left-4 z-20 w-8 h-8 bg-white/80 backdrop-blur-md shadow-sm border border-slate-200 rounded-full flex items-center justify-center text-slate-800 cursor-pointer active:scale-95 transition-transform" 
+                  onClick={() => setActiveLandSurveyView('menu')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
+                </div>
+              )}
+
+              {/* Upper Section Scalable Screen */}
+              <div className={`${isFmbFullScreen ? 'flex-1' : 'min-h-[60vh] shrink-0'} w-full relative flex flex-col items-center justify-center pt-8 pb-4 px-4 bg-gradient-to-b from-[#f8fafc] to-[#e2e8f0]`}>
+                {/* Floating Right Micro Controls */}
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2 bg-white/60 backdrop-blur-md p-1 rounded-xl shadow-sm border border-slate-200/50">
+                  <button onClick={() => setIsFmbFullScreen(!isFmbFullScreen)} className="w-6 h-6 bg-slate-800 rounded-md flex items-center justify-center text-white shadow-md active:scale-95 transition-transform">
+                    {isFmbFullScreen ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                    )}
+                  </button>
+                </div>
+
+                {/* Real-Time Auto-Scaling Vector Canvas */}
+                <div 
+                  className="flex-1 w-full bg-white rounded-3xl shadow-inner border-2 border-slate-200/50 relative flex items-center justify-center overflow-hidden touch-none"
+                  onTouchStart={handleTouchStartFMB}
+                  onTouchMove={handleTouchMoveFMB}
+                  onTouchEnd={handleTouchEndFMB}
+                  onTouchCancel={handleTouchEndFMB}
+                >
+                  {(() => {
+                    let multiplier = 1;
+                    if (fmbUnit === 'Feet') multiplier = 0.3048;
+                    else if (fmbUnit === 'Centimeter (Cm)') multiplier = 0.01;
+                    else if (fmbUnit === 'Millimeter (Mm)') multiplier = 0.001;
+
+                    const t = (parseFloat(fmbTop) || 0) * multiplier;
+                    const b = (parseFloat(fmbBottom) || 0) * multiplier;
+                    const l = (parseFloat(fmbLeft) || 0) * multiplier;
+                    const r = (parseFloat(fmbRight) || 0) * multiplier;
+                    
+                    if (t > 0 && b > 0 && l > 0 && r > 0) {
+                      const avgLength = (l + r) / 2;
+                      const avgWidth = (t + b) / 2;
+                      const wMax = Math.max(t, b);
+                      const hMax = avgLength;
+                      
+                      // Auto-Scaling ViewBox padding (Massive padding to replicate compact A4 layout)
+                      const maxOverall = Math.max(wMax, hMax);
+                      const vWidth = maxOverall * 4;
+                      const vHeight = maxOverall * 4;
+                      const cx = vWidth / 2;
+                      const cy = vHeight / 2;
+
+                      // Vector Coordinates (Perfect centering)
+                      const p1 = `${cx - t/2},${cy - hMax/2}`;
+                      const p2 = `${cx + t/2},${cy - hMax/2}`;
+                      const p3 = `${cx + b/2},${cy + hMax/2}`;
+                      const p4 = `${cx - b/2},${cy + hMax/2}`;
+
+                      return (
+                        <div style={{ transform: `translate(${fmbPanX}px, ${fmbPanY}px) scale(${fmbScale}) rotate(${fmbRotation}deg)`, transformOrigin: 'center', transition: fmbPanX === 0 && fmbPanY === 0 && fmbScale === 1 ? 'transform 0.2s ease-out' : 'none', width: '100%', height: '100%' }}>
+                          <svg viewBox={`0 0 ${vWidth} ${vHeight}`} className="w-full h-full max-h-full drop-shadow-md">
+                            {/* Closed Path Geometry */}
+                            <polygon 
+                              points={`${p1} ${p2} ${p3} ${p4}`} 
+                              fill="transparent" 
+                              stroke="#000000" 
+                              strokeWidth="1.5" 
+                              vectorEffect="non-scaling-stroke"
+                              strokeLinejoin="miter"
+                            />
+                            {/* Top Label */}
+                            <text x={cx} y={cy - hMax/2 - (vHeight*0.02)} textAnchor="middle" fill="#1d4ed8" fontSize={Math.max(vWidth, vHeight) * 0.02}>{parseFloat(fmbTop)}</text>
+                            {/* Bottom Label */}
+                            <text x={cx} y={cy + hMax/2 + (vHeight*0.03)} textAnchor="middle" fill="#1d4ed8" fontSize={Math.max(vWidth, vHeight) * 0.02}>{parseFloat(fmbBottom)}</text>
+                            {/* Left Label */}
+                            <text transform={`translate(${cx - Math.max(t,b)/2 - (vWidth*0.015)}, ${cy}) rotate(-90)`} textAnchor="middle" fill="#1d4ed8" fontSize={Math.max(vWidth, vHeight) * 0.02}>{parseFloat(fmbLeft)}</text>
+                            {/* Right Label */}
+                            <text transform={`translate(${cx + Math.max(t,b)/2 + (vWidth*0.015)}, ${cy}) rotate(-90)`} textAnchor="middle" fill="#1d4ed8" fontSize={Math.max(vWidth, vHeight) * 0.02}>{parseFloat(fmbRight)}</text>
+                          </svg>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="text-center text-slate-400 font-bold text-xs uppercase tracking-widest flex flex-col items-center opacity-60">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-2 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          Enter 4 Coordinates
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+
+                {/* Instant Trait Summary Labels Base */}
+                <div className="w-full bg-white/80 backdrop-blur-sm rounded-2xl p-3 shadow-sm border border-slate-200/50 mt-3 flex flex-wrap justify-between gap-1 mb-2 shrink-0">
+                  {(() => {
+                    let multiplier = 1;
+                    if (fmbUnit === 'Feet') multiplier = 0.3048;
+                    else if (fmbUnit === 'Centimeter (Cm)') multiplier = 0.01;
+                    else if (fmbUnit === 'Millimeter (Mm)') multiplier = 0.001;
+
+                    const t = (parseFloat(fmbTop) || 0) * multiplier;
+                    const b = (parseFloat(fmbBottom) || 0) * multiplier;
+                    const l = (parseFloat(fmbLeft) || 0) * multiplier;
+                    const r = (parseFloat(fmbRight) || 0) * multiplier;
+                    
+                    const avgLength = (l + r) / 2;
+                    const avgWidth = (t + b) / 2;
+                    const totalSqM = avgLength * avgWidth;
+                    const cent = totalSqM / 40.468;
+                    const sqFt = totalSqM * 10.7639;
+                    const acre = totalSqM / 4046.86;
+
+                    return (
+                      <>
+                        <div className="w-[48%] bg-slate-50 rounded-lg p-2 border border-slate-100 flex flex-col items-center">
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Total Sq.M</span>
+                          <span className="text-sm font-black text-slate-800">{totalSqM > 0 ? totalSqM.toFixed(2) : '0.00'}</span>
+                        </div>
+                        <div className="w-[48%] bg-slate-50 rounded-lg p-2 border border-slate-100 flex flex-col items-center">
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Total Sq.Ft</span>
+                          <span className="text-sm font-black text-slate-800">{sqFt > 0 ? sqFt.toFixed(2) : '0.00'}</span>
+                        </div>
+                        <div className="w-full bg-emerald-50/50 rounded-lg p-2 border border-emerald-100/50 flex flex-col items-center mt-1">
+                          <span className="text-[10px] text-emerald-600 font-black uppercase tracking-wider mb-0.5">Estimated Cent</span>
+                          <span className="text-xl font-black text-emerald-700">{cent > 0 ? cent.toFixed(2) : '0.00'}</span>
+                          {cent >= 100 && (
+                            <span className="text-[11px] text-emerald-700 font-bold mt-0.5 bg-emerald-100 px-3 py-0.5 rounded-full">
+                              ~ {acre.toFixed(2)} Acres
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Lower Section Scrolling Inputs */}
+              {!isFmbFullScreen && (
+                <div className="bg-white border-t-2 border-slate-200 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] p-4 pt-5 z-10 flex flex-col justify-center gap-4 pb-8 shrink-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-black text-slate-800 text-[11px] uppercase tracking-wider text-slate-400">Boundary Dimensions</h4>
+                    <div className="flex items-center gap-2">
+                      <button onClick={handleResetFMB} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border border-red-100 shadow-sm active:scale-95 transition-transform">Reset</button>
+                      <select 
+                        value={fmbUnit}
+                        onChange={(e) => setFmbUnit(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 text-[#0369a1] text-[10px] font-black rounded-lg px-2 py-1 outline-none shadow-sm focus:border-[#0369a1] uppercase"
+                      >
+                        <option value="Meter">Meter (Default)</option>
+                        <option value="Feet">Feet</option>
+                        <option value="Centimeter (Cm)">Centimeter (Cm)</option>
+                        <option value="Millimeter (Mm)">Millimeter (Mm)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                    <div className="relative">
+                      <label className="absolute -top-2 left-3 bg-white px-1 text-[9px] text-[#0369a1] font-black uppercase tracking-wider">Top ({fmbUnit === 'Meter' ? 'm' : fmbUnit === 'Feet' ? 'ft' : fmbUnit === 'Centimeter (Cm)' ? 'cm' : 'mm'})</label>
+                      <input type="number" value={fmbTop} onChange={e => setFmbTop(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors text-center shadow-inner" placeholder="0.0" />
+                    </div>
+                    <div className="relative">
+                      <label className="absolute -top-2 left-3 bg-white px-1 text-[9px] text-[#0369a1] font-black uppercase tracking-wider">Bottom ({fmbUnit === 'Meter' ? 'm' : fmbUnit === 'Feet' ? 'ft' : fmbUnit === 'Centimeter (Cm)' ? 'cm' : 'mm'})</label>
+                      <input type="number" value={fmbBottom} onChange={e => setFmbBottom(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors text-center shadow-inner" placeholder="0.0" />
+                    </div>
+                    <div className="relative">
+                      <label className="absolute -top-2 left-3 bg-white px-1 text-[9px] text-emerald-600 font-black uppercase tracking-wider">Left ({fmbUnit === 'Meter' ? 'm' : fmbUnit === 'Feet' ? 'ft' : fmbUnit === 'Centimeter (Cm)' ? 'cm' : 'mm'})</label>
+                      <input type="number" value={fmbLeft} onChange={e => setFmbLeft(e.target.value)} className="w-full bg-emerald-50/30 border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-emerald-800 outline-none focus:border-emerald-500 transition-colors text-center shadow-inner" placeholder="0.0" />
+                    </div>
+                    <div className="relative">
+                      <label className="absolute -top-2 left-3 bg-white px-1 text-[9px] text-emerald-600 font-black uppercase tracking-wider">Right ({fmbUnit === 'Meter' ? 'm' : fmbUnit === 'Feet' ? 'ft' : fmbUnit === 'Centimeter (Cm)' ? 'cm' : 'mm'})</label>
+                      <input type="number" value={fmbRight} onChange={e => setFmbRight(e.target.value)} className="w-full bg-emerald-50/30 border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-emerald-800 outline-none focus:border-emerald-500 transition-colors text-center shadow-inner" placeholder="0.0" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 };
