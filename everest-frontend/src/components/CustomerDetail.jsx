@@ -4,6 +4,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import OfflineImage from './OfflineImage';
 import femaleAvatar from '../assets/avatar-female.png';
 import maleAvatar from '../assets/avatar-male.png';
+import companyLogo from '../assets/logo.png';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import ApprovalDetailsModal from './ApprovalDetailsModal';
@@ -13,6 +14,10 @@ const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 const CustomerDetail = ({ customer, onBack }) => {
   const [showPhoneMenu, setShowPhoneMenu] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showStatementModal, setShowStatementModal] = useState(false);
+  const [showCustomerReportModal, setShowCustomerReportModal] = useState(false);
+  const [includeBounces, setIncludeBounces] = useState(false);
   const [collectionDate, setCollectionDate] = useState("");
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   
@@ -89,7 +94,24 @@ const CustomerDetail = ({ customer, onBack }) => {
   const loanAmount = customer.loanAmount !== undefined && customer.loanAmount !== '' ? Number(customer.loanAmount) : 0;
   const repayAmount = customer.repayAmount !== undefined && customer.repayAmount !== '' ? Number(customer.repayAmount) : 0;
   
-  const numberOfWeeks = customer.weeks !== undefined && customer.weeks !== '' ? Number(customer.weeks) : 12;
+  const getPlanToken = () => {
+    if (customer.tenureUnit) return customer.tenureUnit.toUpperCase().replace(/S$/, '');
+    if (customer.weeks) return 'WEEK';
+    if (customer.days) return 'DAY';
+    if (customer.months) return 'MONTH';
+    return 'WEEK';
+  };
+  const planToken = getPlanToken();
+
+  const getPlanCount = () => {
+    if (customer.tenureVal) return Number(customer.tenureVal);
+    if (customer.weeks) return Number(customer.weeks);
+    if (customer.days) return Number(customer.days);
+    if (customer.months) return Number(customer.months);
+    return 12;
+  };
+  const planCount = getPlanCount();
+  const numberOfWeeks = planCount; // Ensure fallback compatibility
   const emiAmount = repayAmount > 0 ? Math.round(repayAmount / numberOfWeeks) : 0;
 
   const runningSubTotal = installments.reduce((sum, inst) => sum + (inst.amount || 0), 0);
@@ -639,8 +661,11 @@ const CustomerDetail = ({ customer, onBack }) => {
       <div className="absolute bottom-0 left-0 w-full z-50">
         <div className="bg-[#124b33] rounded-t-[2rem] h-20 flex justify-between items-center px-8 relative shadow-[0_-15px_30px_rgba(0,0,0,0.15)] border-t border-white/5 pb-2">
           
-          {/* Pay Later */}
-          <button className="flex flex-col items-center justify-center gap-1 opacity-80 hover:opacity-100 transition-opacity flex-1">
+          {/* SCHEDULE */}
+          <button 
+            onClick={() => setShowScheduleModal(true)}
+            className="flex flex-col items-center justify-center gap-1 opacity-80 hover:opacity-100 transition-opacity flex-1"
+          >
             <div className="p-1.5 border border-white/10 bg-white/5 rounded-xl">
                <Clock className="w-4 h-4 text-emerald-100" />
             </div>
@@ -665,7 +690,10 @@ const CustomerDetail = ({ customer, onBack }) => {
           </div>
 
           {/* Report */}
-          <button className="flex flex-col items-center justify-center gap-1 opacity-80 hover:opacity-100 transition-opacity flex-1">
+          <button 
+            onClick={() => setShowStatementModal(true)}
+            className="flex flex-col items-center justify-center gap-1 opacity-80 hover:opacity-100 transition-opacity flex-1"
+          >
             <div className="p-1.5 border border-blue-500/30 bg-blue-500/10 rounded-xl">
                <FileText className="w-4 h-4 text-blue-300" />
             </div>
@@ -674,6 +702,390 @@ const CustomerDetail = ({ customer, onBack }) => {
 
         </div>
       </div>
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full h-[85vh] sm:h-[80vh] sm:max-w-2xl bg-[#f8fafc] sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#115e41] to-[#1b7c58] px-6 py-5 flex justify-between items-center shadow-md relative z-10">
+              <div>
+                <h2 className="text-xl font-black text-white tracking-wide flex items-center gap-2">
+                  <CalendarDays className="w-6 h-6 text-emerald-300" />
+                  REPAYMENT SCHEDULE
+                </h2>
+                <p className="text-emerald-100/80 text-xs font-semibold mt-1 tracking-wider uppercase">
+                  {planCount} {planToken}S PLAN • EMI ₹{emiAmount.toLocaleString('en-IN')}
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowScheduleModal(false)}
+                className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Grid Table */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-white relative">
+              <table className="w-full text-center border-collapse">
+                <thead className="sticky top-0 bg-slate-100 shadow-sm z-20 outline outline-1 outline-slate-200">
+                  <tr>
+                    <th className="py-3 px-2 text-[10px] sm:text-xs font-extrabold text-slate-700 tracking-wider w-[15%] uppercase">
+                      {planToken}
+                    </th>
+                    <th className="py-3 px-2 text-[10px] sm:text-xs font-extrabold text-slate-700 tracking-wider w-[25%]">
+                      DATE
+                    </th>
+                    <th className="py-3 px-2 text-[10px] sm:text-xs font-extrabold text-slate-700 tracking-wider w-[15%]">
+                      DAY
+                    </th>
+                    <th className="py-3 px-2 text-[10px] sm:text-xs font-extrabold text-slate-700 tracking-wider w-[20%] text-right">
+                      EMI
+                    </th>
+                    <th className="py-3 px-2 text-[10px] sm:text-xs font-extrabold text-slate-700 tracking-wider w-[25%] text-right pr-4">
+                      PENDING
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: planCount }).map((_, idx) => {
+                    const rowDateObj = new Date(baseDateObj);
+                    if (planToken === 'DAY') {
+                      rowDateObj.setDate(rowDateObj.getDate() + idx);
+                    } else if (planToken === 'MONTH') {
+                      rowDateObj.setMonth(rowDateObj.getMonth() + idx);
+                    } else { // WEEK
+                      rowDateObj.setDate(rowDateObj.getDate() + (idx * 7));
+                    }
+                    
+                    const dd = String(rowDateObj.getDate()).padStart(2, '0');
+                    const mm = String(rowDateObj.getMonth() + 1).padStart(2, '0');
+                    const yyyy = rowDateObj.getFullYear();
+                    const formattedDate = `${dd}-${mm}-${yyyy}`;
+                    const weekday = rowDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+                    
+                    const outstanding = Math.max(0, repayAmount - (emiAmount * (idx + 1)));
+
+                    return (
+                      <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-2 text-xs sm:text-sm font-black text-slate-800">
+                          {idx + 1}
+                        </td>
+                        <td className="py-3 px-2 text-[11px] sm:text-[13px] font-bold text-slate-600">
+                          {formattedDate}
+                        </td>
+                        <td className="py-3 px-2 text-[10px] sm:text-xs font-bold text-slate-400">
+                          ({weekday})
+                        </td>
+                        <td className="py-3 px-2 text-xs sm:text-sm font-black text-[#1b7c58] text-right">
+                          ₹{emiAmount.toLocaleString('en-IN')}
+                        </td>
+                        <td className="py-3 px-2 text-xs sm:text-sm font-black text-[#ef4444] text-right pr-4">
+                          ₹{outstanding.toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Statement Dashboard Modal */}
+      {showStatementModal && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full h-[85vh] sm:h-[80vh] sm:max-w-xl bg-slate-50 sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-700 to-blue-900 px-6 py-5 flex justify-between items-center shadow-md relative z-10">
+              <div>
+                <h2 className="text-xl font-black text-white tracking-wide flex items-center gap-2">
+                  <FileText className="w-6 h-6 text-blue-300" />
+                  STATEMENT DASHBOARD
+                </h2>
+                <p className="text-blue-100/80 text-xs font-semibold mt-1 tracking-wider uppercase">
+                  Select a report to generate
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowStatementModal(false)}
+                className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body: 2 stacked cards */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              
+              {/* Card A: Customer Report */}
+              <div 
+                onClick={() => setShowCustomerReportModal(true)}
+                className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between cursor-pointer hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.1)] hover:border-blue-100 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-100 transition-transform">
+                    <Star className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Customer Report</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Complete profile & loan metrics</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label 
+                    onClick={(e) => e.stopPropagation()} 
+                    className="flex items-center gap-2 cursor-pointer bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-blue-200 transition-colors"
+                  >
+                    <input 
+                      type="checkbox" 
+                      checked={includeBounces}
+                      onChange={(e) => setIncludeBounces(e.target.checked)}
+                      className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                    />
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">With Bounce Report</span>
+                  </label>
+                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                </div>
+              </div>
+
+              {/* Card B: Account Statement */}
+              <div className="bg-white rounded-2xl p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between cursor-pointer hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.1)] hover:border-blue-100 transition-all group">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-indigo-100 transition-transform">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Account Statement</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Full transaction ledger history</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Report Modal */}
+      {showCustomerReportModal && (
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full h-[90vh] sm:h-[85vh] sm:max-w-3xl bg-slate-50 sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300">
+            {/* Header Branding */}
+            <div className="bg-white px-6 py-5 border-b border-slate-100 flex justify-between items-start relative z-10 shadow-sm">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-6 flex items-center justify-center rounded overflow-hidden">
+                    <img src={companyLogo} alt="Logo" className="h-full object-contain" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 tracking-wide uppercase">Everest Micro Finance</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-[#115e41] tracking-tight mt-1">
+                  Customer Collection Report
+                </h2>
+              </div>
+              <button 
+                onClick={() => setShowCustomerReportModal(false)}
+                className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-5">
+              {/* Metadata Layout Constraint (Vertical Colon Alignment) */}
+              <div className="flex flex-col sm:flex-row justify-between gap-4 px-2">
+                {(() => {
+                  const getExpectedDueDate = (instNumber) => {
+                    if (!instNumber) return '';
+                    const idxMatch = instNumber.match(/\d+/);
+                    const idx = idxMatch ? parseInt(idxMatch[0], 10) - 1 : 0;
+                    const rowDateObj = new Date(baseDateObj);
+                    if (planToken === 'DAY') {
+                      rowDateObj.setDate(rowDateObj.getDate() + idx);
+                    } else if (planToken === 'MONTH') {
+                      rowDateObj.setMonth(rowDateObj.getMonth() + idx);
+                    } else { // WEEK
+                      rowDateObj.setDate(rowDateObj.getDate() + (idx * 7));
+                    }
+                    const dd = String(rowDateObj.getDate()).padStart(2, '0');
+                    const mm = String(rowDateObj.getMonth() + 1).padStart(2, '0');
+                    const yyyy = rowDateObj.getFullYear();
+                    return `${dd}-${mm}-${yyyy}`;
+                  };
+
+                  return (
+                    <>
+                      {/* Left Side */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex text-[11px] sm:text-xs">
+                          <span className="text-slate-800 font-bold w-24">Customer Name</span>
+                          <span className="text-slate-800 font-bold mx-2">:</span>
+                          <span className="font-black text-slate-900">{formatName(customer.name)}</span>
+                        </div>
+                        <div className="flex text-[11px] sm:text-xs">
+                          <span className="text-slate-800 font-bold w-24">Customer ID</span>
+                          <span className="text-slate-800 font-bold mx-2">:</span>
+                          <span className="font-black text-slate-900">{customer.customerId || customer.id || 'N/A'}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Right Side */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex text-[11px] sm:text-xs">
+                          <span className="text-slate-800 font-bold w-24">Opening Date</span>
+                          <span className="text-slate-800 font-bold mx-2">:</span>
+                          <span className="font-black text-slate-900">{getExpectedDueDate('1')}</span>
+                        </div>
+                        <div className="flex text-[11px] sm:text-xs">
+                          <span className="text-slate-800 font-bold w-24">Closing Date</span>
+                          <span className="text-slate-800 font-bold mx-2">:</span>
+                          <span className="font-black text-slate-900">{getExpectedDueDate(String(planCount))}</span>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Top Tri-Fold Consolidated Financial Summary Card */}
+              <div className="flex bg-white rounded-xl shadow-sm border border-slate-200 divide-x divide-slate-100 overflow-hidden">
+                <div className="flex-1 p-3 flex flex-col items-center justify-center bg-blue-50/20">
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-900 uppercase tracking-wider mb-1">Principal</span>
+                  <span className="text-sm sm:text-base font-black text-blue-600">₹{loanAmount.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex-1 p-3 flex flex-col items-center justify-center bg-emerald-50/20">
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-900 uppercase tracking-wider mb-1">Collection</span>
+                  <span className="text-sm sm:text-base font-black text-emerald-600">₹{runningSubTotal.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex-1 p-3 flex flex-col items-center justify-center bg-rose-50/20">
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-900 uppercase tracking-wider mb-1">Balance</span>
+                  <span className="text-sm sm:text-base font-black text-rose-600">₹{netBalance.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+
+              {/* Advanced 5-Column Grid with Conditional Row-Span Collapsing */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-center border-collapse">
+                    <thead className="bg-slate-100 border-b border-slate-200">
+                      <tr>
+                        <th className="py-3 px-2 text-[10px] sm:text-[11px] font-extrabold text-slate-700 uppercase tracking-wider border-r border-slate-200/50">Due Date</th>
+                        <th className="py-3 px-2 text-[10px] sm:text-[11px] font-extrabold text-slate-700 uppercase tracking-wider border-r border-slate-200/50">No.</th>
+                        <th className="py-3 px-2 text-[10px] sm:text-[11px] font-extrabold text-slate-700 uppercase tracking-wider border-r border-slate-200/50">Coll. Date</th>
+                        <th className="py-3 px-2 text-[10px] sm:text-[11px] font-extrabold text-slate-700 uppercase tracking-wider border-r border-slate-200/50">Coll. Amt</th>
+                        <th className="py-3 px-2 text-[10px] sm:text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const getExpectedDueDate = (instNumber) => {
+                          if (!instNumber) return '';
+                          const idxMatch = instNumber.match(/\d+/);
+                          const idx = idxMatch ? parseInt(idxMatch[0], 10) - 1 : 0;
+                          const rowDateObj = new Date(baseDateObj);
+                          if (planToken === 'DAY') {
+                            rowDateObj.setDate(rowDateObj.getDate() + idx);
+                          } else if (planToken === 'MONTH') {
+                            rowDateObj.setMonth(rowDateObj.getMonth() + idx);
+                          } else { // WEEK
+                            rowDateObj.setDate(rowDateObj.getDate() + (idx * 7));
+                          }
+                          const dd = String(rowDateObj.getDate()).padStart(2, '0');
+                          const mm = String(rowDateObj.getMonth() + 1).padStart(2, '0');
+                          const yyyy = rowDateObj.getFullYear();
+                          return `${dd}-${mm}-${yyyy}`;
+                        };
+
+                        const reportCollections = [];
+                        let currentGroup = null;
+                        
+                        const filteredInstallments = includeBounces 
+                          ? installments 
+                          : installments.filter(i => i.status !== 'BOUNCED');
+                        
+                        filteredInstallments.forEach(inst => {
+                          if (!currentGroup || currentGroup.number !== inst.number) {
+                            if (currentGroup) reportCollections.push(currentGroup);
+                            currentGroup = {
+                              number: inst.number,
+                              dueDate: getExpectedDueDate(inst.number),
+                              entries: [inst]
+                            };
+                          } else {
+                            currentGroup.entries.push(inst);
+                          }
+                        });
+                        if (currentGroup) reportCollections.push(currentGroup);
+
+                        if (reportCollections.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="5" className="py-8 text-sm text-slate-500 font-medium bg-slate-50/50">
+                                No collection entries exist.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return reportCollections.map((group, groupIndex) => {
+                          return group.entries.map((inst, entryIndex) => {
+                            const cumulativePaidUpToThis = installments
+                              .slice(0, installments.indexOf(inst) + 1)
+                              .filter(i => i.status !== 'BOUNCED')
+                              .reduce((sum, i) => sum + (i.amount || 0), 0);
+                            const currentBalance = Math.max(0, repayAmount - cumulativePaidUpToThis);
+
+                            return (
+                              <tr key={inst.id || `${groupIndex}-${entryIndex}`} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                                {entryIndex === 0 && (
+                                  <>
+                                    <td rowSpan={group.entries.length} className="py-3.5 px-2 text-[11px] sm:text-xs font-bold text-slate-700 border-r border-slate-100 bg-slate-50/30 align-middle">
+                                      {group.dueDate}
+                                    </td>
+                                    <td rowSpan={group.entries.length} className="py-3.5 px-2 text-[11px] sm:text-xs font-black text-slate-800 border-r border-slate-100 bg-slate-50/30 align-middle">
+                                      {group.number.replace(/[()]/g, '')}
+                                    </td>
+                                  </>
+                                )}
+                                <td className="py-3.5 px-2 text-[11px] sm:text-xs font-semibold text-slate-600 border-r border-slate-100/50">
+                                  {inst.date}
+                                </td>
+                                <td className="py-3.5 px-2 border-r border-slate-100/50 text-center">
+                                  {inst.status === 'BOUNCED' ? (
+                                    <span className="text-[9px] bg-rose-100/80 text-rose-700 px-1.5 py-0.5 rounded font-black uppercase tracking-wider inline-block">Bounce</span>
+                                  ) : (
+                                    <span className="text-[11px] sm:text-xs font-bold text-emerald-600 block text-right">₹{(inst.amount || 0).toLocaleString('en-IN')}</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-2 text-[11px] sm:text-xs font-bold text-rose-600">
+                                  ₹{currentBalance.toLocaleString('en-IN')}
+                                </td>
+                              </tr>
+                            );
+                          });
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Bottom Layout Disclaimer */}
+              <div className="pt-2 pb-6 text-center">
+                <div className="inline-block bg-slate-100/80 px-5 py-2.5 rounded-lg border border-slate-200 shadow-sm">
+                  <p className="text-[10px] sm:text-xs text-slate-500 font-medium italic">
+                    "This is an auto-generated statement and requires no signature."
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Collection Entry Modal */}
       {showCollectionModal && (
