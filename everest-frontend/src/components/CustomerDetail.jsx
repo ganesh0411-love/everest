@@ -190,7 +190,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       date: collectionDate || nextFormattedDueDate,
       number: nextNumber,
       status: 'PAID',
-      amount: emiAmount
+      amount: emiAmount,
+      timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
     };
     
     const updatedInstallments = [...installments, newInstallment];
@@ -201,7 +202,10 @@ const CustomerDetail = ({ customer, onBack }) => {
     if (customer && customer.id) {
       try {
         const customerRef = doc(db, 'customers', customer.id);
-        updateDoc(customerRef, { installments: updatedInstallments }).catch(err => console.error("Cloud sync failed:", err));
+        updateDoc(customerRef, { 
+          installments: updatedInstallments,
+          lastUpdated: new Date().toISOString()
+        }).catch(err => console.error("Cloud sync failed:", err));
       } catch(err) {
         console.error("Firestore error:", err);
       }
@@ -219,7 +223,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       date: collectionDate || nextFormattedDueDate,
       number: nextNumber,
       status: 'BOUNCED',
-      amount: 0
+      amount: 0,
+      timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
     };
     
     const updatedInstallments = [...installments, newInstallment];
@@ -230,7 +235,10 @@ const CustomerDetail = ({ customer, onBack }) => {
     if (customer && customer.id) {
       try {
         const customerRef = doc(db, 'customers', customer.id);
-        updateDoc(customerRef, { installments: updatedInstallments }).catch(err => console.error("Cloud sync failed:", err));
+        updateDoc(customerRef, { 
+          installments: updatedInstallments,
+          lastUpdated: new Date().toISOString()
+        }).catch(err => console.error("Cloud sync failed:", err));
       } catch(err) {
         console.error("Firestore error:", err);
       }
@@ -264,7 +272,10 @@ const CustomerDetail = ({ customer, onBack }) => {
       );
       setInstallments(updatedInstallments);
       const customerRef = doc(db, 'customers', customer.id);
-      await updateDoc(customerRef, { installments: updatedInstallments });
+      await updateDoc(customerRef, { 
+        installments: updatedInstallments,
+        lastUpdated: new Date().toISOString()
+      });
       setSelectedTransaction(null);
     } catch (error) {
       console.error('Error saving transaction', error);
@@ -287,7 +298,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       const customerRef = doc(db, 'customers', customer.id);
       await updateDoc(customerRef, { 
         installments: updatedInstallments,
-        deletedInstallments: updatedDeleted
+        deletedInstallments: updatedDeleted,
+        lastUpdated: new Date().toISOString()
       });
       setSelectedTransaction(null);
     } catch (error) {
@@ -442,7 +454,7 @@ const CustomerDetail = ({ customer, onBack }) => {
                   <td className="py-3.5 px-1 font-bold text-slate-800 text-left pl-2">
                     <div className="flex flex-col">
                       <span>{inst.date}</span>
-                      <span className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">({parseDate(inst.date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()})</span>
+                      <span className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">({parseDate(inst.date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}){inst.timeStr ? ` ${inst.timeStr}` : ''}</span>
                     </div>
                   </td>
                   <td className="py-3.5 px-1 font-semibold text-slate-600">{inst.number.replace(/[()]/g, '')}</td>

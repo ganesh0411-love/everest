@@ -221,6 +221,11 @@ function App() {
         setViewHistory(prev => {
           const actualView = currentViewRef.current;
           
+          if (actualView === 'Customer Detail') {
+            setCurrentView('Customer');
+            return ['Home', 'Customer'];
+          }
+
           if (actualView !== 'Home') {
             if (prev.length > 1) {
               const newHistory = [...prev];
@@ -347,7 +352,7 @@ function App() {
     filtered.sort((a, b) => {
       switch (activeSort) {
         case 'Recent':
-          return new Date(b.date) - new Date(a.date);
+          return new Date(b.lastUpdated || b.date) - new Date(a.lastUpdated || a.date);
         case 'Oldest':
           return new Date(a.date) - new Date(b.date);
         case 'Highest Amount':
@@ -520,6 +525,7 @@ function App() {
             <CustomerDetail 
               customer={selectedCustomer} 
               onBack={() => {
+                setViewHistory(['Home', 'Customer']);
                 setCurrentView('Customer');
                 setSelectedCustomer(null);
               }}
@@ -625,10 +631,11 @@ function App() {
                 </main>
               </>
             )}
-            
-            <div onClick={() => setIsAddCustomerOpen(true)}>
-              <FloatingActionButton isScrolled={isScrolled} />
-            </div>
+            {!isAddCustomerOpen && !isFilterOpen && (
+              <div onClick={() => setIsAddCustomerOpen(true)}>
+                <FloatingActionButton isScrolled={isScrolled} />
+              </div>
+            )}
 
             {/* Full-Screen Image Modal Overlay */}
             {fullscreenImage && (

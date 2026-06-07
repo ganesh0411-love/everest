@@ -24,16 +24,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
 
   const toggleMenu = (id, e) => {
     e.stopPropagation();
-    if (activeMenuId === id) {
-      setActiveMenuId(null);
-    } else {
-      const rect = e.currentTarget.getBoundingClientRect();
-      setMenuPosition({
-        top: rect.top,
-        left: rect.left - 200 // Approx width of dropdown + margin
-      });
-      setActiveMenuId(id);
-    }
+    setActiveMenuId(activeMenuId === id ? null : id);
   };
 
   const updateStatus = (id, newStatus, extraData = {}) => {
@@ -110,7 +101,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
               ) : currentApps.map((app, index) => (
                 <tr 
                   key={app.id} 
-                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors w-full overflow-hidden ${activeTab === 'Pending' ? 'cursor-pointer' : ''}`}
+                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors w-full ${activeTab === 'Pending' ? 'cursor-pointer' : ''}`}
                   onClick={() => {
                     if (activeTab === 'Pending') {
                       setSelectedPendingApp(app);
@@ -146,6 +137,56 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       </svg>
                     </button>
 
+                    {/* Embedded Dropdown Menu */}
+                    {activeMenuId === app.id && (
+                      <div 
+                        className="absolute right-10 top-10 w-48 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button 
+                          onClick={() => {
+                            setIsEditing(app);
+                            setActiveMenuId(null);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                        >
+                          <span>✏️</span> Edit Details
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setActivePdfApp(app);
+                            setActiveMenuId(null);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                        >
+                          <span>📄</span> View PDF
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setPdfAutoMode('share');
+                            setActivePdfApp(app);
+                            setActiveMenuId(null);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                        >
+                          <span>🔗</span> Share
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setPdfAutoMode('print');
+                            setActivePdfApp(app);
+                            setActiveMenuId(null);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                        >
+                          <span>🖨️</span> Print PDF
+                        </button>
+                        <button onClick={() => deleteApp(app.id)} className="w-full text-left px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3">
+                          <span>🗑️</span> Delete
+                        </button>
+                      </div>
+                    )}
+
                     {/* Action Triggers based on Tab */}
                     {activeTab === 'Pending' && (
                       <>
@@ -177,59 +218,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
         </div>
       </div>
 
-      {/* Global Portal for Three-Dot Menu to prevent clipping */}
-      {activeMenuId && createPortal(
-        <div 
-          className="fixed w-48 bg-white rounded-xl shadow-2xl border border-slate-100 z-[9999] animate-in fade-in zoom-in-95 overflow-hidden"
-          style={{ top: menuPosition.top, left: menuPosition.left }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button 
-            onClick={() => {
-              const appToEdit = applications.find(a => a.id === activeMenuId);
-              setIsEditing(appToEdit);
-              setActiveMenuId(null);
-            }}
-            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
-          >
-            <span>✏️</span> Edit Details
-          </button>
-          <button 
-            onClick={() => {
-              const appToView = applications.find(a => a.id === activeMenuId);
-              setActivePdfApp(appToView);
-              setActiveMenuId(null);
-            }}
-            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
-          >
-            <span>📄</span> View PDF
-          </button>
-            <button 
-              onClick={() => {
-                setPdfAutoMode('share');
-                setActivePdfApp(applications.find(a => a.id === activeMenuId));
-                setActiveMenuId(null);
-              }}
-              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
-            >
-              <span>🔗</span> Share
-            </button>
-            <button 
-              onClick={() => {
-                setPdfAutoMode('print');
-                setActivePdfApp(applications.find(a => a.id === activeMenuId));
-                setActiveMenuId(null);
-              }}
-              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
-            >
-              <span>🖨️</span> Print PDF
-            </button>
-          <button onClick={() => deleteApp(activeMenuId)} className="w-full text-left px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3">
-            <span>🗑️</span> Delete
-          </button>
-        </div>,
-        document.body
-      )}
+
 
       {/* Full-Screen Image Modal Overlay */}
       {fullscreenImage && (
