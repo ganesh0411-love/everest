@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square, X, Camera as CameraIcon } from 'lucide-react';
+import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square, X, Camera as CameraIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import OfflineImage from './OfflineImage';
 import femaleAvatar from '../assets/avatar-female.png';
@@ -30,9 +30,12 @@ const CustomerDetail = ({ customer, onBack }) => {
   const [manualUpi, setManualUpi] = useState('');
   const [denomCounts, setDenomCounts] = useState({ '500': '', '200': '', '100': '', '50': '', '20': '', '10': '', 'Coins': '' });
   const [upiPhoto, setUpiPhoto] = useState(null);
+  const [reviewTransaction, setReviewTransaction] = useState(null);
+  const [reviewSlideIndex, setReviewSlideIndex] = useState(0);
 
   const phoneMenuRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const touchStartXRef = useRef(0);
 
   const [installments, setInstallments] = useState(() => {
     if (!customer || !customer.id) return [];
@@ -107,7 +110,23 @@ const CustomerDetail = ({ customer, onBack }) => {
     return new Date(dStr);
   };
 
-  const effectiveInstallmentCount = installments.filter(inst => inst.status !== 'BOUNCED').length;
+  const nonBouncedInstallments = installments.filter(inst => inst.status !== 'BOUNCED');
+  
+  const sumByNumber = {};
+  nonBouncedInstallments.forEach(inst => {
+    sumByNumber[inst.number] = (sumByNumber[inst.number] || 0) + (inst.amount || 0);
+  });
+  const uniqueNumbers = Object.keys(sumByNumber);
+  const fullySettledCount = uniqueNumbers.filter(num => sumByNumber[num] >= emiAmount).length;
+
+  const lastValidInst = nonBouncedInstallments.length > 0 ? nonBouncedInstallments[nonBouncedInstallments.length - 1] : null;
+  const totalPaidForLastNumber = lastValidInst ? sumByNumber[lastValidInst.number] : 0;
+  
+  const isLastPending = lastValidInst && totalPaidForLastNumber < emiAmount;
+  const targetPendingAmount = isLastPending ? emiAmount - totalPaidForLastNumber : 0;
+  const currentDueAmount = isLastPending ? targetPendingAmount : emiAmount;
+
+  const effectiveInstallmentCount = fullySettledCount;
   const baseDateObj = parseDate(rawDueDate);
   const nextDueDateObj = new Date(baseDateObj);
   nextDueDateObj.setDate(nextDueDateObj.getDate() + (effectiveInstallmentCount * 7));
@@ -185,8 +204,26 @@ const CustomerDetail = ({ customer, onBack }) => {
   };
   const isModalFutureDate = getModalDateCompare();
 
+  const handleCloseEntryModal = () => {
+    setIsManualEntryMode(false);
+    setIsDenominationMode(false);
+    setIsUpiPhotoSelectionMode(false);
+    setTempUpiPhoto(null);
+    setManualCash('');
+    setManualUpi('');
+    setUpiPhoto(null);
+    setDenomCounts({ '500': '', '200': '', '100': '', '50': '', '20': '', '10': '', 'Coins': '' });
+    setShowCollectionModal(false);
+  };
+
   const handleOpenCollectionModal = () => {
-    setCollectionDate(nextFormattedDueDate);
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    const todayFormatted = `${dd}-${mm}-${yyyy}`;
+
+    setCollectionDate(isLastPending ? todayFormatted : nextFormattedDueDate);
     setIsManualEntryMode(false);
     setIsDenominationMode(false);
     setIsUpiPhotoSelectionMode(false);
@@ -228,7 +265,7 @@ const CustomerDetail = ({ customer, onBack }) => {
   };
 
   const grandTotal = Number(manualCash || 0) + Number(manualUpi || 0);
-  const manualPending = emiAmount - grandTotal;
+  const manualPending = currentDueAmount - grandTotal;
 
   const handleManualQuickPay = () => {
     if (isModalFutureDate) return;
@@ -241,7 +278,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       status: 'PAID',
       amount: grandTotal,
       timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase(),
-      upiPhoto: upiPhoto
+      upiPhoto: upiPhoto,
+      denomCounts: denomCounts
     };
     
     const updatedInstallments = [...installments, newInstallment];
@@ -273,7 +311,7 @@ const CustomerDetail = ({ customer, onBack }) => {
       date: collectionDate || nextFormattedDueDate,
       number: nextNumber,
       status: 'PAID',
-      amount: emiAmount,
+      amount: currentDueAmount,
       timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
     };
     
@@ -524,7 +562,21 @@ const CustomerDetail = ({ customer, onBack }) => {
               </thead>
             )}
             <tbody>
-              {installments.map((inst, index) => (
+              {installments.map((inst, index) => {
+                const isPaid = inst.status === 'PAID';
+                const cumulativePaidUpToThis = installments
+                  .slice(0, index + 1)
+                  .filter(i => i.number === inst.number && i.status !== 'BOUNCED')
+                  .reduce((sum, i) => sum + (i.amount || 0), 0);
+                
+                const displayStatus = (isPaid && cumulativePaidUpToThis < emiAmount) ? 'PENDING' : inst.status;
+                const hasDenomData = inst.denomCounts && Object.values(inst.denomCounts).some(val => Number(val) > 0);
+                const hasUpiData = !!inst.upiPhoto;
+                const hasReviewData = hasDenomData || hasUpiData;
+                const isClickable = hasReviewData && (displayStatus === 'PAID' || displayStatus === 'PENDING');
+                const dotColor = displayStatus === 'PAID' ? 'text-green-900' : 'text-orange-900';
+
+                return (
                 <tr 
                   key={inst.id || index} 
                   onClick={() => {
@@ -542,19 +594,30 @@ const CustomerDetail = ({ customer, onBack }) => {
                   </td>
                   <td className="py-3.5 px-1 font-semibold text-slate-600">{inst.number.replace(/[()]/g, '')}</td>
                   <td className="py-3.5 px-1">
-                    <span className={`inline-flex items-center justify-center px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-extrabold text-white tracking-widest shadow-sm min-w-[70px] sm:min-w-[85px]
-                      ${inst.status === 'PAID' ? 'bg-[#22c55e]' : 
-                        inst.status === 'BOUNCED' ? 'bg-[#f97316]' : 
-                        inst.status === 'O.D.' ? 'bg-[#ef4444]' : 'bg-slate-400'}`}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isClickable) {
+                          setReviewTransaction(inst);
+                          setReviewSlideIndex(0);
+                        }
+                      }}
+                      className={`inline-flex items-center justify-center px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-extrabold text-white tracking-widest shadow-sm min-w-[70px] sm:min-w-[85px]
+                      ${isClickable ? 'active:scale-95 transition-transform cursor-pointer' : 'cursor-default'}
+                      ${displayStatus === 'PAID' ? 'bg-[#22c55e]' : 
+                        displayStatus === 'PENDING' ? 'bg-[#f59e0b]' : 
+                        displayStatus === 'BOUNCED' ? 'bg-[#ef4444]' : 
+                        displayStatus === 'O.D.' ? 'bg-[#ef4444]' : 'bg-slate-400'}`}
                     >
-                      {inst.status}
-                    </span>
+                      {displayStatus}
+                      {isClickable && <span className="ml-1.5 text-[11px] text-[#fbbf24] drop-shadow-sm flex items-center justify-center translate-y-[-0.5px]">★</span>}
+                    </button>
                   </td>
                   <td className="py-3.5 px-1 font-black text-[#1b7c58] text-right pr-4 text-[12px] sm:text-[14px]">
                     {inst.amount ? `₹${inst.amount.toLocaleString('en-IN')}` : '--'}
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
             {installments.length > 0 && (
               <tfoot className="bg-slate-50 border-t border-slate-200/80 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] sticky bottom-0 z-20">
@@ -581,7 +644,7 @@ const CustomerDetail = ({ customer, onBack }) => {
             <div className="p-1.5 border border-white/10 bg-white/5 rounded-xl">
                <Clock className="w-4 h-4 text-emerald-100" />
             </div>
-            <span className="text-[9px] text-emerald-100 font-bold tracking-widest uppercase mt-0.5">Pay Later</span>
+            <span className="text-[9px] text-emerald-100 font-bold tracking-widest uppercase mt-0.5">SCHEDULE</span>
           </button>
 
           {/* Pay Now (Center pop-up) */}
@@ -606,7 +669,7 @@ const CustomerDetail = ({ customer, onBack }) => {
             <div className="p-1.5 border border-blue-500/30 bg-blue-500/10 rounded-xl">
                <FileText className="w-4 h-4 text-blue-300" />
             </div>
-            <span className="text-[9px] text-white font-bold tracking-widest uppercase mt-0.5">Report</span>
+            <span className="text-[9px] text-white font-bold tracking-widest uppercase mt-0.5">STATEMENT</span>
           </button>
 
         </div>
@@ -615,11 +678,11 @@ const CustomerDetail = ({ customer, onBack }) => {
       {/* Collection Entry Modal */}
       {showCollectionModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={() => setShowCollectionModal(false)}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={handleCloseEntryModal}></div>
           
           <div className="relative w-full max-w-[340px] bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl border-[1.5px] border-white/60 rounded-[2rem] p-6 shadow-[0_0_40px_rgba(20,83,56,0.6)] animate-in zoom-in-95 duration-200">
             {/* Close Button */}
-            <button onClick={() => setShowCollectionModal(false)} className="absolute top-4 right-4 w-8 h-8 bg-slate-200/50 rounded-full flex items-center justify-center text-[#2d4a3e] hover:bg-slate-200 transition-colors shadow-sm">
+            <button onClick={handleCloseEntryModal} className="absolute top-4 right-4 w-8 h-8 bg-slate-200/50 rounded-full flex items-center justify-center text-[#2d4a3e] hover:bg-slate-200 transition-colors shadow-sm">
               <X className="w-4 h-4 stroke-[2.5]" />
             </button>
             
@@ -643,7 +706,7 @@ const CustomerDetail = ({ customer, onBack }) => {
                         <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE DATE:</span>
                         <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
                         <div className="flex items-baseline gap-1.5">
-                          {isRetrySequence ? (
+                          {isRetrySequence || isLastPending ? (
                             <input 
                               type="text"
                               className="bg-white/50 border border-[#2d4a3e]/40 rounded px-2 py-0.5 text-xl font-black text-[#2d4a3e] w-32 outline-none focus:ring-2 focus:ring-[#1b7c58] transition-all"
@@ -653,7 +716,7 @@ const CustomerDetail = ({ customer, onBack }) => {
                           ) : (
                             <span className="text-[#2d4a3e] font-black text-xl leading-none">{(collectionDate || nextFormattedDueDate).replace(/-/g, '.')}</span>
                           )}
-                          {!isRetrySequence && <span className="text-[#2d4a3e]/80 font-bold text-[11px] tracking-widest">{nextFormattedWeekday}</span>}
+                          {!(isRetrySequence || isLastPending) && <span className="text-[#2d4a3e]/80 font-bold text-[11px] tracking-widest">{nextFormattedWeekday}</span>}
                         </div>
                       </div>
                       <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">({nextNumber} Installment)</span>
@@ -670,9 +733,11 @@ const CustomerDetail = ({ customer, onBack }) => {
                     </div>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">DUE AMOUNT:</span>
+                        <span className="text-[#2d4a3e] text-[14px] font-bold tracking-wider">{isLastPending ? 'PENDING:' : 'DUE AMOUNT:'}</span>
                         <div className="h-4 w-[2px] bg-[#2d4a3e]/30 rounded-full"></div>
-                        <span className="text-[#166534] font-black text-[22px] leading-none drop-shadow-sm">₹{emiAmount.toLocaleString('en-IN')}</span>
+                        <span className={isLastPending ? "text-[#FF0000] font-black text-[22px] leading-none drop-shadow-sm" : "text-[#166534] font-black text-[22px] leading-none drop-shadow-sm"}>
+                          ₹{currentDueAmount.toLocaleString('en-IN')}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -931,6 +996,142 @@ const CustomerDetail = ({ customer, onBack }) => {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Review Slider Modal */}
+      {reviewTransaction && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={() => setReviewTransaction(null)}></div>
+          
+          <div className="relative w-full max-w-[340px] bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl border-[1.5px] border-white/60 rounded-[2rem] p-6 shadow-[0_0_40px_rgba(20,83,56,0.6)] animate-in zoom-in-95 duration-200 overflow-hidden">
+            {/* Close Button */}
+            <button onClick={() => setReviewTransaction(null)} className="absolute top-4 right-4 w-8 h-8 z-10 bg-slate-200/50 rounded-full flex items-center justify-center text-[#2d4a3e] hover:bg-slate-200 transition-colors shadow-sm">
+              <X className="w-4 h-4 stroke-[2.5]" />
+            </button>
+            
+            <div className="relative w-full overflow-hidden" 
+                 onTouchStart={(e) => { 
+                   if (reviewTransaction.upiPhoto) {
+                     touchStartXRef.current = e.changedTouches[0].screenX; 
+                   }
+                 }}
+                 onTouchEnd={(e) => { 
+                   if (reviewTransaction.upiPhoto) {
+                     if (touchStartXRef.current - e.changedTouches[0].screenX > 50) setReviewSlideIndex(1);
+                     if (touchStartXRef.current - e.changedTouches[0].screenX < -50) setReviewSlideIndex(0);
+                   }
+                 }}
+            >
+              <div className="flex transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${reviewSlideIndex * 100}%)` }}>
+                
+                {/* Page 1: Denomination */}
+                <div className="w-full flex-shrink-0 px-1">
+                  <h2 className="text-[18px] font-black text-[#2d4a3e] text-center uppercase tracking-wide mb-6 mt-2 drop-shadow-sm">Denomination Matrix</h2>
+                  {(() => {
+                    let cashTotal = 0;
+                    if (reviewTransaction.denomCounts) {
+                      ['500', '200', '100', '50', '20', '10', 'Coins'].forEach(note => {
+                        const count = reviewTransaction.denomCounts[note];
+                        if (count && Number(count) > 0) {
+                          cashTotal += (note === 'Coins' ? Number(count) : Number(count) * Number(note));
+                        }
+                      });
+                    }
+                    const grandTotal = reviewTransaction.amount || 0;
+                    const upiAmount = Math.max(0, grandTotal - cashTotal);
+                    const reviewPending = Math.max(0, emiAmount - grandTotal);
+                    
+                    return (
+                      <div className="space-y-2">
+                        {['500', '200', '100', '50', '20', '10', 'Coins'].map((note) => {
+                          const count = reviewTransaction?.denomCounts?.[note];
+                          if (!count || Number(count) === 0) return null;
+                          const total = note === 'Coins' ? Number(count) : Number(count) * Number(note);
+                          return (
+                            <div key={note} className="flex justify-between items-center bg-white border border-slate-200 p-2 rounded-lg text-sm">
+                              <span className="font-bold text-slate-700">{note} x {count}</span>
+                              <span className="font-black text-[#1b7c58]">₹{total.toLocaleString('en-IN')}</span>
+                            </div>
+                          )
+                        })}
+                        
+                        {/* Consolidated Summary Panel (Dual-Split Grid) */}
+                        <div className="mt-4 pt-4 border-t-2 border-slate-200/80 grid grid-cols-2 gap-3">
+                          
+                          {/* Panel A: Left-Aligned EMI Metadata */}
+                          <div className="flex items-center justify-start border-r border-slate-200/60 pr-2">
+                            <span className="text-[14px] font-black text-slate-700 tracking-wide drop-shadow-sm">EMI: ₹{emiAmount.toLocaleString('en-IN')}</span>
+                          </div>
+                          
+                          {/* Panel B: Right-Aligned Collection Reconciliation */}
+                          <div className="flex flex-col gap-1.5 pl-1 w-full">
+                            <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 w-full">
+                              <span>Cash</span>
+                              <span>₹{cashTotal.toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600 w-full">
+                              <span>UPI</span>
+                              <span>₹{upiAmount.toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs font-black text-[#1b7c58] mt-1 pt-1.5 border-t border-slate-200/60 w-full">
+                              <span>Grand Total</span>
+                              <span>₹{grandTotal.toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px] font-black text-orange-600 mt-0.5 w-full">
+                              <span>Pending</span>
+                              <span>₹{reviewPending.toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+                          
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Page 2: UPI Screenshot */}
+                <div className="w-full flex-shrink-0 px-1">
+                  <h2 className="text-[18px] font-black text-[#2d4a3e] text-center uppercase tracking-wide mb-6 mt-2 drop-shadow-sm">UPI Screenshot</h2>
+                  {reviewTransaction.upiPhoto ? (
+                    <div className="flex justify-center">
+                      <img src={reviewTransaction.upiPhoto} alt="UPI Screenshot" className="max-h-[250px] object-contain rounded-xl border border-slate-200 shadow-sm" />
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-slate-400 font-medium text-sm">No UPI image attached</div>
+                  )}
+                </div>
+                
+              </div>
+            </div>
+
+            {/* Navigation Controls */}
+            {reviewTransaction.upiPhoto && (
+            <div className="flex justify-center items-center gap-6 mt-6 pt-4 border-t border-slate-200/60">
+              <button 
+                onClick={() => setReviewSlideIndex(0)}
+                className={`p-2 rounded-full transition-colors ${reviewSlideIndex === 0 ? 'bg-slate-100 text-slate-400' : 'bg-slate-200 text-[#2d4a3e] hover:bg-slate-300 shadow-sm'}`}
+                disabled={reviewSlideIndex === 0}
+              >
+                <ChevronLeft className="w-5 h-5 stroke-[3]" />
+              </button>
+              
+              <div className="flex gap-2">
+                <div className={`w-2 h-2 rounded-full ${reviewSlideIndex === 0 ? 'bg-[#1b7c58]' : 'bg-slate-300'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${reviewSlideIndex === 1 ? 'bg-[#1b7c58]' : 'bg-slate-300'}`}></div>
+              </div>
+
+              <button 
+                onClick={() => setReviewSlideIndex(1)}
+                className={`p-2 rounded-full transition-colors ${reviewSlideIndex === 1 ? 'bg-slate-100 text-slate-400' : 'bg-slate-200 text-[#2d4a3e] hover:bg-slate-300 shadow-sm'}`}
+                disabled={reviewSlideIndex === 1}
+              >
+                <ChevronRight className="w-5 h-5 stroke-[3]" />
+              </button>
+            </div>
+            )}
+            
           </div>
         </div>
       )}
