@@ -1,6 +1,9 @@
 import React from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
+// Cloud API base — reads from .env at build time, falls back to localhost for dev
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+
 const loadPdfJsScript = () => new Promise((resolve, reject) => {
   if (window.pdfjsLib) return resolve(window.pdfjsLib);
   const script = document.createElement('script');
@@ -42,7 +45,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/fmb-maps');
+      const response = await fetch(`${API_BASE}/api/fmb-maps`);
       const data = await response.json();
       setProjects(data);
     } catch (err) {
@@ -56,7 +59,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
   const loadProject = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/fmb-maps/${id}`);
+      const response = await fetch(`${API_BASE}/api/fmb-maps/${id}`);
       const data = await response.json();
       setExtractedVectors(data.svg_data);
       setPdfScale(data.scale);
@@ -73,7 +76,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const deleteProject = async (id) => {
     if (!confirm("Are you sure you want to delete this project?")) return;
     try {
-      await fetch(`http://localhost:5000/api/fmb-maps/${id}`, { method: 'DELETE' });
+      await fetch(`${API_BASE}/api/fmb-maps/${id}`, { method: 'DELETE' });
       fetchProjects();
     } catch (err) {
       console.error(err);
@@ -85,7 +88,7 @@ const AdminDashboard = ({ setCurrentView }) => {
     const newName = prompt("Enter new map name:");
     if (!newName) return;
     try {
-      await fetch(`http://localhost:5000/api/fmb-maps/${id}/rename`, {
+      await fetch(`${API_BASE}/api/fmb-maps/${id}/rename`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName })
@@ -168,7 +171,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       setCroppedImage(croppedBase64);
 
       try {
-        const response = await fetch('http://localhost:5000/api/extract-vectors', {
+        const response = await fetch(`${API_BASE}/api/extract-vectors`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageBase64: croppedBase64, pdfBase64: pdfBase64, fullImageBase64: sourceImage })

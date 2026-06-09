@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: everest-backend
+    runtime: docker
+    dockerfilePath: ./everest-backend/Dockerfile
+    dockerContext: ./everest-backend
+    plan: free
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /api/health

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const sharp = require('sharp');
@@ -6,14 +7,20 @@ const Tesseract = require('tesseract.js');
 const fs = require('fs/promises');
 const path = require('path');
 const pdfPoppler = require('pdf-poppler');
-const { initDb } = require('./db');
+const { insertMap, getAllMaps, getMapById, renameMap, deleteMap } = require('./db');
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
 
+// ─── Health Check (required for Render) ───────────────────────────────────────
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ─── Helper: Potrace SVG tracing ──────────────────────────────────────────────
 const traceVector = (buffer, options) => {
     return new Promise((resolve, reject) => {
         potrace.trace(buffer, options, (err, svg) => {
@@ -23,6 +30,7 @@ const traceVector = (buffer, options) => {
     });
 };
 
+// ─── POST /api/extract-vectors ────────────────────────────────────────────────
 app.post('/api/extract-vectors', async (req, res) => {
     try {
         const { imageBase64, pdfBase64, fullImageBase64 } = req.body;
@@ -30,12 +38,13 @@ app.post('/api/extract-vectors', async (req, res) => {
 
         let detectedScale = null;
 
+        // PDF OCR: extract scale from header using pdf-poppler + sharp + Tesseract
         if (pdfBase64) {
-            console.log("Processing high-res PDF OCR extraction...");
-            const tempPdfPath = path.join(__dirname, `temp_${Date.now()}.pdf`);
-            const outDir = __dirname;
+            console.log('Processing high-res PDF OCR extraction...');
+            const tempPdfPath = path.join('/tmp', `temp_${Date.now()}.pdf`);
+            const outDir = '/tmp';
             const outPrefix = `temp_img_${Date.now()}`;
-            
+
             try {
                 const pdfBuffer = Buffer.from(pdfBase64.split(',')[1], 'base64');
                 await fs.writeFile(tempPdfPath, pdfBuffer);
@@ -47,13 +56,13 @@ app.post('/api/extract-vectors', async (req, res) => {
                     page: 1,
                     scale: 2048
                 };
-                
+
                 await pdfPoppler.convert(tempPdfPath, opts);
                 const outputImagePath = path.join(outDir, `${outPrefix}-1.png`);
-                
+
                 const fullPdfImageBuffer = await fs.readFile(outputImagePath);
                 const originalMetadata = await sharp(fullPdfImageBuffer).metadata();
-                
+
                 const headerBuffer = await sharp(fullPdfImageBuffer)
                     .extract({ left: 0, top: 0, width: originalMetadata.width, height: Math.min(350, originalMetadata.height) })
                     .toBuffer();
@@ -63,23 +72,23 @@ app.post('/api/extract-vectors', async (req, res) => {
                     const scaleMatch = ocrResult.data.text.match(/(?:Scale|1:)\s*([0-9,.]+)/i);
                     if (scaleMatch) {
                         detectedScale = scaleMatch[1].replace(/,/g, '');
-                        console.log(`✅ Native PDF OCR Detected Scale: ${detectedScale}`);
+                        console.log(`✅ PDF OCR Detected Scale: ${detectedScale}`);
                     } else {
-                        console.log(`❌ Native PDF OCR scale not found in text: ${ocrResult.data.text}`);
+                        console.log(`❌ Scale not found in OCR text: ${ocrResult.data.text}`);
                     }
                 }
-                
-                await fs.unlink(tempPdfPath).catch(()=>{});
-                await fs.unlink(outputImagePath).catch(()=>{});
+
+                await fs.unlink(tempPdfPath).catch(() => {});
+                await fs.unlink(outputImagePath).catch(() => {});
             } catch (err) {
-                console.error("PDF-Poppler Native OCR Failed", err);
+                console.error('PDF-Poppler OCR Failed:', err);
             }
         }
 
-        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+        // ─── 3-Colour Vector Extraction ───────────────────────────────────────
+        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
         const inputBuffer = Buffer.from(base64Data, 'base64');
 
-        // Extract raw pixel data
         const { data, info } = await sharp(inputBuffer)
             .ensureAlpha()
             .raw()
@@ -89,10 +98,9 @@ app.post('/api/extract-vectors', async (req, res) => {
         const height = info.height;
         const numPixels = width * height;
 
-        // Create empty buffers for masks (1 byte per pixel, grayscale)
         const blackBuffer = Buffer.alloc(numPixels, 255);
-        const blueBuffer = Buffer.alloc(numPixels, 255);
-        const redBuffer = Buffer.alloc(numPixels, 255);
+        const blueBuffer  = Buffer.alloc(numPixels, 255);
+        const redBuffer   = Buffer.alloc(numPixels, 255);
 
         for (let i = 0; i < numPixels; i++) {
             const idx = i * 4;
@@ -101,20 +109,15 @@ app.post('/api/extract-vectors', async (req, res) => {
             const b = data[idx + 2];
             const a = data[idx + 3];
 
-            if (a < 50) continue; // skip transparent
+            if (a < 50) continue;
 
-            // Color Heuristics - relaxed for scanned images
             const isBlue = (b > r + 20 && b > g + 20 && b > 60);
-            const isRed = (r > b + 20 && r > g + 20 && r > 60);
+            const isRed  = (r > b + 20 && r > g + 20 && r > 60);
             const isDark = (r < 180 && g < 180 && b < 180);
 
-            if (isBlue) {
-                blueBuffer[i] = 0; 
-            } else if (isRed) {
-                redBuffer[i] = 0;
-            } else if (isDark) {
-                blackBuffer[i] = 0;
-            }
+            if (isBlue)       blueBuffer[i]  = 0;
+            else if (isRed)   redBuffer[i]   = 0;
+            else if (isDark)  blackBuffer[i] = 0;
         }
 
         const toPng = (buf) => sharp(buf, { raw: { width, height, channels: 1 } }).png().toBuffer();
@@ -125,7 +128,7 @@ app.post('/api/extract-vectors', async (req, res) => {
             toPng(redBuffer)
         ]);
 
-        const traceOpts = { 
+        const traceOpts = {
             turnPolicy: potrace.Potrace.TURNPOLICY_MINORITY,
             turdSize: 2,
             optCurve: true,
@@ -144,9 +147,9 @@ app.post('/api/extract-vectors', async (req, res) => {
             return contentMatch[1].replace(/fill="black"/g, `fill="${color}"`);
         };
 
-        const blackPaths = extractPaths(blackSvg, '#cbd5e1'); // Slate
-        const bluePaths = extractPaths(blueSvg, '#0ea5e9'); // Cyan
-        const redPaths = extractPaths(redSvg, '#ef4444'); // Red
+        const blackPaths = extractPaths(blackSvg, '#cbd5e1');
+        const bluePaths  = extractPaths(blueSvg,  '#0ea5e9');
+        const redPaths   = extractPaths(redSvg,   '#ef4444');
 
         const viewBoxMatch = blackSvg.match(/viewBox="([^"]*)"/);
         const viewBox = viewBoxMatch ? viewBoxMatch[1] : `0 0 ${width} ${height}`;
@@ -156,46 +159,35 @@ app.post('/api/extract-vectors', async (req, res) => {
   <g class="layer-black">${blackPaths}</g>
   <g class="layer-blue">${bluePaths}</g>
   <g class="layer-red">${redPaths}</g>
-</svg>
-        `.trim();
+</svg>`.trim();
 
-        // Auto-Save to Database
-        const db = await initDb();
+        // ─── Auto-Save to Supabase ─────────────────────────────────────────────
         const mapName = `FMB Map ${new Date().toLocaleString()}`;
-        let insertedId = null;
-        if (db) {
-            const result = await db.run(
-                `INSERT INTO fmb_maps (name, survey_number, scale, svg_data, source_image_base64) VALUES (?, ?, ?, ?, ?)`,
-                [mapName, '', detectedScale || '', unifiedSvg, fullImageBase64 || '']
-            );
-            insertedId = result.lastID;
-        }
+        const insertedId = await insertMap(mapName, '', detectedScale || '', unifiedSvg, fullImageBase64 || '');
 
-        console.log(`Extraction complete. SVG length: ${unifiedSvg.length} characters. Scale: ${detectedScale}`);
+        console.log(`Extraction complete. SVG length: ${unifiedSvg.length} chars. Scale: ${detectedScale}. DB ID: ${insertedId}`);
         res.json({ svg: unifiedSvg, detectedScale, id: insertedId });
-        
+
     } catch (err) {
         console.error('Extraction pipeline error:', err);
         res.status(500).json({ error: 'Server error during extraction' });
     }
 });
 
-// Library Endpoints
+// ─── GET /api/fmb-maps ────────────────────────────────────────────────────────
 app.get('/api/fmb-maps', async (req, res) => {
     try {
-        const db = await initDb();
-        if (!db) return res.status(500).json({ error: 'Database unavailable' });
-        const maps = await db.all(`SELECT id, name, survey_number, scale, source_image_base64, created_at FROM fmb_maps ORDER BY created_at DESC`);
+        const maps = await getAllMaps();
         res.json(maps);
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch maps' });
     }
 });
 
+// ─── GET /api/fmb-maps/:id ───────────────────────────────────────────────────
 app.get('/api/fmb-maps/:id', async (req, res) => {
     try {
-        const db = await initDb();
-        const map = await db.get(`SELECT * FROM fmb_maps WHERE id = ?`, [req.params.id]);
+        const map = await getMapById(req.params.id);
         if (!map) return res.status(404).json({ error: 'Map not found' });
         res.json(map);
     } catch (err) {
@@ -203,27 +195,30 @@ app.get('/api/fmb-maps/:id', async (req, res) => {
     }
 });
 
+// ─── PUT /api/fmb-maps/:id/rename ────────────────────────────────────────────
 app.put('/api/fmb-maps/:id/rename', async (req, res) => {
     try {
-        const db = await initDb();
         const { name } = req.body;
-        await db.run(`UPDATE fmb_maps SET name = ? WHERE id = ?`, [name, req.params.id]);
+        const ok = await renameMap(req.params.id, name);
+        if (!ok) return res.status(500).json({ error: 'Rename failed' });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Failed to rename map' });
     }
 });
 
+// ─── DELETE /api/fmb-maps/:id ────────────────────────────────────────────────
 app.delete('/api/fmb-maps/:id', async (req, res) => {
     try {
-        const db = await initDb();
-        await db.run(`DELETE FROM fmb_maps WHERE id = ?`, [req.params.id]);
+        const ok = await deleteMap(req.params.id);
+        if (!ok) return res.status(500).json({ error: 'Delete failed' });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Failed to delete map' });
     }
 });
 
+// ─── Start Server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-    console.log(`Everest Backend Server running on http://localhost:${PORT}`);
+    console.log(`✅ Everest Backend running on port ${PORT}`);
 });
