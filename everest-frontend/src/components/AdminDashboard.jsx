@@ -23,6 +23,79 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [pdfScaleStatus, setPdfScaleStatus] = React.useState(''); // 'found', 'not_found', 'error'
   const [pdfScale, setPdfScale] = React.useState('');
   const [isExtractingScale, setIsExtractingScale] = React.useState(false);
+  const [pdfBase64, setPdfBase64] = React.useState('');
+  
+  // Persistent Storage State
+  const [projects, setProjects] = React.useState([]);
+  const [activeMapMenuId, setActiveMapMenuId] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!activeMapMenuId) return;
+    const handleDismiss = () => setActiveMapMenuId(null);
+    document.addEventListener('click', handleDismiss);
+    window.addEventListener('scroll', handleDismiss, true);
+    return () => {
+      document.removeEventListener('click', handleDismiss);
+      window.removeEventListener('scroll', handleDismiss, true);
+    };
+  }, [activeMapMenuId]);
+
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/fmb-maps');
+      const data = await response.json();
+      setProjects(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const loadProject = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/fmb-maps/${id}`);
+      const data = await response.json();
+      setExtractedVectors(data.svg_data);
+      setPdfScale(data.scale);
+      if (data.source_image_base64) {
+        setSourceImage(data.source_image_base64);
+      }
+      setFmbWorkflowState('canvas');
+      setActiveLandSurveyView('recreate_fmb');
+    } catch (err) {
+      console.error("Failed to load map", err);
+    }
+  };
+
+  const deleteProject = async (id) => {
+    if (!confirm("Are you sure you want to delete this project?")) return;
+    try {
+      await fetch(`http://localhost:5000/api/fmb-maps/${id}`, { method: 'DELETE' });
+      fetchProjects();
+    } catch (err) {
+      console.error(err);
+    }
+    setActiveMapMenuId(null);
+  };
+
+  const handleRename = async (id) => {
+    const newName = prompt("Enter new map name:");
+    if (!newName) return;
+    try {
+      await fetch(`http://localhost:5000/api/fmb-maps/${id}/rename`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName })
+      });
+      fetchProjects();
+    } catch (err) {
+      console.error(err);
+    }
+    setActiveMapMenuId(null);
+  };
   
   // FMB Workflow States (Task 2)
   const [fmbWorkflowState, setFmbWorkflowState] = React.useState('extract'); // extract, crop, canvas
@@ -98,11 +171,15 @@ const AdminDashboard = ({ setCurrentView }) => {
         const response = await fetch('http://localhost:5000/api/extract-vectors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: croppedBase64 })
+          body: JSON.stringify({ imageBase64: croppedBase64, pdfBase64: pdfBase64, fullImageBase64: sourceImage })
         });
         const data = await response.json();
         if (data.svg) {
           setExtractedVectors(data.svg);
+          if (data.detectedScale) {
+             setPdfScale(data.detectedScale);
+          }
+          fetchProjects(); // refresh projects
         } else {
           console.error("No SVG returned from backend:", data);
         }
@@ -968,91 +1045,68 @@ const AdminDashboard = ({ setCurrentView }) => {
                              setIsExtractingScale(true);
                              setPdfScale('');
                              setPdfScaleStatus('');
-                             try {
-                                const pdfLib = await loadPdfJsScript();
-                                const url = URL.createObjectURL(file);
-                                const loadingTask = pdfLib.getDocument(url);
-                                const pdf = await loadingTask.promise;
-                                const page = await pdf.getPage(1);
-                                
-                                // Render high-res image for cropping
-                                const viewport = page.getViewport({ scale: 2.5 });
-                                const canvas = document.createElement('canvas');
-                                const context = canvas.getContext('2d');
-                                canvas.height = viewport.height;
-                                canvas.width = viewport.width;
-                                await page.render({ canvasContext: context, viewport }).promise;
-                                setSourceImage(canvas.toDataURL('image/png'));
-                                
-                                const textContent = await page.getTextContent();
-                                
-                                const textItems = textContent.items.map(item => item.str).join(' ');
-                                console.log("Extracted PDF Text:", textItems);
-                                
-                                // Look for "1:1000", "Scale 1:2000", "1/1000", etc.
-                                const match = textItems.match(/(?:scale[^\d]*)?1\s*[:\/=]\s*\d+/i);
-                                if (match) {
-                                   console.log("✅ Scale Matrix Found:", match[0]);
-                                   setPdfScale(match[0]);
-                                   setPdfScaleStatus('found');
-                                } else {
-                                   console.log("❌ Scale Matrix Not Found in PDF text layer.");
-                                   setPdfScaleStatus('not_found');
-                                }
-                             } catch(err) {
-                                console.error("Error reading PDF metadata:", err);
-                                setPdfScaleStatus('error');
-                             }
-                             setIsExtractingScale(false);
+
+                             const reader = new FileReader();
+                             reader.readAsDataURL(file);
+                             reader.onload = async () => {
+                               setPdfBase64(reader.result);
+                               try {
+                                  const pdfLib = await loadPdfJsScript();
+                                  const url = URL.createObjectURL(file);
+                                  const loadingTask = pdfLib.getDocument(url);
+                                  const pdf = await loadingTask.promise;
+                                  const page = await pdf.getPage(1);
+                                  
+                                  // Render high-res image for cropping
+                                  const viewport = page.getViewport({ scale: 2.5 });
+                                  const canvas = document.createElement('canvas');
+                                  const context = canvas.getContext('2d');
+                                  canvas.height = viewport.height;
+                                  canvas.width = viewport.width;
+                                  await page.render({ canvasContext: context, viewport }).promise;
+                                  setSourceImage(canvas.toDataURL('image/png'));
+                                  
+                                  // Automatically skip manual text extraction
+                                  setFmbWorkflowState('crop');
+                               } catch(err) {
+                                  console.error("Error loading PDF:", err);
+                               }
+                               setIsExtractingScale(false);
+                             };
                           }
                        }} />
                     </label>
                  </div>
 
-                 {isExtractingScale && (
-                    <div className="mt-8 flex flex-col items-center gap-3">
-                       <div className="w-8 h-8 border-4 border-[#0369a1] border-t-transparent rounded-full animate-spin"></div>
-                       <p className="font-bold text-slate-500 text-xs uppercase tracking-wide">Extracting Metadata...</p>
-                    </div>
-                 )}
-
-                 {!isExtractingScale && pdfScaleStatus && (
-                    <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-2xl p-6 flex flex-col items-center shadow-sm w-full max-w-sm">
-                       <div className="text-[10px] text-emerald-600 font-black uppercase tracking-widest mb-3">Detected Scale Factor</div>
-                       {pdfScaleStatus === 'found' ? (
-                          <div className="text-3xl font-black text-emerald-800">{pdfScale}</div>
-                       ) : pdfScaleStatus === 'not_found' || pdfScaleStatus === 'error' ? (
-                          <div className="flex flex-col items-center gap-3 w-full">
-                             <div className="text-xs font-black text-slate-600 text-center px-4">
-                                {pdfScaleStatus === 'not_found' 
-                                  ? "No embedded text layer found. This is likely a scanned image." 
-                                  : "Error parsing PDF file metadata."}
+                 {/* My Projects Grid */}
+                 <div className="w-full mt-8 max-w-sm">
+                    <h3 className="font-black text-slate-600 text-xs tracking-widest uppercase mb-4 text-center">My Projects</h3>
+                    <div className="flex flex-col gap-2">
+                       {projects.map(p => (
+                          <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm relative hover:shadow-md transition-shadow">
+                             <div className="flex flex-col cursor-pointer" onClick={() => loadProject(p.id)}>
+                                <span className="font-bold text-slate-800 text-sm">{p.name}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">Scale: {p.scale || 'N/A'} • {new Date(p.created_at).toLocaleDateString()}</span>
                              </div>
-                             <div className="flex flex-col w-full gap-1 mt-2">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Enter Scale Manually</label>
-                                <input 
-                                   type="text" 
-                                   placeholder="e.g. 1:1000" 
-                                   value={pdfScale}
-                                   onChange={(e) => setPdfScale(e.target.value)} 
-                                   className="w-full text-center bg-white border-2 border-emerald-200 rounded-xl px-4 py-2.5 font-black text-slate-800 outline-none focus:border-emerald-500 transition-colors shadow-inner" 
-                                />
+                             <div className="relative">
+                                <button onClick={(e) => { e.stopPropagation(); setActiveMapMenuId(activeMapMenuId === p.id ? null : p.id); }} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition-colors">
+                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
+                                </button>
+                                {activeMapMenuId === p.id && (
+                                   <div className="absolute right-0 mt-2 w-36 bg-white border border-slate-100 rounded-xl shadow-xl z-50 overflow-hidden">
+                                      <button onClick={() => handleRename(p.id)} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-50">Rename</button>
+                                      <button onClick={() => deleteProject(p.id)} className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">Delete</button>
+                                   </div>
+                                )}
                              </div>
                           </div>
-                       ) : null}
-                       
-                       {/* Gateway Button */}
-                       {pdfScale && (
-                          <button 
-                             onClick={() => setFmbWorkflowState('crop')}
-                             className="mt-6 w-full bg-[#0f172a] hover:bg-slate-800 text-white py-3.5 rounded-xl font-black uppercase text-[13px] tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
-                          >
-                             Import & Crop
-                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                          </button>
+                       ))}
+                       {projects.length === 0 && (
+                          <div className="text-center py-6 text-slate-400 text-[10px] font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">No saved projects</div>
                        )}
                     </div>
-                 )}
+                 </div>
+
               </div>
             </div>
             )}
@@ -1126,6 +1180,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                       </div>
                     </div>
                   </div>
+                  <button onClick={() => setFmbWorkflowState('extract')} className="w-8 h-8 bg-cyan-900/50 hover:bg-cyan-800 rounded-full flex items-center justify-center text-cyan-400 transition-colors shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                  </button>
                 </div>
                 
                 {/* Main Dark Model Space Canvas */}
