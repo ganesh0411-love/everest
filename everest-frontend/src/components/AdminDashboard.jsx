@@ -1,9 +1,119 @@
 import React from 'react';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+
+const loadPdfJsScript = () => new Promise((resolve, reject) => {
+  if (window.pdfjsLib) return resolve(window.pdfjsLib);
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+  script.onload = () => {
+     const lib = window['pdfjs-dist/build/pdf'] || window.pdfjsLib;
+     lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+     resolve(lib);
+  };
+  script.onerror = () => reject(new Error("pdf.js failed to load"));
+  document.head.appendChild(script);
+});
 
 const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);
   const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu');
+  
+  // FMB Scale Extraction State
+  const [pdfScaleStatus, setPdfScaleStatus] = React.useState(''); // 'found', 'not_found', 'error'
+  const [pdfScale, setPdfScale] = React.useState('');
+  const [isExtractingScale, setIsExtractingScale] = React.useState(false);
+  
+  // FMB Workflow States (Task 2)
+  const [fmbWorkflowState, setFmbWorkflowState] = React.useState('extract'); // extract, crop, canvas
+  const [sourceImage, setSourceImage] = React.useState(null);
+  const [croppedImage, setCroppedImage] = React.useState(null);
+  const [extractedVectors, setExtractedVectors] = React.useState(null);
+  const [isExtractingVectors, setIsExtractingVectors] = React.useState(false);
+  const [cropBox, setCropBox] = React.useState({ x: 10, y: 10, width: 80, height: 80 });
+  const [activeCropHandle, setActiveCropHandle] = React.useState(null);
+  const cropContainerRef = React.useRef(null);
+
+  const handleCropTouchStart = (e, handle) => {
+    e.stopPropagation();
+    setActiveCropHandle(handle);
+  };
+
+  const handleCropTouchMove = (e) => {
+    if (!activeCropHandle || !cropContainerRef.current) return;
+    const touch = e.touches[0];
+    const rect = cropContainerRef.current.getBoundingClientRect();
+    const px = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100));
+    const py = Math.max(0, Math.min(100, ((touch.clientY - rect.top) / rect.height) * 100));
+
+    setCropBox(prev => {
+      let newBox = { ...prev };
+      if (activeCropHandle.includes('n')) {
+        const diff = py - prev.y;
+        newBox.y = py;
+        newBox.height = prev.height - diff;
+      }
+      if (activeCropHandle.includes('s')) {
+        newBox.height = py - prev.y;
+      }
+      if (activeCropHandle.includes('w')) {
+        const diff = px - prev.x;
+        newBox.x = px;
+        newBox.width = prev.width - diff;
+      }
+      if (activeCropHandle.includes('e')) {
+        newBox.width = px - prev.x;
+      }
+      if (newBox.width < 10) newBox.width = 10;
+      if (newBox.height < 10) newBox.height = 10;
+      return newBox;
+    });
+  };
+
+  const handleCropTouchEnd = () => {
+    setActiveCropHandle(null);
+  };
+
+  const confirmCrop = async () => {
+    if (!sourceImage) return;
+    setIsExtractingVectors(true);
+    const img = new Image();
+    img.src = sourceImage;
+    img.onload = async () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const sx = (cropBox.x / 100) * img.naturalWidth;
+      const sy = (cropBox.y / 100) * img.naturalHeight;
+      const sw = (cropBox.width / 100) * img.naturalWidth;
+      const sh = (cropBox.height / 100) * img.naturalHeight;
+      
+      canvas.width = sw;
+      canvas.height = sh;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      
+      const croppedBase64 = canvas.toDataURL('image/png');
+      setCroppedImage(croppedBase64);
+
+      try {
+        const response = await fetch('http://localhost:5000/api/extract-vectors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: croppedBase64 })
+        });
+        const data = await response.json();
+        if (data.svg) {
+          setExtractedVectors(data.svg);
+        } else {
+          console.error("No SVG returned from backend:", data);
+        }
+      } catch (err) {
+        console.error("Backend extraction failed:", err);
+      }
+      
+      setIsExtractingVectors(false);
+      setFmbWorkflowState('canvas');
+    };
+  };
   
   // Engine A: Patta Land Area Converter
   const [hectare, setHectare] = React.useState('');
@@ -554,7 +664,10 @@ const AdminDashboard = ({ setCurrentView }) => {
               </div>
 
               {/* Card 3 */}
-              <div className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer">
+              <div 
+                className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
+                onClick={() => setActiveLandSurveyView('recreate_fmb')}
+              >
                 <div>
                   <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Recreate FMB</h3>
                   <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">Draft new measurement layouts</p>
@@ -828,6 +941,218 @@ const AdminDashboard = ({ setCurrentView }) => {
                 </div>
               )}
             </div>
+          ) : activeLandSurveyView === 'recreate_fmb' ? (
+            <>
+            {fmbWorkflowState === 'extract' && (
+               <div className="flex flex-col bg-slate-50 overflow-y-auto animate-in slide-in-from-right-8 duration-300 flex-1 h-full relative">
+              <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-20 shrink-0">
+                <button 
+                  onClick={() => setActiveLandSurveyView('menu')}
+                  className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-600 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <h2 className="text-lg font-black text-[#0369a1] uppercase tracking-tight mt-0.5">FMB Scale Extraction</h2>
+              </div>
+              <div className="flex-1 w-full relative flex flex-col p-4 bg-gradient-to-b from-[#f8fafc] to-[#e2e8f0]">
+                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-4 text-center">
+                    <h3 className="font-black text-slate-800 uppercase tracking-wide">Select FMB File</h3>
+                    <p className="text-xs text-slate-500 font-bold max-w-xs">Upload your PDF to automatically extract the scale matrix before rendering.</p>
+                    
+                    <label className="mt-2 bg-[#0369a1] hover:bg-[#0284c7] text-white px-6 py-3 rounded-xl font-black uppercase text-[13px] tracking-wider shadow-md cursor-pointer active:scale-95 transition-transform flex items-center gap-2">
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                       Upload PDF
+                       <input type="file" accept=".pdf" className="hidden" onChange={async (e) => {
+                          if (e.target.files && e.target.files[0]) {
+                             const file = e.target.files[0];
+                             setIsExtractingScale(true);
+                             setPdfScale('');
+                             setPdfScaleStatus('');
+                             try {
+                                const pdfLib = await loadPdfJsScript();
+                                const url = URL.createObjectURL(file);
+                                const loadingTask = pdfLib.getDocument(url);
+                                const pdf = await loadingTask.promise;
+                                const page = await pdf.getPage(1);
+                                
+                                // Render high-res image for cropping
+                                const viewport = page.getViewport({ scale: 2.5 });
+                                const canvas = document.createElement('canvas');
+                                const context = canvas.getContext('2d');
+                                canvas.height = viewport.height;
+                                canvas.width = viewport.width;
+                                await page.render({ canvasContext: context, viewport }).promise;
+                                setSourceImage(canvas.toDataURL('image/png'));
+                                
+                                const textContent = await page.getTextContent();
+                                
+                                const textItems = textContent.items.map(item => item.str).join(' ');
+                                console.log("Extracted PDF Text:", textItems);
+                                
+                                // Look for "1:1000", "Scale 1:2000", "1/1000", etc.
+                                const match = textItems.match(/(?:scale[^\d]*)?1\s*[:\/=]\s*\d+/i);
+                                if (match) {
+                                   console.log("✅ Scale Matrix Found:", match[0]);
+                                   setPdfScale(match[0]);
+                                   setPdfScaleStatus('found');
+                                } else {
+                                   console.log("❌ Scale Matrix Not Found in PDF text layer.");
+                                   setPdfScaleStatus('not_found');
+                                }
+                             } catch(err) {
+                                console.error("Error reading PDF metadata:", err);
+                                setPdfScaleStatus('error');
+                             }
+                             setIsExtractingScale(false);
+                          }
+                       }} />
+                    </label>
+                 </div>
+
+                 {isExtractingScale && (
+                    <div className="mt-8 flex flex-col items-center gap-3">
+                       <div className="w-8 h-8 border-4 border-[#0369a1] border-t-transparent rounded-full animate-spin"></div>
+                       <p className="font-bold text-slate-500 text-xs uppercase tracking-wide">Extracting Metadata...</p>
+                    </div>
+                 )}
+
+                 {!isExtractingScale && pdfScaleStatus && (
+                    <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-2xl p-6 flex flex-col items-center shadow-sm w-full max-w-sm">
+                       <div className="text-[10px] text-emerald-600 font-black uppercase tracking-widest mb-3">Detected Scale Factor</div>
+                       {pdfScaleStatus === 'found' ? (
+                          <div className="text-3xl font-black text-emerald-800">{pdfScale}</div>
+                       ) : pdfScaleStatus === 'not_found' || pdfScaleStatus === 'error' ? (
+                          <div className="flex flex-col items-center gap-3 w-full">
+                             <div className="text-xs font-black text-slate-600 text-center px-4">
+                                {pdfScaleStatus === 'not_found' 
+                                  ? "No embedded text layer found. This is likely a scanned image." 
+                                  : "Error parsing PDF file metadata."}
+                             </div>
+                             <div className="flex flex-col w-full gap-1 mt-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Enter Scale Manually</label>
+                                <input 
+                                   type="text" 
+                                   placeholder="e.g. 1:1000" 
+                                   value={pdfScale}
+                                   onChange={(e) => setPdfScale(e.target.value)} 
+                                   className="w-full text-center bg-white border-2 border-emerald-200 rounded-xl px-4 py-2.5 font-black text-slate-800 outline-none focus:border-emerald-500 transition-colors shadow-inner" 
+                                />
+                             </div>
+                          </div>
+                       ) : null}
+                       
+                       {/* Gateway Button */}
+                       {pdfScale && (
+                          <button 
+                             onClick={() => setFmbWorkflowState('crop')}
+                             className="mt-6 w-full bg-[#0f172a] hover:bg-slate-800 text-white py-3.5 rounded-xl font-black uppercase text-[13px] tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                          >
+                             Import & Crop
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                          </button>
+                       )}
+                    </div>
+                 )}
+              </div>
+            </div>
+            )}
+            
+            {/* AutoCAD Dark Mode Views */}
+            {fmbWorkflowState === 'crop' && (
+              <div 
+                className="flex flex-col bg-[#0f172a] overflow-hidden flex-1 h-full relative touch-none"
+                onTouchMove={handleCropTouchMove}
+                onTouchEnd={handleCropTouchEnd}
+                onTouchCancel={handleCropTouchEnd}
+              >
+                <div className="bg-[#1e293b] px-5 py-4 border-b border-slate-700 flex items-center justify-between shadow-md relative z-20 shrink-0">
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => setFmbWorkflowState('extract')} className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-slate-300 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <div>
+                      <h2 className="text-lg font-black text-slate-100 uppercase tracking-tight mt-0.5">Define Boundaries</h2>
+                      <p className="text-[10px] text-slate-400 font-bold tracking-wider">AutoCAD Model Space</p>
+                    </div>
+                  </div>
+                  <button disabled={isExtractingVectors} onClick={confirmCrop} className={`${isExtractingVectors ? 'bg-emerald-600/50' : 'bg-emerald-500 hover:bg-emerald-400'} text-white px-4 py-2 rounded-lg font-black uppercase text-[11px] tracking-wider shadow-lg active:scale-95 transition-all flex items-center gap-2`}>
+                    {isExtractingVectors ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Extracting Vectors...
+                      </>
+                    ) : "Confirm Crop"}
+                  </button>
+                </div>
+                
+                <div className="flex-1 w-full relative p-6 flex items-center justify-center">
+                  <div ref={cropContainerRef} className="relative max-w-full max-h-full border border-slate-700 shadow-2xl">
+                    <img src={sourceImage} alt="Source" className="max-w-full max-h-full object-contain pointer-events-none" />
+                    
+                    {/* Dark Overlay Outside Crop */}
+                    <div className="absolute inset-0 bg-black/60 pointer-events-none" style={{ clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, ${cropBox.x}% ${cropBox.y}%, ${cropBox.x}% ${cropBox.y + cropBox.height}%, ${cropBox.x + cropBox.width}% ${cropBox.y + cropBox.height}%, ${cropBox.x + cropBox.width}% ${cropBox.y}%, ${cropBox.x}% ${cropBox.y}%)` }}></div>
+                    
+                    {/* Crop Box Grid & Border */}
+                    <div className="absolute border border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)] pointer-events-none" style={{ left: `${cropBox.x}%`, top: `${cropBox.y}%`, width: `${cropBox.width}%`, height: `${cropBox.height}%` }}>
+                      <div className="w-full h-full border border-cyan-400/30 grid grid-cols-3 grid-rows-3">
+                        <div className="border-r border-b border-cyan-400/20"></div><div className="border-r border-b border-cyan-400/20"></div><div className="border-b border-cyan-400/20"></div>
+                        <div className="border-r border-b border-cyan-400/20"></div><div className="border-r border-b border-cyan-400/20"></div><div className="border-b border-cyan-400/20"></div>
+                        <div className="border-r border-cyan-400/20"></div><div className="border-r border-cyan-400/20"></div><div></div>
+                      </div>
+                    </div>
+
+                    {/* Corner Drag Handles */}
+                    <div className="absolute w-8 h-8 -ml-4 -mt-4 flex items-center justify-center cursor-nwse-resize" style={{ left: `${cropBox.x}%`, top: `${cropBox.y}%` }} onTouchStart={(e) => handleCropTouchStart(e, 'nw')}><div className="w-4 h-4 bg-cyan-400 rounded-full shadow-md border-2 border-[#0f172a]"></div></div>
+                    <div className="absolute w-8 h-8 -ml-4 -mt-4 flex items-center justify-center cursor-nesw-resize" style={{ left: `${cropBox.x + cropBox.width}%`, top: `${cropBox.y}%` }} onTouchStart={(e) => handleCropTouchStart(e, 'ne')}><div className="w-4 h-4 bg-cyan-400 rounded-full shadow-md border-2 border-[#0f172a]"></div></div>
+                    <div className="absolute w-8 h-8 -ml-4 -mt-4 flex items-center justify-center cursor-sw-resize" style={{ left: `${cropBox.x}%`, top: `${cropBox.y + cropBox.height}%` }} onTouchStart={(e) => handleCropTouchStart(e, 'sw')}><div className="w-4 h-4 bg-cyan-400 rounded-full shadow-md border-2 border-[#0f172a]"></div></div>
+                    <div className="absolute w-8 h-8 -ml-4 -mt-4 flex items-center justify-center cursor-se-resize" style={{ left: `${cropBox.x + cropBox.width}%`, top: `${cropBox.y + cropBox.height}%` }} onTouchStart={(e) => handleCropTouchStart(e, 'se')}><div className="w-4 h-4 bg-cyan-400 rounded-full shadow-md border-2 border-[#0f172a]"></div></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {fmbWorkflowState === 'canvas' && (
+              <div className="flex flex-col bg-[#0f172a] overflow-hidden flex-1 h-full relative">
+                <div className="bg-[#1e293b] px-5 py-4 border-b border-slate-700 flex items-center justify-between shadow-md relative z-20 shrink-0">
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => setFmbWorkflowState('crop')} className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-slate-300 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <div>
+                      <h2 className="text-lg font-black text-cyan-400 uppercase tracking-tight mt-0.5">Workspace</h2>
+                      <div className="flex items-center gap-2">
+                         <p className="text-[10px] text-slate-400 font-bold tracking-wider">AutoCAD Mode Active</p>
+                         <span className="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[8px] font-black uppercase">Scale {pdfScale}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Main Dark Model Space Canvas */}
+                <div className="flex-1 w-full relative p-4 flex items-center justify-center bg-[#0f172a] bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]">
+                  {extractedVectors ? (
+                    <TransformWrapper 
+                      initialScale={1} 
+                      minScale={0.5} 
+                      maxScale={20}
+                      wheel={{ wheelDisabled: false }}
+                      pinch={{ disabled: false }}
+                      panning={{ disabled: false }}
+                    >
+                      <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }} contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div 
+                          className="w-full h-full shadow-2xl border border-cyan-900/50 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
+                          dangerouslySetInnerHTML={{ __html: extractedVectors }} 
+                        />
+                      </TransformComponent>
+                    </TransformWrapper>
+                  ) : croppedImage ? (
+                    <img src={croppedImage} alt="Cropped FMB" className="max-w-full max-h-full object-contain shadow-2xl border border-cyan-900/50" />
+                  ) : null}
+                </div>
+              </div>
+            )}
+            </>
           ) : null}
         </div>
       )}
