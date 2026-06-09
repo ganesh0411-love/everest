@@ -6,8 +6,21 @@ const potrace = require('potrace');
 const Tesseract = require('tesseract.js');
 const fs = require('fs/promises');
 const path = require('path');
-const pdfPoppler = require('pdf-poppler');
+const { execFile } = require('child_process');
 const { insertMap, getAllMaps, getMapById, renameMap, deleteMap } = require('./db');
+
+// ─── Helper: call pdftoppm directly (Linux-compatible, no pdf-poppler) ────────
+// pdftoppm is installed via poppler-utils in the Dockerfile
+const pdfToImage = (pdfPath, outPrefix, scale = 2048) => {
+    return new Promise((resolve, reject) => {
+        // -png: output PNG, -f/-l 1: first page only, -scale-to: max dimension in pixels
+        const args = ['-png', '-f', '1', '-l', '1', '-scale-to', String(scale), pdfPath, outPrefix];
+        execFile('pdftoppm', args, { timeout: 60000 }, (err, stdout, stderr) => {
+            if (err) reject(new Error(`pdftoppm failed: ${err.message}\n${stderr}`));
+            else resolve();
+        });
+    });
+};
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,15 +62,9 @@ app.post('/api/extract-vectors', async (req, res) => {
                 const pdfBuffer = Buffer.from(pdfBase64.split(',')[1], 'base64');
                 await fs.writeFile(tempPdfPath, pdfBuffer);
 
-                const opts = {
-                    format: 'png',
-                    out_dir: outDir,
-                    out_prefix: outPrefix,
-                    page: 1,
-                    scale: 2048
-                };
-
-                await pdfPoppler.convert(tempPdfPath, opts);
+                // Call pdftoppm directly — outputs /tmp/outPrefix-1.png
+                const outPrefixFull = path.join(outDir, outPrefix);
+                await pdfToImage(tempPdfPath, outPrefixFull, 2048);
                 const outputImagePath = path.join(outDir, `${outPrefix}-1.png`);
 
                 const fullPdfImageBuffer = await fs.readFile(outputImagePath);
