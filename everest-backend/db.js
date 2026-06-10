@@ -44,7 +44,7 @@ const getAllMaps = async () => {
     if (!db) return [];
     const { data, error } = await db
         .from('fmb_maps')
-        .select('id, name, survey_number, scale, source_image_base64, created_at')
+        .select('id, name, survey_number, scale, created_at')
         .order('created_at', { ascending: false });
     if (error) { console.error('getAllMaps error:', error); return []; }
     return data;
