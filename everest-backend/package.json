@@ -20,5 +20,8 @@
     "potrace": "^2.1.8",
     "sharp": "^0.34.5",
     "tesseract.js": "^5.1.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
