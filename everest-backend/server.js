@@ -11,7 +11,9 @@ const { insertMap, getAllMaps, getMapById, renameMap, deleteMap } = require('./d
 
 const os = require('os');
 let pdfPoppler = null;
-try { pdfPoppler = require('pdf-poppler'); } catch(e) {}
+if (os.platform() === 'win32') {
+    try { pdfPoppler = require('pdf-poppler'); } catch(e) {}
+}
 
 // ─── Helper: call pdftoppm directly (Linux) or pdf-poppler (Windows) ────────
 const pdfToImage = async (pdfPath, outPrefix, scale = 2048) => {
