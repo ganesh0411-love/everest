@@ -199,7 +199,7 @@ app.post('/api/extract-vectors', async (req, res) => {
 
     } catch (err) {
         console.error('Extraction pipeline error:', err);
-        res.status(500).json({ error: 'Server error during extraction' });
+        res.status(500).json({ error: 'Server error during extraction', message: err.message, stack: err.stack });
     }
 });
 
