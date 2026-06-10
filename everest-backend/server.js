@@ -9,9 +9,24 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { insertMap, getAllMaps, getMapById, renameMap, deleteMap } = require('./db');
 
-// ─── Helper: call pdftoppm directly (Linux-compatible, no pdf-poppler) ────────
-// pdftoppm is installed via poppler-utils in the Dockerfile
-const pdfToImage = (pdfPath, outPrefix, scale = 2048) => {
+const os = require('os');
+let pdfPoppler = null;
+try { pdfPoppler = require('pdf-poppler'); } catch(e) {}
+
+// ─── Helper: call pdftoppm directly (Linux) or pdf-poppler (Windows) ────────
+const pdfToImage = async (pdfPath, outPrefix, scale = 2048) => {
+    if (os.platform() === 'win32' && pdfPoppler) {
+        let opts = {
+            format: 'png',
+            out_dir: path.dirname(outPrefix),
+            out_prefix: path.basename(outPrefix),
+            page: 1,
+            scale: scale
+        };
+        await pdfPoppler.convert(pdfPath, opts);
+        return;
+    }
+    
     return new Promise((resolve, reject) => {
         // -png: output PNG, -f/-l 1: first page only, -scale-to: max dimension in pixels
         const args = ['-png', '-f', '1', '-l', '1', '-scale-to', String(scale), pdfPath, outPrefix];
@@ -54,8 +69,8 @@ app.post('/api/extract-vectors', async (req, res) => {
         // PDF OCR: extract scale from header using pdf-poppler + sharp + Tesseract
         if (pdfBase64) {
             console.log('Processing high-res PDF OCR extraction...');
-            const tempPdfPath = path.join('/tmp', `temp_${Date.now()}.pdf`);
-            const outDir = '/tmp';
+            const outDir = os.tmpdir();
+            const tempPdfPath = path.join(outDir, `temp_${Date.now()}.pdf`);
             const outPrefix = `temp_img_${Date.now()}`;
 
             try {
