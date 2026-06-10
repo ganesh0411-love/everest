@@ -19,7 +19,8 @@
     "pdf-poppler": "^0.2.3",
     "potrace": "^2.1.8",
     "sharp": "^0.34.5",
-    "tesseract.js": "^5.1.1"
+    "tesseract.js": "^5.1.1",
+    "ws": "^8.21.0"
   },
   "engines": {
     "node": ">=20.0.0"

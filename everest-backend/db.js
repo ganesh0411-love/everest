@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const WebSocket = require('ws');
 
 let supabase = null;
 
@@ -13,8 +14,11 @@ const initDb = () => {
             return null;
         }
 
+        // Pass ws to global so that RealtimeClient uses it
+        if (!global.WebSocket) global.WebSocket = WebSocket;
+
         supabase = createClient(url, key, {
-            auth: { persistSession: false }
+            auth: { persistSession: false },
         });
         console.log('✅ Supabase client initialized.');
     }
