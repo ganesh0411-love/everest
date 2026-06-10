@@ -62,10 +62,15 @@ app.post('/api/extract-vectors', async (req, res) => {
                 const pdfBuffer = Buffer.from(pdfBase64.split(',')[1], 'base64');
                 await fs.writeFile(tempPdfPath, pdfBuffer);
 
-                // Call pdftoppm directly — outputs /tmp/outPrefix-1.png
+                // Call pdftoppm directly — outputs /tmp/outPrefix-1.png or outPrefix-01.png
                 const outPrefixFull = path.join(outDir, outPrefix);
                 await pdfToImage(tempPdfPath, outPrefixFull, 2048);
-                const outputImagePath = path.join(outDir, `${outPrefix}-1.png`);
+                
+                // Find the generated file dynamically to bypass pdftoppm zero-padding logic
+                const files = await fs.readdir(outDir);
+                const generatedFile = files.find(f => f.startsWith(outPrefix) && f.endsWith('.png'));
+                if (!generatedFile) throw new Error('pdftoppm did not generate a PNG file');
+                const outputImagePath = path.join(outDir, generatedFile);
 
                 const fullPdfImageBuffer = await fs.readFile(outputImagePath);
                 const originalMetadata = await sharp(fullPdfImageBuffer).metadata();

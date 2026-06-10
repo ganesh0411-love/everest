@@ -47,9 +47,10 @@ const AdminDashboard = ({ setCurrentView }) => {
     try {
       const response = await fetch(`${API_BASE}/api/fmb-maps`);
       const data = await response.json();
-      setProjects(data);
+      setProjects(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setProjects([]);
     }
   };
 
@@ -1089,7 +1090,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                           <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm relative hover:shadow-md transition-shadow">
                              <div className="flex flex-col cursor-pointer" onClick={() => loadProject(p.id)}>
                                 <span className="font-bold text-slate-800 text-sm">{p.name}</span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Scale: {p.scale || 'N/A'} • {new Date(p.created_at).toLocaleDateString()}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">Scale: {p.scale || 'N/A'} • {p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</span>
                              </div>
                              <div className="relative">
                                 <button onClick={(e) => { e.stopPropagation(); setActiveMapMenuId(activeMapMenuId === p.id ? null : p.id); }} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition-colors">
