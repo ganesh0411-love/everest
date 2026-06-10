@@ -31,6 +31,8 @@ const AdminDashboard = ({ setCurrentView }) => {
   // Persistent Storage State
   const [projects, setProjects] = React.useState([]);
   const [activeMapMenuId, setActiveMapMenuId] = React.useState(null);
+  const [currentProjectId, setCurrentProjectId] = React.useState(null);
+  const [showAllProjects, setShowAllProjects] = React.useState(false);
 
   React.useEffect(() => {
     if (!activeMapMenuId) return;
@@ -67,6 +69,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       if (data.source_image_base64) {
         setSourceImage(data.source_image_base64);
       }
+      setCurrentProjectId(id);
       setFmbWorkflowState('canvas');
       setActiveLandSurveyView('recreate_fmb');
     } catch (err) {
@@ -103,6 +106,8 @@ const AdminDashboard = ({ setCurrentView }) => {
   
   // FMB Workflow States (Task 2)
   const [fmbWorkflowState, setFmbWorkflowState] = React.useState('extract'); // extract, crop, canvas
+  const [workspaceSurveyNumber, setWorkspaceSurveyNumber] = React.useState('');
+  const [workspaceSubDivision, setWorkspaceSubDivision] = React.useState('');
   const [sourceImage, setSourceImage] = React.useState(null);
   const [croppedImage, setCroppedImage] = React.useState(null);
   const [extractedVectors, setExtractedVectors] = React.useState(null);
@@ -175,13 +180,22 @@ const AdminDashboard = ({ setCurrentView }) => {
         const response = await fetch(`${API_BASE}/api/extract-vectors`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: croppedBase64, pdfBase64: pdfBase64, fullImageBase64: sourceImage })
+          body: JSON.stringify({ imageBase64: croppedBase64, pdfBase64: pdfBase64, fullImageBase64: sourceImage, projectId: currentProjectId })
         });
         const data = await response.json();
         if (data.svg) {
           setExtractedVectors(data.svg);
-          if (data.detectedScale) {
-             setPdfScale(data.detectedScale);
+            if (data.detectedScale) {
+               setPdfScale(data.detectedScale);
+            }
+            if (data.detectedSurveyNumber) {
+               setWorkspaceSurveyNumber(data.detectedSurveyNumber);
+            }
+            if (data.detectedSubDivision) {
+               setWorkspaceSubDivision(data.detectedSubDivision);
+            }
+            if (data.id) {
+             setCurrentProjectId(data.id);
           }
           fetchProjects(); // refresh projects
         } else {
@@ -702,17 +716,19 @@ const AdminDashboard = ({ setCurrentView }) => {
       {/* Land Survey Dashboard Overlay Route */}
       {showLandSurveyDashboard && (
         <div className="fixed inset-0 z-[120] bg-[#f8fafc] flex flex-col animate-in slide-in-from-right-full duration-300">
-          <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-10">
-            <button 
-              onClick={closeLandSurvey}
-              className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-600 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </button>
-            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight mt-0.5">Land Survey</h2>
-          </div>
+          {activeLandSurveyView !== 'recreate_fmb' && (
+            <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-10">
+              <button 
+                onClick={closeLandSurvey}
+                className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
+              <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight mt-0.5">Land Survey</h2>
+            </div>
+          )}
 
           {activeLandSurveyView === 'menu' ? (
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
@@ -747,7 +763,15 @@ const AdminDashboard = ({ setCurrentView }) => {
               {/* Card 3 */}
               <div 
                 className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
-                onClick={() => setActiveLandSurveyView('recreate_fmb')}
+                onClick={() => {
+                  setCurrentProjectId(null);
+                  setExtractedVectors(null);
+                  setPdfScale('');
+                  setWorkspaceSurveyNumber('');
+                  setWorkspaceSubDivision('');
+                  setFmbWorkflowState('extract');
+                  setActiveLandSurveyView('recreate_fmb');
+                }}
               >
                 <div>
                   <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Recreate FMB</h3>
@@ -1086,11 +1110,11 @@ const AdminDashboard = ({ setCurrentView }) => {
                  <div className="w-full mt-8 max-w-sm">
                     <h3 className="font-black text-slate-600 text-xs tracking-widest uppercase mb-4 text-center">My Projects</h3>
                     <div className="flex flex-col gap-2">
-                       {projects.map(p => (
+                       {projects.slice(0, showAllProjects ? projects.length : 3).map(p => (
                           <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm relative hover:shadow-md transition-shadow">
                              <div className="flex flex-col cursor-pointer" onClick={() => loadProject(p.id)}>
                                 <span className="font-bold text-slate-800 text-sm">{p.name}</span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Scale: {p.scale || 'N/A'} • {p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">Scale: {p.scale || 'N/A'} • {p.created_at ? new Date(p.created_at).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
                              </div>
                              <div className="relative">
                                 <button onClick={(e) => { e.stopPropagation(); setActiveMapMenuId(activeMapMenuId === p.id ? null : p.id); }} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition-colors">
@@ -1105,6 +1129,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                              </div>
                           </div>
                        ))}
+                       {!showAllProjects && projects.length > 3 && (
+                          <button onClick={() => setShowAllProjects(true)} className="mt-2 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-[11px] font-black uppercase tracking-wider transition-colors w-full shadow-sm">
+                             Show More
+                          </button>
+                       )}
+                       {showAllProjects && projects.length > 3 && (
+                          <button onClick={() => setShowAllProjects(false)} className="mt-2 py-2 text-slate-400 hover:text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-colors w-full">
+                             Show Less
+                          </button>
+                       )}
                        {projects.length === 0 && (
                           <div className="text-center py-6 text-slate-400 text-[10px] font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">No saved projects</div>
                        )}
@@ -1186,6 +1220,23 @@ const AdminDashboard = ({ setCurrentView }) => {
                   </div>
                   <button onClick={() => setFmbWorkflowState('extract')} className="w-8 h-8 bg-cyan-900/50 hover:bg-cyan-800 rounded-full flex items-center justify-center text-cyan-400 transition-colors shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                  </button>
+                </div>
+                
+                {/* Workspace Inputs Card */}
+                <div className="bg-[#1e293b] px-4 py-3 border-b border-slate-700 shadow-md relative z-10 shrink-0 flex items-stretch gap-4 justify-between w-full">
+                  <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[9px] sm:text-[10px] font-black text-cyan-400 uppercase w-20 sm:w-28 shrink-0 truncate">Survey No.</label>
+                      <input type="text" value={workspaceSurveyNumber} onChange={e => setWorkspaceSurveyNumber(e.target.value)} className="flex-1 min-w-0 bg-[#0f172a] border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs sm:text-sm font-bold outline-none focus:border-cyan-500 shadow-inner" placeholder="e.g. 124" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[9px] sm:text-[10px] font-black text-cyan-400 uppercase w-20 sm:w-28 shrink-0 truncate">Sub div</label>
+                      <input type="text" value={workspaceSubDivision} onChange={e => setWorkspaceSubDivision(e.target.value)} className="flex-1 min-w-0 bg-[#0f172a] border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs sm:text-sm font-bold outline-none focus:border-cyan-500 shadow-inner" placeholder="e.g. 2A" />
+                    </div>
+                  </div>
+                  <button className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 sm:px-6 rounded-xl font-black uppercase text-[10px] sm:text-[11px] tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center shrink-0">
+                    Calculate
                   </button>
                 </div>
                 

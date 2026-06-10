@@ -7,7 +7,7 @@ const Tesseract = require('tesseract.js');
 const fs = require('fs/promises');
 const path = require('path');
 const { execFile } = require('child_process');
-const { insertMap, getAllMaps, getMapById, renameMap, deleteMap } = require('./db');
+const { insertMap, getAllMaps, getMapById, renameMap, deleteMap, updateMap, cleanStaleDrafts } = require('./db');
 
 const os = require('os');
 let pdfPoppler = null;
@@ -63,10 +63,12 @@ const traceVector = (buffer, options) => {
 // ─── POST /api/extract-vectors ────────────────────────────────────────────────
 app.post('/api/extract-vectors', async (req, res) => {
     try {
-        const { imageBase64, pdfBase64, fullImageBase64 } = req.body;
+        const { imageBase64, pdfBase64, fullImageBase64, projectId } = req.body;
         if (!imageBase64) return res.status(400).json({ error: 'No image provided' });
 
         let detectedScale = null;
+        let detectedSurveyNumber = null;
+        let detectedSubDivision = null;
 
         // PDF OCR: extract scale from header using pdf-poppler + sharp + Tesseract
         if (pdfBase64) {
@@ -97,13 +99,32 @@ app.post('/api/extract-vectors', async (req, res) => {
                     .toBuffer();
 
                 const ocrResult = await Tesseract.recognize(headerBuffer, 'eng').catch(() => ({ data: { text: '' } }));
+
                 if (ocrResult && ocrResult.data && ocrResult.data.text) {
-                    const scaleMatch = ocrResult.data.text.match(/(?:Scale|1:)\s*([0-9,.]+)/i);
+                    const ocrText = ocrResult.data.text;
+                    console.log(`\n--- OCR RAW TEXT START ---\n${ocrText}\n--- OCR RAW TEXT END ---\n`);
+                    const scaleMatch = ocrText.match(/(?:Scale|1:)\s*([0-9,.]+)/i);
                     if (scaleMatch) {
                         detectedScale = scaleMatch[1].replace(/,/g, '');
                         console.log(`✅ PDF OCR Detected Scale: ${detectedScale}`);
                     } else {
-                        console.log(`❌ Scale not found in OCR text: ${ocrResult.data.text}`);
+                        console.log(`❌ Scale not found in OCR text`);
+                    }
+
+                    // Survey Number & Sub Division Extraction
+                    const surveyMatch = ocrText.match(/(?:S\.?F\.?No\.?|S\.?No\.?|Survey\s*No|Survey\s*Number|புல\s*எண்)[\s.:-]*([0-9A-Za-z]+)(?:\s*[/|\\\-]\s*([a-zA-Z0-9]+))?/i);
+                    if (surveyMatch) {
+                        detectedSurveyNumber = surveyMatch[1];
+                        if (surveyMatch[2]) detectedSubDivision = surveyMatch[2];
+                        console.log(`✅ PDF OCR Detected Survey No: ${detectedSurveyNumber}, Sub Div: ${detectedSubDivision}`);
+                    } else {
+                        // Fallback fraction match e.g. 145/2A or 145 / 2A
+                        const fractionMatch = ocrText.match(/\b([0-9]+)\s*[/|\\\-]\s*([a-zA-Z0-9]+)\b/);
+                        if (fractionMatch) {
+                            detectedSurveyNumber = fractionMatch[1];
+                            detectedSubDivision = fractionMatch[2];
+                            console.log(`✅ PDF OCR Detected Survey No (from fraction): ${detectedSurveyNumber}, Sub Div: ${detectedSubDivision}`);
+                        }
                     }
                 }
 
@@ -191,11 +212,24 @@ app.post('/api/extract-vectors', async (req, res) => {
 </svg>`.trim();
 
         // ─── Auto-Save to Supabase ─────────────────────────────────────────────
-        const mapName = `FMB Map ${new Date().toLocaleString()}`;
-        const insertedId = await insertMap(mapName, '', detectedScale || '', unifiedSvg, fullImageBase64 || '');
+        let finalId = projectId;
+        if (projectId) {
+            await updateMap(projectId, detectedScale || '', unifiedSvg, fullImageBase64 || '');
+        } else {
+            let mapName = 'Unnamed Project';
+            if (detectedSurveyNumber && detectedSubDivision) {
+                mapName = `${detectedSurveyNumber}/${detectedSubDivision}`;
+            } else if (detectedSurveyNumber) {
+                mapName = `${detectedSurveyNumber}`;
+            }
+            finalId = await insertMap(mapName, '', detectedScale || '', unifiedSvg, fullImageBase64 || '');
+        }
 
-        console.log(`Extraction complete. SVG length: ${unifiedSvg.length} chars. Scale: ${detectedScale}. DB ID: ${insertedId}`);
-        res.json({ svg: unifiedSvg, detectedScale, id: insertedId });
+        // Clean up any stale unnamed drafts EXCEPT the one we just processed
+        // await cleanStaleDrafts(finalId); // Disabled per user request to retain history
+
+        console.log(`Extraction complete. SVG length: ${unifiedSvg.length} chars. Scale: ${detectedScale}. DB ID: ${finalId}`);
+        res.json({ svg: unifiedSvg, detectedScale, detectedSurveyNumber, detectedSubDivision, id: finalId });
 
     } catch (err) {
         console.error('Extraction pipeline error:', err);

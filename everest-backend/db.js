@@ -87,4 +87,39 @@ const deleteMap = async (id) => {
     return true;
 };
 
-module.exports = { initDb, insertMap, getAllMaps, getMapById, renameMap, deleteMap };
+// Update an existing map record
+const updateMap = async (id, scale, svgData, sourceImageBase64) => {
+    const db = initDb();
+    if (!db) return false;
+
+    // Fetch to check if name is default
+    const { data: mapData } = await db.from('fmb_maps').select('name').eq('id', id).single();
+    let newName = mapData?.name;
+    if (newName && newName.startsWith('FMB Map ')) {
+        newName = `FMB Map Draft`;
+    }
+
+    const { error } = await db
+        .from('fmb_maps')
+        .update({ name: newName, scale, svg_data: svgData, source_image_base64: sourceImageBase64, created_at: new Date().toISOString() })
+        .eq('id', id);
+    if (error) { console.error('updateMap error:', error); return false; }
+    return true;
+};
+
+// Clean up old stale drafts
+const cleanStaleDrafts = async (keepId) => {
+    const db = initDb();
+    if (!db) return false;
+    
+    let query = db.from('fmb_maps').delete().like('name', 'FMB Map %');
+    if (keepId) {
+        query = query.neq('id', keepId);
+    }
+    
+    const { error } = await query;
+    if (error) { console.error('cleanStaleDrafts error:', error); return false; }
+    return true;
+};
+
+module.exports = { initDb, insertMap, getAllMaps, getMapById, renameMap, deleteMap, updateMap, cleanStaleDrafts };
