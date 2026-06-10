@@ -33,6 +33,73 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [activeMapMenuId, setActiveMapMenuId] = React.useState(null);
   const [currentProjectId, setCurrentProjectId] = React.useState(null);
   const [showAllProjects, setShowAllProjects] = React.useState(false);
+  const [showWorkspaceCalculation, setShowWorkspaceCalculation] = React.useState(false);
+  const [isCalculating, setIsCalculating] = React.useState(false);
+  const [calculatedLandArea, setCalculatedLandArea] = React.useState({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
+  const [isSavingCalculations, setIsSavingCalculations] = React.useState(false);
+  const [calculationsSaved, setCalculationsSaved] = React.useState(false);
+  const [isMetricSquare, setIsMetricSquare] = React.useState(false);
+  const [isFmbMetricSquare, setIsFmbMetricSquare] = React.useState(false);
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = React.useState(false);
+
+  const getHVal = () => workspaceArea ? (parseInt(workspaceArea.h, 10) || 0) : 0;
+  const getAVal = () => workspaceArea ? (parseFloat(workspaceArea.a) || 0) : 0;
+  const getSqm = () => ( (getHVal() + (getAVal() / 100)) * 10000 ).toFixed(2);
+  const getSqft = () => ( (getHVal() + (getAVal() / 100)) * 107639.1 ).toFixed(2);
+
+  const handleSaveCalculations = async () => {
+    if (!currentProjectId) return;
+    setIsSavingCalculations(true);
+    setCalculationsSaved(false);
+    try {
+      const metadata = JSON.stringify({
+        surveyNumber: workspaceSurveyNumber,
+        subDivision: workspaceSubDivision,
+        area: workspaceArea,
+        calculated: calculatedLandArea
+      });
+      const res = await fetch(`${API_BASE}/api/fmb-maps/${currentProjectId}/calculations`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metadata })
+      });
+      if (res.ok) setCalculationsSaved(true);
+    } catch (err) {
+      console.error("Failed to save calculations", err);
+    }
+    setIsSavingCalculations(false);
+  };
+
+  const handleCalculateClick = () => {
+    if (showWorkspaceCalculation) {
+      setShowWorkspaceCalculation(false);
+      return;
+    }
+    
+    setShowWorkspaceCalculation(true);
+    setIsCalculating(true);
+    setCalculationsSaved(false);
+
+    setTimeout(() => {
+        if (workspaceArea && workspaceArea.h !== undefined && workspaceArea.a !== undefined) {
+          const h = parseInt(workspaceArea.h, 10) || 0;
+          const a = parseFloat(workspaceArea.a) || 0;
+          
+          const totalHectare = h + (a / 100);
+          const totalAcre = totalHectare * 2.47105;
+          const totalCent = totalAcre * 100;
+
+          setCalculatedLandArea({
+            hectareAres: `${h.toString().padStart(2, '0')} Hect, ${a.toFixed(2)} Ares`,
+            acre: totalAcre.toFixed(4),
+            cent: totalCent.toFixed(2)
+          });
+        } else {
+          setCalculatedLandArea({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
+        }
+        setIsCalculating(false);
+    }, 800);
+  };
 
   React.useEffect(() => {
     if (!activeMapMenuId) return;
@@ -61,6 +128,19 @@ const AdminDashboard = ({ setCurrentView }) => {
   }, []);
 
   const loadProject = async (id) => {
+    setActiveLandSurveyView('recreate_fmb');
+    setFmbWorkflowState('canvas');
+    setCurrentProjectId(id);
+    setIsLoadingWorkspace(true);
+    setExtractedVectors(null);
+    setPdfScale(null);
+    setSourceImage('');
+    setWorkspaceSurveyNumber('');
+    setWorkspaceSubDivision('');
+    setWorkspaceArea(null);
+    setShowWorkspaceCalculation(false);
+    setCalculatedLandArea({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
+
     try {
       const response = await fetch(`${API_BASE}/api/fmb-maps/${id}`);
       const data = await response.json();
@@ -69,11 +149,41 @@ const AdminDashboard = ({ setCurrentView }) => {
       if (data.source_image_base64) {
         setSourceImage(data.source_image_base64);
       }
-      setCurrentProjectId(id);
-      setFmbWorkflowState('canvas');
-      setActiveLandSurveyView('recreate_fmb');
+      if (data.survey_number) {
+         try {
+           const metadata = JSON.parse(data.survey_number);
+           setWorkspaceSurveyNumber(metadata.surveyNumber || '');
+           setWorkspaceSubDivision(metadata.subDivision || '');
+           setWorkspaceArea(metadata.area || null);
+           if (metadata.calculated) {
+               setCalculatedLandArea(metadata.calculated);
+           }
+         } catch(e) {
+           const nameStr = data.name || '';
+           if (nameStr.includes('/')) {
+             const parts = nameStr.split('/');
+             setWorkspaceSurveyNumber(parts[0].trim());
+             setWorkspaceSubDivision(parts.slice(1).join('/').trim());
+           } else {
+             setWorkspaceSurveyNumber(nameStr);
+             setWorkspaceSubDivision('');
+           }
+         }
+      } else {
+         const nameStr = data.name || '';
+         if (nameStr.includes('/')) {
+           const parts = nameStr.split('/');
+           setWorkspaceSurveyNumber(parts[0].trim());
+           setWorkspaceSubDivision(parts.slice(1).join('/').trim());
+         } else {
+           setWorkspaceSurveyNumber(nameStr);
+           setWorkspaceSubDivision('');
+         }
+      }
     } catch (err) {
       console.error("Failed to load map", err);
+    } finally {
+      setIsLoadingWorkspace(false);
     }
   };
 
@@ -108,6 +218,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [fmbWorkflowState, setFmbWorkflowState] = React.useState('extract'); // extract, crop, canvas
   const [workspaceSurveyNumber, setWorkspaceSurveyNumber] = React.useState('');
   const [workspaceSubDivision, setWorkspaceSubDivision] = React.useState('');
+  const [workspaceArea, setWorkspaceArea] = React.useState(null);
   const [sourceImage, setSourceImage] = React.useState(null);
   const [croppedImage, setCroppedImage] = React.useState(null);
   const [extractedVectors, setExtractedVectors] = React.useState(null);
@@ -193,6 +304,9 @@ const AdminDashboard = ({ setCurrentView }) => {
             }
             if (data.detectedSubDivision) {
                setWorkspaceSubDivision(data.detectedSubDivision);
+            }
+            if (data.detectedArea) {
+               setWorkspaceArea(data.detectedArea);
             }
             if (data.id) {
              setCurrentProjectId(data.id);
@@ -716,19 +830,27 @@ const AdminDashboard = ({ setCurrentView }) => {
       {/* Land Survey Dashboard Overlay Route */}
       {showLandSurveyDashboard && (
         <div className="fixed inset-0 z-[120] bg-[#f8fafc] flex flex-col animate-in slide-in-from-right-full duration-300">
-          {activeLandSurveyView !== 'recreate_fmb' && (
-            <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-10">
-              <button 
-                onClick={closeLandSurvey}
-                className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-600 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </button>
-              <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight mt-0.5">Land Survey</h2>
-            </div>
-          )}
+          <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-10">
+            <button 
+              onClick={() => {
+                if (activeLandSurveyView === 'menu') {
+                  setShowLandSurveyDashboard(false);
+                } else {
+                  setActiveLandSurveyView('menu');
+                }
+              }}
+              className="w-10 h-10 -ml-2 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-700 transition-colors shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight mt-0.5">
+              {activeLandSurveyView === 'simple' ? 'Simple Land View' : 
+               activeLandSurveyView === 'fmb' ? 'Field Measurement Book' : 
+               'Land Survey'}
+            </h2>
+          </div>
 
           {activeLandSurveyView === 'menu' ? (
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
@@ -769,6 +891,10 @@ const AdminDashboard = ({ setCurrentView }) => {
                   setPdfScale('');
                   setWorkspaceSurveyNumber('');
                   setWorkspaceSubDivision('');
+                  setWorkspaceArea(null);
+                  setCurrentProjectId(null);
+                  setShowWorkspaceCalculation(false);
+                  setCalculatedLandArea({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
                   setFmbWorkflowState('extract');
                   setActiveLandSurveyView('recreate_fmb');
                 }}
@@ -784,14 +910,6 @@ const AdminDashboard = ({ setCurrentView }) => {
             </div>
           ) : activeLandSurveyView === 'simple' ? (
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5 animate-in slide-in-from-right-8 duration-300">
-              {/* Top Bar for Back */}
-              <div className="flex items-center gap-3 mb-2 cursor-pointer w-max active:scale-95 transition-transform" onClick={() => setActiveLandSurveyView('menu')}>
-                <div className="w-7 h-7 bg-white shadow-sm rounded-full flex items-center justify-center text-[#0369a1]">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-                </div>
-                <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Simple Lands View</h3>
-              </div>
-
               {/* Engine A: Patta Land Area Converter */}
               <div className="bg-white p-4 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex flex-col gap-4">
                 <div className="flex items-center justify-between">
@@ -866,16 +984,7 @@ const AdminDashboard = ({ setCurrentView }) => {
             </div>
           ) : activeLandSurveyView === 'fmb' ? (
             <div className={`flex flex-col bg-slate-50 overflow-y-auto animate-in slide-in-from-right-8 duration-300 ${isFmbFullScreen ? 'fixed inset-0 z-[150] h-full' : 'flex-1 h-full relative'}`}>
-              {/* Back Button Overlay */}
-              {!isFmbFullScreen && (
-                <div 
-                  className="absolute top-4 left-4 z-20 w-8 h-8 bg-white/80 backdrop-blur-md shadow-sm border border-slate-200 rounded-full flex items-center justify-center text-slate-800 cursor-pointer active:scale-95 transition-transform" 
-                  onClick={() => setActiveLandSurveyView('menu')}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-                </div>
-              )}
-
+              
               {/* Upper Section Scalable Screen */}
               <div className={`${isFmbFullScreen ? 'flex-1' : 'min-h-[60vh] shrink-0'} w-full relative flex flex-col items-center justify-center pt-8 pb-4 px-4 bg-gradient-to-b from-[#f8fafc] to-[#e2e8f0]`}>
                 {/* Floating Right Micro Controls */}
@@ -977,6 +1086,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                     const avgLength = (l + r) / 2;
                     const avgWidth = (t + b) / 2;
                     const totalSqM = avgLength * avgWidth;
+                    const totalHectares = totalSqM / 10000;
+                    const fmb_h = Math.floor(totalHectares);
+                    const fmb_a = (totalHectares - fmb_h) * 100;
                     const cent = totalSqM / 40.468;
                     const sqFt = totalSqM * 10.7639;
                     const acre = totalSqM / 4046.86;
@@ -984,12 +1096,17 @@ const AdminDashboard = ({ setCurrentView }) => {
                     return (
                       <>
                         <div className="w-[48%] bg-slate-50 rounded-lg p-2 border border-slate-100 flex flex-col items-center">
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Total Sq.M</span>
-                          <span className="text-sm font-black text-slate-800">{totalSqM > 0 ? totalSqM.toFixed(2) : '0.00'}</span>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">{isFmbMetricSquare ? 'Total Sq.M' : 'Hectare'}</span>
+                          <span className="text-sm font-black text-slate-800">{isFmbMetricSquare ? (totalSqM > 0 ? totalSqM.toFixed(2) : '0.00') : (fmb_h > 0 ? fmb_h : '0')}</span>
                         </div>
-                        <div className="w-[48%] bg-slate-50 rounded-lg p-2 border border-slate-100 flex flex-col items-center">
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Total Sq.Ft</span>
-                          <span className="text-sm font-black text-slate-800">{sqFt > 0 ? sqFt.toFixed(2) : '0.00'}</span>
+                        <div className="w-[48%] bg-slate-50 rounded-lg p-2 border border-slate-100 flex flex-col items-center relative">
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-0.5">
+                            {isFmbMetricSquare ? 'Total Sq.Ft' : 'Ares'}
+                            <button onClick={() => setIsFmbMetricSquare(!isFmbMetricSquare)} className="p-0.5 hover:bg-slate-200 rounded transition-colors active:scale-95 ml-0.5 text-slate-500">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                          </span>
+                          <span className="text-sm font-black text-slate-800">{isFmbMetricSquare ? (sqFt > 0 ? sqFt.toFixed(2) : '0.00') : (fmb_a > 0 ? fmb_a.toFixed(2) : '0.00')}</span>
                         </div>
                         <div className="w-full bg-emerald-50/50 rounded-lg p-2 border border-emerald-100/50 flex flex-col items-center mt-1">
                           <span className="text-[10px] text-emerald-600 font-black uppercase tracking-wider mb-0.5">Estimated Cent</span>
@@ -1052,7 +1169,13 @@ const AdminDashboard = ({ setCurrentView }) => {
                <div className="flex flex-col bg-slate-50 overflow-y-auto animate-in slide-in-from-right-8 duration-300 flex-1 h-full relative">
               <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-20 shrink-0">
                 <button 
-                  onClick={() => setActiveLandSurveyView('menu')}
+                  onClick={() => {
+                    setActiveLandSurveyView('menu');
+                    fetchProjects();
+                    setShowWorkspaceCalculation(false);
+                    setCalculatedLandArea({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
+                    setCurrentProjectId(null);
+                  }}
                   className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-600 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
@@ -1070,6 +1193,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                        <input type="file" accept=".pdf" className="hidden" onChange={async (e) => {
                           if (e.target.files && e.target.files[0]) {
                              const file = e.target.files[0];
+                             setCurrentProjectId(null);
                              setIsExtractingScale(true);
                              setPdfScale('');
                              setPdfScaleStatus('');
@@ -1159,7 +1283,10 @@ const AdminDashboard = ({ setCurrentView }) => {
               >
                 <div className="bg-[#1e293b] px-5 py-4 border-b border-slate-700 flex items-center justify-between shadow-md relative z-20 shrink-0">
                   <div className="flex items-center gap-4">
-                    <button onClick={() => setFmbWorkflowState('extract')} className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-slate-300 transition-colors">
+                    <button onClick={() => {
+                        setFmbWorkflowState('extract');
+                        setCurrentProjectId(null);
+                    }} className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-slate-300 transition-colors">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                     </button>
                     <div>
@@ -1218,12 +1345,23 @@ const AdminDashboard = ({ setCurrentView }) => {
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setFmbWorkflowState('extract')} className="w-8 h-8 bg-cyan-900/50 hover:bg-cyan-800 rounded-full flex items-center justify-center text-cyan-400 transition-colors shadow-sm">
+                  <button onClick={() => {
+                      setFmbWorkflowState('extract');
+                      setCurrentProjectId(null);
+                    }} className="w-8 h-8 bg-cyan-900/50 hover:bg-cyan-800 rounded-full flex items-center justify-center text-cyan-400 transition-colors shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                   </button>
                 </div>
                 
-                {/* Workspace Inputs Card */}
+                {isLoadingWorkspace ? (
+                  <div className="flex-1 flex flex-col items-center justify-center relative p-8">
+                    <div className="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin mb-4 shadow-[0_0_15px_rgba(34,211,238,0.4)]"></div>
+                    <h3 className="text-cyan-400 font-black tracking-widest uppercase mb-2 animate-pulse">Loading Workspace</h3>
+                    <p className="text-slate-500 text-xs font-bold text-center">Rendering geometric vectors...</p>
+                  </div>
+                ) : (
+                  <>
+                  {/* Workspace Inputs Card */}
                 <div className="bg-[#1e293b] px-4 py-3 border-b border-slate-700 shadow-md relative z-10 shrink-0 flex items-stretch gap-4 justify-between w-full">
                   <div className="flex flex-col gap-2.5 flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -1235,14 +1373,57 @@ const AdminDashboard = ({ setCurrentView }) => {
                       <input type="text" value={workspaceSubDivision} onChange={e => setWorkspaceSubDivision(e.target.value)} className="flex-1 min-w-0 bg-[#0f172a] border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs sm:text-sm font-bold outline-none focus:border-cyan-500 shadow-inner" placeholder="e.g. 2A" />
                     </div>
                   </div>
-                  <button className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 sm:px-6 rounded-xl font-black uppercase text-[10px] sm:text-[11px] tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center shrink-0">
-                    Calculate
+                  <button onClick={handleCalculateClick} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 sm:px-6 rounded-xl font-black uppercase text-[10px] sm:text-[11px] tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center shrink-0 w-24">
+                    {showWorkspaceCalculation ? 'Map View' : 'Calculate'}
                   </button>
                 </div>
                 
                 {/* Main Dark Model Space Canvas */}
                 <div className="flex-1 w-full relative p-4 flex items-center justify-center bg-[#0f172a] bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]">
-                  {extractedVectors ? (
+                  {showWorkspaceCalculation ? (
+                    <div className="w-full h-full max-w-2xl bg-white rounded-2xl shadow-2xl p-6 sm:p-8 flex flex-col border-4 border-slate-100/50">
+                       <h3 className="font-black text-slate-800 text-lg uppercase tracking-wide mb-6 border-b border-slate-100 pb-4">Land Calculation Results</h3>
+                       {isCalculating ? (
+                          <div className="flex flex-col items-center justify-center flex-1 space-y-4">
+                             <div className="w-12 h-12 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin"></div>
+                             <p className="text-slate-500 font-bold text-sm tracking-wider uppercase animate-pulse">Calculating land metrics...</p>
+                          </div>
+                       ) : (
+                         <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-col">
+                             <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-2">
+                               <div className="flex-1 flex flex-col items-center border-r border-slate-200">
+                                 <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-0.5">{isMetricSquare ? 'Total Square Meter' : 'Hectare'}</span>
+                                 <span className="text-lg font-black text-slate-800">{isMetricSquare ? getSqm() : getHVal()}</span>
+                               </div>
+                               <div className="flex-1 flex flex-col items-center relative">
+                                 <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                                   {isMetricSquare ? 'Total Square Feet' : 'Ares'}
+                                   <button onClick={() => setIsMetricSquare(!isMetricSquare)} className="p-0.5 hover:bg-slate-200 rounded transition-colors active:scale-95 ml-0.5 text-slate-500">
+                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                                   </button>
+                                 </span>
+                                 <span className="text-lg font-black text-slate-800">{isMetricSquare ? getSqft() : getAVal().toFixed(2)}</span>
+                               </div>
+                             </div>
+                             <div className="flex justify-between items-center">
+                               <div className="flex-1 flex flex-col items-center border-r border-slate-200">
+                                 <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Acre</span>
+                                 <span className="text-lg font-black text-slate-800">{calculatedLandArea.acre}</span>
+                               </div>
+                               <div className="flex-1 flex flex-col items-center">
+                                 <span className="text-emerald-600/80 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Cent</span>
+                                 <span className="text-xl font-black text-emerald-700">{calculatedLandArea.cent}</span>
+                               </div>
+                             </div>
+                           </div>
+                       )}
+                       <div className="mt-8 flex justify-end">
+                             <button onClick={handleSaveCalculations} disabled={isSavingCalculations || calculationsSaved} className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-400 text-white px-6 py-3 rounded-xl font-black uppercase text-xs tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center min-w-[140px]">
+                               {isSavingCalculations ? 'Saving...' : calculationsSaved ? 'Saved!' : 'Save Data'}
+                             </button>
+                           </div>
+                    </div>
+                  ) : extractedVectors ? (
                     <TransformWrapper 
                       initialScale={1} 
                       minScale={0.5} 
@@ -1262,6 +1443,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                     <img src={croppedImage} alt="Cropped FMB" className="max-w-full max-h-full object-contain shadow-2xl border border-cyan-900/50" />
                   ) : null}
                 </div>
+                  </>
+                )}
               </div>
             )}
             </>

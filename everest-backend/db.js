@@ -88,7 +88,7 @@ const deleteMap = async (id) => {
 };
 
 // Update an existing map record
-const updateMap = async (id, scale, svgData, sourceImageBase64) => {
+const updateMap = async (id, scale, svgData, sourceImageBase64, surveyNumber) => {
     const db = initDb();
     if (!db) return false;
 
@@ -101,7 +101,7 @@ const updateMap = async (id, scale, svgData, sourceImageBase64) => {
 
     const { error } = await db
         .from('fmb_maps')
-        .update({ name: newName, scale, svg_data: svgData, source_image_base64: sourceImageBase64, created_at: new Date().toISOString() })
+        .update({ name: newName, scale, svg_data: svgData, source_image_base64: sourceImageBase64, created_at: new Date().toISOString(), survey_number: surveyNumber })
         .eq('id', id);
     if (error) { console.error('updateMap error:', error); return false; }
     return true;
@@ -122,4 +122,13 @@ const cleanStaleDrafts = async (keepId) => {
     return true;
 };
 
-module.exports = { initDb, insertMap, getAllMaps, getMapById, renameMap, deleteMap, updateMap, cleanStaleDrafts };
+// Update only the metadata (survey_number column)
+const saveMapMetadata = async (id, metadataStr) => {
+    const db = initDb();
+    if (!db) return false;
+    const { error } = await db.from('fmb_maps').update({ survey_number: metadataStr }).eq('id', id);
+    if (error) { console.error('saveMapMetadata error:', error); return false; }
+    return true;
+};
+
+module.exports = { initDb, insertMap, getAllMaps, getMapById, renameMap, deleteMap, updateMap, cleanStaleDrafts, saveMapMetadata };

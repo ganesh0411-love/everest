@@ -7,7 +7,7 @@ const Tesseract = require('tesseract.js');
 const fs = require('fs/promises');
 const path = require('path');
 const { execFile } = require('child_process');
-const { insertMap, getAllMaps, getMapById, renameMap, deleteMap, updateMap, cleanStaleDrafts } = require('./db');
+const { insertMap, getAllMaps, getMapById, renameMap, deleteMap, updateMap, cleanStaleDrafts, saveMapMetadata } = require('./db');
 
 const os = require('os');
 let pdfPoppler = null;
@@ -69,6 +69,7 @@ app.post('/api/extract-vectors', async (req, res) => {
         let detectedScale = null;
         let detectedSurveyNumber = null;
         let detectedSubDivision = null;
+        let detectedArea = null;
 
         // PDF OCR: extract scale from header using pdf-poppler + sharp + Tesseract
         if (pdfBase64) {
@@ -124,6 +125,33 @@ app.post('/api/extract-vectors', async (req, res) => {
                             detectedSurveyNumber = fractionMatch[1];
                             detectedSubDivision = fractionMatch[2];
                             console.log(`✅ PDF OCR Detected Survey No (from fraction): ${detectedSurveyNumber}, Sub Div: ${detectedSubDivision}`);
+                        }
+                    }
+
+                    // Area Extraction
+                    const areaMatch = ocrText.match(/Hect\D*(\d+)\s*Ares\D*([\d\.]+)(?:\s*Sqm\D*([\d\.]+))?/i);
+                    if (areaMatch) {
+                        let h = areaMatch[1];
+                        let a = areaMatch[2];
+                        let finalAres = parseFloat(a);
+                        if (areaMatch[3]) {
+                            finalAres += parseFloat(areaMatch[3]) / 100;
+                        }
+                        detectedArea = { h, a: finalAres.toString() };
+                        console.log(`✅ PDF OCR Detected Area: ${h} Hectares, ${finalAres} Ares`);
+                    } else {
+                        // Fallback Area extraction e.g. "Area : 4.96 Hectares"
+                        const fallbackArea = ocrText.match(/Area\s*[:=-]?\s*([\d\.]+)\s*(Hect|Hectares?|Ares?)/i);
+                        if (fallbackArea) {
+                           let val = parseFloat(fallbackArea[1]);
+                           if (fallbackArea[2].toLowerCase().startsWith('hect')) {
+                               detectedArea = { h: Math.floor(val).toString(), a: ((val - Math.floor(val))*100).toFixed(2) };
+                           } else {
+                               detectedArea = { h: "0", a: val.toString() };
+                           }
+                           console.log(`✅ PDF OCR Detected Area (Fallback): ${detectedArea.h} Hectares, ${detectedArea.a} Ares`);
+                        } else {
+                           console.log(`❌ Area not found in OCR text. Regex match failed.`);
                         }
                     }
                 }
@@ -213,8 +241,14 @@ app.post('/api/extract-vectors', async (req, res) => {
 
         // ─── Auto-Save to Supabase ─────────────────────────────────────────────
         let finalId = projectId;
+        const metadata = JSON.stringify({
+            surveyNumber: detectedSurveyNumber || '',
+            subDivision: detectedSubDivision || '',
+            area: detectedArea || null
+        });
+
         if (projectId) {
-            await updateMap(projectId, detectedScale || '', unifiedSvg, fullImageBase64 || '');
+            await updateMap(projectId, detectedScale || '', unifiedSvg, fullImageBase64 || '', metadata);
         } else {
             let mapName = 'Unnamed Project';
             if (detectedSurveyNumber && detectedSubDivision) {
@@ -222,14 +256,14 @@ app.post('/api/extract-vectors', async (req, res) => {
             } else if (detectedSurveyNumber) {
                 mapName = `${detectedSurveyNumber}`;
             }
-            finalId = await insertMap(mapName, '', detectedScale || '', unifiedSvg, fullImageBase64 || '');
+            finalId = await insertMap(mapName, metadata, detectedScale || '', unifiedSvg, fullImageBase64 || '');
         }
 
         // Clean up any stale unnamed drafts EXCEPT the one we just processed
         // await cleanStaleDrafts(finalId); // Disabled per user request to retain history
 
         console.log(`Extraction complete. SVG length: ${unifiedSvg.length} chars. Scale: ${detectedScale}. DB ID: ${finalId}`);
-        res.json({ svg: unifiedSvg, detectedScale, detectedSurveyNumber, detectedSubDivision, id: finalId });
+        res.json({ svg: unifiedSvg, detectedScale, detectedSurveyNumber, detectedSubDivision, detectedArea, id: finalId });
 
     } catch (err) {
         console.error('Extraction pipeline error:', err);
@@ -267,6 +301,18 @@ app.put('/api/fmb-maps/:id/rename', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Failed to rename map' });
+    }
+});
+
+// ─── PUT /api/fmb-maps/:id/calculations ──────────────────────────
+app.put('/api/fmb-maps/:id/calculations', async (req, res) => {
+    try {
+        const { metadata } = req.body;
+        const ok = await saveMapMetadata(req.params.id, metadata);
+        if (!ok) return res.status(500).json({ error: 'Calculations save failed' });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save calculations' });
     }
 });
 
