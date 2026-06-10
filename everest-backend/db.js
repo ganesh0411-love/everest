@@ -4,8 +4,9 @@ let supabase = null;
 
 const initDb = () => {
     if (!supabase) {
-        const url = process.env.SUPABASE_URL;
-        const key = process.env.SUPABASE_SERVICE_KEY;
+        // Hardcoded to new production instance because Render dashboard lacks these updated env vars
+        const url = process.env.SUPABASE_URL || 'https://ksvkazxyovmqucgvvuuc.supabase.co';
+        const key = process.env.SUPABASE_SERVICE_KEY || 'sb_secret_6RzYfEFdtLYMo-4LQbsDvg_0bfrpfci';
 
         if (!url || !key) {
             console.error('❌ SUPABASE_URL or SUPABASE_SERVICE_KEY is not set in environment.');
