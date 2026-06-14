@@ -34,7 +34,15 @@ import CustomerDetail from './components/CustomerDetail';
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(() => {
+    const saved = localStorage.getItem('everest_user_profile');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [user, setUser] = useState(() => {
+    const savedProfile = localStorage.getItem('everest_user_profile');
+    return savedProfile ? { uid: 'cached', placeholder: true } : null;
+  });
   const [customers, setCustomers] = useState(() => {
     const saved = localStorage.getItem('everest_customers');
     return saved ? JSON.parse(saved) : [];
@@ -42,11 +50,8 @@ function App() {
   const [isDbLoading, setIsDbLoading] = useState(() => {
     return !localStorage.getItem('everest_customers');
   });
-  const [authChecking, setAuthChecking] = useState(true);
-
-  const [userProfile, setUserProfile] = useState(() => {
-    const saved = localStorage.getItem('everest_user_profile');
-    return saved ? JSON.parse(saved) : null;
+  const [authChecking, setAuthChecking] = useState(() => {
+    return !localStorage.getItem('everest_user_profile');
   });
 
   useEffect(() => {

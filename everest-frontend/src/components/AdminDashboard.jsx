@@ -325,20 +325,20 @@ const AdminDashboard = ({ setCurrentView }) => {
   };
   
   // Engine A: Patta Land Area Converter
-  const [hectare, setHectare] = React.useState('');
-  const [ares, setAres] = React.useState('');
-  const [topCent, setTopCent] = React.useState('');
+  const [landRows, setLandRows] = React.useState([{ id: Date.now(), hectare: '', ares: '', topCent: '' }]);
   
   const [acreOutput, setAcreOutput] = React.useState('');
   const [centOutput, setCentOutput] = React.useState('');
   const [sqftOutput, setSqftOutput] = React.useState('');
   const [sqmOutput, setSqmOutput] = React.useState('');
 
-  const calculateFromTop = (h_val, a_val, c_val) => {
-    const h = parseFloat(h_val) || 0;
-    const a = parseFloat(a_val) || 0;
-    const c = parseFloat(c_val) || 0;
-    const totalSqFt = (h * 107639.1) + ((a / 100) * 107639.1) + (c * 435.6);
+  const calculateFromTop = (rows) => {
+    const totalSqFt = rows.reduce((acc, r) => {
+      const h = parseFloat(r.hectare) || 0;
+      const a = parseFloat(r.ares) || 0;
+      const c = parseFloat(r.topCent) || 0;
+      return acc + (h * 107639.1) + ((a / 100) * 107639.1) + (c * 435.6);
+    }, 0);
     const totalH = totalSqFt / 107639.1;
     setAcreOutput(totalSqFt > 0 ? (totalH * 2.47105).toFixed(4) : '');
     setCentOutput(totalSqFt > 0 ? (totalSqFt / 435.6).toFixed(2) : '');
@@ -346,13 +346,27 @@ const AdminDashboard = ({ setCurrentView }) => {
     setSqmOutput(totalSqFt > 0 ? (totalH * 10000).toFixed(2) : '');
   };
 
-  const handleHectareChange = (val) => { setHectare(val); calculateFromTop(val, ares, topCent); };
-  const handleAresChange = (val) => { setAres(val); calculateFromTop(hectare, val, topCent); };
-  const handleTopCentChange = (val) => { setTopCent(val); calculateFromTop(hectare, ares, val); };
+  const handleRowChange = (id, field, val) => {
+    const newRows = landRows.map(r => r.id === id ? { ...r, [field]: val } : r);
+    setLandRows(newRows);
+    calculateFromTop(newRows);
+  };
+
+  const addLandRow = () => {
+    setLandRows([...landRows, { id: Date.now(), hectare: '', ares: '', topCent: '' }]);
+  };
+  
+  const removeLandRow = (id) => {
+    if (landRows.length > 1) {
+      const newRows = landRows.filter(r => r.id !== id);
+      setLandRows(newRows);
+      calculateFromTop(newRows);
+    }
+  };
 
   const applyReverse = (totalH, source) => {
     if (totalH <= 0) {
-      setHectare(''); setAres(''); setTopCent('');
+      setLandRows([{ id: Date.now(), hectare: '', ares: '', topCent: '' }]);
       if (source !== 'acre') setAcreOutput('');
       if (source !== 'centOut') setCentOutput('');
       if (source !== 'sqft') setSqftOutput('');
@@ -361,9 +375,7 @@ const AdminDashboard = ({ setCurrentView }) => {
     }
     const h = Math.floor(totalH);
     const a = (totalH - h) * 100;
-    setHectare(h > 0 ? h.toString() : '');
-    setAres(a > 0 ? a.toFixed(2) : '');
-    setTopCent(''); // Cleared when inversely calculated from absolute totals
+    setLandRows([{ id: Date.now(), hectare: h > 0 ? h.toString() : '', ares: a > 0 ? a.toFixed(2) : '', topCent: '' }]);
 
     const totalSqFt = totalH * 107639.1;
     if (source !== 'acre') setAcreOutput((totalH * 2.47105).toFixed(4));
@@ -836,6 +848,18 @@ const AdminDashboard = ({ setCurrentView }) => {
                 if (activeLandSurveyView === 'menu') {
                   setShowLandSurveyDashboard(false);
                 } else {
+                  if (activeLandSurveyView === 'fmb' || activeLandSurveyView === 'recreate_fmb') {
+                    setPdfBase64('');
+                    setPdfScaleStatus('');
+                    setPdfScale('');
+                    setSourceImage(null);
+                    setCroppedImage(null);
+                    setExtractedVectors(null);
+                    setShowWorkspaceCalculation(false);
+                    setCalculatedLandArea({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
+                    setCurrentProjectId(null);
+                    setFmbTop(''); setFmbBottom(''); setFmbLeft(''); setFmbRight(''); setFmbUnit('Meter');
+                  }
                   setActiveLandSurveyView('menu');
                 }
               }}
@@ -847,6 +871,7 @@ const AdminDashboard = ({ setCurrentView }) => {
             </button>
             <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight mt-0.5">
               {activeLandSurveyView === 'simple' ? 'Simple Land View' : 
+               activeLandSurveyView === 'recreate_fmb' ? 'FMB SCALE EXTRACTION' : 
                activeLandSurveyView === 'fmb' ? 'Field Measurement Book' : 
                'Land Survey'}
             </h2>
@@ -916,19 +941,34 @@ const AdminDashboard = ({ setCurrentView }) => {
                   <h4 className="font-black text-slate-800 text-[12px] uppercase tracking-wide">Land Area Converter</h4>
                 </div>
 
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Hectare</label>
-                    <input type="number" value={hectare} onChange={e => handleHectareChange(e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Ares</label>
-                    <input type="number" value={ares} onChange={e => handleAresChange(e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Cent</label>
-                    <input type="number" value={topCent} onChange={e => handleTopCentChange(e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
-                  </div>
+                <div className="flex flex-col gap-3">
+                  {landRows.map((row, index) => (
+                    <div key={row.id} className="flex gap-2 items-end relative">
+                      <div className="flex-[1.2]">
+                        {index === 0 && <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Hectare</label>}
+                        <input type="number" value={row.hectare} onChange={e => handleRowChange(row.id, 'hectare', e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
+                      </div>
+                      <div className="flex-[1.2]">
+                        {index === 0 && <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Ares</label>}
+                        <input type="number" value={row.ares} onChange={e => handleRowChange(row.id, 'ares', e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
+                      </div>
+                      <div className="flex-[1.4]">
+                        {index === 0 && <label className="text-[10px] text-[#0369a1] font-black mb-1 block uppercase">Cent</label>}
+                        <div className="flex items-center gap-1">
+                          <input type="number" value={row.topCent} onChange={e => handleRowChange(row.id, 'topCent', e.target.value)} className="w-full bg-sky-50/50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-black text-slate-800 outline-none focus:border-[#0369a1] transition-colors shadow-inner" placeholder="0" />
+                          {index === landRows.length - 1 ? (
+                            <button onClick={addLandRow} className="w-9 h-9 ml-1 bg-[#0369a1] text-white rounded-lg flex items-center justify-center shadow-md shrink-0 hover:bg-[#0284c7] transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                            </button>
+                          ) : (
+                            <button onClick={() => removeLandRow(row.id)} className="w-9 h-9 ml-1 bg-red-50 text-red-500 border border-red-100 rounded-lg flex items-center justify-center shrink-0 hover:bg-red-100 transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mt-1">
@@ -1167,21 +1207,6 @@ const AdminDashboard = ({ setCurrentView }) => {
             <>
             {fmbWorkflowState === 'extract' && (
                <div className="flex flex-col bg-slate-50 overflow-y-auto animate-in slide-in-from-right-8 duration-300 flex-1 h-full relative">
-              <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-20 shrink-0">
-                <button 
-                  onClick={() => {
-                    setActiveLandSurveyView('menu');
-                    fetchProjects();
-                    setShowWorkspaceCalculation(false);
-                    setCalculatedLandArea({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
-                    setCurrentProjectId(null);
-                  }}
-                  className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-600 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <h2 className="text-lg font-black text-[#0369a1] uppercase tracking-tight mt-0.5">FMB Scale Extraction</h2>
-              </div>
               <div className="flex-1 w-full relative flex flex-col p-4 bg-gradient-to-b from-[#f8fafc] to-[#e2e8f0]">
                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-4 text-center">
                     <h3 className="font-black text-slate-800 uppercase tracking-wide">Select FMB File</h3>
