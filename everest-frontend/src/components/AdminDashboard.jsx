@@ -436,7 +436,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       let targetNode = null; let targetLine = null; let targetCircle = null; let targetText = null; let targetMetric = null;
       let minSnapDist = 50 * (cadViewport.width / 1000);
 
-      if (isEditingLineMode || cadTool === 'SKETCH_LINE') {
+      if (cadTool === 'IDLE' || isEditingLineMode || cadTool === 'SKETCH_LINE' || cadTool === 'ADD_RADIUS') {
          if (cadTool === 'SKETCH_LINE') {
             const activeL = cadLines.find(x => Math.hypot(x.p1.x - rawPt.x, x.p1.y - rawPt.y) < minSnapDist || Math.hypot(x.p2.x - rawPt.x, x.p2.y - rawPt.y) < minSnapDist);
             if (activeL) {
@@ -686,7 +686,8 @@ const AdminDashboard = ({ setCurrentView }) => {
       
       if (cadPointerGesture && !cadPointerGesture.isDragging && !cadPointerGesture.isDraggingMetric && !cadPointerGesture.isDraggingText && !cadPointerGesture.isDraggingLineBody) {
          if (cadPointerGesture.targetNode) {
-            setShowDarkDrawSettings(false); setCadSelectedNode(cadPointerGesture.targetNode);
+            setShowDarkDrawSettings(false); 
+            setCadSelectedNode(cadPointerGesture.targetNode);
          } else if (cadPointerGesture.targetLine) {
             setShowDarkDrawSettings(false); setCadSelectedLine(cadPointerGesture.targetLine.id); setCadSelectedNode(null); setCadSelectedCircle(null);
             setCadEditInputs(p => ({ ...p, length: cadPointerGesture.targetLine.fixedLength || '', weight: cadPointerGesture.targetLine.strokeWidth || 4, hex: cadPointerGesture.targetLine.hexColor || '#38bdf8' }));
@@ -2459,6 +2460,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                    {showDarkDrawSettings && (
                      <div className="absolute right-0 top-12 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[150] overflow-hidden py-1">
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_LINE'); setShowDarkDrawSettings(false); }}>Add Line</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-sky-400 hover:bg-slate-700 hover:text-sky-300 transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_RADIUS'); setShowDarkDrawSettings(false); }}>Add Radius</button>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-fuchsia-400 hover:bg-slate-700 hover:text-fuchsia-300 transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('SKETCH_LINE'); setShowDarkDrawSettings(false); }}>Sketch / Extend Line</button>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(true); setIsLineMoving(false); setCadTool('EDIT_LINE'); setShowDarkDrawSettings(false); }}>Edit Line Attributes</button>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('EDIT_RADIUS'); setShowDarkDrawSettings(false); }}>Edit Radius</button>
@@ -2706,6 +2708,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                     style={{ left: pLeft, top: pTop }}
                     onClick={e => e.stopPropagation()}
                     onPointerDown={e => e.stopPropagation()}
+                    onPointerUp={e => e.stopPropagation()}
                   >
                     <button 
                       className="w-full text-left px-3 py-2 text-xs font-black text-white hover:bg-slate-700 rounded-lg transition-colors"
