@@ -2,7 +2,7 @@ import React from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.100:5000';
 
 const loadPdfJsScript = () => new Promise((resolve, reject) => {
   if (window.pdfjsLib) return resolve(window.pdfjsLib);
@@ -20,7 +20,645 @@ const loadPdfJsScript = () => new Promise((resolve, reject) => {
 const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);
-  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu');
+  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
+
+  // --- MANUAL CAD ENGINE STATE ---
+  const [cadLines, setCadLines] = React.useState([]);
+  const [cadCircles, setCadCircles] = React.useState([]);
+  const [cadScale, setCadScale] = React.useState(null);
+  const [cadTool, setCadTool] = React.useState('IDLE');
+  const [cadViewport, setCadViewport] = React.useState({ x: 0, y: 0, width: 2000, height: 2000 });
+  const [cadActiveLine, setCadActiveLine] = React.useState(null);
+  const [cadPrompt, setCadPrompt] = React.useState(null);
+  const [cadPromptValue, setCadPromptValue] = React.useState('');
+  const cadSvgRef = React.useRef(null);
+  
+  // Multi-Touch & Gesture State
+    const cadPointersRef = React.useRef(new Map());
+  const cadPanIntervalRef = React.useRef(null);
+
+  const startCadPan = (dx, dy) => {
+    if (cadPanIntervalRef.current) clearInterval(cadPanIntervalRef.current);
+    cadPanIntervalRef.current = setInterval(() => {
+      setCadViewport(prev => ({
+         ...prev,
+         x: prev.x + (dx * prev.width * 0.02),
+         y: prev.y + (dy * prev.height * 0.02)
+      }));
+    }, 16); // ~60 FPS smooth scrolling
+  };
+
+  const stopCadPan = () => {
+    if (cadPanIntervalRef.current) {
+       clearInterval(cadPanIntervalRef.current);
+       cadPanIntervalRef.current = null;
+    }
+  };
+
+  const [cadPinchInitial, setCadPinchInitial] = React.useState(null);
+  
+  // Nodes & Selection
+  const [cadHoveredNode, setCadHoveredNode] = React.useState(null);
+  const [cadSelectedNode, setCadSelectedNode] = React.useState(null);
+  const [cadPointerGesture, setCadPointerGesture] = React.useState(null);
+  const [cadGlowingCircle, setCadGlowingCircle] = React.useState(null);
+  const [cadBlinkingRadius, setCadBlinkingRadius] = React.useState(null);
+  const [cadSnapIndicator, setCadSnapIndicator] = React.useState(null);
+
+  // Extended Editing
+  const [cadSelectedLine, setCadSelectedLine] = React.useState(null);
+  const [cadSelectedCircle, setCadSelectedCircle] = React.useState(null);
+  const [cadTexts, setCadTexts] = React.useState([]);
+  const [cadSelectedText, setCadSelectedText] = React.useState(null);
+  const [cadSelectedMetric, setCadSelectedMetric] = React.useState(null);
+  const [cadDraggingNode, setCadDraggingNode] = React.useState(null); // { lineId, end: 'p1'|'p2' }
+  const [cadEditInputs, setCadEditInputs] = React.useState({ length: '', weight: 4, hex: '#38bdf8', isMovingMetric: false });
+  const [cadPopupOffset, setCadPopupOffset] = React.useState({ x: 0, y: 0 });
+  const [savedProjects, setSavedProjects] = React.useState([]);
+  const [cadMetricOffsets, setCadMetricOffsets] = React.useState({});
+
+  const [cadHistory, setCadHistory] = React.useState({ past: [], future: [] });
+  const cadStateBeforeActionRef = React.useRef(null);
+
+  const handleSaveProject = () => {
+     const project = {
+        id: Date.now().toString(),
+        date: new Date().toLocaleString(),
+        state: {
+           lines: cadLines,
+           circles: cadCircles,
+           texts: cadTexts,
+           metricOffsets: cadMetricOffsets,
+           viewport: cadViewport,
+           scale: cadScale
+        }
+     };
+     setSavedProjects(prev => [project, ...prev]);
+     setShowDarkDrawSettings(false);
+     alert("Project Saved Successfully to My Projects!");
+  };
+
+  const cadComputedArea = React.useMemo(() => {
+    if (!cadScale || cadLines.length < 3) return null;
+    
+    const adj = new Map();
+    cadLines.forEach(l => {
+       const p1 = `${l.p1.x.toFixed(2)},${l.p1.y.toFixed(2)}`;
+       const p2 = `${l.p2.x.toFixed(2)},${l.p2.y.toFixed(2)}`;
+       if (!adj.has(p1)) adj.set(p1, []);
+       if (!adj.has(p2)) adj.set(p2, []);
+       adj.get(p1).push(p2);
+       adj.get(p2).push(p1);
+    });
+    
+    let isLoop = true;
+    for (let [node, neighbors] of adj.entries()) {
+       if (neighbors.length !== 2) { isLoop = false; break; }
+    }
+    if (!isLoop) return null;
+    
+    const vertices = [];
+    const startNode = adj.keys().next().value;
+    let curr = startNode;
+    let prev = null;
+    
+    for (let i = 0; i < adj.size; i++) {
+       const coords = curr.split(',').map(Number);
+       vertices.push({ x: coords[0], y: coords[1] });
+       const neighbors = adj.get(curr);
+       const next = (neighbors[0] !== prev) ? neighbors[0] : neighbors[1];
+       prev = curr;
+       curr = next;
+    }
+    
+    let areaPixels = 0;
+    for (let i = 0; i < vertices.length; i++) {
+       const j = (i + 1) % vertices.length;
+       areaPixels += vertices[i].x * vertices[j].y - vertices[j].x * vertices[i].y;
+    }
+    areaPixels = Math.abs(areaPixels) / 2;
+    
+    const sqMeters = areaPixels * cadScale * cadScale;
+    const sqFt = sqMeters * 10.76391;
+    const cents = sqFt / 435.6;
+    const acres = sqFt / 43560;
+    const hectares = sqFt / 107639.104;
+    
+    return { hectareAre: hectares, acre: acres, cent: cents, sqFt: sqFt };
+  }, [cadLines, cadScale]);
+
+  const captureCadState = () => ({
+     lines: JSON.parse(JSON.stringify(cadLines)),
+     circles: JSON.parse(JSON.stringify(cadCircles)),
+     texts: JSON.parse(JSON.stringify(cadTexts)),
+     metricOffsets: JSON.parse(JSON.stringify(cadMetricOffsets))
+  });
+
+  const saveCadStateToHistory = (customState) => {
+    const stateToSave = customState || captureCadState();
+    setCadHistory(h => {
+      const newPast = [...h.past, stateToSave];
+      if (newPast.length > 40) newPast.shift(); // Max 40 steps
+      return { past: newPast, future: [] };
+    });
+  };
+
+  const handleCadUndo = () => {
+    if (cadHistory.past.length === 0) return;
+    const currentSnapshot = captureCadState();
+    const previous = cadHistory.past[cadHistory.past.length - 1];
+    const newPast = cadHistory.past.slice(0, cadHistory.past.length - 1);
+    
+    setCadHistory({ past: newPast, future: [currentSnapshot, ...cadHistory.future] });
+    setCadLines(previous.lines);
+    setCadCircles(previous.circles);
+    setCadTexts(previous.texts);
+    setCadMetricOffsets(previous.metricOffsets);
+  };
+
+  const handleCadRedo = () => {
+    if (cadHistory.future.length === 0) return;
+    const currentSnapshot = captureCadState();
+    const next = cadHistory.future[0];
+    const newFuture = cadHistory.future.slice(1);
+    
+    setCadHistory({ past: [...cadHistory.past, currentSnapshot], future: newFuture });
+    setCadLines(next.lines);
+    setCadCircles(next.circles);
+    setCadTexts(next.texts);
+    setCadMetricOffsets(next.metricOffsets);
+  };
+
+  const cadNodes = React.useMemo(() => {
+    const nodes = [];
+    cadLines.forEach(l => {
+      if (!nodes.some(n => Math.hypot(n.x - l.p1.x, n.y - l.p1.y) < 1e-4)) nodes.push({ ...l.p1, id: 'n_' + Math.random().toString(36).substr(2, 9) });
+      if (!nodes.some(n => Math.hypot(n.x - l.p2.x, n.y - l.p2.y) < 1e-4)) nodes.push({ ...l.p2, id: 'n_' + Math.random().toString(36).substr(2, 9) });
+    });
+    
+    // Circle tangency points
+    cadCircles.forEach(circle => {
+      const cx = circle.center.x; const cy = circle.center.y; const r = circle.radiusPixels;
+      nodes.push({ x: cx + r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9) });
+      nodes.push({ x: cx - r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9) });
+      nodes.push({ x: cx, y: cy + r, id: 'nc_' + Math.random().toString(36).substr(2, 9) });
+      nodes.push({ x: cx, y: cy - r, id: 'nc_' + Math.random().toString(36).substr(2, 9) });
+    });
+
+    // Intersections between lines
+    for (let i = 0; i < cadLines.length; i++) {
+      for (let j = i + 1; j < cadLines.length; j++) {
+        const l1 = cadLines[i]; const l2 = cadLines[j];
+        const denom = (l1.p1.x - l1.p2.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l1.p2.y) * (l2.p1.x - l2.p2.x);
+        if (Math.abs(denom) > 1e-6) {
+           const t = ((l1.p1.x - l2.p1.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l2.p1.y) * (l2.p1.x - l2.p2.x)) / denom;
+           const u = ((l1.p1.x - l2.p1.x) * (l1.p1.y - l1.p2.y) - (l1.p1.y - l2.p1.y) * (l1.p1.x - l1.p2.x)) / denom;
+           if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+              nodes.push({ x: l1.p1.x + t * (l1.p2.x - l1.p1.x), y: l1.p1.y + t * (l1.p2.y - l1.p1.y), id: 'ni_' + Math.random().toString(36).substr(2, 9) });
+           }
+        }
+      }
+    }
+    return nodes;
+  }, [cadLines, cadCircles]);
+
+  const getCadSvgCoords = (clientX, clientY) => {
+    if (!cadSvgRef.current) return { x: 0, y: 0 };
+    const CTM = cadSvgRef.current.getScreenCTM();
+    if (!CTM) return { x: 0, y: 0 };
+    return { x: (clientX - CTM.e) / CTM.a, y: (clientY - CTM.f) / CTM.d };
+  };
+
+  const getCadSnapPoint = (pt, excludeCircles = false) => {
+    let snapped = { ...pt, snapType: 'NONE' };
+    let minSnapDist = 50 * (cadViewport.width / 1000); 
+    let didSnap = false;
+
+    cadNodes.forEach(n => {
+      const d = Math.hypot(n.x - pt.x, n.y - pt.y);
+      if (d < minSnapDist) { minSnapDist = d; snapped = { ...n, snapType: 'NODE', targetId: n.id }; didSnap = true; }
+    });
+
+    if (!excludeCircles) {
+      cadCircles.forEach(circle => {
+        const dCenter = Math.hypot(circle.center.x - pt.x, circle.center.y - pt.y);
+        const dPerimeter = Math.abs(dCenter - circle.radiusPixels);
+        if (dPerimeter < minSnapDist) {
+          minSnapDist = dPerimeter;
+          const angle = Math.atan2(pt.y - circle.center.y, pt.x - circle.center.x);
+          snapped = {
+            x: circle.center.x + circle.radiusPixels * Math.cos(angle),
+            y: circle.center.y + circle.radiusPixels * Math.sin(angle),
+            snapType: 'CIRCLE',
+            targetId: circle.id
+          };
+          didSnap = true;
+        }
+      });
+    }
+    
+    setCadSnapIndicator(didSnap ? snapped : null);
+    setCadGlowingCircle(snapped.snapType === 'CIRCLE' ? snapped.targetId : null);
+    return snapped;
+  };
+
+  const getSvgPtToContainer = (svgX, svgY) => {
+    if (!cadSvgRef.current) return { left: 0, top: 0 };
+    const rect = cadSvgRef.current.getBoundingClientRect();
+    const scaleX = rect.width / cadViewport.width;
+    const scaleY = rect.height / cadViewport.height;
+    return { left: (svgX - cadViewport.x) * scaleX, top: (svgY - cadViewport.y) * scaleY };
+  };
+
+  const handleCadPointerDown = (e) => {
+    cadStateBeforeActionRef.current = captureCadState();
+    e.target.setPointerCapture(e.pointerId);
+    cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
+    if (cadPointersRef.current.size === 2) {
+      const pts = Array.from(cadPointersRef.current.values());
+      const dist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+      const cx = (pts[0].clientX + pts[1].clientX) / 2;
+      const cy = (pts[0].clientY + pts[1].clientY) / 2;
+      setCadPinchInitial({ dist, cx, cy, view: { ...cadViewport } });
+      setCadActiveLine(null); 
+      setCadTool('IDLE');
+      return;
+    }
+
+    if (cadPointersRef.current.size === 1) {
+      const rawPt = getCadSvgCoords(e.clientX, e.clientY);
+
+      if (cadPrompt || cadSelectedNode || cadSelectedLine || cadSelectedCircle || cadSelectedText || cadSelectedMetric) {
+        if (!cadDraggingNode && !cadPointerGesture?.isDraggingMetric && !cadPointerGesture?.isDraggingText && !cadPointerGesture?.isDraggingLineBody) {
+           setCadPrompt(null); setCadSelectedNode(null); setCadSelectedLine(null); setCadSelectedCircle(null); setCadSelectedText(null); setCadSelectedMetric(null);
+           setCadPopupOffset({ x: 0, y: 0 }); 
+        }
+        return; 
+      }
+      
+      let targetNode = null; let targetLine = null; let targetCircle = null; let targetText = null; let targetMetric = null;
+      let minSnapDist = 50 * (cadViewport.width / 1000);
+
+      if (cadTool === 'EDIT_LINE' || cadTool === 'SKETCH_LINE') {
+         if (cadTool === 'SKETCH_LINE') {
+            const activeL = cadLines.find(x => Math.hypot(x.p1.x - rawPt.x, x.p1.y - rawPt.y) < minSnapDist || Math.hypot(x.p2.x - rawPt.x, x.p2.y - rawPt.y) < minSnapDist);
+            if (activeL) {
+               if (Math.hypot(activeL.p1.x - rawPt.x, activeL.p1.y - rawPt.y) < minSnapDist) { setCadDraggingNode({ lineId: activeL.id, end: 'p1' }); setCadSelectedLine(activeL.id); return; }
+               if (Math.hypot(activeL.p2.x - rawPt.x, activeL.p2.y - rawPt.y) < minSnapDist) { setCadDraggingNode({ lineId: activeL.id, end: 'p2' }); setCadSelectedLine(activeL.id); return; }
+            }
+         }
+         
+         // Legacy Move Mode removed for Sketch integration
+
+         cadNodes.forEach(n => {
+            if (Math.hypot(n.x - rawPt.x, n.y - rawPt.y) < minSnapDist) targetNode = n;
+         });
+         if (!targetNode) {
+            let minLineDist = 20 * (cadViewport.width / 1000);
+            cadLines.forEach(l => {
+               const L2 = Math.pow(l.p1.x - l.p2.x, 2) + Math.pow(l.p1.y - l.p2.y, 2);
+               if (L2 === 0) return;
+               let t = ((rawPt.x - l.p1.x) * (l.p2.x - l.p1.x) + (rawPt.y - l.p1.y) * (l.p2.y - l.p1.y)) / L2;
+               t = Math.max(0, Math.min(1, t));
+               const projX = l.p1.x + t * (l.p2.x - l.p1.x);
+               const projY = l.p1.y + t * (l.p2.y - l.p1.y);
+               if (Math.hypot(rawPt.x - projX, rawPt.y - projY) < minLineDist) targetLine = l;
+            });
+         }
+      } else if (cadTool === 'EDIT_RADIUS') {
+         cadCircles.forEach(circle => {
+            if (Math.abs(Math.hypot(circle.center.x - rawPt.x, circle.center.y - rawPt.y) - circle.radiusPixels) < minSnapDist) targetCircle = circle;
+         });
+      } else if (cadTool === 'SELECT_TEXT') {
+         cadTexts.forEach(txt => {
+            if (Math.hypot(txt.x - rawPt.x, txt.y - rawPt.y) < minSnapDist * 1.5) targetText = txt;
+         });
+      } else if (cadTool === 'SELECT_METRIC') {
+         cadLines.forEach(l => {
+            if (l.fixedLength) {
+               const offset = cadMetricOffsets[l.id] || { dx: 0, dy: -cadViewport.width * 0.01 };
+               const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
+               const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
+               if (Math.hypot(mx - rawPt.x, my - rawPt.y) < minSnapDist * 1.5) targetMetric = l;
+            }
+         });
+      }
+
+      setCadPointerGesture({ 
+         startX: e.clientX, startY: e.clientY, 
+         isDragging: false, isDraggingMetric: false, isDraggingText: false, isDraggingLineBody: false,
+         targetNode, targetLine, targetCircle, targetText, targetMetric 
+      });
+
+      if (cadTool === 'ADD_LINE' && !cadActiveLine) {
+         const snapPt = getCadSnapPoint(rawPt, true);
+         setCadActiveLine({ p1: snapPt, p2: snapPt });
+      } else if (cadTool === 'ADD_TEXT') {
+         const ctCoords = getSvgPtToContainer(rawPt.x, rawPt.y);
+         setCadPrompt({ type: 'TEXT', x: ctCoords.left, y: ctCoords.top, svgPt: rawPt });
+         setCadPromptValue('');
+         setCadTool('IDLE');
+      }
+    }
+  };
+
+  const handleCadPointerMove = (e) => {
+    e.preventDefault(); 
+    if (!cadPointersRef.current.has(e.pointerId)) return;
+    cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
+    if (cadPointersRef.current.size === 2 && cadPinchInitial) {
+      const pts = Array.from(cadPointersRef.current.values());
+      const dist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+      const cx = (pts[0].clientX + pts[1].clientX) / 2;
+      const cy = (pts[0].clientY + pts[1].clientY) / 2;
+
+      const scaleDelta = dist > 5 ? cadPinchInitial.dist / dist : 1;
+      const newWidth = cadPinchInitial.view.width * scaleDelta;
+      const newHeight = cadPinchInitial.view.height * scaleDelta;
+
+      const svgRect = cadSvgRef.current.getBoundingClientRect();
+      const uniformScale = Math.max(cadPinchInitial.view.width / svgRect.width, cadPinchInitial.view.height / svgRect.height);
+      const dx = (cadPinchInitial.cx - cx) * uniformScale;
+      const dy = (cadPinchInitial.cy - cy) * uniformScale; 
+
+      const centroidSvgX = cadPinchInitial.view.x + (cadPinchInitial.cx - svgRect.left) * uniformScale;
+      const centroidSvgY = cadPinchInitial.view.y + (cadPinchInitial.cy - svgRect.top) * uniformScale;
+      const zdx = (centroidSvgX - cadPinchInitial.view.x) * (1 - scaleDelta);
+      const zdy = (centroidSvgY - cadPinchInitial.view.y) * (1 - scaleDelta);
+
+      setCadViewport({ x: cadPinchInitial.view.x + dx + zdx, y: cadPinchInitial.view.y + dy + zdy, width: newWidth, height: newHeight });
+      return;
+    }
+
+    if (cadPointersRef.current.size === 1) {
+      const rawPt = getCadSvgCoords(e.clientX, e.clientY);
+      const svgRect = cadSvgRef.current?.getBoundingClientRect();
+      const uniformScale = svgRect ? Math.max(cadViewport.width / svgRect.width, cadViewport.height / svgRect.height) : 1;
+      
+      let hoveredNode = null;
+      if (cadTool === 'ADD_LINE' || cadTool === 'EDIT_LINE') {
+        let minSnapDist = 50 * (cadViewport.width / 1000);
+        cadNodes.forEach(n => { if (Math.hypot(n.x - rawPt.x, n.y - rawPt.y) < minSnapDist) hoveredNode = n; });
+      }
+      setCadHoveredNode(hoveredNode);
+
+      if (cadPointerGesture && !cadPointerGesture.isDragging && !cadPointerGesture.isDraggingMetric && !cadPointerGesture.isDraggingText && !cadPointerGesture.isDraggingLineBody ) {
+         if (Math.hypot(e.clientX - cadPointerGesture.startX, e.clientY - cadPointerGesture.startY) > 5) {
+            
+            if (cadPointerGesture.targetNode) {
+               setCadPointerGesture(p => ({ ...p, isDragging: true }));
+               setShowDarkDrawSettings(false);
+               const connectedLines = cadLines.filter(l => (Math.hypot(l.p1.x - cadPointerGesture.targetNode.x, l.p1.y - cadPointerGesture.targetNode.y) < 1e-4) || (Math.hypot(l.p2.x - cadPointerGesture.targetNode.x, l.p2.y - cadPointerGesture.targetNode.y) < 1e-4));
+               if (connectedLines.length > 0) {
+                  setCadSelectedLine(connectedLines[0].id);
+                  const end = Math.hypot(connectedLines[0].p1.x - cadPointerGesture.targetNode.x, connectedLines[0].p1.y - cadPointerGesture.targetNode.y) < 1e-4 ? 'p1' : 'p2';
+                  setCadDraggingNode({ lineId: connectedLines[0].id, end });
+               }
+            } else if (cadPointerGesture.targetMetric && cadEditInputs.isMovingMetric) {
+               setCadPointerGesture(p => ({ ...p, isDraggingMetric: true }));
+               setShowDarkDrawSettings(false);
+            } else if (cadPointerGesture.targetText && cadEditInputs.isMovingText) {
+               setCadPointerGesture(p => ({ ...p, isDraggingText: true }));
+               setShowDarkDrawSettings(false);
+            }
+         }
+      }
+
+
+
+      if (cadPointerGesture?.isDraggingMetric) {
+         const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
+         const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
+         const lineId = cadPointerGesture.targetMetric.id;
+         const baseOffset = cadPointerGesture.baseOffset || cadMetricOffsets[lineId] || { dx: 0, dy: -cadViewport.width * 0.01 };
+         if (!cadPointerGesture.baseOffset) setCadPointerGesture(p => ({ ...p, baseOffset }));
+         
+         setCadMetricOffsets(prev => ({ ...prev, [lineId]: { dx: baseOffset.dx + dxSvg, dy: baseOffset.dy + dySvg } }));
+         return;
+      }
+
+      if (cadPointerGesture?.isDraggingText) {
+         const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
+         const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
+         const textId = cadPointerGesture.targetText.id;
+         const basePos = cadPointerGesture.basePos || { x: cadPointerGesture.targetText.x, y: cadPointerGesture.targetText.y };
+         if (!cadPointerGesture.basePos) setCadPointerGesture(p => ({ ...p, basePos }));
+         
+         setCadTexts(prev => prev.map(t => t.id === textId ? { ...t, x: basePos.x + dxSvg, y: basePos.y + dySvg } : t));
+         return;
+      }
+
+      if (cadDraggingNode) {
+         const snapPt = getCadSnapPoint(rawPt, false); 
+         setCadLines(prev => prev.map(l => {
+            if (l.id === cadDraggingNode.lineId) {
+               const nl = { ...l, [cadDraggingNode.end]: snapPt };
+               if (cadScale) {
+                  nl.fixedLength = (Math.hypot(nl.p1.x - nl.p2.x, nl.p1.y - nl.p2.y) * cadScale).toFixed(2);
+               }
+               setCadEditInputs(p => ({ ...p, length: nl.fixedLength }));
+               return nl;
+            }
+            return l;
+         }));
+         return;
+      }
+
+      if (cadTool === 'ADD_LINE' && cadActiveLine) {
+        const snapPt = getCadSnapPoint(rawPt, false); 
+        setCadActiveLine({ ...cadActiveLine, p2: snapPt });
+
+        const edgeThreshX = cadViewport.width * 0.1; const edgeThreshY = cadViewport.height * 0.1;
+        let needsZoom = false; let nX = cadViewport.x, nY = cadViewport.y, nW = cadViewport.width, nH = cadViewport.height;
+
+        if (snapPt.x < cadViewport.x + edgeThreshX) { nW *= 1.05; nH *= 1.05; nX -= cadViewport.width * 0.025; nY -= cadViewport.height * 0.025; needsZoom = true; }
+        else if (snapPt.x > cadViewport.x + cadViewport.width - edgeThreshX) { nW *= 1.05; nH *= 1.05; nX += cadViewport.width * 0.025; nY -= cadViewport.height * 0.025; needsZoom = true; }
+        
+        if (snapPt.y < cadViewport.y + edgeThreshY) { nW *= 1.05; nH *= 1.05; nX -= cadViewport.width * 0.025; nY -= cadViewport.height * 0.025; needsZoom = true; }
+        else if (snapPt.y > cadViewport.y + cadViewport.height - edgeThreshY) { nW *= 1.05; nH *= 1.05; nX -= cadViewport.width * 0.025; nY += cadViewport.height * 0.025; needsZoom = true; }
+        
+        if (needsZoom) setCadViewport({ x: nX, y: nY, width: nW, height: nH });
+      }
+    }
+  };
+
+  const handleCadPointerUp = (e) => {
+    cadPointersRef.current.delete(e.pointerId);
+    if (cadPointersRef.current.size < 2) setCadPinchInitial(null);
+    if (cadPointersRef.current.size === 0) {
+      setCadSnapIndicator(null);
+      setCadGlowingCircle(null);
+      
+      if (cadDraggingNode) { setCadDraggingNode(null); setCadPointerGesture(null); return; }
+      
+      
+      if (cadPointerGesture && !cadPointerGesture.isDragging && !cadPointerGesture.isDraggingMetric && !cadPointerGesture.isDraggingText && !cadPointerGesture.isDraggingLineBody) {
+         if (cadPointerGesture.targetNode) {
+            setShowDarkDrawSettings(false); setCadSelectedNode(cadPointerGesture.targetNode);
+         } else if (cadPointerGesture.targetLine) {
+            setShowDarkDrawSettings(false); setCadSelectedLine(cadPointerGesture.targetLine.id); setCadSelectedNode(null); setCadSelectedCircle(null);
+            setCadEditInputs(p => ({ ...p, length: cadPointerGesture.targetLine.fixedLength || '', weight: cadPointerGesture.targetLine.strokeWidth || 4, hex: cadPointerGesture.targetLine.hexColor || '#38bdf8' }));
+         } else if (cadPointerGesture.targetCircle) {
+            setShowDarkDrawSettings(false); setCadSelectedCircle(cadPointerGesture.targetCircle.id); setCadSelectedNode(null); setCadSelectedLine(null);
+            setCadEditInputs(p => ({ ...p, length: cadPointerGesture.targetCircle.radiusMeters, weight: cadPointerGesture.targetCircle.strokeWidth || 3, hex: cadPointerGesture.targetCircle.hexColor || '#4f46e5' }));
+         } else if (cadPointerGesture.targetText) {
+            setShowDarkDrawSettings(false); setCadSelectedText(cadPointerGesture.targetText.id);
+            setCadPopupOffset({x:0, y:0});
+         } else if (cadPointerGesture.targetMetric) {
+            setShowDarkDrawSettings(false); setCadSelectedMetric(cadPointerGesture.targetMetric.id);
+            setCadPopupOffset({x:0, y:0});
+         }
+      }
+      setCadPointerGesture(null);
+
+      if (cadTool === 'ADD_LINE' && cadActiveLine) {
+        const d = Math.hypot(cadActiveLine.p1.x - cadActiveLine.p2.x, cadActiveLine.p1.y - cadActiveLine.p2.y);
+        if (d > 5) {
+          const newId = Date.now().toString();
+          let finalLen = cadScale ? (Math.hypot(cadActiveLine.p1.x - cadActiveLine.p2.x, cadActiveLine.p1.y - cadActiveLine.p2.y) * cadScale).toFixed(2) : null;
+          
+          setCadLines(prev => [...prev, { id: newId, p1: cadActiveLine.p1, p2: cadActiveLine.p2, fixedLength: finalLen, strokeWidth: 4, hexColor: '#38bdf8' }]);
+          
+          if (!finalLen) {
+             const midSvgX = (cadActiveLine.p1.x + cadActiveLine.p2.x) / 2;
+             const midSvgY = (cadActiveLine.p1.y + cadActiveLine.p2.y) / 2;
+             const ctCoords = getSvgPtToContainer(midSvgX, midSvgY);
+             setCadPrompt({ type: 'LINE', targetId: newId, x: ctCoords.left, y: ctCoords.top });
+             setCadPromptValue('');
+          }
+        }
+        setCadActiveLine(null);
+        setCadTool('IDLE');
+      }
+    }
+  };
+
+  const handleCadWheel = (e) => {
+    if (cadPrompt || cadSelectedNode || cadSelectedLine || cadSelectedCircle) return;
+    e.preventDefault();
+    const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+    const rawPt = getCadSvgCoords(e.clientX, e.clientY);
+    setCadViewport(prev => ({
+      x: prev.x + (rawPt.x - prev.x) * (1 - zoomFactor),
+      y: prev.y + (rawPt.y - prev.y) * (1 - zoomFactor),
+      width: prev.width * zoomFactor,
+      height: prev.height * zoomFactor
+    }));
+  };
+
+  React.useEffect(() => {
+    const el = cadSvgRef.current;
+    if (el) {
+      el.addEventListener('wheel', handleCadWheel, { passive: false });
+      return () => el.removeEventListener('wheel', handleCadWheel);
+    }
+  }, [cadViewport, cadPrompt, cadSelectedNode, cadSelectedLine, cadSelectedCircle]);
+
+
+  
+  const submitCadPrompt = (e) => {
+    try {
+      if (e && e.preventDefault) e.preventDefault();
+      if (!cadPrompt) return;
+      saveCadStateToHistory();
+
+      if (cadPrompt.type === 'TEXT') {
+         if (cadPromptValue && cadPromptValue.trim()) {
+            setCadTexts(prev => [...prev, { id: Date.now().toString(), x: cadPrompt.svgPt.x, y: cadPrompt.svgPt.y, text: cadPromptValue, fontSize: cadViewport.width * 0.02, hexColor: '#e2e8f0' }]);
+         }
+         setCadPrompt(null);
+         return;
+      }
+
+      const num = parseFloat(cadPromptValue);
+      if (isNaN(num) || num <= 0) { setCadPrompt(null); return; }
+
+      if (cadPrompt.type === 'LINE') {
+        const line = cadLines.find(l => l.id === cadPrompt.targetId);
+        if (!line) { setCadPrompt(null); return; }
+        const pxLength = Math.hypot(line.p1.x - line.p2.x, line.p1.y - line.p2.y);
+        if (!cadScale) {
+          setCadScale(num / pxLength);
+          setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, fixedLength: num } : l));
+        } else {
+          const targetPx = num / cadScale;
+          const ratio = targetPx / pxLength;
+          const newP2 = {
+            x: line.p1.x + (line.p2.x - line.p1.x) * ratio,
+            y: line.p1.y + (line.p2.y - line.p1.y) * ratio
+          };
+          setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, p2: newP2, fixedLength: num } : l));
+        }
+      } else if (cadPrompt.type === 'RADIUS') {
+        if (!cadScale) { alert("Draw and dimension a baseline first to establish scale."); setCadPrompt(null); return; }
+        const rPx = num / cadScale;
+        setCadCircles(prev => [...prev, { id: Date.now().toString(), center: cadPrompt.center, radiusMeters: num, radiusPixels: rPx, strokeWidth: 3, hexColor: '#4f46e5' }]);
+        
+        const minX = cadPrompt.center.x - rPx, maxX = cadPrompt.center.x + rPx;
+        const minY = cadPrompt.center.y - rPx, maxY = cadPrompt.center.y + rPx;
+        const reqWidth = (maxX - minX) * 1.2, reqHeight = (maxY - minY) * 1.2;
+        
+        setCadViewport(prev => {
+          let nX = prev.x, nY = prev.y, nW = prev.width, nH = prev.height;
+          if (minX < prev.x || maxX > prev.x + prev.width || minY < prev.y || maxY > prev.y + prev.height) {
+            nW = Math.max(prev.width, reqWidth); nH = Math.max(prev.height, reqHeight);
+            if (minX < prev.x) nX = minX - nW * 0.1;
+            if (maxX > nX + nW) nX = maxX - nW * 0.9;
+            if (minY < prev.y) nY = minY - nH * 0.1;
+            if (maxY > nY + nH) nY = maxY - nH * 0.9;
+          }
+          return { x: nX, y: nY, width: nW, height: nH };
+        });
+      }
+      setCadPrompt(null);
+    } catch (err) {
+      console.error("submitCadPrompt critical failure:", err);
+      setCadPrompt(null);
+    }
+  };
+
+  const handleCadEditSave = () => {
+      saveCadStateToHistory();
+     if (cadSelectedLine) {
+       const l = cadLines.find(x => x.id === cadSelectedLine);
+       if (l && cadScale) {
+         const num = parseFloat(cadEditInputs.length) || l.fixedLength;
+         const pxLength = Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y);
+         const targetPx = num / cadScale;
+         const ratio = targetPx / pxLength;
+         const newP2 = {
+            x: l.p1.x + (l.p2.x - l.p1.x) * ratio,
+            y: l.p1.y + (l.p2.y - l.p1.y) * ratio
+         };
+         setCadLines(prev => prev.map(x => x.id === cadSelectedLine ? { ...x, p2: newP2, fixedLength: num, strokeWidth: cadEditInputs.weight, hexColor: cadEditInputs.hex } : x));
+       } else {
+         setCadLines(prev => prev.map(x => x.id === cadSelectedLine ? { ...x, strokeWidth: cadEditInputs.weight, hexColor: cadEditInputs.hex } : x));
+       }
+       setCadSelectedLine(null);
+     }
+     
+     if (cadSelectedCircle) {
+        const c = cadCircles.find(x => x.id === cadSelectedCircle);
+        if (c && cadScale) {
+           const num = parseFloat(cadEditInputs.length) || c.radiusMeters;
+           const rPx = num / cadScale;
+           setCadCircles(prev => prev.map(x => x.id === cadSelectedCircle ? { ...x, radiusMeters: num, radiusPixels: rPx, strokeWidth: cadEditInputs.weight, hexColor: cadEditInputs.hex } : x));
+        }
+        setCadSelectedCircle(null);
+     }
+  };
+  
+  const handleCadEditDelete = () => {
+     if (cadSelectedLine) setCadLines(prev => prev.filter(x => x.id !== cadSelectedLine));
+     if (cadSelectedCircle) setCadCircles(prev => prev.filter(x => x.id !== cadSelectedCircle));
+     setCadSelectedLine(null);
+     setCadSelectedCircle(null);
+  };
+  // --- END MANUAL CAD ENGINE STATE ---
+
+  const [showDarkDrawSettings, setShowDarkDrawSettings] = React.useState(false);
   
   // FMB Scale Extraction State
   const [pdfScaleStatus, setPdfScaleStatus] = React.useState(''); // 'found', 'not_found', 'error'
@@ -615,7 +1253,21 @@ const AdminDashboard = ({ setCurrentView }) => {
                   fill="none"
                   strokeWidth="4"
                 />
-              </svg>
+              
+                  {cadTexts.map(t => {
+                     const isSelected = cadSelectedText === t.id;
+                     return (
+                        <text 
+                           key={t.id} x={t.x} y={t.y} fill={isSelected ? "#fbcfe8" : (t.hexColor || "#ffffff")} 
+                           fontSize={t.fontSize || cadViewport.width * 0.02} fontWeight="bold" textAnchor="middle"
+                           pointerEvents="auto"
+                           style={{ opacity: 1, visibility: 'visible' }}
+                        >
+                           {t.text}
+                        </text>
+                     );
+                  })}
+</svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-white/80 text-[8px] font-bold">Collected:</span>
                 <span className="text-white font-black text-sm leading-none mt-0.5">65%</span>
@@ -842,6 +1494,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       {/* Land Survey Dashboard Overlay Route */}
       {showLandSurveyDashboard && (
         <div className="fixed inset-0 z-[120] bg-[#f8fafc] flex flex-col animate-in slide-in-from-right-full duration-300">
+          {activeLandSurveyView !== 'dark_draw_manual' && activeLandSurveyView !== 'dark_draw_submenu' && activeLandSurveyView !== 'dark_draw_projects' && (
           <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-10">
             <button 
               onClick={() => {
@@ -873,9 +1526,11 @@ const AdminDashboard = ({ setCurrentView }) => {
               {activeLandSurveyView === 'simple' ? 'Simple Land View' : 
                activeLandSurveyView === 'recreate_fmb' ? 'FMB SCALE EXTRACTION' : 
                activeLandSurveyView === 'fmb' ? 'Field Measurement Book' : 
+               activeLandSurveyView === 'dark_draw_manual' ? 'DARK DRAW FMB' : 
                'Land Survey'}
             </h2>
           </div>
+        )}
 
           {activeLandSurveyView === 'menu' ? (
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
@@ -930,6 +1585,19 @@ const AdminDashboard = ({ setCurrentView }) => {
                 </div>
                 <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 shadow-inner">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </div>
+              </div>
+              {/* Card 4 */}
+              <div 
+                className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
+                onClick={() => setActiveLandSurveyView('dark_draw_submenu')}
+              >
+                <div>
+                  <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">DARK DRAW FMB</h3>
+                  <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">Advanced manual drawing mode</p>
+                </div>
+                <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white shadow-inner">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 </div>
               </div>
             </div>
@@ -1473,6 +2141,465 @@ const AdminDashboard = ({ setCurrentView }) => {
               </div>
             )}
             </>
+          ) : activeLandSurveyView === 'dark_draw_submenu' ? (
+             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-slate-50 animate-in slide-in-from-right-8 duration-300">
+               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
+                 <h3 className="font-black text-[#0369a1] text-lg uppercase tracking-wide border-b border-slate-100 pb-2">Dark Draw Setup</h3>
+                 <button onClick={() => setActiveLandSurveyView('dark_draw_manual')} className="w-full text-left bg-slate-50 hover:bg-[#0369a1] hover:text-white text-slate-800 p-4 rounded-xl border border-slate-200 transition-colors font-bold flex justify-between items-center group">
+                   Manual Drawing Canvas
+                   <span className="text-slate-400 group-hover:text-white">→</span>
+                 </button>
+                 <button disabled className="w-full text-left bg-slate-50 text-slate-800 p-4 rounded-xl border border-slate-200 font-bold opacity-50 pointer-events-none flex justify-between items-center">
+                   Point 2
+                   <span className="text-slate-400">→</span>
+                 </button>
+                 <button onClick={() => setActiveLandSurveyView('dark_draw_projects')} className="w-full text-left bg-slate-50 hover:bg-[#0369a1] hover:text-white text-slate-800 p-4 rounded-xl border border-slate-200 transition-colors font-bold flex justify-between items-center group">
+                   My Projects
+                   <span className="text-slate-400 group-hover:text-white">→</span>
+                 </button>
+               </div>
+             </div>
+          ) : activeLandSurveyView === 'dark_draw_projects' ? (
+             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-slate-50 animate-in slide-in-from-right-8 duration-300">
+               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
+                 <h3 className="font-black text-[#0369a1] text-lg uppercase tracking-wide border-b border-slate-100 pb-2 flex items-center gap-3">
+                   <button onClick={() => setActiveLandSurveyView('dark_draw_submenu')} className="hover:text-slate-500 transition-colors">⬅️</button>
+                   Saved Projects
+                 </h3>
+                 {savedProjects.length === 0 ? (
+                   <p className="text-sm text-slate-500 italic">No projects saved yet.</p>
+                 ) : (
+                   savedProjects.map(proj => (
+                     <button key={proj.id} onClick={() => {
+                        setCadLines(proj.state.lines);
+                        setCadCircles(proj.state.circles);
+                        setCadTexts(proj.state.texts);
+                        setCadMetricOffsets(proj.state.metricOffsets);
+                        setCadViewport(proj.state.viewport);
+                        setCadScale(proj.state.scale);
+                        setCadHistory({ past: [], future: [] }); // Reset history
+                        setActiveLandSurveyView('dark_draw_manual');
+                     }} className="w-full text-left bg-slate-50 hover:bg-[#0369a1] hover:text-white text-slate-800 p-4 rounded-xl border border-slate-200 transition-colors font-bold flex justify-between items-center group">
+                       Project - {proj.date}
+                       <span className="text-slate-400 group-hover:text-white font-black text-xs uppercase tracking-widest">Load</span>
+                     </button>
+                   ))
+                 )}
+               </div>
+             </div>
+          ) : activeLandSurveyView === 'dark_draw_manual' ? (
+             <div className="flex-1 flex flex-col bg-slate-950 animate-in slide-in-from-right-8 duration-300">
+               {/* TOP NAVIGATION BAR OVERHAUL */}
+               <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center shadow-md relative z-50 shrink-0 w-full justify-between">
+                 <div className="flex items-center gap-4">
+                    {/* Native Back Arrow */}
+                    <button 
+                      onClick={() => setActiveLandSurveyView('menu')}
+                      className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                      </svg>
+                    </button>
+                    
+                    {/* WorkSpace Title */}
+                    <h2 className="text-[14px] font-black text-slate-200 uppercase tracking-widest mt-0.5">
+                      WORKSPACE
+                    </h2>
+                    
+                    {/* Action Micro-Buttons (Undo / Redo) */}
+                    <div className="flex items-center gap-1 ml-2 border-l border-slate-700 pl-4">
+                       <button onClick={handleCadUndo} disabled={cadHistory.past.length === 0} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                       </button>
+                       <button onClick={handleCadRedo} disabled={cadHistory.future.length === 0} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" /></svg>
+                       </button>
+                    </div>
+                 </div>
+                 
+                 <div className="relative">
+                   <button 
+                     onClick={() => setShowDarkDrawSettings(!showDarkDrawSettings)}
+                     className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors"
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                     </svg>
+                   </button>
+                   
+                   {showDarkDrawSettings && (
+                     <div className="absolute right-0 top-12 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[100] overflow-hidden py-1">
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setCadTool('ADD_LINE'); setShowDarkDrawSettings(false); }}>Add Line</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-fuchsia-400 hover:bg-slate-700 hover:text-fuchsia-300 transition-colors" onClick={() => { setCadTool('SKETCH_LINE'); setShowDarkDrawSettings(false); }}>Sketch / Extend Line</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setCadTool('EDIT_LINE'); setShowDarkDrawSettings(false); }}>Edit Line Attributes</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setCadTool('EDIT_RADIUS'); setShowDarkDrawSettings(false); }}>Edit Radius</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setCadTool('ADD_TEXT'); setShowDarkDrawSettings(false); }}>Add Text</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setCadTool('SELECT_METRIC'); setShowDarkDrawSettings(false); }}>Select Metric</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setCadTool('SELECT_TEXT'); setShowDarkDrawSettings(false); }}>Select Text</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-black text-emerald-400 hover:bg-slate-700 hover:text-emerald-300 transition-colors border-t border-slate-700 uppercase tracking-widest" onClick={handleSaveProject}>Save Project</button>
+                     </div>
+                   )}
+                 </div>
+               </div>
+
+{/* DARK CANVAS CONTAINER */}
+              <div 
+                className="flex-1 w-full relative overflow-hidden bg-slate-950 flex items-center justify-center touch-none" 
+                onPointerDown={handleCadPointerDown}
+                onPointerMove={handleCadPointerMove}
+                onPointerUp={handleCadPointerUp}
+                onPointerLeave={handleCadPointerUp}
+                onClick={() => setShowDarkDrawSettings(false)}
+              >
+                 <svg 
+                   ref={cadSvgRef}
+                   className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
+                   viewBox={`${cadViewport.x} ${cadViewport.y} ${cadViewport.width} ${cadViewport.height}`}
+                   preserveAspectRatio="xMidYMid slice"
+                 >
+                   <defs>
+                     <pattern id="grid" width={cadViewport.width * 0.05} height={cadViewport.width * 0.05} patternUnits="userSpaceOnUse">
+                       <path d={`M ${cadViewport.width * 0.05} 0 L 0 0 0 ${cadViewport.width * 0.05}`} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={cadViewport.width * 0.001}/>
+                     </pattern>
+                   </defs>
+                   <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
+
+                  {cadCircles.map(c => {
+                    const isSelected = cadSelectedCircle === c.id;
+                    const isGlowing = cadGlowingCircle === c.id;
+                    return (
+                    <g key={c.id}>
+                      <circle 
+                        cx={c.center.x} cy={c.center.y} r={c.radiusPixels} 
+                        fill={isSelected ? "rgba(236,72,153,0.1)" : "none"}
+                        stroke={isSelected || isGlowing ? "#ec4899" : (c.hexColor || "#4f46e5")} 
+                        strokeWidth={cadViewport.width * (c.strokeWidth ? c.strokeWidth / 1000 : 0.003)} 
+                        className={cadBlinkingRadius === c.id || isGlowing ? "animate-pulse stroke-fuchsia-500" : "transition-colors duration-200"}
+                      />
+                    </g>
+                  )})}
+
+                  {cadLines.map(l => {
+                    const isSelected = cadSelectedLine === l.id;
+                    const isMetricHovered = cadHoveredNode === null && !cadPointerGesture?.isDragging && !isSelected; // basic fallback
+                    const isMetricSelected = cadSelectedMetric === l.id;
+                    const offset = cadMetricOffsets[l.id] || { dx: 0, dy: -cadViewport.width * 0.01 };
+                    const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
+                    const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
+                    
+                    return (
+                    <g key={l.id}>
+                      <line 
+                        x1={l.p1.x} y1={l.p1.y} x2={l.p2.x} y2={l.p2.y} 
+                        stroke={isSelected ? "#ec4899" : (l.hexColor || "#38bdf8")} 
+                        strokeWidth={cadViewport.width * (l.strokeWidth ? l.strokeWidth / 1000 : 0.004)} 
+                        strokeLinecap="round" 
+                      />
+                      {isSelected && cadEditInputs.isMovingLine && (
+                        <>
+                           <circle cx={l.p1.x} cy={l.p1.y} r={cadViewport.width * 0.015} fill="#0f172a" stroke="#ec4899" strokeWidth={cadViewport.width * 0.002} className="animate-pulse" />
+                           <circle cx={l.p2.x} cy={l.p2.y} r={cadViewport.width * 0.015} fill="#0f172a" stroke="#ec4899" strokeWidth={cadViewport.width * 0.002} className="animate-pulse" />
+                        </>
+                      )}
+                      {l.fixedLength && (
+                        <text 
+                          x={mx} y={my} 
+                          fill={isSelected || isMetricSelected ? "#fbcfe8" : (l.metricHexColor || "#ffffff")} 
+                          fontSize={l.metricFontSize || (cadViewport.width * (isMetricSelected ? 0.025 : 0.02))} 
+                          fontWeight="bold" textAnchor="middle"
+                          className="transition-all duration-200"
+                        >
+                          {l.fixedLength} m
+                        </text>
+                      )}
+                      {isMetricSelected && l.fixedLength && (
+                         <rect x={mx - cadViewport.width * 0.05} y={my - cadViewport.width * 0.03} width={cadViewport.width * 0.1} height={cadViewport.width * 0.04} fill="none" stroke="#fbcfe8" strokeWidth={cadViewport.width * 0.001} strokeDasharray="5,5" />
+                      )}
+                    </g>
+                  )})}
+
+                  {cadActiveLine && (
+                    <g>
+                      <line x1={cadActiveLine.p1.x} y1={cadActiveLine.p1.y} x2={cadActiveLine.p2.x} y2={cadActiveLine.p2.y} stroke="#f472b6" strokeWidth={cadViewport.width * 0.004} strokeDasharray="15, 10" strokeLinecap="round" />
+                      <text x={(cadActiveLine.p1.x + cadActiveLine.p2.x) / 2} y={(cadActiveLine.p1.y + cadActiveLine.p2.y) / 2 - cadViewport.width * 0.01} fill="#fbcfe8" fontSize={cadViewport.width * 0.02} fontWeight="bold" textAnchor="middle">
+                        {cadScale ? (Math.hypot(cadActiveLine.p1.x - cadActiveLine.p2.x, cadActiveLine.p1.y - cadActiveLine.p2.y) * cadScale).toFixed(2) + ' m' : 'Draft'}
+                      </text>
+                    </g>
+                  )}
+                  {/* Magnetic Snap Pulse Indicator */}
+                  {cadSnapIndicator && (
+                    <circle cx={cadSnapIndicator.x} cy={cadSnapIndicator.y} r={cadViewport.width * 0.01} fill="none" stroke="#d946ef" strokeWidth={cadViewport.width * 0.002} className="animate-ping" />
+                  )}
+
+                                    {cadTexts.map(txt => {
+                     const isSelected = cadSelectedText === txt.id;
+                     return (
+                        <text
+                           key={txt.id}
+                           x={txt.x} y={txt.y}
+                           fill={isSelected ? "#fbcfe8" : (txt.hexColor || "#e2e8f0")}
+                           fontSize={txt.fontSize || (cadViewport.width * 0.02)}
+                           fontWeight="bold"
+                           className="transition-colors duration-200 cursor-pointer"
+                        >
+                           {txt.text}
+                        </text>
+                     );
+                  })}
+                  
+                  {/* Dynamic Nodes */}
+                  {(cadNodes || []).map(n => {
+                    const isHovered = cadHoveredNode && cadHoveredNode.id === n.id;
+                    const isSelected = cadSelectedNode && cadSelectedNode.id === n.id;
+                    const nodeScale = isHovered || isSelected ? 2.5 : 1;
+                    return (
+                      <circle 
+                        key={n.id} cx={n.x} cy={n.y} r={cadViewport.width * 0.004 * nodeScale} 
+                        fill={isSelected ? "#ec4899" : "#38bdf8"} 
+                        stroke="#0f172a" strokeWidth={cadViewport.width * 0.001}
+                        className="transition-all duration-150 ease-out"
+                      />
+                    );
+                  })}
+                </svg>
+
+                {cadSelectedNode && (
+                  <div 
+                    className="absolute z-[100] bg-slate-800 p-2 rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-slate-600 animate-in zoom-in-95 flex flex-col gap-1 w-32" 
+                    style={{ left: getSvgPtToContainer(cadSelectedNode.x, cadSelectedNode.y).left + 15, top: getSvgPtToContainer(cadSelectedNode.x, cadSelectedNode.y).top - 40 }}
+                    onClick={e => e.stopPropagation()}
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    <button 
+                      className="w-full text-left px-3 py-2 text-xs font-black text-white hover:bg-slate-700 rounded-lg transition-colors"
+                      onClick={() => {
+                        setCadSelectedNode(null);
+                        setCadTool('ADD_LINE');
+                        setCadActiveLine({ p1: { x: cadSelectedNode.x, y: cadSelectedNode.y }, p2: { x: cadSelectedNode.x, y: cadSelectedNode.y } });
+                      }}
+                    >
+                      Add Line
+                    </button>
+                    <button 
+                      className="w-full text-left px-3 py-2 text-xs font-black text-white hover:bg-slate-700 rounded-lg transition-colors"
+                      onClick={() => {
+                        setCadSelectedNode(null);
+                        setCadPrompt({ type: 'RADIUS', center: cadSelectedNode, x: getSvgPtToContainer(cadSelectedNode.x, cadSelectedNode.y).left + 20, y: getSvgPtToContainer(cadSelectedNode.x, cadSelectedNode.y).top });
+                        setCadPromptValue('');
+                      }}
+                    >
+                      Radius
+                    </button>
+                  </div>
+                )}
+
+                {(cadSelectedLine || cadSelectedCircle) && (() => {
+                   let target = null; let tType = ''; let midSvgX=0; let midSvgY=0;
+                   if (cadSelectedLine) { target = cadLines.find(x => x.id === cadSelectedLine); tType='LINE'; if(target){ midSvgX = (target.p1.x + target.p2.x)/2; midSvgY = (target.p1.y + target.p2.y)/2; } }
+                   if (cadSelectedCircle) { target = cadCircles.find(x => x.id === cadSelectedCircle); tType='CIRCLE'; if(target){ midSvgX = target.center.x; midSvgY = target.center.y - target.radiusPixels; } }
+                   if (!target) return null;
+                   const ctCoords = getSvgPtToContainer(midSvgX, midSvgY);
+                   return (
+                     <div 
+                       className="absolute z-[110] bg-slate-800 p-4 rounded-xl shadow-2xl border border-slate-600 flex flex-col gap-3 w-56 animate-in slide-in-from-bottom-2" 
+                       style={{ left: Math.min(ctCoords.left + cadPopupOffset.x, window.innerWidth - 250), top: Math.max(ctCoords.top - 180 + cadPopupOffset.y, 20) }}
+                       onClick={e => e.stopPropagation()}
+                       onPointerDown={e => e.stopPropagation()}
+                     >
+                       <div 
+                         className="flex justify-between items-center cursor-move bg-slate-700 -mx-4 -mt-4 p-3 rounded-t-xl"
+                         onPointerDown={e => { e.stopPropagation(); e.target.setPointerCapture(e.pointerId); e.target.dataset.dragStart = JSON.stringify({x: e.clientX, y: e.clientY, ox: cadPopupOffset.x, oy: cadPopupOffset.y}); }}
+                         onPointerMove={e => {
+                           if (e.target.hasPointerCapture(e.pointerId) && e.target.dataset.dragStart) {
+                             const start = JSON.parse(e.target.dataset.dragStart);
+                             setCadPopupOffset({ x: start.ox + (e.clientX - start.x), y: start.oy + (e.clientY - start.y) });
+                           }
+                         }}
+                         onPointerUp={e => { e.target.releasePointerCapture(e.pointerId); delete e.target.dataset.dragStart; }}
+                       >
+                          <span className="text-xs font-bold text-slate-300 pointer-events-none">EDIT {tType}</span>
+                          <button onClick={() => { setCadSelectedLine(null); setCadSelectedCircle(null); setCadPopupOffset({x:0, y:0}); }} className="text-xs font-black text-slate-400 hover:text-white">✕</button>
+                       </div>
+                       <input type="number" value={cadEditInputs.length} onChange={e => setCadEditInputs({...cadEditInputs, length: e.target.value})} className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm" placeholder={tType === 'LINE' ? "Length (m)" : "Radius (m)"} />
+                       <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500 uppercase">Weight: {cadEditInputs.weight}</span>
+                          <input type="range" min="1" max="20" value={cadEditInputs.weight} onChange={e => setCadEditInputs({...cadEditInputs, weight: e.target.value})} className="accent-fuchsia-500" />
+                       </div>
+                       <div className="flex gap-2">
+                          {['#38bdf8', '#4f46e5', '#ec4899', '#10b981', '#f59e0b', '#e2e8f0'].map(hex => (
+                             <button key={hex} onClick={() => setCadEditInputs({...cadEditInputs, hex})} className={`w-6 h-6 rounded-full border-2 ${cadEditInputs.hex === hex ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: hex }}></button>
+                          ))}
+                       </div>
+                       {tType === 'LINE' && (
+                         <button onClick={() => setCadEditInputs(p => ({ ...p, isMovingLine: !p.isMovingLine }))} className={`w-full font-bold py-2 rounded text-sm transition-colors ${cadEditInputs.isMovingLine ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                           {cadEditInputs.isMovingLine ? 'MOVE MODE ACTIVE' : 'MOVE'}
+                         </button>
+                       )}
+                       <button onClick={handleCadEditSave} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2 rounded text-sm transition-colors mt-2">SAVE</button>
+                       <button onClick={handleCadEditDelete} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded text-sm transition-colors">{tType === 'LINE' ? 'DELETE LINE' : 'DELETE RADIUS'}</button>
+                     </div>
+                   );
+                 })()}
+
+                 {typeof cadSelectedText !== 'undefined' && cadSelectedText && (() => {
+                   const txt = cadTexts.find(t => t.id === cadSelectedText);
+                   if (!txt) return null;
+                   const ctCoords = getSvgPtToContainer(txt.x, txt.y);
+                   return (
+                     <div 
+                       className="absolute z-[110] bg-slate-800 p-4 rounded-xl shadow-2xl border border-slate-600 flex flex-col gap-3 w-56 animate-in slide-in-from-bottom-2" 
+                       style={{ left: Math.min(ctCoords.left + cadPopupOffset.x, window.innerWidth - 250), top: Math.max(ctCoords.top - 180 + cadPopupOffset.y, 20) }}
+                       onClick={e => e.stopPropagation()}
+                       onPointerDown={e => e.stopPropagation()}
+                     >
+                       <div 
+                         className="flex justify-between items-center cursor-move bg-slate-700 -mx-4 -mt-4 p-3 rounded-t-xl"
+                         onPointerDown={e => { e.stopPropagation(); e.target.setPointerCapture(e.pointerId); e.target.dataset.dragStart = JSON.stringify({x: e.clientX, y: e.clientY, ox: cadPopupOffset.x, oy: cadPopupOffset.y}); }}
+                         onPointerMove={e => {
+                           if (e.target.hasPointerCapture(e.pointerId) && e.target.dataset.dragStart) {
+                             const start = JSON.parse(e.target.dataset.dragStart);
+                             setCadPopupOffset({ x: start.ox + (e.clientX - start.x), y: start.oy + (e.clientY - start.y) });
+                           }
+                         }}
+                         onPointerUp={e => { e.target.releasePointerCapture(e.pointerId); delete e.target.dataset.dragStart; }}
+                       >
+                          <span className="text-xs font-bold text-slate-300 pointer-events-none">EDIT TEXT</span>
+                          <button onClick={() => { setCadSelectedText(null); setCadPopupOffset({x:0, y:0}); }} className="text-xs font-black text-slate-400 hover:text-white">✕</button>
+                       </div>
+                       <input type="text" value={txt.text} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, text: e.target.value} : t))} className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm" />
+                       <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500 uppercase">Font Size: {Math.round(txt.fontSize)}</span>
+                          <input type="range" min="10" max={cadViewport.width * 0.2} value={txt.fontSize} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, fontSize: parseInt(e.target.value)} : t))} className="accent-fuchsia-500" />
+                       </div>
+                       <div className="flex gap-2">
+                          {['#38bdf8', '#4f46e5', '#ec4899', '#10b981', '#f59e0b', '#e2e8f0'].map(hex => (
+                             <button key={hex} onClick={() => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, hexColor: hex} : t))} className={`w-6 h-6 rounded-full border-2 ${txt.hexColor === hex ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: hex }}></button>
+                          ))}
+                       </div>
+                       <button onClick={() => setCadEditInputs(p => ({ ...p, isMovingText: !p.isMovingText }))} className={`w-full font-bold py-2 rounded text-sm transition-colors ${cadEditInputs.isMovingText ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                         {cadEditInputs.isMovingText ? 'MOVE MODE ACTIVE' : 'MOVE'}
+                       </button>
+                       <button onClick={() => { setCadTexts(prev => prev.filter(t => t.id !== txt.id)); setCadSelectedText(null); }} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded text-sm transition-colors mt-2">DELETE TEXT</button>
+                     </div>
+                   );
+                 })()}
+
+                 
+
+                 {typeof cadSelectedMetric !== 'undefined' && cadSelectedMetric && (() => {
+                   const line = cadLines.find(l => l.id === cadSelectedMetric);
+                   if (!line || !line.fixedLength) return null;
+                   const offset = cadMetricOffsets[line.id] || { dx: 0, dy: -cadViewport.width * 0.01 };
+                   const mx = (line.p1.x + line.p2.x) / 2 + offset.dx;
+                   const my = (line.p1.y + line.p2.y) / 2 + offset.dy;
+                   const ctCoords = getSvgPtToContainer(mx, my);
+                   return (
+                     <div 
+                       className="absolute z-[110] bg-slate-800 p-4 rounded-xl shadow-2xl border border-slate-600 flex flex-col gap-3 w-56 animate-in slide-in-from-bottom-2" 
+                       style={{ left: Math.min(ctCoords.left + cadPopupOffset.x, window.innerWidth - 250), top: Math.max(ctCoords.top - 180 + cadPopupOffset.y, 20) }}
+                       onClick={e => e.stopPropagation()}
+                       onPointerDown={e => e.stopPropagation()}
+                     >
+                       <div 
+                         className="flex justify-between items-center cursor-move bg-slate-700 -mx-4 -mt-4 p-3 rounded-t-xl"
+                         onPointerDown={e => { e.stopPropagation(); e.target.setPointerCapture(e.pointerId); e.target.dataset.dragStart = JSON.stringify({x: e.clientX, y: e.clientY, ox: cadPopupOffset.x, oy: cadPopupOffset.y}); }}
+                         onPointerMove={e => {
+                           if (e.target.hasPointerCapture(e.pointerId) && e.target.dataset.dragStart) {
+                             const start = JSON.parse(e.target.dataset.dragStart);
+                             setCadPopupOffset({ x: start.ox + (e.clientX - start.x), y: start.oy + (e.clientY - start.y) });
+                           }
+                         }}
+                         onPointerUp={e => { e.target.releasePointerCapture(e.pointerId); delete e.target.dataset.dragStart; }}
+                       >
+                          <span className="text-xs font-bold text-slate-300 pointer-events-none">METRIC</span>
+                          <button onClick={() => { setCadSelectedMetric(null); setCadPopupOffset({x:0, y:0}); }} className="text-xs font-black text-slate-400 hover:text-white">✕</button>
+                       </div>
+                       
+                       <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500 uppercase">Font Size</span>
+                          <input type="range" min="10" max={cadViewport.width * 0.1} value={line.metricFontSize || cadViewport.width * 0.02} onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricFontSize: parseInt(e.target.value)} : l))} className="accent-fuchsia-500" />
+                       </div>
+                       <div className="flex gap-2">
+                          {['#ffffff', '#38bdf8', '#ec4899', '#10b981', '#f59e0b', '#a855f7'].map(hex => (
+                             <button key={hex} onClick={() => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricHexColor: hex} : l))} className={`w-6 h-6 rounded-full border-2 ${line.metricHexColor === hex ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: hex }}></button>
+                          ))}
+                       </div>
+
+                       <button onClick={() => setCadEditInputs(p => ({ ...p, isMovingMetric: !p.isMovingMetric }))} className={`w-full font-bold py-2 rounded text-sm transition-colors ${cadEditInputs.isMovingMetric ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                         {cadEditInputs.isMovingMetric ? 'MOVE MODE ACTIVE' : 'MOVE'}
+                       </button>
+                     </div>
+                   );
+                 })()}
+
+
+            {cadComputedArea && (
+                <div className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-4 rounded-xl shadow-2xl border border-slate-700 pointer-events-none">
+                  <div className="text-[10px] text-fuchsia-400 font-black mb-2 uppercase tracking-widest border-b border-slate-700 pb-1">Polygon Area</div>
+                  <div className="font-mono text-xs text-white grid grid-cols-[100px_1fr] gap-x-2 gap-y-1">
+                    <span className="text-slate-400 text-right">Hectare / Are :</span><span className="font-bold">{cadComputedArea.hectareAre.toFixed(4)}</span>
+                    <span className="text-slate-400 text-right">Acre :</span><span className="font-bold">{cadComputedArea.acre.toFixed(4)}</span>
+                    <span className="text-slate-400 text-right">Cent :</span><span className="font-bold">{cadComputedArea.cent.toFixed(2)}</span>
+                    <span className="text-slate-400 text-right">Sq. Ft :</span><span className="font-bold">{cadComputedArea.sqFt.toFixed(2)}</span>
+                  </div>
+                </div>
+             )}
+             
+            {/* VIRTUAL JOYSTICK D-PAD */}
+            <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none"
+                 onPointerDown={e => e.stopPropagation()}
+            >
+               <div className="flex flex-col items-center gap-1">
+                  <button 
+                     className="w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex justify-center items-center font-bold text-xl active:bg-fuchsia-600 transition-colors"
+                     onPointerDown={() => startCadPan(0, -1)} onPointerUp={stopCadPan} onPointerLeave={stopCadPan}
+                  >
+                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                  </button>
+                  <div className="flex gap-1">
+                     <button 
+                        className="w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex justify-center items-center font-bold text-xl active:bg-fuchsia-600 transition-colors"
+                        onPointerDown={() => startCadPan(-1, 0)} onPointerUp={stopCadPan} onPointerLeave={stopCadPan}
+                     >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                     </button>
+                     <button 
+                        className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-fuchsia-400 border border-slate-600 flex justify-center items-center font-bold text-xl transition-colors"
+                        onClick={() => setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 })}
+                        title="Reset Origin"
+                     >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2"/></svg>
+                     </button>
+                     <button 
+                        className="w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex justify-center items-center font-bold text-xl active:bg-fuchsia-600 transition-colors"
+                        onPointerDown={() => startCadPan(1, 0)} onPointerUp={stopCadPan} onPointerLeave={stopCadPan}
+                     >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                     </button>
+                  </div>
+                  <button 
+                     className="w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex justify-center items-center font-bold text-xl active:bg-fuchsia-600 transition-colors"
+                     onPointerDown={() => startCadPan(0, 1)} onPointerUp={stopCadPan} onPointerLeave={stopCadPan}
+                  >
+                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+               </div>
+            </div>
+{cadPrompt && (
+                  <form 
+                    onSubmit={submitCadPrompt}
+                    className="absolute z-[120] bg-slate-800 p-3 rounded-xl shadow-2xl border border-slate-600 flex gap-2 animate-in fade-in" 
+                    style={{ left: cadPrompt.x, top: cadPrompt.y }}
+                    onClick={e => e.stopPropagation()}
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    <input autoFocus type={cadPrompt.type === "TEXT" ? "text" : "number"} step="0.01" value={cadPromptValue} onChange={e => setCadPromptValue(e.target.value)} className="bg-slate-900 border border-slate-700 rounded p-2 text-white w-24 text-sm font-bold text-center" placeholder={cadPrompt.type === "TEXT" ? "Enter text..." : "Metric (m)"} />
+                    <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2 px-4 rounded text-sm transition-colors">OK</button>
+                  </form>
+                 )}
+              </div>
+            </div>
           ) : null}
         </div>
       )}
