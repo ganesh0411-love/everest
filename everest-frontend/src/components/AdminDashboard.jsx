@@ -60,6 +60,9 @@ const AdminDashboard = ({ setCurrentView }) => {
   // Nodes & Selection
   const [cadHoveredNode, setCadHoveredNode] = React.useState(null);
   const [cadSelectedNode, setCadSelectedNode] = React.useState(null);
+  const [isAddRadiusEnabled, setIsAddRadiusEnabled] = React.useState(false);
+  const [isSketchExtendEnabled, setIsSketchExtendEnabled] = React.useState(false);
+  const [isMetricsVisible, setIsMetricsVisible] = React.useState(true);
   const [cadPointerGesture, setCadPointerGesture] = React.useState(null);
   const [cadGlowingCircles, setCadGlowingCircles] = React.useState([]);
   const [cadBlinkingRadius, setCadBlinkingRadius] = React.useState(null);
@@ -98,7 +101,13 @@ const AdminDashboard = ({ setCurrentView }) => {
   const cadStateBeforeActionRef = React.useRef(null);
 
   const handleSaveProject = () => {
-     const defaultName = "Project - " + new Date().toLocaleString();
+     const now = new Date();
+     const d = String(now.getDate()).padStart(2, '0');
+     const mo = String(now.getMonth() + 1).padStart(2, '0');
+     const y = now.getFullYear();
+     const h = String(now.getHours()).padStart(2, '0');
+     const mi = String(now.getMinutes()).padStart(2, '0');
+     const defaultName = `${d}/${mo}/${y} - ${h}:${mi}`;
      const customName = window.prompt("Enter Project/Survey Name", defaultName);
      if (customName === null) return;
 
@@ -438,10 +447,12 @@ const AdminDashboard = ({ setCurrentView }) => {
 
       if (cadTool === 'IDLE' || isEditingLineMode || cadTool === 'SKETCH_LINE' || cadTool === 'ADD_RADIUS') {
          if (cadTool === 'SKETCH_LINE') {
-            const activeL = cadLines.find(x => Math.hypot(x.p1.x - rawPt.x, x.p1.y - rawPt.y) < minSnapDist || Math.hypot(x.p2.x - rawPt.x, x.p2.y - rawPt.y) < minSnapDist);
-            if (activeL) {
-               if (Math.hypot(activeL.p1.x - rawPt.x, activeL.p1.y - rawPt.y) < minSnapDist) { setCadDraggingNode({ lineId: activeL.id, end: 'p1' }); setCadSelectedLine(activeL.id); return; }
-               if (Math.hypot(activeL.p2.x - rawPt.x, activeL.p2.y - rawPt.y) < minSnapDist) { setCadDraggingNode({ lineId: activeL.id, end: 'p2' }); setCadSelectedLine(activeL.id); return; }
+            if (isSketchExtendEnabled) {
+               const activeL = cadLines.find(x => Math.hypot(x.p1.x - rawPt.x, x.p1.y - rawPt.y) < minSnapDist || Math.hypot(x.p2.x - rawPt.x, x.p2.y - rawPt.y) < minSnapDist);
+               if (activeL) {
+                  if (Math.hypot(activeL.p1.x - rawPt.x, activeL.p1.y - rawPt.y) < minSnapDist) { setCadDraggingNode({ lineId: activeL.id, end: 'p1' }); setCadSelectedLine(activeL.id); return; }
+                  if (Math.hypot(activeL.p2.x - rawPt.x, activeL.p2.y - rawPt.y) < minSnapDist) { setCadDraggingNode({ lineId: activeL.id, end: 'p2' }); setCadSelectedLine(activeL.id); return; }
+               }
             }
          }
          
@@ -502,8 +513,8 @@ const AdminDashboard = ({ setCurrentView }) => {
          });
       } else if (cadTool === 'SELECT_METRIC') {
          cadLines.forEach(l => {
-            if (l.fixedLength) {
-               const offset = cadMetricOffsets[l.id] || { dx: 0, dy: -cadViewport.width * 0.01 };
+            if (l.fixedLength && isMetricsVisible) {
+               const offset = cadMetricOffsets[l.id] || { dx: 0, dy: -20 };
                const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
                const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
                if (Math.hypot(mx - rawPt.x, my - rawPt.y) < minSnapDist * 1.5) targetMetric = l;
@@ -513,7 +524,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
       setCadPointerGesture({ 
          startX: e.clientX, startY: e.clientY, 
-         isDragging: false, isDraggingMetric: false, isDraggingText: false, isDraggingLineBody: !!(targetLine && isEditingLineMode && isLineMoving),
+         isDragging: false, isDraggingMetric: false, isDraggingText: false, isDraggingLineBody: !!(isSketchExtendEnabled && targetLine && isEditingLineMode && isLineMoving),
          targetNode, targetLine, targetCircle, targetText, targetMetric 
       });
 
@@ -598,13 +609,22 @@ const AdminDashboard = ({ setCurrentView }) => {
          }
       }
 
-
+      if (cadPointerGesture?.isDraggingLineBody && cadSelectedLine) {
+         if (isSketchExtendEnabled) {
+            const dx = rawPt.x - (cadPointerGesture.lastSvgX || (cadPointerGesture.startX / uniformScale));
+            const dy = rawPt.y - (cadPointerGesture.lastSvgY || (cadPointerGesture.startY / uniformScale));
+            
+            setCadLines(prev => prev.map(l => l.id === cadSelectedLine ? { ...l, p1: { x: l.p1.x + dx, y: l.p1.y + dy }, p2: { x: l.p2.x + dx, y: l.p2.y + dy } } : l));
+            setCadPointerGesture(p => ({ ...p, lastSvgX: rawPt.x, lastSvgY: rawPt.y }));
+         }
+         return;
+      }
 
       if (cadPointerGesture?.isDraggingMetric) {
          const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
          const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
          const lineId = cadPointerGesture.targetMetric.id;
-         const baseOffset = cadPointerGesture.baseOffset || cadMetricOffsets[lineId] || { dx: 0, dy: -cadViewport.width * 0.01 };
+         const baseOffset = cadPointerGesture.baseOffset || cadMetricOffsets[lineId] || { dx: 0, dy: -20 };
          if (!cadPointerGesture.baseOffset) setCadPointerGesture(p => ({ ...p, baseOffset }));
          
          setCadMetricOffsets(prev => ({ ...prev, [lineId]: { dx: baseOffset.dx + dxSvg, dy: baseOffset.dy + dySvg } }));
@@ -623,18 +643,20 @@ const AdminDashboard = ({ setCurrentView }) => {
       }
 
       if (cadDraggingNode) {
-         const snapPt = getCadSnapPoint(rawPt, false); 
-         setCadLines(prev => prev.map(l => {
-            if (l.id === cadDraggingNode.lineId) {
-               const nl = { ...l, [cadDraggingNode.end]: snapPt };
-               if (cadScale) {
-                  nl.fixedLength = (Math.hypot(nl.p1.x - nl.p2.x, nl.p1.y - nl.p2.y) * cadScale).toFixed(2);
+         if (isSketchExtendEnabled) {
+            const snapPt = getCadSnapPoint(rawPt, false); 
+            setCadLines(prev => prev.map(l => {
+               if (l.id === cadDraggingNode.lineId) {
+                  const nl = { ...l, [cadDraggingNode.end]: snapPt };
+                  if (cadScale) {
+                     nl.fixedLength = (Math.hypot(nl.p1.x - nl.p2.x, nl.p1.y - nl.p2.y) * cadScale).toFixed(2);
+                  }
+                  setCadEditInputs(p => ({ ...p, length: nl.fixedLength }));
+                  return nl;
                }
-               setCadEditInputs(p => ({ ...p, length: nl.fixedLength }));
-               return nl;
-            }
-            return l;
-         }));
+               return l;
+            }));
+         }
          return;
       }
 
@@ -687,10 +709,15 @@ const AdminDashboard = ({ setCurrentView }) => {
       if (cadPointerGesture && !cadPointerGesture.isDragging && !cadPointerGesture.isDraggingMetric && !cadPointerGesture.isDraggingText && !cadPointerGesture.isDraggingLineBody) {
          if (cadPointerGesture.targetNode) {
             setShowDarkDrawSettings(false); 
-            setCadSelectedNode(cadPointerGesture.targetNode);
+            if (isAddRadiusEnabled) {
+               setCadSelectedNode(cadPointerGesture.targetNode);
+            }
          } else if (cadPointerGesture.targetLine) {
-            setShowDarkDrawSettings(false); setCadSelectedLine(cadPointerGesture.targetLine.id); setCadSelectedNode(null); setCadSelectedCircle(null);
-            setCadEditInputs(p => ({ ...p, length: cadPointerGesture.targetLine.fixedLength || '', weight: cadPointerGesture.targetLine.strokeWidth || 4, hex: cadPointerGesture.targetLine.hexColor || '#38bdf8' }));
+            setShowDarkDrawSettings(false); 
+            if (isSketchExtendEnabled) {
+               setCadSelectedLine(cadPointerGesture.targetLine.id); setCadSelectedNode(null); setCadSelectedCircle(null);
+               setCadEditInputs(p => ({ ...p, length: cadPointerGesture.targetLine.fixedLength || '', weight: cadPointerGesture.targetLine.strokeWidth || 4, hex: cadPointerGesture.targetLine.hexColor || '#38bdf8' }));
+            }
          } else if (cadPointerGesture.targetCircle) {
             setShowDarkDrawSettings(false); setCadSelectedCircle(cadPointerGesture.targetCircle.id); setCadSelectedNode(null); setCadSelectedLine(null);
             setCadEditInputs(p => ({ ...p, length: cadPointerGesture.targetCircle.radiusMeters, weight: cadPointerGesture.targetCircle.strokeWidth || 3, hex: cadPointerGesture.targetCircle.hexColor || '#4f46e5' }));
@@ -2459,9 +2486,25 @@ const AdminDashboard = ({ setCurrentView }) => {
                    
                    {showDarkDrawSettings && (
                      <div className="absolute right-0 top-12 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[150] overflow-hidden py-1">
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsAddRadiusEnabled(!isAddRadiusEnabled); }}>
+                         <span>Add Radius</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isAddRadiusEnabled ? 'bg-sky-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isAddRadiusEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsSketchExtendEnabled(!isSketchExtendEnabled); }}>
+                         <span>Sketch / Extend</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isSketchExtendEnabled ? 'bg-fuchsia-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isSketchExtendEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsMetricsVisible(!isMetricsVisible); }}>
+                         <span>Metrics</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isMetricsVisible ? 'bg-emerald-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isMetricsVisible ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_LINE'); setShowDarkDrawSettings(false); }}>Add Line</button>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-sky-400 hover:bg-slate-700 hover:text-sky-300 transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_RADIUS'); setShowDarkDrawSettings(false); }}>Add Radius</button>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-fuchsia-400 hover:bg-slate-700 hover:text-fuchsia-300 transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('SKETCH_LINE'); setShowDarkDrawSettings(false); }}>Sketch / Extend Line</button>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(true); setIsLineMoving(false); setCadTool('EDIT_LINE'); setShowDarkDrawSettings(false); }}>Edit Line Attributes</button>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('EDIT_RADIUS'); setShowDarkDrawSettings(false); }}>Edit Radius</button>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_TEXT'); setShowDarkDrawSettings(false); }}>Add Text</button>
@@ -2537,7 +2580,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                     const isSelected = cadSelectedLine === l.id;
                     const isMetricHovered = cadHoveredNode === null && !cadPointerGesture?.isDragging && !isSelected; // basic fallback
                     const isMetricSelected = cadSelectedMetric === l.id;
-                    const offset = cadMetricOffsets[l.id] || { dx: 0, dy: -cadViewport.width * 0.01 };
+                    const offset = cadMetricOffsets[l.id] || { dx: 0, dy: -20 };
                     const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
                     const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
                     
@@ -2549,11 +2592,11 @@ const AdminDashboard = ({ setCurrentView }) => {
                         strokeWidth={cadViewport.width * (l.strokeWidth ? l.strokeWidth / 1000 : 0.004)} 
                         strokeLinecap="round" 
                       />
-                      {l.fixedLength && (
+                      {isMetricsVisible && l.fixedLength && (
                         <text 
                           x={mx} y={my} 
                           fill={isSelected || isMetricSelected ? "#fbcfe8" : (l.metricHexColor || "#ffffff")} 
-                          fontSize={l.metricFontSize || (cadViewport.width * (isMetricSelected ? 0.025 : 0.02))} 
+                          fontSize={l.metricFontSize || (isMetricSelected ? 50 : 40)} 
                           fontWeight="bold" textAnchor="middle"
                           className="transition-all duration-200"
                           transform={l.metricRotation ? `rotate(${l.metricRotation}, ${mx}, ${my})` : undefined}
@@ -2561,8 +2604,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                           {l.fixedLength} m
                         </text>
                       )}
-                      {isMetricSelected && l.fixedLength && (
-                         <rect x={mx - cadViewport.width * 0.05} y={my - cadViewport.width * 0.03} width={cadViewport.width * 0.1} height={cadViewport.width * 0.04} fill="none" stroke="#fbcfe8" strokeWidth={cadViewport.width * 0.001} strokeDasharray="5,5" />
+                      {isMetricsVisible && isMetricSelected && l.fixedLength && (
+                         <rect x={mx - 50} y={my - 30} width={100} height={40} fill="none" stroke="#fbcfe8" strokeWidth={2} strokeDasharray="5,5" />
                       )}
                     </g>
                   )})}
@@ -2570,7 +2613,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                   {cadActiveLine && (
                     <g>
                       <line x1={cadActiveLine.p1.x} y1={cadActiveLine.p1.y} x2={cadActiveLine.p2.x} y2={cadActiveLine.p2.y} stroke="#f472b6" strokeWidth={cadViewport.width * 0.004} strokeDasharray="15, 10" strokeLinecap="round" />
-                      <text x={(cadActiveLine.p1.x + cadActiveLine.p2.x) / 2} y={(cadActiveLine.p1.y + cadActiveLine.p2.y) / 2 - cadViewport.width * 0.01} fill="#fbcfe8" fontSize={cadViewport.width * 0.02} fontWeight="bold" textAnchor="middle">
+                      <text x={(cadActiveLine.p1.x + cadActiveLine.p2.x) / 2} y={(cadActiveLine.p1.y + cadActiveLine.p2.y) / 2 - 20} fill="#fbcfe8" fontSize={40} fontWeight="bold" textAnchor="middle">
                         {cadScale ? (Math.hypot(cadActiveLine.p1.x - cadActiveLine.p2.x, cadActiveLine.p1.y - cadActiveLine.p2.y) * cadScale).toFixed(2) + ' m' : 'Draft'}
                       </text>
                     </g>
@@ -2638,7 +2681,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                            key={txt.id}
                            x={txt.x} y={txt.y}
                            fill={isSelected ? "#fbcfe8" : (txt.hexColor || "#e2e8f0")}
-                           fontSize={txt.fontSize || (cadViewport.width * 0.02)}
+                           fontSize={txt.fontSize || 40}
                            fontWeight="bold"
                            className="transition-colors duration-200 cursor-pointer"
                            transform={txt.rotation ? `rotate(${txt.rotation}, ${txt.x}, ${txt.y})` : undefined}
@@ -2812,8 +2855,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                        </div>
                        <input type="text" value={txt.text} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, text: e.target.value} : t))} className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm" />
                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-slate-500 uppercase">Font Size: {Math.round(txt.fontSize)}</span>
-                          <input type="range" min="10" max={cadViewport.width * 0.2} value={txt.fontSize} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, fontSize: parseInt(e.target.value)} : t))} className="accent-fuchsia-500" />
+                          <span className="text-[10px] text-slate-500 uppercase">Font Size: {Math.round(txt.fontSize || 40)}</span>
+                          <input type="range" min="10" max={200} value={txt.fontSize || 40} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, fontSize: parseInt(e.target.value)} : t))} className="accent-fuchsia-500" />
                        </div>
                        <div className="flex flex-col gap-1">
                           <span className="text-[10px] text-slate-500 uppercase">Rotation: {Math.round(txt.rotation || 0)}°</span>
@@ -2839,8 +2882,8 @@ const AdminDashboard = ({ setCurrentView }) => {
 
                  {typeof cadSelectedMetric !== 'undefined' && cadSelectedMetric && (() => {
                    const line = cadLines.find(l => l.id === cadSelectedMetric);
-                   if (!line || !line.fixedLength) return null;
-                   const offset = cadMetricOffsets[line.id] || { dx: 0, dy: -cadViewport.width * 0.01 };
+                   if (!line || !line.fixedLength || !isMetricsVisible) return null;
+                   const offset = cadMetricOffsets[line.id] || { dx: 0, dy: -20 };
                    const mx = (line.p1.x + line.p2.x) / 2 + offset.dx;
                    const my = (line.p1.y + line.p2.y) / 2 + offset.dy;
                    const ctCoords = getSvgPtToContainer(mx, my);
@@ -2868,7 +2911,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                        
                        <div className="flex flex-col gap-1">
                           <span className="text-[10px] text-slate-500 uppercase">Font Size</span>
-                          <input type="range" min="10" max={cadViewport.width * 0.1} value={line.metricFontSize || cadViewport.width * 0.02} onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricFontSize: parseInt(e.target.value)} : l))} className="accent-fuchsia-500" />
+                          <input type="range" min="10" max={200} value={line.metricFontSize || 40} onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricFontSize: parseInt(e.target.value)} : l))} className="accent-fuchsia-500" />
                        </div>
                        <div className="flex flex-col gap-1">
                           <span className="text-[10px] text-slate-500 uppercase">Rotation: {Math.round(line.metricRotation || 0)}°</span>
