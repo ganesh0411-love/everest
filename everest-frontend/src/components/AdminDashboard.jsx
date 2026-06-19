@@ -33,6 +33,59 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadPromptValue, setCadPromptValue] = React.useState('');
   const cadSvgRef = React.useRef(null);
   
+  const [isFloatingStackExpanded, setIsFloatingStackExpanded] = React.useState(true);
+  const [isPolygonAreaCardVisible, setIsPolygonAreaCardVisible] = React.useState(true);
+
+  const [selectedAreaUnit, setSelectedAreaUnit] = React.useState('Ares');
+  const [isAreaDropdownOpen, setIsAreaDropdownOpen] = React.useState(false);
+
+  const [selectedPerimeterUnit, setSelectedPerimeterUnit] = React.useState('Ft');
+
+  const [cadBackgroundImage, setCadBackgroundImage] = React.useState(null);
+  const [isBackgroundImageVisible, setIsBackgroundImageVisible] = React.useState(true);
+  const [isGalleryPopupOpen, setIsGalleryPopupOpen] = React.useState(false);
+  const fileInputRef = React.useRef(null);
+  const cameraInputRef = React.useRef(null);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setIsGalleryPopupOpen(false);
+    
+    if (file.type === 'application/pdf') {
+      try {
+        const pdfjsLib = await loadPdfJsScript();
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        setCadBackgroundImage(canvas.toDataURL('image/png'));
+      } catch (err) {
+        console.error("Error loading PDF", err);
+        alert("Failed to load PDF.");
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setCadBackgroundImage(ev.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  React.useEffect(() => {
+    if (cadLines.length === 0) {
+      if (cadScale !== null) setCadScale(null);
+      setIsPolygonAreaCardVisible(true);
+    }
+  }, [cadLines.length, cadScale]);
+  
   // Multi-Touch & Gesture State
     const cadPointersRef = React.useRef(new Map());
   const cadPanIntervalRef = React.useRef(null);
@@ -100,33 +153,65 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadMagnifierPos, setCadMagnifierPos] = React.useState(null);
   const cadStateBeforeActionRef = React.useRef(null);
 
-  const handleSaveProject = () => {
-     const now = new Date();
-     const d = String(now.getDate()).padStart(2, '0');
-     const mo = String(now.getMonth() + 1).padStart(2, '0');
-     const y = now.getFullYear();
-     const h = String(now.getHours()).padStart(2, '0');
-     const mi = String(now.getMinutes()).padStart(2, '0');
-     const defaultName = `${d}/${mo}/${y} - ${h}:${mi}`;
-     const customName = window.prompt("Enter Project/Survey Name", defaultName);
-     if (customName === null) return;
-
-     const project = {
-        id: Date.now().toString(),
-        date: customName.trim() || defaultName,
-        state: {
-           lines: cadLines,
-           circles: cadCircles,
-           texts: cadTexts,
-           metricOffsets: cadMetricOffsets,
-           viewport: cadViewport,
-           scale: cadScale
-        }
-     };
-     setSavedProjects(prev => [project, ...prev]);
-     setShowDarkDrawSettings(false);
-     alert("Project Saved Successfully to My Projects!");
+  const getMetricDefaultOffset = (l) => {
+      let rot = Math.atan2(l.p2.y - l.p1.y, l.p2.x - l.p1.x) * (180 / Math.PI);
+      if (rot > 90) rot -= 180;
+      else if (rot < -90) rot += 180;
+      const finalRot = l.metricRotation !== undefined ? l.metricRotation : rot;
+      const theta = finalRot * (Math.PI / 180);
+      return { dx: 20 * Math.sin(theta), dy: -20 * Math.cos(theta) };
   };
+
+  const handleSaveProject = () => {
+     if (cadLoadedProjectId) {
+         setSavedProjects(prev => prev.map(p => {
+             if (p.id === cadLoadedProjectId) {
+                 return {
+                     ...p,
+                     state: {
+                        lines: cadLines,
+                        circles: cadCircles,
+                        texts: cadTexts,
+                        metricOffsets: cadMetricOffsets,
+                        viewport: cadViewport,
+                        scale: cadScale
+                     }
+                 };
+             }
+             return p;
+         }));
+         setShowDarkDrawSettings(false);
+         alert("Project Updated Successfully!");
+     } else {
+         const now = new Date();
+         const d = String(now.getDate()).padStart(2, '0');
+         const mo = String(now.getMonth() + 1).padStart(2, '0');
+         const y = now.getFullYear();
+         const h = String(now.getHours()).padStart(2, '0');
+         const mi = String(now.getMinutes()).padStart(2, '0');
+         const defaultName = `${d}/${mo}/${y} - ${h}:${mi}`;
+         const customName = window.prompt("Enter Project/Survey Name", defaultName);
+         if (customName === null) return;
+
+         const project = {
+            id: Date.now().toString(),
+            date: customName.trim() || defaultName,
+            state: {
+               lines: cadLines,
+               circles: cadCircles,
+               texts: cadTexts,
+               metricOffsets: cadMetricOffsets,
+               viewport: cadViewport,
+               scale: cadScale
+            }
+         };
+         setCadLoadedProjectId(project.id);
+         setSavedProjects(prev => [project, ...prev]);
+         setShowDarkDrawSettings(false);
+         alert("Project Saved Successfully to My Projects!");
+     }
+  };
+
 
   const handleDeleteSavedProject = (id) => {
     if (!confirm("Are you sure you want to delete this project?")) return;
@@ -514,7 +599,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       } else if (cadTool === 'SELECT_METRIC') {
          cadLines.forEach(l => {
             if (l.fixedLength && isMetricsVisible) {
-               const offset = cadMetricOffsets[l.id] || { dx: 0, dy: -20 };
+               const offset = cadMetricOffsets[l.id] || getMetricDefaultOffset(l);
                const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
                const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
                if (Math.hypot(mx - rawPt.x, my - rawPt.y) < minSnapDist * 1.5) targetMetric = l;
@@ -605,8 +690,21 @@ const AdminDashboard = ({ setCurrentView }) => {
             } else if (cadPointerGesture.targetText && cadEditInputs.isMovingText) {
                setCadPointerGesture(p => ({ ...p, isDraggingText: true }));
                setShowDarkDrawSettings(false);
+            } else if (!cadPointerGesture.targetNode && !cadPointerGesture.targetLine && !cadPointerGesture.targetCircle && !cadPointerGesture.targetText && !cadPointerGesture.targetMetric) {
+               if (cadTool === 'IDLE') {
+                  setCadPointerGesture(p => ({ ...p, isDraggingPan: true, lastClientX: e.clientX, lastClientY: e.clientY }));
+                  setShowDarkDrawSettings(false);
+               }
             }
          }
+      }
+
+      if (cadPointerGesture?.isDraggingPan) {
+         const dx = (cadPointerGesture.lastClientX - e.clientX) * uniformScale;
+         const dy = (cadPointerGesture.lastClientY - e.clientY) * uniformScale;
+         setCadViewport(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+         setCadPointerGesture(p => ({ ...p, lastClientX: e.clientX, lastClientY: e.clientY }));
+         return;
       }
 
       if (cadPointerGesture?.isDraggingLineBody && cadSelectedLine) {
@@ -624,7 +722,7 @@ const AdminDashboard = ({ setCurrentView }) => {
          const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
          const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
          const lineId = cadPointerGesture.targetMetric.id;
-         const baseOffset = cadPointerGesture.baseOffset || cadMetricOffsets[lineId] || { dx: 0, dy: -20 };
+         const baseOffset = cadPointerGesture.baseOffset || cadMetricOffsets[lineId] || getMetricDefaultOffset(cadPointerGesture.targetMetric);
          if (!cadPointerGesture.baseOffset) setCadPointerGesture(p => ({ ...p, baseOffset }));
          
          setCadMetricOffsets(prev => ({ ...prev, [lineId]: { dx: baseOffset.dx + dxSvg, dy: baseOffset.dy + dySvg } }));
@@ -696,7 +794,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       }
       
       
-      if (cadPointerGesture && (cadPointerGesture.isDragging || cadPointerGesture.isDraggingMetric || cadPointerGesture.isDraggingText || cadPointerGesture.isDraggingLineBody)) {
+      if (cadPointerGesture && (cadPointerGesture.isDragging || cadPointerGesture.isDraggingMetric || cadPointerGesture.isDraggingText || cadPointerGesture.isDraggingLineBody || cadPointerGesture.isDraggingPan)) {
          if (cadStateBeforeActionRef.current && JSON.stringify(cadStateBeforeActionRef.current) !== JSON.stringify(captureCadState())) saveCadStateToHistory(cadStateBeforeActionRef.current);
          if (cadPointerGesture.isDraggingLineBody) {
              setCadSelectedLine(null);
@@ -792,7 +890,8 @@ const AdminDashboard = ({ setCurrentView }) => {
          return;
       }
 
-      const num = parseFloat(cadPromptValue);
+      const valStr = cadPromptValue.trim();
+      const num = parseFloat(valStr);
       if (isNaN(num) || num <= 0) { setCadPrompt(null); return; }
 
       if (cadPrompt.type === 'LINE') {
@@ -801,7 +900,7 @@ const AdminDashboard = ({ setCurrentView }) => {
         const pxLength = Math.hypot(line.p1.x - line.p2.x, line.p1.y - line.p2.y);
         if (!cadScale) {
           setCadScale(num / pxLength);
-          setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, fixedLength: num } : l));
+          setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, fixedLength: valStr } : l));
         } else {
           const targetPx = num / cadScale;
           const ratio = targetPx / pxLength;
@@ -809,7 +908,7 @@ const AdminDashboard = ({ setCurrentView }) => {
             x: line.p1.x + (line.p2.x - line.p1.x) * ratio,
             y: line.p1.y + (line.p2.y - line.p1.y) * ratio
           };
-          setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, p2: newP2, fixedLength: num } : l));
+          setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, p2: newP2, fixedLength: valStr } : l));
         }
       } else if (cadPrompt.type === 'RADIUS') {
         if (!cadScale) { alert("Draw and dimension a baseline first to establish scale."); setCadPrompt(null); return; }
@@ -849,7 +948,9 @@ const AdminDashboard = ({ setCurrentView }) => {
              const targetPx = num / cadScale;
              const ratio = targetPx / pxLength;
              const newP2 = { x: l.p1.x + (l.p2.x - l.p1.x) * ratio, y: l.p1.y + (l.p2.y - l.p1.y) * ratio };
-             setCadLines(prev => prev.map(x => x.id === cadSelectedLine ? { ...x, p2: newP2, fixedLength: num.toString(), strokeWidth: parseInt(cadEditInputs.weight) || 4, hexColor: cadEditInputs.hex || '#38bdf8' } : x));
+             setCadLines(prev => prev.map(x => x.id === cadSelectedLine ? { ...x, p2: newP2, fixedLength: cadEditInputs.length.trim(), strokeWidth: parseInt(cadEditInputs.weight) || 4, hexColor: cadEditInputs.hex || '#38bdf8' } : x));
+          } else if (cadEditInputs.length.trim() !== '') {
+             setCadLines(prev => prev.map(x => x.id === cadSelectedLine ? { ...x, fixedLength: cadEditInputs.length.trim(), strokeWidth: parseInt(cadEditInputs.weight) || 4, hexColor: cadEditInputs.hex || '#38bdf8' } : x));
           } else {
              setCadLines(prev => prev.map(x => x.id === cadSelectedLine ? { ...x, strokeWidth: parseInt(cadEditInputs.weight) || 4, hexColor: cadEditInputs.hex || '#38bdf8' } : x));
           }
@@ -2438,9 +2539,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                </div>
              </div>
           ) : activeLandSurveyView === 'dark_draw_manual' ? (
-             <div className="flex-1 flex flex-col bg-slate-950 animate-in slide-in-from-right-8 duration-300">
+             <div className="flex-1 flex flex-col bg-slate-950 animate-in slide-in-from-right-8 duration-300 relative">
                {/* TOP NAVIGATION BAR OVERHAUL */}
-               <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center shadow-md relative z-50 shrink-0 w-full justify-between">
+               <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center shadow-md relative z-[200] shrink-0 w-full justify-between">
                  <div className="flex items-center gap-4">
                     {/* Native Back Arrow */}
                     <button 
@@ -2520,24 +2621,118 @@ const AdminDashboard = ({ setCurrentView }) => {
                    )}
                  </div>
                </div>
-               
-               {/* AUTO-ZOOM ERROR ANCHOR BUTTON */}
-               {cadLines.length >= 3 && !cadComputedArea && cadOpenNodes && cadOpenNodes.length > 0 && (
-                 <div className="absolute top-[60px] left-4 z-[90] animate-in slide-in-from-top-4">
-                   <button 
-                     onClick={() => {
-                        const errNode = cadOpenNodes[0];
-                        setCadViewport({ x: errNode.x - 125, y: errNode.y - 125, width: 250, height: 250 });
-                     }}
-                     className="bg-red-600/90 hover:bg-red-500 text-white font-black text-xs px-4 py-2 rounded-full shadow-[0_0_15px_rgba(255,0,51,0.5)] border border-red-400 animate-pulse uppercase tracking-widest transition-all flex items-center gap-2 backdrop-blur-sm"
-                   >
-                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                     Fix Error
+
+               {/* WORKSPACE SPLIT SUMMARY CARD */}
+               <div className="bg-slate-800/90 backdrop-blur border-b border-r border-slate-700 w-[calc(100%-60px)] flex items-center shrink-0 shadow-sm z-[150] relative rounded-br-2xl">
+                 <div className="flex-1 flex items-center justify-center px-2 py-2.5 border-r border-slate-700/50 min-w-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    <button onClick={() => { setIsAreaDropdownOpen(!isAreaDropdownOpen); setIsPerimeterDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-emerald-400 transition-colors shrink-0 outline-none">
+                      <span>{cadComputedArea ? (
+                          selectedAreaUnit === 'Hectare' ? cadComputedArea.hectare.toFixed(4) :
+                          selectedAreaUnit === 'Ares' ? cadComputedArea.are.toFixed(4) :
+                          selectedAreaUnit === 'Acre' ? cadComputedArea.acre.toFixed(4) :
+                          selectedAreaUnit === 'Cent' ? cadComputedArea.cent.toFixed(2) :
+                          selectedAreaUnit === 'Sq. Ft' ? cadComputedArea.sqFt.toFixed(2) :
+                          selectedAreaUnit === 'Sq. M' ? cadComputedArea.sqMeters.toFixed(2) : '--'
+                      ) : "--"}</span> <span className="text-xs text-slate-400 whitespace-nowrap">{selectedAreaUnit} ▼</span>
+                    </button>
+                 </div>
+                 <div className="flex-1 flex items-center justify-center px-2 py-2.5 min-w-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    <button onClick={() => { setSelectedPerimeterUnit(selectedPerimeterUnit === 'Ft' ? 'M' : 'Ft'); setIsAreaDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-fuchsia-400 transition-colors shrink-0 outline-none">
+                      <span>{(() => {
+                          let totalMeters = cadLines.reduce((acc, l) => acc + (l.fixedLength ? parseFloat(l.fixedLength) : (cadScale ? Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y) * cadScale : 0)), 0);
+                          if (cadActiveLine && cadScale) {
+                              totalMeters += Math.hypot(cadActiveLine.p1.x - cadActiveLine.p2.x, cadActiveLine.p1.y - cadActiveLine.p2.y) * cadScale;
+                          }
+                          if (selectedPerimeterUnit === 'Ft') {
+                              return (totalMeters * 3.28084).toFixed(2);
+                          } else {
+                              return totalMeters.toFixed(2);
+                          }
+                      })()}</span> <span className="text-xs text-slate-400 whitespace-nowrap">{selectedPerimeterUnit} <span className="text-[10px]">⇄</span></span>
+                    </button>
+                 </div>
+
+                 {/* DROPDOWNS OUTSIDE OVERFLOW CONTEXTS */}
+                 {isAreaDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsAreaDropdownOpen(false)}></div>
+                      <div className="absolute top-full left-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-50 min-w-[120px] flex flex-col">
+                         {['Hectare', 'Ares', 'Acre', 'Cent', 'Sq. Ft', 'Sq. M'].map(unit => (
+                             <button key={unit} onClick={() => { setSelectedAreaUnit(unit); setIsAreaDropdownOpen(false); }} className={`px-4 py-2 text-xs font-bold text-left hover:bg-slate-700 transition-colors ${selectedAreaUnit === unit ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                {unit}
+                             </button>
+                         ))}
+                      </div>
+                    </>
+                 )}
+               </div>
+
+               {/* RIGHT-TOP CORNER VERTICAL FLOATING ICONS */}
+               <div className="absolute top-[76px] right-3 z-[90] flex flex-col gap-2 items-center">
+                 {/* Gallery / Image Upload Icon - ALWAYS VISIBLE */}
+                 <button onClick={() => setIsGalleryPopupOpen(true)} className="w-10 h-10 shrink-0 rounded-full bg-slate-900 border border-slate-600 flex items-center justify-center text-slate-400 hover:text-white hover:border-indigo-500 hover:bg-indigo-500 transition-all shadow-md z-10">
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                   </svg>
+                 </button>
+
+                 {/* COLLAPSIBLE ICONS */}
+                 <div className={`flex flex-col gap-3 overflow-hidden transition-all duration-500 ease-in-out ${isFloatingStackExpanded ? 'max-h-[300px] opacity-100 mb-1' : 'max-h-0 opacity-0 mb-0 -mt-2'}`}>
+                   {/* Eye Icon */}
+                   <button className={`w-10 h-10 shrink-0 rounded-full bg-slate-900 flex items-center justify-center transition-all shadow-md relative ${!isBackgroundImageVisible ? 'border border-rose-500 text-rose-500 bg-rose-500/10' : 'border border-slate-600 text-slate-400 hover:border-cyan-500 hover:text-white hover:bg-cyan-500'}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsBackgroundImageVisible(!isBackgroundImageVisible); }}>
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                     </svg>
+                     {!isBackgroundImageVisible && (
+                       <svg xmlns="http://www.w3.org/2000/svg" className="absolute h-6 w-6 text-rose-500 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                         <line x1="4" y1="4" x2="20" y2="20" strokeLinecap="round" strokeLinejoin="round" />
+                       </svg>
+                     )}
+                   </button>
+                   {/* Scale / Ruler Icon */}
+                   <button className="w-10 h-10 shrink-0 rounded-full bg-slate-900 border border-slate-600 flex items-center justify-center text-slate-400 hover:text-white hover:border-amber-500 hover:bg-amber-500 transition-all shadow-md">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                       <rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect>
+                       <line x1="6" y1="6" x2="6" y2="10"></line>
+                       <line x1="10" y1="6" x2="10" y2="10"></line>
+                       <line x1="14" y1="6" x2="14" y2="10"></line>
+                       <line x1="18" y1="6" x2="18" y2="10"></line>
+                     </svg>
+                   </button>
+                   {/* Metric / Math Symbol Icon */}
+                   <button className="w-10 h-10 shrink-0 rounded-full bg-slate-900 border border-slate-600 flex items-center justify-center text-slate-400 hover:text-white hover:border-fuchsia-500 hover:bg-fuchsia-500 transition-all shadow-md font-serif font-bold text-[16px]">
+                     ∑
                    </button>
                  </div>
+                 {/* Collapse/Expand Toggle Arrow (Simplified) */}
+                 <button onClick={() => setIsFloatingStackExpanded(!isFloatingStackExpanded)} className="flex items-center justify-center text-slate-500 hover:text-white transition-all pt-1">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transform transition-transform duration-300 ${isFloatingStackExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                     <path d="M6 9l6 6 6-6"/>
+                   </svg>
+                 </button>
+               </div>
+
+               {/* GALLERY POPUP MENU */}
+               {isGalleryPopupOpen && (
+                 <>
+                   <div className="fixed inset-0 z-[200]" onClick={() => setIsGalleryPopupOpen(false)}></div>
+                   <div className="absolute top-[76px] right-16 z-[210] bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col w-48">
+                     <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileUpload} />
+                     <input type="file" accept=".png,.jpg,.jpeg,.pdf" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                     <button onClick={() => cameraInputRef.current?.click()} className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-200 hover:bg-slate-700 hover:text-indigo-400 transition-colors border-b border-slate-700">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                       Open Camera
+                     </button>
+                     <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-200 hover:bg-slate-700 hover:text-indigo-400 transition-colors">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                       Upload Files
+                     </button>
+                   </div>
+                 </>
                )}
 
-{/* DARK CANVAS CONTAINER */}
+              {/* DARK CANVAS CONTAINER */}
               <div 
                 className="flex-1 w-full relative overflow-hidden bg-slate-950 flex items-center justify-center touch-none" 
                 onPointerDown={handleCadPointerDown}
@@ -2560,6 +2755,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                    <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
                    
                    <g id="cad-drawing-layer">
+                      {(cadBackgroundImage && isBackgroundImageVisible) && (
+                         <image href={cadBackgroundImage} x={0} y={0} width={2000} height={2000} preserveAspectRatio="xMidYMid meet" opacity={0.5} pointerEvents="none" />
+                      )}
 
                   {cadCircles.map(c => {
                     const isSelected = cadSelectedCircle === c.id;
@@ -2580,7 +2778,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                     const isSelected = cadSelectedLine === l.id;
                     const isMetricHovered = cadHoveredNode === null && !cadPointerGesture?.isDragging && !isSelected; // basic fallback
                     const isMetricSelected = cadSelectedMetric === l.id;
-                    const offset = cadMetricOffsets[l.id] || { dx: 0, dy: -20 };
+                    const offset = cadMetricOffsets[l.id] || getMetricDefaultOffset(l);
                     const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
                     const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
                     
@@ -2592,18 +2790,24 @@ const AdminDashboard = ({ setCurrentView }) => {
                         strokeWidth={cadViewport.width * (l.strokeWidth ? l.strokeWidth / 1000 : 0.004)} 
                         strokeLinecap="round" 
                       />
-                      {isMetricsVisible && l.fixedLength && (
-                        <text 
-                          x={mx} y={my} 
-                          fill={isSelected || isMetricSelected ? "#fbcfe8" : (l.metricHexColor || "#ffffff")} 
-                          fontSize={l.metricFontSize || (isMetricSelected ? 50 : 40)} 
-                          fontWeight="bold" textAnchor="middle"
-                          className="transition-all duration-200"
-                          transform={l.metricRotation ? `rotate(${l.metricRotation}, ${mx}, ${my})` : undefined}
-                        >
-                          {l.fixedLength} m
-                        </text>
-                      )}
+                      {isMetricsVisible && l.fixedLength && (() => {
+                        let defaultRot = Math.atan2(l.p2.y - l.p1.y, l.p2.x - l.p1.x) * (180 / Math.PI);
+                        if (defaultRot > 90) defaultRot -= 180;
+                        else if (defaultRot < -90) defaultRot += 180;
+                        const finalRot = l.metricRotation !== undefined ? l.metricRotation : defaultRot;
+                        return (
+                          <text 
+                            x={mx} y={my} 
+                            fill={isSelected || isMetricSelected ? "#fbcfe8" : (l.metricHexColor || "#ffffff")} 
+                            fontSize={l.metricFontSize || (isMetricSelected ? 50 : 40)} 
+                            fontWeight="bold" textAnchor="middle"
+                            className="transition-all duration-200"
+                            transform={`rotate(${finalRot}, ${mx}, ${my})`}
+                          >
+                            {l.fixedLength} m
+                          </text>
+                        );
+                      })()}
                       {isMetricsVisible && isMetricSelected && l.fixedLength && (
                          <rect x={mx - 50} y={my - 30} width={100} height={40} fill="none" stroke="#fbcfe8" strokeWidth={2} strokeDasharray="5,5" />
                       )}
@@ -2883,7 +3087,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                  {typeof cadSelectedMetric !== 'undefined' && cadSelectedMetric && (() => {
                    const line = cadLines.find(l => l.id === cadSelectedMetric);
                    if (!line || !line.fixedLength || !isMetricsVisible) return null;
-                   const offset = cadMetricOffsets[line.id] || { dx: 0, dy: -20 };
+                   const offset = cadMetricOffsets[line.id] || getMetricDefaultOffset(line);
                    const mx = (line.p1.x + line.p2.x) / 2 + offset.dx;
                    const my = (line.p1.y + line.p2.y) / 2 + offset.dy;
                    const ctCoords = getSvgPtToContainer(mx, my);
@@ -2938,10 +3142,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                  })()}
 
 
-            {cadComputedArea && (
-                <div className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 pointer-events-none w-max">
-                  <div className="text-[10px] text-fuchsia-400 font-black mb-1 uppercase tracking-widest border-b border-slate-700 pb-1">Polygon Area</div>
-                  <div className="font-mono text-xs text-white grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 whitespace-nowrap">
+            {cadComputedArea ? (
+               isPolygonAreaCardVisible && (
+                <div className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto">
+                  <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1 gap-4">
+                     <span className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest">Polygon Area</span>
+                     <button onClick={() => setIsPolygonAreaCardVisible(false)} className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-slate-800">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                     </button>
+                  </div>
+                  <div className="font-mono text-xs text-white grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 whitespace-nowrap pointer-events-none">
                     <span className="text-slate-400 text-left">Hectare:</span><span className="font-bold text-right">{cadComputedArea.hectare.toFixed(4)}</span>
                     <span className="text-slate-400 text-left">Are:</span><span className="font-bold text-right">{cadComputedArea.are.toFixed(4)}</span>
                     <span className="text-slate-400 text-left">Acre:</span><span className="font-bold text-right">{cadComputedArea.acre.toFixed(4)}</span>
@@ -2949,6 +3159,22 @@ const AdminDashboard = ({ setCurrentView }) => {
                     <span className="text-slate-400 text-left">Sq. Ft:</span><span className="font-bold text-right">{cadComputedArea.sqFt.toFixed(2)}</span>
                   </div>
                 </div>
+               )
+             ) : (
+                cadLines.length >= 3 && cadOpenNodes && cadOpenNodes.length > 0 && (
+                  <div className="absolute bottom-8 left-8 z-[120] animate-in slide-in-from-bottom-4">
+                   <button 
+                     onClick={() => {
+                        const errNode = cadOpenNodes[0];
+                        setCadViewport({ x: errNode.x - 125, y: errNode.y - 125, width: 250, height: 250 });
+                     }}
+                     className="bg-red-600/90 hover:bg-red-500 text-white font-black text-xs px-4 py-2 rounded-full shadow-[0_0_15px_rgba(255,0,51,0.5)] border border-red-400 animate-pulse uppercase tracking-widest transition-all flex items-center gap-2 backdrop-blur-sm"
+                   >
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                     Fix Error
+                   </button>
+                  </div>
+                )
              )}
              
             {/* VIRTUAL JOYSTICK D-PAD */}
