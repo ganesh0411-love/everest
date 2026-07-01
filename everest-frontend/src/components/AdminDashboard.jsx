@@ -359,8 +359,9 @@ const AdminDashboard = ({ setCurrentView }) => {
           const surveyIds = Array.from(parentSurveys);
           l.surveyIds = surveyIds; // Dynamic state array mapping
           
+          if (cadSurveys.length === 0) return true;
+          if (cadPrompt && cadPrompt.targetId === l.id) return true;
           if (!l.surveyId && cadSurveys.length > 0) return false;
-          
           return surveyIds.some(id => visibleSurveyIds.has(id));
       });
   }, [cadLines, cadSurveys, cadPolygons, checkedSurveyNos]);
@@ -1286,9 +1287,9 @@ const AdminDashboard = ({ setCurrentView }) => {
             } else {
                if (cadTool === 'IDLE' && cadPolygons.length > 0) {
                      const rawPt = getCadSvgCoords(e.clientX, e.clientY);
-                     let hitPoly = null;
-                     let hitSurveyId = null;
-                     for (let p of cadPolygons) {
+                       let hitPoly = null;
+                       let hitSurveyId = null;
+                       for (let p of visibleCadPolygons) {
                          if (pointInPolygon(rawPt, p.pts)) {
                              hitPoly = p.id;
                              hitSurveyId = p.surveyId;
