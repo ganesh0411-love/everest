@@ -307,18 +307,25 @@ const AdminDashboard = ({ setCurrentView }) => {
             }
             area /= 2;
             if (area < -1e-4) {
-                let newestIdx = -1;
-                let polySurveyId = null;
-                faceEdges.forEach(edge => {
-                    const lnIdx = cadLines.findIndex(l => 
-                        (Math.hypot(l.p1.x - edge.from.x, l.p1.y - edge.from.y) < 1e-3 && Math.hypot(l.p2.x - edge.to.x, l.p2.y - edge.to.y) < 1e-3) ||
-                        (Math.hypot(l.p2.x - edge.from.x, l.p2.y - edge.from.y) < 1e-3 && Math.hypot(l.p1.x - edge.to.x, l.p1.y - edge.to.y) < 1e-3)
-                    );
-                    if (lnIdx > newestIdx) {
-                        newestIdx = lnIdx;
-                        polySurveyId = cadLines[lnIdx].surveyId;
-                    }
-                });
+                  const surveyCounts = {};
+                  let maxCount = 0;
+                  let polySurveyId = null;
+                  faceEdges.forEach(edge => {
+                      const lnIdx = cadLines.findIndex(l => 
+                          (Math.hypot(l.p1.x - edge.from.x, l.p1.y - edge.from.y) < 1e-3 && Math.hypot(l.p2.x - edge.to.x, l.p2.y - edge.to.y) < 1e-3) ||
+                          (Math.hypot(l.p2.x - edge.from.x, l.p2.y - edge.from.y) < 1e-3 && Math.hypot(l.p1.x - edge.to.x, l.p1.y - edge.to.y) < 1e-3)
+                      );
+                      if (lnIdx !== -1) {
+                          const sId = cadLines[lnIdx].surveyId;
+                          if (sId) {
+                             surveyCounts[sId] = (surveyCounts[sId] || 0) + 1;
+                             if (surveyCounts[sId] > maxCount) {
+                                 maxCount = surveyCounts[sId];
+                                 polySurveyId = sId;
+                             }
+                          }
+                      }
+                  });
                 faces.push({ id: `poly_${faceId++}`, pts, area: Math.abs(area), surveyId: polySurveyId, faceEdges });
             }
         }
@@ -335,34 +342,26 @@ const AdminDashboard = ({ setCurrentView }) => {
           
           return s.isVisible;
       }).map(s => s.id));
-    const visiblePolyEdges = new Set();
-    
-    cadPolygons.forEach(p => {
-       if (visibleSurveyIds.has(p.surveyId)) {
-          p.faceEdges.forEach(edge => {
-             const k1 = `${edge.from.x.toFixed(3)},${edge.from.y.toFixed(3)}->${edge.to.x.toFixed(3)},${edge.to.y.toFixed(3)}`;
-             const k2 = `${edge.to.x.toFixed(3)},${edge.to.y.toFixed(3)}->${edge.from.x.toFixed(3)},${edge.from.y.toFixed(3)}`;
-             visiblePolyEdges.add(k1);
-             visiblePolyEdges.add(k2);
+      return cadLines.filter(l => {
+          const parentSurveys = new Set();
+          if (l.surveyId) parentSurveys.add(l.surveyId);
+          
+          cadPolygons.forEach(p => {
+               const hasEdge = p.faceEdges.some(edge => 
+                   (Math.hypot(l.p1.x - edge.from.x, l.p1.y - edge.from.y) < 1e-3 && Math.hypot(l.p2.x - edge.to.x, l.p2.y - edge.to.y) < 1e-3) ||
+                   (Math.hypot(l.p2.x - edge.from.x, l.p2.y - edge.from.y) < 1e-3 && Math.hypot(l.p1.x - edge.to.x, l.p1.y - edge.to.y) < 1e-3)
+               );
+               if (hasEdge && p.surveyId) {
+                   parentSurveys.add(p.surveyId);
+               }
           });
-       }
-    });
-
-    return cadLines.filter(l => {
-        const lk1 = `${l.p1.x.toFixed(3)},${l.p1.y.toFixed(3)}->${l.p2.x.toFixed(3)},${l.p2.y.toFixed(3)}`;
-        const lk2 = `${l.p2.x.toFixed(3)},${l.p2.y.toFixed(3)}->${l.p1.x.toFixed(3)},${l.p1.y.toFixed(3)}`;
-        const isShared = visiblePolyEdges.has(lk1) || visiblePolyEdges.has(lk2);
-        
-        // Rule 2: Shared Edge Exception (keep if it bounds a currently valid closed polygon)
-        if (isShared) return true;
-
-        if (!l.surveyId) {
-            // Prevent orphan null-survey lines from leaking into workspace once surveys exist
-            return cadSurveys.length === 0;
-        }
-
-        // Rule 1: Remove completely if it belongs to an unchecked survey and isn't shared
-        return visibleSurveyIds.has(l.surveyId);
+          
+          const surveyIds = Array.from(parentSurveys);
+          l.surveyIds = surveyIds; // Dynamic state array mapping
+          
+          if (!l.surveyId && cadSurveys.length > 0) return false;
+          
+          return surveyIds.some(id => visibleSurveyIds.has(id));
       });
   }, [cadLines, cadSurveys, cadPolygons, checkedSurveyNos]);
 
