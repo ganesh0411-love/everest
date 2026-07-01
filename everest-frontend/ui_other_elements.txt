@@ -1,0 +1,190 @@
+  const [selectedAreaUnit, setSelectedAreaUnit] = React.useState('Ares');
+  const [isAreaDropdownOpen, setIsAreaDropdownOpen] = React.useState(false);
+
+  const [selectedPerimeterUnit, setSelectedPerimeterUnit] = React.useState('Ft');
+
+  React.useEffect(() => {
+
+=====
+
+                 <div className="flex-1 flex items-center justify-center px-2 py-2.5 min-w-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    <button onClick={() => { setSelectedPerimeterUnit(selectedPerimeterUnit === 'Ft' ? 'M' : 'Ft'); setIsAreaDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-fuchsia-400 transition-colors shrink-0 outline-none">
+                      <span>{(() => {
+                          let totalMeters = cadLines.reduce((acc, l) => acc + (l.fixedLength ? parseFloat(l.fixedLength) : (cadScale ? Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y) * cadScale : 0)), 0);
+                          if (cadActiveLine && cadScale) {
+                              totalMeters += Math.hypot(cadActiveLine.p1.x - cadActiveLine.p2.x, cadActiveLine.p1.y - cadActiveLine.p2.y) * cadScale;
+                          }
+                          if (selectedPerimeterUnit === 'Ft') {
+                              return (totalMeters * 3.28084).toFixed(2);
+                          } else {
+                              return totalMeters.toFixed(2);
+                          }
+                      })()}</span> <span className="text-xs text-slate-400 whitespace-nowrap">{selectedPerimeterUnit} <span className="text-[10px]">⇄</span></span>
+                    </button>
+                 </div>
+
+                 {/* DROPDOWNS OUTSIDE OVERFLOW CONTEXTS */}
+                 {isAreaDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsAreaDropdownOpen(false)}></div>
+                      <div className="absolute top-full left-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-50 min-w-[120px] flex flex-col">
+                         {['Hectare', 'Ares', 'Acre', 'Cent', 'Sq. Ft', 'Sq. M'].map(unit => (
+                             <button key={unit} onClick={() => { setSelectedAreaUnit(unit); setIsAreaDropdownOpen(false); }} className={`px-4 py-2 text-xs font-bold text-left hover:bg-slate-700 transition-colors ${selectedAreaUnit === unit ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                {unit}
+                             </button>
+                         ))}
+                      </div>
+                    </>
+                 )}
+               </div>
+
+=====
+
+               {/* WORKSPACE COMPACT TOP HEADER */}
+               <div className="bg-slate-800/90 backdrop-blur border-b border-r border-slate-700 w-[calc(100%-60px)] flex justify-between items-center shrink-0 shadow-sm z-[150] relative rounded-br-2xl p-2">
+                 
+                 {/* LEFT: AREA & PARAMETER (VERTICAL STACK) */}
+                 <div className="flex-1 flex flex-col justify-center items-start px-2 border-r border-slate-700/50 min-w-0 overflow-hidden">
+                    <button onClick={() => { setIsAreaDropdownOpen(!isAreaDropdownOpen); setIsPerimeterDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-emerald-400 transition-colors shrink-0 outline-none w-full">
+                      <span className="truncate">{cadComputedArea ? (
+                          selectedAreaUnit === 'Hectare' ? cadComputedArea.hectare.toFixed(4) :
+                          selectedAreaUnit === 'Ares' ? cadComputedArea.are.toFixed(4) :
+                          selectedAreaUnit === 'Acre' ? cadComputedArea.acre.toFixed(4) :
+                          selectedAreaUnit === 'Cent' ? cadComputedArea.cent.toFixed(2) :
+                          selectedAreaUnit === 'Sq. Ft' ? cadComputedArea.sqFt.toFixed(2) :
+                          selectedAreaUnit === 'Sq. M' ? cadComputedArea.sqMeters.toFixed(2) : '--'
+                      ) : "--"}</span> <span className="text-[10px] text-slate-400 whitespace-nowrap ml-auto">{selectedAreaUnit} ▼</span>
+                    </button>
+                    
+                    <button onClick={() => { setSelectedPerimeterUnit(selectedPerimeterUnit === 'Ft' ? 'M' : 'Ft'); setIsAreaDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-fuchsia-400 transition-colors shrink-0 outline-none w-full mt-1">
+                      <span className="truncate">{(() => {
+                          if (cadPointerGesture?.isDraggingAnchor) {
+                              let activeSegmentMeters = null;
+                              
+                              if (cadPointerGesture.connectedLineRefs && cadPointerGesture.connectedLineRefs.length > 0) {
+                                  const activeL = cadLines.find(x => x.id === cadPointerGesture.connectedLineRefs[0].id);
+                                  if (activeL && cadScale) activeSegmentMeters = Math.hypot(activeL.p1.x - activeL.p2.x, activeL.p1.y - activeL.p2.y) * cadScale;
+                              } else if (cadPrompt?.type === 'LINE') {
+                                  const activeL = cadLines.find(x => x.id === cadPrompt.targetId);
+                                  if (activeL && cadScale) activeSegmentMeters = Math.hypot(activeL.p1.x - activeL.p2.x, activeL.p1.y - activeL.p2.y) * cadScale;
+                              }
+
+                              if (activeSegmentMeters !== null) {
+                                  if (selectedPerimeterUnit === 'Ft') {
+                                      return (activeSegmentMeters * 3.28084).toFixed(2);
+                                  } else {
+                                      return activeSegmentMeters.toFixed(2);
+                                  }
+                              }
+                          }
+
+                          let totalMeters = cadLines.reduce((acc, l) => acc + (l.fixedLength ? parseFloat(l.fixedLength) : (cadScale ? Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y) * cadScale : 0)), 0);
+                          if (selectedPerimeterUnit === 'Ft') {
+                              return (totalMeters * 3.28084).toFixed(2);
+                          } else {
+                              return totalMeters.toFixed(2);
+                          }
+                      })()}</span> <span className="text-[10px] text-slate-400 whitespace-nowrap ml-auto">{cadPointerGesture?.isDraggingAnchor ? 'Seg ' + selectedPerimeterUnit : 'Tot ' + selectedPerimeterUnit} ▼</span>
+                    </button>
+                 </div>
+
+                 {/* RIGHT: SURVEY DATA (VERTICAL STACK) */}
+                 <div className="flex-1 flex flex-col justify-center items-start px-3 min-w-0 overflow-hidden">
+                    <button className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none">
+                      <span className="truncate">S.No -</span> <span className="text-[9px]">▼</span>
+                    </button>
+                    <button className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none mt-1.5">
+                      <span className="truncate">Sub-D -</span> <span className="text-[9px]">▼</span>
+                    </button>
+                 </div>
+
+=====
+
+                 {/* RIGHT: SURVEY DATA (VERTICAL STACK) */}
+                 <div className="flex-1 flex flex-col justify-center items-start px-3 min-w-0 overflow-hidden">
+                    <button onClick={() => setIsSurveyDropdownOpen(!isSurveyDropdownOpen)} className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none">
+                      <span className="truncate">S.No {multiSurveyData.find(s => s.id === activeSurveyId)?.surveyNo || '-'}</span> <span className="text-[9px]">▼</span>
+                    </button>
+                    <button className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none mt-1.5">
+                      <span className="truncate">Sub-D -</span> <span className="text-[9px]">▼</span>
+                    </button>
+                 </div>
+
+                 {/* DROPDOWNS OUTSIDE OVERFLOW CONTEXTS */}
+                 {isAreaDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsAreaDropdownOpen(false)}></div>
+                      <div className="absolute top-full left-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-50 min-w-[120px] flex flex-col">
+                         {['Hectare', 'Ares', 'Acre', 'Cent', 'Sq. Ft', 'Sq. M'].map(unit => (
+                             <button key={unit} onClick={() => { setSelectedAreaUnit(unit); setIsAreaDropdownOpen(false); }} className={`px-4 py-2 text-xs font-bold text-left hover:bg-slate-700 transition-colors ${selectedAreaUnit === unit ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                {unit}
+                             </button>
+                         ))}
+                      </div>
+                    </>
+                 )}
+                 
+                 {isSurveyDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsSurveyDropdownOpen(false)}></div>
+                      <div className="absolute top-full right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[150px] flex flex-col max-h-[300px] overflow-y-auto">
+                        {multiSurveyData.length === 0 ? (
+                          <div className="px-4 py-2 text-xs text-slate-500 italic">No active surveys</div>
+                        ) : (
+                          multiSurveyData.map(survey => (
+                             <label key={survey.id} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700 cursor-pointer">
+                               <input type="checkbox" className="w-3.5 h-3.5 accent-indigo-500" checked={!hiddenSurveys.includes(survey.id)} onChange={(e) => {
+                                   if (e.target.checked) {
+                                       setHiddenSurveys(prev => prev.filter(id => id !== survey.id));
+                                   } else {
+                                       setHiddenSurveys(prev => [...prev, survey.id]);
+                                   }
+                               }} />
+                               <div className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: survey.color || '#38bdf8' }}></div>
+                               <span className="text-xs font-bold text-slate-300 truncate">S.No {survey.surveyNo || survey.sNo}</span>
+                             </label>
+                          ))
+                        )}
+                      </div>
+                    </>
+                 )}
+               </div>
+
+=====
+
+  const [backgroundLayers, setBackgroundLayers] = React.useState([]);
+  const [isLayersDropdownOpen, setIsLayersDropdownOpen] = React.useState(false);
+  const [bgDragGesture, setBgDragGesture] = React.useState(null);
+
+=====
+
+                      })()}</span> <span className="text-[10px] text-slate-400 whitespace-nowrap ml-auto">{cadPointerGesture?.isDraggingAnchor ? 'Seg ' + selectedPerimeterUnit : 'Tot ' + selectedPerimeterUnit}  </span>
+                    </button>
+                 </div>
+
+                 {/* NEW LAYERS BUTTON (Below Left Box) */}
+                 <div className="absolute top-[68px] left-0 flex flex-col w-[250px] z-50">
+                    <button onClick={() => setIsLayersDropdownOpen(!isLayersDropdownOpen)} className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-xs font-bold text-slate-300 flex justify-between items-center shadow-lg hover:bg-slate-700 transition-colors">
+                       Layers {backgroundLayers.length > 0 && `(${backgroundLayers.length})`}
+                       <span className="text-[9px]">▼</span>
+                    </button>
+                    {isLayersDropdownOpen && backgroundLayers.length > 0 && (
+                        <div className="mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 flex flex-col gap-2 max-h-[300px] overflow-y-auto pointer-events-auto">
+                            {backgroundLayers.map((layer, idx) => (
+                                <div key={layer.id} className="flex items-center gap-2 p-2 bg-slate-900 rounded border border-slate-700">
+                                    <img src={layer.url} alt="bg" className="w-8 h-8 object-cover rounded opacity-80" />
+                                    <div className="flex-1 min-w-0 flex flex-col">
+                                        <span className="text-[10px] text-slate-400 truncate">Layer {idx+1}</span>
+                                        <span className="text-[11px] font-bold text-slate-200 truncate">{layer.surveyNo}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={(e) => { e.stopPropagation(); setBackgroundLayers(prev => prev.map(l => l.id === layer.id ? { ...l, isVisible: !l.isVisible } : l)); }} className={`p-1 rounded hover:bg-slate-700 ${layer.isVisible ? 'text-cyan-400' : 'text-slate-500'}`}>👁️</button>
+                                        <button onClick={(e) => { e.stopPropagation(); setBackgroundLayers(prev => prev.map(l => l.id === layer.id ? { ...l, isFrozen: !l.isFrozen } : l)); }} className={`p-1 rounded hover:bg-slate-700 ${layer.isFrozen ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500'}`}>❄️</button>
+                                        <button onClick={(e) => { e.stopPropagation(); setBackgroundLayers(prev => prev.map(l => l.id === layer.id ? { ...l, isLinked: !l.isLinked } : l)); }} className={`p-1 rounded hover:bg-slate-700 ${layer.isLinked ? 'text-amber-400 bg-amber-400/10' : 'text-slate-500'}`}>🔗</button>
+                                        <button onClick={(e) => { e.stopPropagation(); setBackgroundLayers(prev => prev.filter(l => l.id !== layer.id)); }} className="p-1 rounded hover:bg-slate-700 text-rose-500">❌</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                 </div>

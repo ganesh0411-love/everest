@@ -1,0 +1,58 @@
+{/* WORKSPACE COMPACT TOP HEADER */}
+               <div className="bg-slate-800/90 backdrop-blur border-b border-r border-slate-700 w-[calc(100%-60px)] flex justify-between items-center shrink-0 shadow-sm z-[150] relative rounded-br-2xl p-2">
+                 
+                 {/* LEFT: AREA & PARAMETER (VERTICAL STACK) */}
+                 <div className="flex-1 flex flex-col justify-center items-start px-2 border-r border-slate-700/50 min-w-0 overflow-hidden">
+                    <button onClick={() => { setIsAreaDropdownOpen(!isAreaDropdownOpen); setIsPerimeterDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-emerald-400 transition-colors shrink-0 outline-none w-full">
+                      <span className="truncate">{cadComputedArea ? (
+                          selectedAreaUnit === 'Hectare' ? cadComputedArea.hectare.toFixed(4) :
+                          selectedAreaUnit === 'Ares' ? cadComputedArea.are.toFixed(4) :
+                          selectedAreaUnit === 'Acre' ? cadComputedArea.acre.toFixed(4) :
+                          selectedAreaUnit === 'Cent' ? cadComputedArea.cent.toFixed(2) :
+                          selectedAreaUnit === 'Sq. Ft' ? cadComputedArea.sqFt.toFixed(2) :
+                          selectedAreaUnit === 'Sq. M' ? cadComputedArea.sqMeters.toFixed(2) : '--'
+                      ) : "--"}</span> <span className="text-[10px] text-slate-400 whitespace-nowrap ml-auto">{selectedAreaUnit} ▼</span>
+                    </button>
+                    
+                    <button onClick={() => { setSelectedPerimeterUnit(selectedPerimeterUnit === 'Ft' ? 'M' : 'Ft'); setIsAreaDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-fuchsia-400 transition-colors shrink-0 outline-none w-full mt-1">
+                      <span className="truncate">{(() => {
+                          if (cadPointerGesture?.isDraggingAnchor) {
+                              let activeSegmentMeters = null;
+                              
+                              if (cadPointerGesture.connectedLineRefs && cadPointerGesture.connectedLineRefs.length > 0) {
+                                  const activeL = cadLines.find(x => x.id === cadPointerGesture.connectedLineRefs[0].id);
+                                  if (activeL && cadScale) activeSegmentMeters = Math.hypot(activeL.p1.x - activeL.p2.x, activeL.p1.y - activeL.p2.y) * cadScale;
+                              } else if (cadPrompt?.type === 'LINE') {
+                                  const activeL = cadLines.find(x => x.id === cadPrompt.targetId);
+                                  if (activeL && cadScale) activeSegmentMeters = Math.hypot(activeL.p1.x - activeL.p2.x, activeL.p1.y - activeL.p2.y) * cadScale;
+                              }
+
+                              if (activeSegmentMeters !== null) {
+                                  if (selectedPerimeterUnit === 'Ft') {
+                                      return (activeSegmentMeters * 3.28084).toFixed(2);
+                                  } else {
+                                      return activeSegmentMeters.toFixed(2);
+                                  }
+                              }
+                          }
+
+                          let totalMeters = cadLines.reduce((acc, l) => acc + (l.fixedLength ? parseFloat(l.fixedLength) : (cadScale ? Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y) * cadScale : 0)), 0);
+                          if (selectedPerimeterUnit === 'Ft') {
+                              return (totalMeters * 3.28084).toFixed(2);
+                          } else {
+                              return totalMeters.toFixed(2);
+                          }
+                      })()}</span> <span className="text-[10px] text-slate-400 whitespace-nowrap ml-auto">{cadPointerGesture?.isDraggingAnchor ? 'Seg ' + selectedPerimeterUnit : 'Tot ' + selectedPerimeterUnit} ▼</span>
+                    </button>
+                 </div>
+
+                 {/* RIGHT: SURVEY DATA (VERTICAL STACK) */}
+                 <div className="flex-1 flex flex-col justify-center items-start px-3 min-w-0 overflow-hidden">
+                    <button className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none">
+                      <span className="truncate">S.No -</span> <span className="text-[9px]">▼</span>
+                    </button>
+                    <button className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none mt-1.5">
+                      <span className="truncate">Sub-D -</span> <span className="text-[9px]">▼</span>
+                    </button>
+                 </div>
+

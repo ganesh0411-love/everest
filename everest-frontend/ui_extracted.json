@@ -1,0 +1,135 @@
+{
+  "survey_card": {
+    "step_index": 17077,
+    "created_at": "2026-06-29T04:34:39Z",
+    "name": "multi_replace_file_content",
+    "args": {
+      "Description": "Execute Master Matrix Transform, Auto-Close Menus, New Canvas Reset, and Smart Crop Overlay states",
+      "Instruction": "1. Add `cadCropActive`, `cadCropImage`, `svgRect` states.\n2. Add `useEffect` to observe `cadSvgRef` size.\n3. Update `handleFileUpload` to set `cadCropImage` instead of directly adding layer.\n4. Add `isSurveyDropdownOpen`, `isSubDivDropdownOpen` etc to the `onClick` of the dark canvas container.\n5. Update `New Canvas` to reset `backgroundLayers`, `cadPolygons`, `multiSurveyData`.\n6. Replace `viewBox` with `<g id=\"global-canvas-transform\">`.\n7. Update `getScreenCTM` references.",
+      "ReplacementChunks": [
+        {
+          "AllowMultiple": false,
+          "EndLine": 141,
+          "ReplacementContent": "  const [cadCropActive, setCadCropActive] = React.useState(false);\n  const [cadCropImage, setCadCropImage] = React.useState(null);\n  const [cadCropRect, setCadCropRect] = React.useState({ x: 10, y: 10, w: 80, h: 80 });\n  const [cadCropDragHandle, setCadCropDragHandle] = React.useState(null);\n\n  const [svgRect, setSvgRect] = React.useState({ width: window.innerWidth, height: window.innerHeight });\n\n  React.useEffect(() => {\n    const el = cadSvgRef.current;\n    if (!el) return;\n    const observer = new ResizeObserver(entries => {\n        for (let entry of entries) {\n            setSvgRect({ width: entry.contentRect.width, height: entry.contentRect.height });\n        }\n    });\n    observer.observe(el);\n    return () => observer.disconnect();\n  }, []);\n\n  const handleFileUpload = async (e) => {\n    const file = e.target.files[0];\n    if (!file) return;\n    \n    setIsGalleryPopupOpen(false);",
+          "StartLine": 137,
+          "TargetContent": "  const handleFileUpload = async (e) => {\n    const file = e.target.files[0];\n    if (!file) return;\n    \n    setIsGalleryPopupOpen(false);"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 204,
+          "ReplacementContent": "    const triggerCropOverlay = (url) => {\n        const img = new Image();\n        img.onload = () => {\n            setCadCropImage({ url, width: img.width, height: img.height });\n            setCadCropActive(true);\n            setCadCropRect({ x: 10, y: 10, w: 80, h: 80 });\n        };\n        img.src = url;\n    };\n    \n    if (file.type === 'application/pdf') {\n      try {\n        const pdfjsLib = await loadPdfJsScript();\n        const arrayBuffer = await file.arrayBuffer();\n        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;\n        const page = await pdf.getPage(1);\n        const viewport = page.getViewport({ scale: 2.0 });\n        const canvas = document.createElement('canvas');\n        canvas.width = viewport.width;\n        canvas.height = viewport.height;\n        const ctx = canvas.getContext('2d');\n        await page.render({ canvasContext: ctx, viewport }).promise;\n        const url = canvas.toDataURL('image/png');\n        triggerCropOverlay(url);\n      } catch (err) {\n        console.error(\"Error loading PDF\", err);\n        alert(\"Failed to load PDF.\");\n      }\n    } else {\n      const reader = new FileReader();\n      reader.onload = (ev) => {\n        const url = ev.target.result;\n        triggerCropOverlay(url);\n      };\n      reader.readAsDataURL(file);\n    }\n  };\n\n  const handleCropSubmit = () => {\n      if (!cadCropImage) return;\n      const canvas = document.createElement('canvas');\n      const ctx = canvas.getContext('2d');\n      \n      const srcX = (cadCropRect.x / 100) * cadCropImage.width;\n      const srcY = (cadCropRect.y / 100) * cadCropImage.height;\n      const srcW = (cadCropRect.w / 100) * cadCropImage.width;\n      const srcH = (cadCropRect.h / 100) * cadCropImage.height;\n      \n      canvas.width = srcW;\n      canvas.height = srcH;\n      \n      const img = new Image();\n      img.onload = () => {\n          ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);\n          const croppedUrl = canvas.toDataURL('image/png');\n          \n          const imgAspect = srcW / srcH;\n          const viewAspect = cadViewport.width / cadViewport.height;\n          \n          let w, h;\n          if (imgAspect > viewAspect) {\n              w = cadViewport.width * 0.8;\n              h = w / imgAspect;\n          } else {\n              h = cadViewport.height * 0.8;\n              w = h * imgAspect;\n          }\n          \n          const x = cadViewport.x + (cadViewport.width - w) / 2;\n          const y = cadViewport.y + (cadViewport.height - h) / 2;\n          \n          setBackgroundLayers(prev => [...prev, {\n              id: 'bg_' + Date.now(),\n              url: croppedUrl,\n              x,\n              y,\n              w,\n              h,\n              scale: 1,\n              isVisible: true,\n              isFrozen: false,\n              isLinked: false,\n              surveyNo: activeSurveyId ? (multiSurveyData.find(s => s.id === activeSurveyId)?.surveyNo || '-') : '-'\n          }]);\n          \n          setCadCropActive(false);\n          setCadCropImage(null);\n      };\n      img.src = cadCropImage.url;\n  };",
+          "StartLine": 143,
+          "TargetContent": "    const addImageLayer = (url) => {\n        const img = new Image();\n        img.onload = () => {\n            const imgAspect = img.width / img.height;\n            const viewAspect = cadViewport.width / cadViewport.height;\n            \n            let w, h;\n            if (imgAspect > viewAspect) {\n                w = cadViewport.width * 0.8;\n                h = w / imgAspect;\n            } else {\n                h = cadViewport.height * 0.8;\n                w = h * imgAspect;\n            }\n            \n            const x = cadViewport.x + (cadViewport.width - w) / 2;\n            const y = cadViewport.y + (cadViewport.height - h) / 2;\n            \n            setBackgroundLayers(prev => [...prev, {\n                id: 'bg_' + Date.now(),\n                url,\n                x,\n                y,\n                w,\n                h,\n                scale: 1,\n                isVisible: true,\n                isFrozen: false,\n                isLinked: false,\n                surveyNo: activeSurveyId ? (multiSurveyData.find(s => s.id === activeSurveyId)?.surveyNo || '-') : '-'\n            }]);\n        };\n        img.src = url;\n    };\n    \n    if (file.type === 'application/pdf') {\n      try {\n        const pdfjsLib = await loadPdfJsScript();\n        const arrayBuffer = await file.arrayBuffer();\n        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;\n        const page = await pdf.getPage(1);\n        const viewport = page.getViewport({ scale: 2.0 });\n        const canvas = document.createElement('canvas');\n        canvas.width = viewport.width;\n        canvas.height = viewport.height;\n        const ctx = canvas.getContext('2d');\n        await page.render({ canvasContext: ctx, viewport }).promise;\n        const url = canvas.toDataURL('image/png');\n        addImageLayer(url);\n      } catch (err) {\n        console.error(\"Error loading PDF\", err);\n        alert(\"Failed to load PDF.\");\n      }\n    } else {\n      const reader = new FileReader();\n      reader.onload = (ev) => {\n        const url = ev.target.result;\n        addImageLayer(url);\n      };\n      reader.readAsDataURL(file);\n    }\n  };"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 741,
+          "ReplacementContent": "    const pt = cadSvgRef.current.createSVGPoint();\n    pt.x = clientX; pt.y = clientY;\n    const globalG = document.getElementById('global-canvas-transform');\n    const CTM = globalG ? globalG.getScreenCTM() : cadSvgRef.current.getScreenCTM();\n    let screenPt = pt.matrixTransform(CTM);",
+          "StartLine": 739,
+          "TargetContent": "    const pt = cadSvgRef.current.createSVGPoint();\n    pt.x = clientX; pt.y = clientY;\n    const CTM = cadSvgRef.current.getScreenCTM();\n    let screenPt = pt.matrixTransform(CTM);"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 804,
+          "ReplacementContent": "    const pt = cadSvgRef.current.createSVGPoint();\n    pt.x = ptCoords.x; pt.y = ptCoords.y;\n    const globalG = document.getElementById('global-canvas-transform');\n    const CTM = globalG ? globalG.getScreenCTM() : cadSvgRef.current.getScreenCTM();\n    let screenPt = pt.matrixTransform(CTM);",
+          "StartLine": 802,
+          "TargetContent": "    const pt = cadSvgRef.current.createSVGPoint();\n    pt.x = ptCoords.x; pt.y = ptCoords.y;\n    let screenPt = pt.matrixTransform(cadSvgRef.current.getScreenCTM());"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 979,
+          "ReplacementContent": "        const pt = cadSvgRef.current.createSVGPoint();\n        pt.x = e.clientX; pt.y = e.clientY;\n        const globalG = document.getElementById('global-canvas-transform');\n        const CTM = globalG ? globalG.getScreenCTM() : cadSvgRef.current.getScreenCTM();\n        const svgP = pt.matrixTransform(CTM.inverse());",
+          "StartLine": 977,
+          "TargetContent": "        const pt = cadSvgRef.current.createSVGPoint();\n        pt.x = e.clientX; pt.y = e.clientY;\n        const svgP = pt.matrixTransform(cadSvgRef.current.getScreenCTM().inverse());"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 3294,
+          "ReplacementContent": "                           setCadLines([]); setCadCircles([]); setCadTexts([]); setCadMetricOffsets({}); setBackgroundLayers([]); setCadPolygons([]); setMultiSurveyData([]);\n                           setCadHistory({ past: [], future: [] }); setCadLoadedProjectId(null);\n                           setPdfBase64(''); setSourceImage(''); setCroppedImage(null); setExtractedVectors(null);\n                           setPdfScale(''); setPdfScaleStatus(''); setCadScale(null);\n                           setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });\n                           setShowDarkDrawSettings(false);",
+          "StartLine": 3289,
+          "TargetContent": "                           setCadLines([]); setCadCircles([]); setCadTexts([]); setCadMetricOffsets({});\n                           setCadHistory({ past: [], future: [] }); setCadLoadedProjectId(null);\n                           setPdfBase64(''); setSourceImage(''); setCroppedImage(null); setExtractedVectors(null);\n                           setPdfScale(''); setPdfScaleStatus(''); setCadScale(null);\n                           setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });\n                           setShowDarkDrawSettings(false);"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 3573,
+          "ReplacementContent": "                onClick={() => { setShowDarkDrawSettings(false); setIsLayersDropdownOpen(false); setIsAreaDropdownOpen(false); setIsSurveyDropdownOpen(false); setIsSubDivDropdownOpen(false); setIsFloatingStackExpanded(false); setIsScaleModalOpen(false); setIsPerimeterDropdownOpen(false); }}\n              >",
+          "StartLine": 3573,
+          "TargetContent": "                onClick={() => setShowDarkDrawSettings(false)}\n              >"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 3587,
+          "ReplacementContent": "                  <svg \n                    ref={cadSvgRef}\n                    style={{ transform: `rotate(${cadRotation}deg)` }}\n                    className=\"absolute inset-0 w-full h-full cursor-crosshair touch-none\"\n                  >\n                    <defs>\n                      <pattern id=\"grid\" width={cadViewport.width * 0.05} height={cadViewport.width * 0.05} patternUnits=\"userSpaceOnUse\">\n                        <path d={`M ${cadViewport.width * 0.05} 0 L 0 0 0 ${cadViewport.width * 0.05}`} fill=\"none\" stroke=\"rgba(255,255,255,0.05)\" strokeWidth={cadViewport.width * 0.001}/>\n                      </pattern>\n                    </defs>\n                    \n                    <g id=\"global-canvas-transform\" transform={`translate(${(svgRect.width - (cadViewport.width * Math.max(svgRect.width / cadViewport.width, svgRect.height / cadViewport.height))) / 2 - cadViewport.x * Math.max(svgRect.width / cadViewport.width, svgRect.height / cadViewport.height)}, ${(svgRect.height - (cadViewport.height * Math.max(svgRect.width / cadViewport.width, svgRect.height / cadViewport.height))) / 2 - cadViewport.y * Math.max(svgRect.width / cadViewport.width, svgRect.height / cadViewport.height)}) scale(${Math.max(svgRect.width / cadViewport.width, svgRect.height / cadViewport.height)})`}>\n                    <rect x={cadViewport.x} y={cadViewport.y} width=\"100%\" height=\"100%\" fill=\"url(#grid)\" />",
+          "StartLine": 3575,
+          "TargetContent": "                  <svg \n                    ref={cadSvgRef}\n                    style={{ transform: `rotate(${cadRotation}deg)` }}\n                    className=\"absolute inset-0 w-full h-full cursor-crosshair touch-none\"\n                    viewBox={`${cadViewport.x} ${cadViewport.y} ${cadViewport.width} ${cadViewport.height}`}\n                    preserveAspectRatio=\"xMidYMid slice\"\n                  >\n                    <defs>\n                      <pattern id=\"grid\" width={cadViewport.width * 0.05} height={cadViewport.width * 0.05} patternUnits=\"userSpaceOnUse\">\n                        <path d={`M ${cadViewport.width * 0.05} 0 L 0 0 0 ${cadViewport.width * 0.05}`} fill=\"none\" stroke=\"rgba(255,255,255,0.05)\" strokeWidth={cadViewport.width * 0.001}/>\n                      </pattern>\n                    </defs>\n                    <rect x={cadViewport.x} y={cadViewport.y} width=\"100%\" height=\"100%\" fill=\"url(#grid)\" />"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 3609,
+          "ReplacementContent": "                                const globalG = document.getElementById('global-canvas-transform');\n                                const ctm = globalG ? globalG.getScreenCTM() : e.currentTarget.ownerSVGElement.getScreenCTM();\n                                const pt = e.currentTarget.ownerSVGElement.createSVGPoint();\n                                pt.x = e.clientX; pt.y = e.clientY;\n                                const svgP = pt.matrixTransform(ctm.inverse());",
+          "StartLine": 3606,
+          "TargetContent": "                                const ctm = e.currentTarget.ownerSVGElement.getScreenCTM();\n                                const pt = e.currentTarget.ownerSVGElement.createSVGPoint();\n                                pt.x = e.clientX; pt.y = e.clientY;\n                                const svgP = pt.matrixTransform(ctm.inverse());"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 3628,
+          "ReplacementContent": "                                const globalG = document.getElementById('global-canvas-transform');\n                                const ctm = globalG ? globalG.getScreenCTM() : e.currentTarget.ownerSVGElement.getScreenCTM();\n                                const pt = e.currentTarget.ownerSVGElement.createSVGPoint();\n                                pt.x = e.clientX; pt.y = e.clientY;\n                                const svgP = pt.matrixTransform(ctm.inverse());",
+          "StartLine": 3625,
+          "TargetContent": "                                const ctm = e.currentTarget.ownerSVGElement.getScreenCTM();\n                                const pt = e.currentTarget.ownerSVGElement.createSVGPoint();\n                                pt.x = e.clientX; pt.y = e.clientY;\n                                const svgP = pt.matrixTransform(ctm.inverse());"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 3684,
+          "ReplacementContent": "                                         const globalG = document.getElementById('global-canvas-transform');\n                                         const ctm = globalG ? globalG.getScreenCTM() : e.currentTarget.ownerSVGElement.getScreenCTM();\n                                         const pt = e.currentTarget.ownerSVGElement.createSVGPoint();\n                                         pt.x = e.clientX; pt.y = e.clientY;\n                                         const svgP = pt.matrixTransform(ctm.inverse());",
+          "StartLine": 3681,
+          "TargetContent": "                                         const ctm = e.currentTarget.ownerSVGElement.getScreenCTM();\n                                         const pt = e.currentTarget.ownerSVGElement.createSVGPoint();\n                                         pt.x = e.clientX; pt.y = e.clientY;\n                                         const svgP = pt.matrixTransform(ctm.inverse());"
+        }
+      ],
+      "TargetFile": "c:\\Users\\DELL\\Desktop\\Everest\\everest-frontend\\src\\components\\AdminDashboard.jsx",
+      "toolAction": "Execute main logic",
+      "toolSummary": "Execute main logic"
+    }
+  },
+  "layers_dropdown": {
+    "step_index": 16760,
+    "created_at": "2026-06-28T17:03:18Z",
+    "name": "multi_replace_file_content",
+    "args": {
+      "Description": "Add backgroundLayers state, upload handlers, and Layers Dropdown UI",
+      "Instruction": "Replace old cadBackgroundImage state with backgroundLayers, update upload functions, and insert the Layers UI below Area/Perimeter in the left panel",
+      "ReplacementChunks": [
+        {
+          "AllowMultiple": false,
+          "EndLine": 131,
+          "ReplacementContent": "  const [backgroundLayers, setBackgroundLayers] = React.useState([]);\n  const [isLayersDropdownOpen, setIsLayersDropdownOpen] = React.useState(false);\n  const [bgDragGesture, setBgDragGesture] = React.useState(null);",
+          "StartLine": 130,
+          "TargetContent": "  const [cadBackgroundImage, setCadBackgroundImage] = React.useState(null);\n  const [isBackgroundImageVisible, setIsBackgroundImageVisible] = React.useState(true);"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 154,
+          "ReplacementContent": "        const url = canvas.toDataURL('image/png');\n        setBackgroundLayers(prev => [...prev, {\n            id: 'bg_' + Date.now(),\n            url,\n            x: -cadViewport.x,\n            y: -cadViewport.y,\n            scale: 1,\n            isVisible: true,\n            isFrozen: false,\n            isLinked: false,\n            surveyNo: activeSurveyId ? (multiSurveyData.find(s => s.id === activeSurveyId)?.surveyNo || '-') : '-'\n        }]);",
+          "StartLine": 154,
+          "TargetContent": "        setCadBackgroundImage(canvas.toDataURL('image/png'));"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 162,
+          "ReplacementContent": "        const url = ev.target.result;\n        setBackgroundLayers(prev => [...prev, {\n            id: 'bg_' + Date.now(),\n            url,\n            x: -cadViewport.x,\n            y: -cadViewport.y,\n            scale: 1,\n            isVisible: true,\n            isFrozen: false,\n            isLinked: false,\n            surveyNo: activeSurveyId ? (multiSurveyData.find(s => s.id === activeSurveyId)?.surveyNo || '-') : '-'\n        }]);",
+          "StartLine": 162,
+          "TargetContent": "        setCadBackgroundImage(ev.target.result);"
+        },
+        {
+          "AllowMultiple": false,
+          "EndLine": 3250,
+          "ReplacementContent": "                      })()}</span> <span className=\"text-[10px] text-slate-400 whitespace-nowrap ml-auto\">{cadPointerGesture?.isDraggingAnchor ? 'Seg ' + selectedPerimeterUnit : 'Tot ' + selectedPerimeterUnit}  </span>\n                    </button>\n                 </div>\n\n                 {/* NEW LAYERS BUTTON (Below Left Box) */}\n                 <div className=\"absolute top-[68px] left-0 flex flex-col w-[250px] z-50\">\n                    <button onClick={() => setIsLayersDropdownOpen(!isLayersDropdownOpen)} className=\"bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-xs font-bold text-slate-300 flex justify-between items-center shadow-lg hover:bg-slate-700 transition-colors\">\n                       Layers {backgroundLayers.length > 0 && `(${backgroundLayers.length})`}\n                       <span className=\"text-[9px]\">▼</span>\n                    </button>\n                    {isLayersDropdownOpen && backgroundLayers.length > 0 && (\n                        <div className=\"mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 flex flex-col gap-2 max-h-[300px] overflow-y-auto pointer-events-auto\">\n                            {backgroundLayers.map((layer, idx) => (\n                                <div key={layer.id} className=\"flex items-center gap-2 p-2 bg-slate-900 rounded border border-slate-700\">\n                                    <img src={layer.url} alt=\"bg\" className=\"w-8 h-8 object-cover rounded opacity-80\" />\n                                    <div className=\"flex-1 min-w-0 flex flex-col\">\n                                        <span className=\"text-[10px] text-slate-400 truncate\">Layer {idx+1}</span>\n                                        <span className=\"text-[11px] font-bold text-slate-200 truncate\">{layer.surveyNo}</span>\n                                    </div>\n                                    <div className=\"flex items-center gap-1\">\n                                        <button onClick={(e) => { e.stopPropagation(); setBackgroundLayers(prev => prev.map(l => l.id === layer.id ? { ...l, isVisible: !l.isVisible } : l)); }} className={`p-1 rounded hover:bg-slate-700 ${layer.isVisible ? 'text-cyan-400' : 'text-slate-500'}`}>👁️</button>\n                                        <button onClick={(e) => { e.stopPropagation(); setBackgroundLayers(prev => prev.map(l => l.id === layer.id ? { ...l, isFrozen: !l.isFrozen } : l)); }} className={`p-1 rounded hover:bg-slate-700 ${layer.isFrozen ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500'}`}>❄️</button>\n                                        <button onClick={(e) => { e.stopPropagation(); setBackgroundLayers(prev => prev.map(l => l.id === layer.id ? { ...l, isLinked: !l.isLinked } : l)); }} className={`p-1 rounded hover:bg-slate-700 ${layer.isLinked ? 'text-amber-400 bg-amber-400/10' : 'text-slate-500'}`}>🔗</button>\n                                        <button onClick={(e) => { e.stopPropagation(); setBackgroundLayers(prev => prev.filter(l => l.id !== layer.id)); }} className=\"p-1 rounded hover:bg-slate-700 text-rose-500\">❌</button>\n                                    </div>\n                                </div>\n                            ))}\n                        </div>\n                    )}\n                 </div>",
+          "StartLine": 3248,
+          "TargetContent": "                      })()}</span> <span className=\"text-[10px] text-slate-400 whitespace-nowrap ml-auto\">{cadPointerGesture?.isDraggingAnchor ? 'Seg ' + selectedPerimeterUnit : 'Tot ' + selectedPerimeterUnit}  </span>\n                    </button>\n                 </div>"
+        }
+      ],
+      "TargetFile": "c:\\Users\\DELL\\Desktop\\Everest\\everest-frontend\\src\\components\\AdminDashboard.jsx",
+      "toolAction": "State & Upload Updates",
+      "toolSummary": "State & Upload Updates"
+    }
+  }
+}

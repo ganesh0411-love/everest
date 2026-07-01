@@ -1,0 +1,269 @@
+﻿  const cadPolygons = React.useMemo(() => {
+    if (visibleCadLines.length < 3) return [];
+
+    const nodesMap = new Map();
+    const getOrAddNode = (x, y) => {
+       const key = `${x.toFixed(3)},${y.toFixed(3)}`;
+       if (!nodesMap.has(key)) nodesMap.set(key, { x, y, edges: [] });
+       return nodesMap.get(key);
+    };
+
+    visibleCadLines.forEach(l => {
+       const n1 = getOrAddNode(l.p1.x, l.p1.y);
+       const n2 = getOrAddNode(l.p2.x, l.p2.y);
+       n1.edges.push(n2);
+       n2.edges.push(n1);
+    });
+
+    const nodes = Array.from(nodesMap.values());
+    const halfEdges = new Map(); 
+    
+    nodes.forEach(n => {
+       n.edges.forEach(tgt => {
+           const dx = tgt.x - n.x;
+           const dy = tgt.y - n.y;
+           const angle = Math.atan2(dy, dx);
+           const k = `${n.x.toFixed(3)},${n.y.toFixed(3)}->${tgt.x.toFixed(3)},${tgt.y.toFixed(3)}`;
+           halfEdges.set(k, { from: n, to: tgt, angle, key: k });
+       });
+    });
+
+    nodes.forEach(n => {
+       const outEdges = n.edges.map(tgt => {
+           const k = `${n.x.toFixed(3)},${n.y.toFixed(3)}->${tgt.x.toFixed(3)},${tgt.y.toFixed(3)}`;
+           return halfEdges.get(k);
+       }).sort((a, b) => a.angle - b.angle);
+       
+       for (let i = 0; i < outEdges.length; i++) {
+           const current = outEdges[i];
+           const prev = outEdges[(i - 1 + outEdges.length) % outEdges.length];
+           const revK = `${prev.to.x.toFixed(3)},${prev.to.y.toFixed(3)}->${prev.from.x.toFixed(3)},${prev.from.y.toFixed(3)}`;
+           const incomingToN = halfEdges.get(revK);
+           if (incomingToN) {
+               incomingToN.next = current;
+           }
+       }
+    });
+
+    const faces = [];
+    const visited = new Set();
+    let faceId = 0;
+
+    for (let he of halfEdges.values()) {
+        if (visited.has(he.key)) continue;
+        
+        const faceEdges = [];
+        let curr = he;
+        let isClosed = false;
+        let sanity = 0;
+        do {
+            visited.add(curr.key);
+            faceEdges.push(curr);
+            curr = curr.next;
+            sanity++;
+            if (!curr) break;
+            if (curr.key === he.key) { isClosed = true; break; }
+        } while (sanity < 1000);
+
+        if (isClosed && faceEdges.length >= 3) {
+            let area = 0;
+            const pts = faceEdges.map(e => e.from);
+            for (let i = 0; i < pts.length; i++) {
+                const j = (i + 1) % pts.length;
+                area += (pts[i].x * pts[j].y - pts[j].x * pts[i].y);
+            }
+            area = area / 2;
+            
+            if (area < -1e-4) {
+                let newestIdx = -1;
+                let polySurveyId = null;
+                faceEdges.forEach(edge => {
+                    const lnIdx = visibleCadLines.findIndex(l => 
+                        (Math.hypot(l.p1.x - edge.from.x, l.p1.y - edge.from.y) < 1e-3 && Math.hypot(l.p2.x - edge.to.x, l.p2.y - edge.to.y) < 1e-3) ||
+                        (Math.hypot(l.p2.x - edge.from.x, l.p2.y - edge.from.y) < 1e-3 && Math.hypot(l.p1.x - edge.to.x, l.p1.y - edge.to.y) < 1e-3)
+                    );
+                    if (lnIdx > newestIdx) {
+                        newestIdx = lnIdx;
+                        polySurveyId = visibleCadLines[lnIdx].surveyId;
+                    }
+                });
+                faces.push({ id: `poly_${faceId++}`, pts, area: Math.abs(area), surveyId: polySurveyId });
+            }
+        }
+    }
+    return faces;
+  }, [visibleCadLines]);
+
+  const getMetricDefaultOffset = (l) => {
+      let rot = Math.atan2(l.p2.y - l.p1.y, l.p2.x - l.p1.x) * (180 / Math.PI);
+      if (rot > 90) rot -= 180;
+      else if (rot < -90) rot += 180;
+      const finalRot = l.metricRotation !== undefined ? l.metricRotation : rot;
+      const theta = finalRot * (Math.PI / 180);
+      return { dx: 25 * Math.sin(theta), dy: -25 * Math.cos(theta) };
+  };
+
+  const handleSaveProject = () => {
+     if (cadLoadedProjectId) {
+         setSavedProjects(prev => prev.map(p => {
+             if (p.id === cadLoadedProjectId) {
+                 return {
+                     ...p,
+                     state: {
+                        lines: cadLines,
+                        circles: cadCircles,
+                        texts: cadTexts,
+                        metricOffsets: cadMetricOffsets,
+                        viewport: cadViewport,
+                        scale: cadScale
+                     }
+                 };
+             }
+             return p;
+         }));
+         setShowDarkDrawSettings(false);
+         alert("Project Updated Successfully!");
+     } else {
+         const now = new Date();
+         const d = String(now.getDate()).padStart(2, '0');
+         const mo = String(now.getMonth() + 1).padStart(2, '0');
+         const y = now.getFullYear();
+         const h = String(now.getHours()).padStart(2, '0');
+         const mi = String(now.getMinutes()).padStart(2, '0');
+         const defaultName = `${d}/${mo}/${y} - ${h}:${mi}`;
+         const customName = window.prompt("Enter Project/Survey Name", defaultName);
+         if (customName === null) return;
+
+         const project = {
+            id: Date.now().toString(),
+            date: customName.trim() || defaultName,
+            state: {
+               lines: cadLines,
+               circles: cadCircles,
+               texts: cadTexts,
+               metricOffsets: cadMetricOffsets,
+               viewport: cadViewport,
+               scale: cadScale
+            }
+         };
+         setCadLoadedProjectId(project.id);
+         setSavedProjects(prev => [project, ...prev]);
+         setShowDarkDrawSettings(false);
+         alert("Project Saved Successfully to My Projects!");
+     }
+  };
+
+
+  const handleDeleteSavedProject = (id) => {
+    if (!confirm("Are you sure you want to delete this project?")) return;
+    setSavedProjects(prev => {
+       const filtered = prev.filter(p => p.id !== id);
+       localStorage.setItem('cad_saved_projects', JSON.stringify(filtered));
+       return filtered;
+    });
+  };
+
+  const handleRenameSavedProject = (id) => {
+    const newName = prompt("Enter new project name:");
+    if (!newName) return;
+    setSavedProjects(prev => {
+       const updated = prev.map(p => p.id === id ? { ...p, date: newName } : p);
+       localStorage.setItem('cad_saved_projects', JSON.stringify(updated));
+       return updated;
+    });
+  };
+
+  const cadNodes = React.useMemo(() => {
+    const nodes = [];
+    visibleCadLines.forEach(l => {
+      if (!nodes.some(n => Math.hypot(n.x - l.p1.x, n.y - l.p1.y) < 1e-4)) nodes.push({ ...l.p1, id: 'n_' + Math.random().toString(36).substr(2, 9) });
+      if (!nodes.some(n => Math.hypot(n.x - l.p2.x, n.y - l.p2.y) < 1e-4)) nodes.push({ ...l.p2, id: 'n_' + Math.random().toString(36).substr(2, 9) });
+    });
+    
+    // Circle tangency points (Type A)
+    cadCircles.forEach(circle => {
+      const cx = circle.center.x; const cy = circle.center.y; const r = circle.radiusPixels;
+      nodes.push({ x: cx + r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx - r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx, y: cy + r, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx, y: cy - r, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+    });
+
+    // Circle Intersections (Type C)
+    for (let i = 0; i < cadCircles.length; i++) {
+      for (let j = i + 1; j < cadCircles.length; j++) {
+         const c1 = cadCircles[i];
+         const c2 = cadCircles[j];
+         const d = Math.hypot(c1.center.x - c2.center.x, c1.center.y - c2.center.y);
+         if (d > c1.radiusPixels + c2.radiusPixels || d < Math.abs(c1.radiusPixels - c2.radiusPixels) || d === 0) continue;
+         
+         const a = (c1.radiusPixels * c1.radiusPixels - c2.radiusPixels * c2.radiusPixels + d * d) / (2 * d);
+         const h = Math.sqrt(Math.max(0, c1.radiusPixels * c1.radiusPixels - a * a));
+         const x2 = c1.center.x + a * (c2.center.x - c1.center.x) / d;
+         const y2 = c1.center.y + a * (c2.center.y - c1.center.y) / d;
+         
+         nodes.push({ 
+           x: x2 + h * (c2.center.y - c1.center.y) / d, 
+           y: y2 - h * (c2.center.x - c1.center.x) / d, 
+           id: 'ncci_' + Math.random().toString(36).substr(2, 9),
+           targetCircleId1: c1.id, targetCircleId2: c2.id,
+           type: 'CIRCLE_INT'
+         });
+         nodes.push({ 
+           x: x2 - h * (c2.center.y - c1.center.y) / d, 
+           y: y2 + h * (c2.center.x - c1.center.x) / d, 
+           id: 'ncci_' + Math.random().toString(36).substr(2, 9),
+           targetCircleId1: c1.id, targetCircleId2: c2.id,
+           type: 'CIRCLE_INT'
+         });
+      }
+    }
+
+    // Intersections between lines and circles (Type B)
+    for (let i = 0; i < cadLines.length; i++) {
+        for (let j = 0; j < cadCircles.length; j++) {
+            const l = cadLines[i];
+            const c = cadCircles[j];
+            const dx = l.p2.x - l.p1.x;
+            const dy = l.p2.y - l.p1.y;
+            const fx = l.p1.x - c.center.x;
+            const fy = l.p1.y - c.center.y;
+            
+            const a = dx * dx + dy * dy;
+            const b = 2 * (fx * dx + fy * dy);
+            const c_val = fx * fx + fy * fy - c.radiusPixels * c.radiusPixels;
+            
+            let disc = b * b - 4 * a * c_val;
+            if (disc >= 0) {
+                disc = Math.sqrt(disc);
+                const t1 = (-b - disc) / (2 * a);
+                const t2 = (-b + disc) / (2 * a);
+                
+                if (t1 >= 0 && t1 <= 1) {
+                    nodes.push({ x: l.p1.x + t1 * dx, y: l.p1.y + t1 * dy, id: 'ncli_' + Math.random().toString(36).substr(2, 9), type: 'LINE_CIRCLE_INT' });
+                }
+                if (t2 >= 0 && t2 <= 1) {
+                    nodes.push({ x: l.p1.x + t2 * dx, y: l.p1.y + t2 * dy, id: 'ncli_' + Math.random().toString(36).substr(2, 9), type: 'LINE_CIRCLE_INT' });
+                }
+            }
+        }
+    }
+
+    // Intersections between lines
+    for (let i = 0; i < cadLines.length; i++) {
+      for (let j = i + 1; j < cadLines.length; j++) {
+        const l1 = cadLines[i]; const l2 = cadLines[j];
+        const denom = (l1.p1.x - l1.p2.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l1.p2.y) * (l2.p1.x - l2.p2.x);
+        if (Math.abs(denom) > 1e-6) {
+           const t = ((l1.p1.x - l2.p1.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l2.p1.y) * (l2.p1.x - l2.p2.x)) / denom;
+           const u = ((l1.p1.x - l2.p1.x) * (l1.p1.y - l1.p2.y) - (l1.p1.y - l2.p1.y) * (l1.p1.x - l1.p2.x)) / denom;
+           if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+              nodes.push({ x: l1.p1.x + t * (l1.p2.x - l1.p1.x), y: l1.p1.y + t * (l1.p2.y - l1.p1.y), id: 'ni_' + Math.random().toString(36).substr(2, 9) });
+           }
+        }
+      }
+    }
+    return nodes;
+  }, [visibleCadLines, cadCircles]);
+
+  const cadComputedArea = React.useMemo(() => {

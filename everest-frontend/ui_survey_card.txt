@@ -1,0 +1,133 @@
+  // --- MANUAL CAD ENGINE STATE ---
+
+  const [multiSurveyData, setMultiSurveyData] = React.useState([]); // { id, sNo, surveyNo, area, color, useCustomColor }
+  const [activeSurveyId, setActiveSurveyId] = React.useState(null);
+  const [hiddenSurveys, setHiddenSurveys] = React.useState([]); // array of survey IDs
+  const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
+  const SURVEY_COLORS = ['#38bdf8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f43f5e', '#14b8a6', '#f97316'];
+  const [cadLines, setCadLines] = React.useState([]);
+
+=====
+
+                 {/* RIGHT: SURVEY DATA (VERTICAL STACK) */}
+                 <div className="flex-1 flex flex-col justify-center items-start px-3 min-w-0 overflow-hidden">
+                    <button onClick={() => setIsSurveyDropdownOpen(!isSurveyDropdownOpen)} className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none">
+                      <span className="truncate">S.No {multiSurveyData.find(s => s.id === activeSurveyId)?.surveyNo || '-'}</span> <span className="text-[9px]">▼</span>
+                    </button>
+                    <button className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none mt-1.5">
+                      <span className="truncate">Sub-D -</span> <span className="text-[9px]">▼</span>
+                    </button>
+                 </div>
+
+                 {/* DROPDOWNS OUTSIDE OVERFLOW CONTEXTS */}
+                 {isAreaDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsAreaDropdownOpen(false)}></div>
+                      <div className="absolute top-full left-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-50 min-w-[120px] flex flex-col">
+                         {['Hectare', 'Ares', 'Acre', 'Cent', 'Sq. Ft', 'Sq. M'].map(unit => (
+                             <button key={unit} onClick={() => { setSelectedAreaUnit(unit); setIsAreaDropdownOpen(false); }} className={`px-4 py-2 text-xs font-bold text-left hover:bg-slate-700 transition-colors ${selectedAreaUnit === unit ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                {unit}
+                             </button>
+                         ))}
+                      </div>
+                    </>
+                 )}
+                 
+                 {isSurveyDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsSurveyDropdownOpen(false)}></div>
+                      <div className="absolute top-full right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[150px] flex flex-col max-h-[300px] overflow-y-auto">
+                        {multiSurveyData.length === 0 ? (
+                          <div className="px-4 py-2 text-xs text-slate-500 italic">No active surveys</div>
+                        ) : (
+                          multiSurveyData.map(survey => (
+                             <label key={survey.id} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700 cursor-pointer">
+                               <input type="checkbox" className="w-3.5 h-3.5 accent-indigo-500" checked={!hiddenSurveys.includes(survey.id)} onChange={(e) => {
+                                   if (e.target.checked) {
+                                       setHiddenSurveys(prev => prev.filter(id => id !== survey.id));
+                                   } else {
+                                       setHiddenSurveys(prev => [...prev, survey.id]);
+                                   }
+                               }} />
+                               <div className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: survey.color || '#38bdf8' }}></div>
+                               <span className="text-xs font-bold text-slate-300 truncate">S.No {survey.surveyNo || survey.sNo}</span>
+                             </label>
+                          ))
+                        )}
+                      </div>
+                    </>
+                 )}
+               </div>
+
+=====
+
+  const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
+  const [isSubDivDropdownOpen, setIsSubDivDropdownOpen] = React.useState(false);
+  const SURVEY_COLORS = ['#38bdf8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f43f5e', '#14b8a6', '#f97316'];
+
+=====
+
+                 {/* RIGHT: SURVEY DATA (VERTICAL STACK) */}
+                 <div className="flex-1 flex flex-col justify-center items-start px-3 min-w-0 overflow-hidden relative">
+                    <button onClick={() => { setIsSurveyDropdownOpen(!isSurveyDropdownOpen); setIsSubDivDropdownOpen(false); }} className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none">
+                      <span className="truncate">S.No {multiSurveyData.find(s => s.id === (multiSurveyData.find(s => s.id === activeSurveyId)?.parentSurveyId || activeSurveyId))?.surveyNo || '-'}</span> <span className="text-[9px]">▼</span>
+                    </button>
+                    <button onClick={() => { setIsSubDivDropdownOpen(!isSubDivDropdownOpen); setIsSurveyDropdownOpen(false); }} className="flex items-center justify-between w-full text-slate-300 font-bold text-xs hover:text-indigo-400 transition-colors shrink-0 outline-none mt-1.5">
+                      <span className="truncate">Sub-D {multiSurveyData.find(s => s.id === activeSurveyId && s.parentSurveyId)?.subDivNo || '-'}</span> <span className="text-[9px]">▼</span>
+                    </button>
+                 </div>
+
+=====
+
+                 {isSurveyDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsSurveyDropdownOpen(false)}></div>
+                      <div className="absolute top-[32px] right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[150px] flex flex-col max-h-[300px] overflow-y-auto">
+                        {multiSurveyData.filter(s => !s.parentSurveyId).length === 0 ? (
+                          <div className="px-4 py-2 text-xs text-slate-500 italic">No active surveys</div>
+                        ) : (
+                          multiSurveyData.filter(s => !s.parentSurveyId).map(survey => (
+                              <div key={survey.id} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700">
+                                <input type="checkbox" className="w-3.5 h-3.5 accent-indigo-500 cursor-pointer" checked={!hiddenSurveys.includes(survey.id)} onChange={(e) => {
+                                    if (e.target.checked) {
+                                        setHiddenSurveys(prev => prev.filter(id => id !== survey.id));
+                                    } else {
+                                        setHiddenSurveys(prev => [...prev, survey.id]);
+                                    }
+                                }} />
+                                <div className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: survey.color || '#38bdf8' }}></div>
+                                <span onClick={() => { setActiveSurveyId(survey.id); setIsSurveyDropdownOpen(false); }} className={`text-xs font-bold truncate cursor-pointer flex-1 ${activeSurveyId === survey.id || multiSurveyData.find(s => s.id === activeSurveyId)?.parentSurveyId === survey.id ? 'text-indigo-400' : 'text-slate-300'}`}>S.No {survey.surveyNo || survey.sNo}</span>
+                              </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                 )}
+
+                 {isSubDivDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsSubDivDropdownOpen(false)}></div>
+                      <div className="absolute top-[60px] right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[150px] flex flex-col max-h-[300px] overflow-y-auto">
+                        {(() => {
+                           const currentParentId = multiSurveyData.find(s => s.id === activeSurveyId)?.parentSurveyId || activeSurveyId;
+                           const children = multiSurveyData.filter(child => child.parentSurveyId === currentParentId);
+                           if (children.length === 0) {
+                               return <div className="px-4 py-2 text-xs text-slate-500 italic">No sub-divisions</div>;
+                           }
+                           return children.map(child => (
+                               <div key={child.id} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700">
+                                 <input type="checkbox" className="w-3.5 h-3.5 accent-indigo-500 cursor-pointer" checked={!hiddenSurveys.includes(child.id)} onChange={(e) => {
+                                     if (e.target.checked) {
+                                         setHiddenSurveys(prev => prev.filter(id => id !== child.id));
+                                     } else {
+                                         setHiddenSurveys(prev => [...prev, child.id]);
+                                     }
+                                 }} />
+                                 <div className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: child.color || '#38bdf8' }}></div>
+                                 <span onClick={() => { setActiveSurveyId(child.id); setIsSubDivDropdownOpen(false); }} className={`text-xs font-bold truncate cursor-pointer flex-1 ${activeSurveyId === child.id ? 'text-indigo-400' : 'text-slate-400'}`}>Sub-D {child.subDivNo}</span>
+                               </div>
+                           ));
+                        })()}
+                      </div>
+                    </>
+                 )}

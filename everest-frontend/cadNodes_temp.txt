@@ -1,0 +1,92 @@
+﻿  const cadNodes = React.useMemo(() => {
+    const nodes = [];
+    visibleCadLines.forEach(l => {
+      if (!nodes.some(n => Math.hypot(n.x - l.p1.x, n.y - l.p1.y) < 1e-4)) nodes.push({ ...l.p1, id: 'n_' + Math.random().toString(36).substr(2, 9) });
+      if (!nodes.some(n => Math.hypot(n.x - l.p2.x, n.y - l.p2.y) < 1e-4)) nodes.push({ ...l.p2, id: 'n_' + Math.random().toString(36).substr(2, 9) });
+    });
+    
+    // Circle tangency points (Type A)
+    cadCircles.forEach(circle => {
+      const cx = circle.center.x; const cy = circle.center.y; const r = circle.radiusPixels;
+      nodes.push({ x: cx + r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx - r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx, y: cy + r, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx, y: cy - r, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+    });
+
+    // Circle Intersections (Type C)
+    for (let i = 0; i < cadCircles.length; i++) {
+      for (let j = i + 1; j < cadCircles.length; j++) {
+         const c1 = cadCircles[i];
+         const c2 = cadCircles[j];
+         const d = Math.hypot(c1.center.x - c2.center.x, c1.center.y - c2.center.y);
+         if (d > c1.radiusPixels + c2.radiusPixels || d < Math.abs(c1.radiusPixels - c2.radiusPixels) || d === 0) continue;
+         
+         const a = (c1.radiusPixels * c1.radiusPixels - c2.radiusPixels * c2.radiusPixels + d * d) / (2 * d);
+         const h = Math.sqrt(Math.max(0, c1.radiusPixels * c1.radiusPixels - a * a));
+         const x2 = c1.center.x + a * (c2.center.x - c1.center.x) / d;
+         const y2 = c1.center.y + a * (c2.center.y - c1.center.y) / d;
+         
+         nodes.push({ 
+           x: x2 + h * (c2.center.y - c1.center.y) / d, 
+           y: y2 - h * (c2.center.x - c1.center.x) / d, 
+           id: 'ncci_' + Math.random().toString(36).substr(2, 9),
+           targetCircleId1: c1.id, targetCircleId2: c2.id,
+           type: 'CIRCLE_INT'
+         });
+         nodes.push({ 
+           x: x2 - h * (c2.center.y - c1.center.y) / d, 
+           y: y2 + h * (c2.center.x - c1.center.x) / d, 
+           id: 'ncci_' + Math.random().toString(36).substr(2, 9),
+           targetCircleId1: c1.id, targetCircleId2: c2.id,
+           type: 'CIRCLE_INT'
+         });
+      }
+    }
+
+    // Intersections between lines and circles (Type B)
+    for (let i = 0; i < cadLines.length; i++) {
+        for (let j = 0; j < cadCircles.length; j++) {
+            const l = cadLines[i];
+            const c = cadCircles[j];
+            const dx = l.p2.x - l.p1.x;
+            const dy = l.p2.y - l.p1.y;
+            const fx = l.p1.x - c.center.x;
+            const fy = l.p1.y - c.center.y;
+            
+            const a = dx * dx + dy * dy;
+            const b = 2 * (fx * dx + fy * dy);
+            const c_val = fx * fx + fy * fy - c.radiusPixels * c.radiusPixels;
+            
+            let disc = b * b - 4 * a * c_val;
+            if (disc >= 0) {
+                disc = Math.sqrt(disc);
+                const t1 = (-b - disc) / (2 * a);
+                const t2 = (-b + disc) / (2 * a);
+                
+                if (t1 >= 0 && t1 <= 1) {
+                    nodes.push({ x: l.p1.x + t1 * dx, y: l.p1.y + t1 * dy, id: 'ncli_' + Math.random().toString(36).substr(2, 9), type: 'LINE_CIRCLE_INT' });
+                }
+                if (t2 >= 0 && t2 <= 1) {
+                    nodes.push({ x: l.p1.x + t2 * dx, y: l.p1.y + t2 * dy, id: 'ncli_' + Math.random().toString(36).substr(2, 9), type: 'LINE_CIRCLE_INT' });
+                }
+            }
+        }
+    }
+
+    // Intersections between lines
+    for (let i = 0; i < cadLines.length; i++) {
+      for (let j = i + 1; j < cadLines.length; j++) {
+        const l1 = cadLines[i]; const l2 = cadLines[j];
+        const denom = (l1.p1.x - l1.p2.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l1.p2.y) * (l2.p1.x - l2.p2.x);
+        if (Math.abs(denom) > 1e-6) {
+           const t = ((l1.p1.x - l2.p1.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l2.p1.y) * (l2.p1.x - l2.p2.x)) / denom;
+           const u = ((l1.p1.x - l2.p1.x) * (l1.p1.y - l1.p2.y) - (l1.p1.y - l2.p1.y) * (l1.p1.x - l1.p2.x)) / denom;
+           if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+              nodes.push({ x: l1.p1.x + t * (l1.p2.x - l1.p1.x), y: l1.p1.y + t * (l1.p2.y - l1.p1.y), id: 'ni_' + Math.random().toString(36).substr(2, 9) });
+           }
+        }
+      }
+    }
+    return nodes;
+  }, [visibleCadLines, cadCircles]);

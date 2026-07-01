@@ -97,14 +97,25 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
 
   // --- MANUAL CAD ENGINE STATE ---
+  const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
+  const [cadPromptSurveyNo, setCadPromptSurveyNo] = React.useState('');
+  const [cadPromptSubDiv, setCadPromptSubDiv] = React.useState('');
+  const [cadPromptColor, setCadPromptColor] = React.useState('#3b82f6'); // Default to blue-500
+  const [cadActiveSurveyId, setCadActiveSurveyId] = React.useState(null);
+  const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
+    const [isSubDivisionDropdownOpen, setIsSubDivisionDropdownOpen] = React.useState(false);
+    const [checkedSurveyNos, setCheckedSurveyNos] = React.useState([]);
   const [cadLines, setCadLines] = React.useState([]);
   const [cadCircles, setCadCircles] = React.useState([]);
   const [cadScale, setCadScale] = React.useState(null);
   const [cadTool, setCadTool] = React.useState('IDLE');
   const [cadViewport, setCadViewport] = React.useState({ x: 0, y: 0, width: 2000, height: 2000 });
+  const cadViewportRef = React.useRef({ x: 0, y: 0, width: 2000, height: 2000 });
+  React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   const [cadAnchorNode, setCadAnchorNode] = React.useState(null);
   const [cadPrompt, setCadPrompt] = React.useState(null);
   const [cadPromptValue, setCadPromptValue] = React.useState('');
+  const [cadPromptUnit, setCadPromptUnit] = React.useState('meters');
   const cadSvgRef = React.useRef(null);
   
   const [isFloatingStackExpanded, setIsFloatingStackExpanded] = React.useState(true);
@@ -247,79 +258,113 @@ const AdminDashboard = ({ setCurrentView }) => {
     cadLines.forEach(l => {
        const n1 = getOrAddNode(l.p1.x, l.p1.y);
        const n2 = getOrAddNode(l.p2.x, l.p2.y);
-       n1.edges.push(n2);
-       n2.edges.push(n1);
+       n1.edges.push({ to: n2, line: l });
+       n2.edges.push({ to: n1, line: l });
     });
 
-    const nodes = Array.from(nodesMap.values());
-    const halfEdges = new Map(); 
-    
-    nodes.forEach(n => {
-       n.edges.forEach(tgt => {
-           const dx = tgt.x - n.x;
-           const dy = tgt.y - n.y;
-           const angle = Math.atan2(dy, dx);
-           const k = `${n.x.toFixed(3)},${n.y.toFixed(3)}->${tgt.x.toFixed(3)},${tgt.y.toFixed(3)}`;
-           halfEdges.set(k, { from: n, to: tgt, angle, key: k });
+    const halfEdges = [];
+    nodesMap.forEach(node => {
+       node.edges.forEach(edge => {
+          halfEdges.push({
+             from: node,
+             to: edge.to,
+             angle: Math.atan2(edge.to.y - node.y, edge.to.x - node.x),
+             line: edge.line
+          });
        });
     });
 
-    nodes.forEach(n => {
-       const outEdges = n.edges.map(tgt => {
-           const k = `${n.x.toFixed(3)},${n.y.toFixed(3)}->${tgt.x.toFixed(3)},${tgt.y.toFixed(3)}`;
-           return halfEdges.get(k);
-       }).sort((a, b) => a.angle - b.angle);
-       
-       for (let i = 0; i < outEdges.length; i++) {
-           const current = outEdges[i];
-           const prev = outEdges[(i - 1 + outEdges.length) % outEdges.length];
-           const revK = `${prev.to.x.toFixed(3)},${prev.to.y.toFixed(3)}->${prev.from.x.toFixed(3)},${prev.from.y.toFixed(3)}`;
-           const incomingToN = halfEdges.get(revK);
-           if (incomingToN) {
-               incomingToN.next = current;
-           }
-       }
+    const edgesByFrom = new Map();
+    halfEdges.forEach(he => {
+       if (!edgesByFrom.has(he.from)) edgesByFrom.set(he.from, []);
+       edgesByFrom.get(he.from).push(he);
+    });
+    
+    edgesByFrom.forEach(edges => {
+       edges.sort((a, b) => a.angle - b.angle);
+    });
+
+    halfEdges.forEach(he => {
+       const toEdges = edgesByFrom.get(he.to) || [];
+       let revIdx = toEdges.findIndex(e => e.to === he.from);
+       he.next = toEdges[(revIdx + 1) % toEdges.length];
     });
 
     const faces = [];
-    const visited = new Set();
     let faceId = 0;
-
-    for (let he of halfEdges.values()) {
-        if (visited.has(he.key)) continue;
-        
-        const faceEdges = [];
-        let curr = he;
-        let isClosed = false;
-        let sanity = 0;
-        do {
-            visited.add(curr.key);
-            faceEdges.push(curr);
-            curr = curr.next;
-            sanity++;
-            if (!curr) break;
-            if (curr.key === he.key) { isClosed = true; break; }
-        } while (sanity < 1000);
-
-        if (isClosed && faceEdges.length >= 3) {
+    halfEdges.forEach(he => {
+        if (!he.visited) {
+            const pts = [];
+            let curr = he;
             let area = 0;
-            const pts = faceEdges.map(e => e.from);
-            for (let i = 0; i < pts.length; i++) {
-                const j = (i + 1) % pts.length;
-                area += (pts[i].x * pts[j].y - pts[j].x * pts[i].y);
+            const faceEdges = [];
+            while (!curr.visited) {
+                curr.visited = true;
+                pts.push({ x: curr.from.x, y: curr.from.y });
+                faceEdges.push(curr);
+                area += (curr.from.x * curr.to.y - curr.to.x * curr.from.y);
+                curr = curr.next;
             }
-            area = area / 2;
-            
-            // In SVG (Y down), counter-clockwise traversal yields negative signed area.
-            // Bounded interior faces are traversed CCW (turning left at each node).
-            // Thus, we only keep faces with negative area to reject the outer boundary.
+            area /= 2;
             if (area < -1e-4) {
-                faces.push({ id: `poly_${faceId++}`, pts, area: Math.abs(area) });
+                let newestIdx = -1;
+                let polySurveyId = null;
+                faceEdges.forEach(edge => {
+                    const lnIdx = cadLines.findIndex(l => 
+                        (Math.hypot(l.p1.x - edge.from.x, l.p1.y - edge.from.y) < 1e-3 && Math.hypot(l.p2.x - edge.to.x, l.p2.y - edge.to.y) < 1e-3) ||
+                        (Math.hypot(l.p2.x - edge.from.x, l.p2.y - edge.from.y) < 1e-3 && Math.hypot(l.p1.x - edge.to.x, l.p1.y - edge.to.y) < 1e-3)
+                    );
+                    if (lnIdx > newestIdx) {
+                        newestIdx = lnIdx;
+                        polySurveyId = cadLines[lnIdx].surveyId;
+                    }
+                });
+                faces.push({ id: `poly_${faceId++}`, pts, area: Math.abs(area), surveyId: polySurveyId, faceEdges });
             }
         }
-    }
+    });
     return faces;
   }, [cadLines]);
+
+  const visibleCadLines = React.useMemo(() => {
+    const visibleSurveyIds = new Set(cadSurveys.filter(s => {
+          if (!checkedSurveyNos.includes(s.surveyNo)) return false;
+          
+          const isMasterDash = !cadSurveys.some(sub => sub.surveyNo === s.surveyNo && sub.isVisible);
+          if (isMasterDash) return true;
+          
+          return s.isVisible;
+      }).map(s => s.id));
+    const visiblePolyEdges = new Set();
+    
+    cadPolygons.forEach(p => {
+       if (visibleSurveyIds.has(p.surveyId)) {
+          p.faceEdges.forEach(edge => {
+             const k1 = `${edge.from.x.toFixed(3)},${edge.from.y.toFixed(3)}->${edge.to.x.toFixed(3)},${edge.to.y.toFixed(3)}`;
+             const k2 = `${edge.to.x.toFixed(3)},${edge.to.y.toFixed(3)}->${edge.from.x.toFixed(3)},${edge.from.y.toFixed(3)}`;
+             visiblePolyEdges.add(k1);
+             visiblePolyEdges.add(k2);
+          });
+       }
+    });
+
+    return cadLines.filter(l => {
+        const lk1 = `${l.p1.x.toFixed(3)},${l.p1.y.toFixed(3)}->${l.p2.x.toFixed(3)},${l.p2.y.toFixed(3)}`;
+        const lk2 = `${l.p2.x.toFixed(3)},${l.p2.y.toFixed(3)}->${l.p1.x.toFixed(3)},${l.p1.y.toFixed(3)}`;
+        const isShared = visiblePolyEdges.has(lk1) || visiblePolyEdges.has(lk2);
+        
+        // Rule 2: Shared Edge Exception (keep if it bounds a currently valid closed polygon)
+        if (isShared) return true;
+
+        if (!l.surveyId) {
+            // Prevent orphan null-survey lines from leaking into workspace once surveys exist
+            return cadSurveys.length === 0;
+        }
+
+        // Rule 1: Remove completely if it belongs to an unchecked survey and isn't shared
+        return visibleSurveyIds.has(l.surveyId);
+      });
+  }, [cadLines, cadSurveys, cadPolygons, checkedSurveyNos]);
 
   const getMetricDefaultOffset = (l) => {
       let rot = Math.atan2(l.p2.y - l.p1.y, l.p2.x - l.p1.x) * (180 / Math.PI);
@@ -400,16 +445,123 @@ const AdminDashboard = ({ setCurrentView }) => {
     });
   };
 
+  const cadNodes = React.useMemo(() => {
+    const nodes = [];
+    visibleCadLines.forEach(l => {
+      if (!nodes.some(n => Math.hypot(n.x - l.p1.x, n.y - l.p1.y) < 1e-4)) nodes.push({ ...l.p1, id: 'n_' + Math.random().toString(36).substr(2, 9) });
+      if (!nodes.some(n => Math.hypot(n.x - l.p2.x, n.y - l.p2.y) < 1e-4)) nodes.push({ ...l.p2, id: 'n_' + Math.random().toString(36).substr(2, 9) });
+    });
+    
+    // Circle tangency points (Type A)
+    cadCircles.forEach(circle => {
+      const cx = circle.center.x; const cy = circle.center.y; const r = circle.radiusPixels;
+      nodes.push({ x: cx + r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx - r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx, y: cy + r, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+      nodes.push({ x: cx, y: cy - r, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
+    });
+
+    // Circle Intersections (Type C)
+    for (let i = 0; i < cadCircles.length; i++) {
+      for (let j = i + 1; j < cadCircles.length; j++) {
+         const c1 = cadCircles[i];
+         const c2 = cadCircles[j];
+         const d = Math.hypot(c1.center.x - c2.center.x, c1.center.y - c2.center.y);
+         if (d > c1.radiusPixels + c2.radiusPixels || d < Math.abs(c1.radiusPixels - c2.radiusPixels) || d === 0) continue;
+         
+         const a = (c1.radiusPixels * c1.radiusPixels - c2.radiusPixels * c2.radiusPixels + d * d) / (2 * d);
+         const h = Math.sqrt(Math.max(0, c1.radiusPixels * c1.radiusPixels - a * a));
+         const x2 = c1.center.x + a * (c2.center.x - c1.center.x) / d;
+         const y2 = c1.center.y + a * (c2.center.y - c1.center.y) / d;
+         
+         nodes.push({ 
+           x: x2 + h * (c2.center.y - c1.center.y) / d, 
+           y: y2 - h * (c2.center.x - c1.center.x) / d, 
+           id: 'ncci_' + Math.random().toString(36).substr(2, 9),
+           targetCircleId1: c1.id, targetCircleId2: c2.id,
+           type: 'CIRCLE_INT'
+         });
+         nodes.push({ 
+           x: x2 - h * (c2.center.y - c1.center.y) / d, 
+           y: y2 + h * (c2.center.x - c1.center.x) / d, 
+           id: 'ncci_' + Math.random().toString(36).substr(2, 9),
+           targetCircleId1: c1.id, targetCircleId2: c2.id,
+           type: 'CIRCLE_INT'
+         });
+      }
+    }
+
+    // Intersections between lines and circles (Type B)
+      for (let i = 0; i < visibleCadLines.length; i++) {
+          for (let j = 0; j < cadCircles.length; j++) {
+              const l = visibleCadLines[i];
+            const c = cadCircles[j];
+            const dx = l.p2.x - l.p1.x;
+            const dy = l.p2.y - l.p1.y;
+            const fx = l.p1.x - c.center.x;
+            const fy = l.p1.y - c.center.y;
+            
+            const a = dx * dx + dy * dy;
+            const b = 2 * (fx * dx + fy * dy);
+            const c_val = fx * fx + fy * fy - c.radiusPixels * c.radiusPixels;
+            
+            let disc = b * b - 4 * a * c_val;
+            if (disc >= 0) {
+                disc = Math.sqrt(disc);
+                const t1 = (-b - disc) / (2 * a);
+                const t2 = (-b + disc) / (2 * a);
+                
+                if (t1 >= 0 && t1 <= 1) {
+                    nodes.push({ x: l.p1.x + t1 * dx, y: l.p1.y + t1 * dy, id: 'ncli_' + Math.random().toString(36).substr(2, 9), type: 'LINE_CIRCLE_INT' });
+                }
+                if (t2 >= 0 && t2 <= 1) {
+                    nodes.push({ x: l.p1.x + t2 * dx, y: l.p1.y + t2 * dy, id: 'ncli_' + Math.random().toString(36).substr(2, 9), type: 'LINE_CIRCLE_INT' });
+                }
+            }
+        }
+    }
+
+    // Intersections between lines
+      for (let i = 0; i < visibleCadLines.length; i++) {
+        for (let j = i + 1; j < visibleCadLines.length; j++) {
+          const l1 = visibleCadLines[i]; const l2 = visibleCadLines[j];
+        const denom = (l1.p1.x - l1.p2.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l1.p2.y) * (l2.p1.x - l2.p2.x);
+        if (Math.abs(denom) > 1e-6) {
+           const t = ((l1.p1.x - l2.p1.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l2.p1.y) * (l2.p1.x - l2.p2.x)) / denom;
+           const u = ((l1.p1.x - l2.p1.x) * (l1.p1.y - l1.p2.y) - (l1.p1.y - l2.p1.y) * (l1.p1.x - l1.p2.x)) / denom;
+           if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+              nodes.push({ x: l1.p1.x + t * (l1.p2.x - l1.p1.x), y: l1.p1.y + t * (l1.p2.y - l1.p1.y), id: 'ni_' + Math.random().toString(36).substr(2, 9) });
+           }
+        }
+      }
+    }
+    return nodes;
+  }, [visibleCadLines, cadCircles]);
+
+  const visibleCadPolygons = React.useMemo(() => {
+      return cadPolygons.filter(p => {
+         if (!p.surveyId) return true;
+         const s = cadSurveys.find(s => s.id === p.surveyId);
+         if (!s) return true;
+         if (!checkedSurveyNos.includes(s.surveyNo)) return false;
+         
+         const isMasterDash = !cadSurveys.some(sub => sub.surveyNo === s.surveyNo && sub.isVisible);
+         if (isMasterDash) return true;
+         
+         return s.isVisible;
+      });
+    }, [cadPolygons, cadSurveys, checkedSurveyNos]);
+
   const cadComputedArea = React.useMemo(() => {
-    if (!cadScale || cadLines.length < 3 || cadPolygons.length === 0) return null;
+    if (!cadScale || cadLines.length < 3 || visibleCadPolygons.length === 0) return null;
     
     let areaPixels = 0;
     if (cadSelectedPolygon) {
-        const poly = cadPolygons.find(p => p.id === cadSelectedPolygon);
+        const poly = visibleCadPolygons.find(p => p.id === cadSelectedPolygon);
         if (poly) areaPixels = poly.area;
     } else {
-        areaPixels = cadPolygons.reduce((sum, p) => sum + p.area, 0);
-    }
+          areaPixels = visibleCadPolygons.reduce((sum, p) => sum + p.area, 0);
+      }
     
     if (areaPixels <= 0) return null;
     
@@ -422,12 +574,12 @@ const AdminDashboard = ({ setCurrentView }) => {
        cent: sqMeters / 40.4686,
        sqFt: sqMeters * 10.7639
     };
-  }, [cadLines, cadScale, cadPolygons, cadSelectedPolygon]);
+  }, [cadLines, cadScale, visibleCadPolygons, cadSelectedPolygon, cadNodes]);
 
   const cadOpenNodes = React.useMemo(() => {
-    if (cadLines.length < 3) return [];
-    const adj = new Map();
-    cadLines.forEach(l => {
+      if (visibleCadLines.length < 3) return [];
+      const adj = new Map();
+      visibleCadLines.forEach(l => {
        const p1 = `${l.p1.x.toFixed(2)},${l.p1.y.toFixed(2)}`;
        const p2 = `${l.p2.x.toFixed(2)},${l.p2.y.toFixed(2)}`;
        if (!adj.has(p1)) adj.set(p1, { x: l.p1.x, y: l.p1.y, count: 0 });
@@ -440,7 +592,7 @@ const AdminDashboard = ({ setCurrentView }) => {
        if (val.count === 1) open.push({ x: val.x, y: val.y });
     }
     return open;
-  }, [cadLines]);
+    }, [visibleCadLines]);
 
   const captureCadState = () => ({
      lines: JSON.parse(JSON.stringify(cadLines)),
@@ -514,98 +666,6 @@ const AdminDashboard = ({ setCurrentView }) => {
     }
   };
 
-  const cadNodes = React.useMemo(() => {
-    const nodes = [];
-    cadLines.forEach(l => {
-      if (!nodes.some(n => Math.hypot(n.x - l.p1.x, n.y - l.p1.y) < 1e-4)) nodes.push({ ...l.p1, id: 'n_' + Math.random().toString(36).substr(2, 9) });
-      if (!nodes.some(n => Math.hypot(n.x - l.p2.x, n.y - l.p2.y) < 1e-4)) nodes.push({ ...l.p2, id: 'n_' + Math.random().toString(36).substr(2, 9) });
-    });
-    
-    // Circle tangency points (Type A)
-    cadCircles.forEach(circle => {
-      const cx = circle.center.x; const cy = circle.center.y; const r = circle.radiusPixels;
-      nodes.push({ x: cx + r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
-      nodes.push({ x: cx - r, y: cy, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
-      nodes.push({ x: cx, y: cy + r, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
-      nodes.push({ x: cx, y: cy - r, id: 'nc_' + Math.random().toString(36).substr(2, 9), targetCircleId: circle.id, type: 'CARDINAL' });
-    });
-
-    // Circle Intersections (Type C)
-    for (let i = 0; i < cadCircles.length; i++) {
-      for (let j = i + 1; j < cadCircles.length; j++) {
-         const c1 = cadCircles[i];
-         const c2 = cadCircles[j];
-         const d = Math.hypot(c1.center.x - c2.center.x, c1.center.y - c2.center.y);
-         if (d > c1.radiusPixels + c2.radiusPixels || d < Math.abs(c1.radiusPixels - c2.radiusPixels) || d === 0) continue;
-         
-         const a = (c1.radiusPixels * c1.radiusPixels - c2.radiusPixels * c2.radiusPixels + d * d) / (2 * d);
-         const h = Math.sqrt(Math.max(0, c1.radiusPixels * c1.radiusPixels - a * a));
-         const x2 = c1.center.x + a * (c2.center.x - c1.center.x) / d;
-         const y2 = c1.center.y + a * (c2.center.y - c1.center.y) / d;
-         
-         nodes.push({ 
-           x: x2 + h * (c2.center.y - c1.center.y) / d, 
-           y: y2 - h * (c2.center.x - c1.center.x) / d, 
-           id: 'ncci_' + Math.random().toString(36).substr(2, 9),
-           targetCircleId1: c1.id, targetCircleId2: c2.id,
-           type: 'CIRCLE_INT'
-         });
-         nodes.push({ 
-           x: x2 - h * (c2.center.y - c1.center.y) / d, 
-           y: y2 + h * (c2.center.x - c1.center.x) / d, 
-           id: 'ncci_' + Math.random().toString(36).substr(2, 9),
-           targetCircleId1: c1.id, targetCircleId2: c2.id,
-           type: 'CIRCLE_INT'
-         });
-      }
-    }
-
-    // Intersections between lines and circles (Type B)
-    for (let i = 0; i < cadLines.length; i++) {
-        for (let j = 0; j < cadCircles.length; j++) {
-            const l = cadLines[i];
-            const c = cadCircles[j];
-            const dx = l.p2.x - l.p1.x;
-            const dy = l.p2.y - l.p1.y;
-            const fx = l.p1.x - c.center.x;
-            const fy = l.p1.y - c.center.y;
-            
-            const a = dx * dx + dy * dy;
-            const b = 2 * (fx * dx + fy * dy);
-            const c_val = fx * fx + fy * fy - c.radiusPixels * c.radiusPixels;
-            
-            let disc = b * b - 4 * a * c_val;
-            if (disc >= 0) {
-                disc = Math.sqrt(disc);
-                const t1 = (-b - disc) / (2 * a);
-                const t2 = (-b + disc) / (2 * a);
-                
-                if (t1 >= 0 && t1 <= 1) {
-                    nodes.push({ x: l.p1.x + t1 * dx, y: l.p1.y + t1 * dy, id: 'ncli_' + Math.random().toString(36).substr(2, 9), type: 'LINE_CIRCLE_INT' });
-                }
-                if (t2 >= 0 && t2 <= 1) {
-                    nodes.push({ x: l.p1.x + t2 * dx, y: l.p1.y + t2 * dy, id: 'ncli_' + Math.random().toString(36).substr(2, 9), type: 'LINE_CIRCLE_INT' });
-                }
-            }
-        }
-    }
-
-    // Intersections between lines
-    for (let i = 0; i < cadLines.length; i++) {
-      for (let j = i + 1; j < cadLines.length; j++) {
-        const l1 = cadLines[i]; const l2 = cadLines[j];
-        const denom = (l1.p1.x - l1.p2.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l1.p2.y) * (l2.p1.x - l2.p2.x);
-        if (Math.abs(denom) > 1e-6) {
-           const t = ((l1.p1.x - l2.p1.x) * (l2.p1.y - l2.p2.y) - (l1.p1.y - l2.p1.y) * (l2.p1.x - l2.p2.x)) / denom;
-           const u = ((l1.p1.x - l2.p1.x) * (l1.p1.y - l1.p2.y) - (l1.p1.y - l2.p1.y) * (l1.p1.x - l1.p2.x)) / denom;
-           if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-              nodes.push({ x: l1.p1.x + t * (l1.p2.x - l1.p1.x), y: l1.p1.y + t * (l1.p2.y - l1.p1.y), id: 'ni_' + Math.random().toString(36).substr(2, 9) });
-           }
-        }
-      }
-    }
-    return nodes;
-  }, [cadLines, cadCircles]);
 
   const interactiveNodes = React.useMemo(() => {
     if (cadSelectedLine && cadEditInputs.isMovingLine) {
@@ -720,7 +780,8 @@ const AdminDashboard = ({ setCurrentView }) => {
       const rawPt = getCadSvgCoords(e.clientX, e.clientY);
 
       const targetDataType = e.target.getAttribute?.('data-type') || e.target.parentElement?.getAttribute?.('data-type');
-      if (targetDataType === 'anchor-handle') {
+      // Anchor-handle drag only fires when actively placing a line (ADD_LINE tool)
+      if (targetDataType === 'anchor-handle' && cadTool === 'ADD_LINE') {
          if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
          const connectedLineRefs = cadLines.filter(l => Math.hypot(l.p1.x - cadAnchorNode.x, l.p1.y - cadAnchorNode.y) < 1e-4 || Math.hypot(l.p2.x - cadAnchorNode.x, l.p2.y - cadAnchorNode.y) < 1e-4).map(l => ({ id: l.id, isP1: Math.hypot(l.p1.x - cadAnchorNode.x, l.p1.y - cadAnchorNode.y) < 1e-4 }));
          setCadPointerGesture({ isDraggingAnchor: true, startX: e.clientX, startY: e.clientY, offsetX: cadAnchorNode.x - rawPt.x, offsetY: cadAnchorNode.y - rawPt.y, connectedLineRefs });
@@ -741,7 +802,38 @@ const AdminDashboard = ({ setCurrentView }) => {
       let targetNode = null; let targetLine = null; let targetCircle = null; let targetText = null; let targetMetric = null;
       let minSnapDist = 50 * (cadViewport.width / 1000);
 
-      if (cadTool === 'IDLE' || isEditingLineMode || cadTool === 'SKETCH_LINE' || cadTool === 'ADD_RADIUS') {
+      if (cadTool === 'IDLE' || isEditingLineMode || cadTool === 'SKETCH_LINE' || cadTool === 'ADD_LINE' || cadTool === 'ADD_RADIUS') {
+         // TWO-WAY VERTEX HIT-TEST: check both p1 (start) and p2 (end) for all lines
+         if ((cadTool === 'IDLE' && !isAddRadiusEnabled) || (cadTool === 'ADD_LINE' && cadPrompt)) {
+            for (const line of cadLines) {
+               if (Math.hypot(line.p1.x - rawPt.x, line.p1.y - rawPt.y) < minSnapDist) {
+                  setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: rawPt.x, svgY: rawPt.y });
+                  if (cadTool === 'ADD_LINE') {
+                      setCadAnchorNode(line.p1);
+                      if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
+                      const connectedLineRefs = cadLines.filter(l => Math.hypot(l.p1.x - line.p1.x, l.p1.y - line.p1.y) < 1e-4 || Math.hypot(l.p2.x - line.p1.x, l.p2.y - line.p1.y) < 1e-4).map(l => ({ id: l.id, isP1: Math.hypot(l.p1.x - line.p1.x, l.p1.y - line.p1.y) < 1e-4 }));
+                      setCadPointerGesture({ isDraggingAnchor: true, startX: e.clientX, startY: e.clientY, offsetX: line.p1.x - rawPt.x, offsetY: line.p1.y - rawPt.y, connectedLineRefs });
+                  } else {
+                      setCadDraggingNode({ lineId: line.id, end: 'p1' });
+                      setCadSelectedLine(line.id);
+                  }
+                  return;
+               }
+               if (Math.hypot(line.p2.x - rawPt.x, line.p2.y - rawPt.y) < minSnapDist) {
+                  setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: rawPt.x, svgY: rawPt.y });
+                  if (cadTool === 'ADD_LINE') {
+                      setCadAnchorNode(line.p2);
+                      if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
+                      const connectedLineRefs = cadLines.filter(l => Math.hypot(l.p1.x - line.p2.x, l.p1.y - line.p2.y) < 1e-4 || Math.hypot(l.p2.x - line.p2.x, l.p2.y - line.p2.y) < 1e-4).map(l => ({ id: l.id, isP1: Math.hypot(l.p1.x - line.p2.x, l.p1.y - line.p2.y) < 1e-4 }));
+                      setCadPointerGesture({ isDraggingAnchor: true, startX: e.clientX, startY: e.clientY, offsetX: line.p2.x - rawPt.x, offsetY: line.p2.y - rawPt.y, connectedLineRefs });
+                  } else {
+                      setCadDraggingNode({ lineId: line.id, end: 'p2' });
+                      setCadSelectedLine(line.id);
+                  }
+                  return;
+               }
+            }
+         }
          if (cadTool === 'SKETCH_LINE') {
             if (isSketchExtendEnabled) {
                const activeL = cadLines.find(x => Math.hypot(x.p1.x - rawPt.x, x.p1.y - rawPt.y) < minSnapDist || Math.hypot(x.p2.x - rawPt.x, x.p2.y - rawPt.y) < minSnapDist);
@@ -938,8 +1030,18 @@ const AdminDashboard = ({ setCurrentView }) => {
       if (cadPointerGesture?.isDraggingPan) {
          const dx = (cadPointerGesture.lastClientX - e.clientX) * uniformScale;
          const dy = (cadPointerGesture.lastClientY - e.clientY) * uniformScale;
-         setCadViewport(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
-         setCadPointerGesture(p => ({ ...p, lastClientX: e.clientX, lastClientY: e.clientY }));
+         
+         const newX = cadViewportRef.current.x + dx;
+         const newY = cadViewportRef.current.y + dy;
+         cadViewportRef.current = { ...cadViewportRef.current, x: newX, y: newY };
+         
+         if (cadSvgRef.current) {
+            cadSvgRef.current.setAttribute('viewBox', `${newX} ${newY} ${cadViewportRef.current.width} ${cadViewportRef.current.height}`);
+         }
+         
+         // Direct mutation of drag state avoids continuous React re-renders during 60FPS dragging
+         cadPointerGesture.lastClientX = e.clientX;
+         cadPointerGesture.lastClientY = e.clientY;
          return;
       }
 
@@ -1032,7 +1134,10 @@ const AdminDashboard = ({ setCurrentView }) => {
          if (cadStateBeforeActionRef.current && JSON.stringify(cadStateBeforeActionRef.current) !== JSON.stringify(captureCadState())) saveCadStateToHistory(cadStateBeforeActionRef.current);
          cadStateBeforeActionRef.current = null;
          setCadDraggingNode(null); 
-         setCadPointerGesture(null); 
+         if (cadPointerGesture?.isDraggingPan) {
+         setCadViewport(cadViewportRef.current);
+      }
+      setCadPointerGesture(null); 
          return; 
       }
 
@@ -1074,6 +1179,14 @@ const AdminDashboard = ({ setCurrentView }) => {
              });
          }
 
+         if (cadTool === 'ADD_LINE' && cadAnchorNode?.isInitialCenter && !cadPrompt) {
+             const tPt = effTargetNode ? { x: effTargetNode.x, y: effTargetNode.y } : getCadSnapPoint(rawPt, true);
+             setCadAnchorNode({ x: tPt.x, y: tPt.y });
+             setCadSelectedNode(null);
+             setShowDarkDrawSettings(false);
+             return;
+         }
+
          if (cadTool === 'ADD_LINE' && effTargetNode && !cadPrompt) {
              const tNode = effTargetNode;
              const isSameNode = cadAnchorNode && Math.hypot(cadAnchorNode.x - tNode.x, cadAnchorNode.y - tNode.y) < 1e-4;
@@ -1095,10 +1208,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                      const newId = Date.now().toString();
                      let finalLen = cadScale ? (Math.hypot(cadAnchorNode.x - tNode.x, cadAnchorNode.y - tNode.y) * cadScale).toFixed(2) : null;
                      
-                     setCadLines(prev => [...prev, { id: newId, p1: { x: cadAnchorNode.x, y: cadAnchorNode.y }, p2: { x: tNode.x, y: tNode.y }, fixedLength: finalLen, strokeWidth: 4, hexColor: '#38bdf8' }]);
+                     const activeSurvey = cadSurveys.find(s => s.id === cadActiveSurveyId);
+                     const assignedHexColor = activeSurvey ? activeSurvey.hexColor : '#38bdf8';
+                     setCadLines(prev => [...prev, { id: newId, p1: { x: cadAnchorNode.x, y: cadAnchorNode.y }, p2: { x: tNode.x, y: tNode.y }, fixedLength: finalLen, strokeWidth: 4, hexColor: assignedHexColor, surveyId: cadActiveSurveyId }]);
                      
                      if (!finalLen) {
-                         setCadPrompt({ type: 'LINE', targetId: newId, x: window.innerWidth / 2 - 140, y: window.innerHeight - 200 });
+                         if (cadSurveys.length === 0) {
+                             setCadPrompt({ type: 'FIRST_SURVEY', targetId: newId, x: 32, y: window.innerHeight - 200 });
+                         } else {
+                             setCadPrompt({ type: 'LINE', targetId: newId, x: window.innerWidth / 2 - 140, y: window.innerHeight - 200 });
+                         }
                          setCadPromptValue('');
                      }
                      
@@ -1117,12 +1236,19 @@ const AdminDashboard = ({ setCurrentView }) => {
             if (cadStateBeforeActionRef.current) saveCadStateToHistory(cadStateBeforeActionRef.current);
             const newId = Date.now().toString();
             let finalLen = cadScale ? (Math.hypot(cadAnchorNode.x - snapPt.x, cadAnchorNode.y - snapPt.y) * cadScale).toFixed(2) : null;
-            
-            setCadLines(prev => [...prev, { id: newId, p1: { x: cadAnchorNode.x, y: cadAnchorNode.y }, p2: snapPt, fixedLength: finalLen, strokeWidth: 4, hexColor: '#38bdf8' }]);
+              
+              const activeSurvey = cadSurveys.find(s => s.id === cadActiveSurveyId);
+              const assignedHexColor = activeSurvey ? activeSurvey.hexColor : '#38bdf8';
+              
+              setCadLines(prev => [...prev, { id: newId, p1: { x: cadAnchorNode.x, y: cadAnchorNode.y }, p2: snapPt, fixedLength: finalLen, strokeWidth: 4, hexColor: assignedHexColor, surveyId: cadActiveSurveyId }]);
             
             if (!finalLen) {
-               setCadPrompt({ type: 'LINE', targetId: newId, x: window.innerWidth / 2 - 140, y: window.innerHeight - 200 });
-               setCadPromptValue('');
+                 if (cadSurveys.length === 0) {
+                     setCadPrompt({ type: 'FIRST_SURVEY', targetId: newId, x: 32, y: window.innerHeight - 200 });
+                 } else {
+                     setCadPrompt({ type: 'LINE', targetId: newId, x: window.innerWidth / 2 - 140, y: window.innerHeight - 200 });
+                 }
+                 setCadPromptValue('');
             }
             
             setCadAnchorNode(snapPt);
@@ -1160,16 +1286,19 @@ const AdminDashboard = ({ setCurrentView }) => {
                setCadPopupOffset({x:0, y:0});
             } else {
                if (cadTool === 'IDLE' && cadPolygons.length > 0) {
-                   const rawPt = getCadSvgCoords(e.clientX, e.clientY);
-                   let hitPoly = null;
-                   for (let p of cadPolygons) {
-                       if (pointInPolygon(rawPt, p.pts)) {
-                           hitPoly = p.id;
-                           break;
-                       }
-                   }
-                   if (hitPoly) {
-                       setCadSelectedPolygon(hitPoly);
+                     const rawPt = getCadSvgCoords(e.clientX, e.clientY);
+                     let hitPoly = null;
+                     let hitSurveyId = null;
+                     for (let p of cadPolygons) {
+                         if (pointInPolygon(rawPt, p.pts)) {
+                             hitPoly = p.id;
+                             hitSurveyId = p.surveyId;
+                             break;
+                         }
+                     }
+                     if (hitPoly) {
+                         setCadSelectedPolygon(hitPoly);
+                         if (hitSurveyId) setCadActiveSurveyId(hitSurveyId);
                        setCadSelectedNode(null);
                        setCadSelectedLine(null);
                        setCadSelectedCircle(null);
@@ -1186,17 +1315,31 @@ const AdminDashboard = ({ setCurrentView }) => {
     }
   };
 
+  const cadWheelTimeoutRef = React.useRef(null);
   const handleCadWheel = (e) => {
     if (cadPrompt || cadSelectedNode || cadSelectedLine || cadSelectedCircle) return;
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
     const rawPt = getCadSvgCoords(e.clientX, e.clientY);
-    setCadViewport(prev => ({
+    
+    const prev = cadViewportRef.current;
+    const next = {
       x: prev.x + (rawPt.x - prev.x) * (1 - zoomFactor),
       y: prev.y + (rawPt.y - prev.y) * (1 - zoomFactor),
       width: prev.width * zoomFactor,
       height: prev.height * zoomFactor
-    }));
+    };
+    
+    cadViewportRef.current = next;
+    
+    if (cadSvgRef.current) {
+        cadSvgRef.current.setAttribute('viewBox', `${next.x} ${next.y} ${next.width} ${next.height}`);
+    }
+    
+    if (cadWheelTimeoutRef.current) clearTimeout(cadWheelTimeoutRef.current);
+    cadWheelTimeoutRef.current = setTimeout(() => {
+        setCadViewport(cadViewportRef.current);
+    }, 150);
   };
 
   React.useEffect(() => {
@@ -1221,6 +1364,58 @@ const AdminDashboard = ({ setCurrentView }) => {
          }
          setCadPrompt(null);
          return;
+      }
+
+      if (cadPrompt.type === 'FIRST_SURVEY' || cadPrompt.type === 'NEW_SURVEY') {
+          if (!cadPromptSurveyNo.trim()) { alert("Survey No is required"); return; }
+          const newSurveyId = Date.now().toString();
+          const surveyColor = cadPrompt.type === 'NEW_SURVEY' ? cadPromptColor : '#3b82f6';
+          setCadSurveys(prev => [...prev, { id: newSurveyId, surveyNo: cadPromptSurveyNo, subDivisionNo: cadPromptSubDiv, hexColor: surveyColor, isVisible: false }]);
+          setCheckedSurveyNos(prev => prev.includes(cadPromptSurveyNo) ? prev : [...prev, cadPromptSurveyNo]);
+          setCadActiveSurveyId(newSurveyId);
+          
+          if (cadPrompt.targetId) {
+                let valStr = cadPromptValue.trim();
+                let num = parseFloat(valStr);
+                if (isNaN(num) || num <= 0) { setCadPrompt(null); return; }
+                
+                if (cadPromptUnit === 'feet') {
+                    num = num * 0.3048;
+                    valStr = num.toFixed(2);
+                }
+                
+                const line = cadLines.find(l => l.id === cadPrompt.targetId);
+                if (line) {
+                   const pxLength = Math.hypot(line.p1.x - line.p2.x, line.p1.y - line.p2.y);
+                   if (!cadScale) {
+                     setCadScale(num / pxLength);
+                     setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, fixedLength: valStr, surveyId: newSurveyId, hexColor: surveyColor } : l));
+                   } else {
+                     const targetPx = num / cadScale;
+                     const ratio = targetPx / pxLength;
+                     const newP2 = {
+                       x: line.p1.x + (line.p2.x - line.p1.x) * ratio,
+                       y: line.p1.y + (line.p2.y - line.p1.y) * ratio
+                     };
+                     setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, p2: newP2, fixedLength: valStr, surveyId: newSurveyId, hexColor: surveyColor } : l));
+                     if (cadTool === 'ADD_LINE' && cadAnchorNode) {
+                        if (Math.hypot(cadAnchorNode.x - line.p2.x, cadAnchorNode.y - line.p2.y) < 1e-4) {
+                           setCadAnchorNode(newP2);
+                        }
+                     }
+                   }
+                }
+            } else if (cadPrompt.node) {
+              setCadAnchorNode(cadPrompt.node);
+              setIsAddRadiusEnabled(true);
+              setCadTool('ADD_LINE');
+          }
+          
+          setCadPrompt(null);
+          setCadPromptSurveyNo('');
+          setCadPromptSubDiv('');
+          setCadPromptValue('');
+          return;
       }
 
       const valStr = cadPromptValue.trim();
@@ -2965,8 +3160,8 @@ const AdminDashboard = ({ setCurrentView }) => {
 
                {/* WORKSPACE SPLIT SUMMARY CARD */}
                <div className="bg-slate-800/90 backdrop-blur border-b border-r border-slate-700 w-[calc(100%-60px)] flex items-center shrink-0 shadow-sm z-[150] relative rounded-br-2xl">
-                 <div className="flex-1 flex items-center justify-center px-2 py-2.5 border-r border-slate-700/50 min-w-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    <button onClick={() => { setIsAreaDropdownOpen(!isAreaDropdownOpen); setIsPerimeterDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-emerald-400 transition-colors shrink-0 outline-none">
+                 <div className="flex-1 flex flex-col justify-center px-3 py-1.5 border-r border-slate-700/50 min-w-0">
+                    <button onClick={() => { setIsAreaDropdownOpen(!isAreaDropdownOpen); setIsPerimeterDropdownOpen(false); }} className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-emerald-400 transition-colors outline-none leading-tight">
                       <span>{cadComputedArea ? (
                           selectedAreaUnit === 'Hectare' ? cadComputedArea.hectare.toFixed(4) :
                           selectedAreaUnit === 'Ares' ? cadComputedArea.are.toFixed(4) :
@@ -2974,11 +3169,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                           selectedAreaUnit === 'Cent' ? cadComputedArea.cent.toFixed(2) :
                           selectedAreaUnit === 'Sq. Ft' ? cadComputedArea.sqFt.toFixed(2) :
                           selectedAreaUnit === 'Sq. M' ? cadComputedArea.sqMeters.toFixed(2) : '--'
-                      ) : "--"}</span> <span className="text-xs text-slate-400 whitespace-nowrap">{selectedAreaUnit} ▼</span>
+                      ) : "--"}</span> <span className="text-[10px] text-slate-400 whitespace-nowrap">{selectedAreaUnit} ▼</span>
                     </button>
-                 </div>
-                 <div className="flex-1 flex items-center justify-center px-2 py-2.5 min-w-0 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    <button onClick={() => { setSelectedPerimeterUnit(selectedPerimeterUnit === 'Ft' ? 'M' : 'Ft'); setIsAreaDropdownOpen(false); }} className="flex items-center gap-1.5 text-white font-black text-sm hover:text-fuchsia-400 transition-colors shrink-0 outline-none">
+                    <button onClick={() => { setSelectedPerimeterUnit(selectedPerimeterUnit === 'Ft' ? 'M' : 'Ft'); setIsAreaDropdownOpen(false); }} className="flex items-center justify-between w-full text-slate-400 font-bold text-[10px] hover:text-fuchsia-400 transition-colors outline-none leading-tight mt-0.5">
                       <span>{(() => {
                           if (cadPointerGesture?.isDraggingAnchor) {
                               let activeSegmentMeters = null;
@@ -3006,7 +3199,30 @@ const AdminDashboard = ({ setCurrentView }) => {
                           } else {
                               return totalMeters.toFixed(2);
                           }
-                      })()}</span> <span className="text-xs text-slate-400 whitespace-nowrap">{cadPointerGesture?.isDraggingAnchor ? 'Seg ' + selectedPerimeterUnit : 'Tot ' + selectedPerimeterUnit} <span className="text-[10px]">▼</span></span>
+                      })()}</span> <span className="whitespace-nowrap text-[9px]">{cadPointerGesture?.isDraggingAnchor ? 'Seg ' + selectedPerimeterUnit : 'Tot ' + selectedPerimeterUnit} ▼</span>
+                    </button>
+                 </div>
+                 <div className="flex-1 flex flex-col justify-center px-3 py-1.5 min-w-0">
+                    <button onClick={() => { setIsSurveyDropdownOpen(!isSurveyDropdownOpen); setIsSubDivisionDropdownOpen(false); }} className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-sky-400 transition-colors outline-none leading-tight">
+                      <span className="truncate">
+                        {(() => {
+                           const activeObj = cadSurveys.find(s => s.id === cadActiveSurveyId);
+                           if (activeObj) return `Survey No ${activeObj.surveyNo}`;
+                           return checkedSurveyNos.length > 0 ? `Survey No ${checkedSurveyNos[0]}` : 'Survey No';
+                        })()}
+                      </span> 
+                      <span className="text-[10px] text-slate-400">▼</span>
+                    </button>
+                    <button onClick={() => { setIsSubDivisionDropdownOpen(!isSubDivisionDropdownOpen); setIsSurveyDropdownOpen(false); }} className="flex items-center justify-between w-full text-slate-400 font-bold text-[10px] hover:text-sky-400 transition-colors outline-none leading-tight mt-0.5">
+                      <span className="truncate">
+                        {(() => {
+                           if (checkedSurveyNos.length === 0) return 'Sub-division -';
+                           const activeObj = cadSurveys.find(s => s.id === cadActiveSurveyId);
+                           if (activeObj) return `Sub-division - ${activeObj.subDivisionNo || '-'}`;
+                           return 'Sub-division - All';
+                        })()}
+                      </span> 
+                      <span className="text-[9px]">▼</span>
                     </button>
                  </div>
 
@@ -3023,6 +3239,68 @@ const AdminDashboard = ({ setCurrentView }) => {
                       </div>
                     </>
                  )}
+                 {isSurveyDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsSurveyDropdownOpen(false)}></div>
+                        <div className="absolute top-full right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[120px] flex flex-col max-h-[300px] overflow-y-auto">
+                           {cadSurveys.length === 0 ? (
+                               <div className="px-4 py-2 text-xs text-slate-400 italic text-center">No surveys</div>
+                           ) : (
+                               Array.from(new Set(cadSurveys.map(s => s.surveyNo))).map(surveyNo => (
+                                   <div key={surveyNo} className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { e.stopPropagation(); setCheckedSurveyNos(prev => prev.includes(surveyNo) ? prev.filter(n => n !== surveyNo) : [...prev, surveyNo]); }}>
+                                       <input 
+                                           type="checkbox" 
+                                           checked={checkedSurveyNos.includes(surveyNo)} 
+                                           onChange={(e) => { e.stopPropagation(); setCheckedSurveyNos(prev => e.target.checked ? [...prev, surveyNo] : prev.filter(n => n !== surveyNo)); }} 
+                                           onClick={(e) => e.stopPropagation()}
+                                           className="w-3.5 h-3.5 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700 cursor-pointer" 
+                                       />
+                                       <span className="text-xs font-bold text-slate-200">{surveyNo}</span>
+                                   </div>
+                               ))
+                           )}
+                        </div>
+                      </>
+                   )}
+                   {isSubDivisionDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsSubDivisionDropdownOpen(false)}></div>
+                        <div className="absolute top-full right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[180px] flex flex-col max-h-[300px] overflow-y-auto">
+                           {/* MASTER DASH ROW */}
+                           <div className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50" onClick={(e) => { e.stopPropagation(); setCadSurveys(prev => prev.map(s => checkedSurveyNos.includes(s.surveyNo) ? { ...s, isVisible: false } : s)); }}>
+                               <input 
+                                   type="checkbox" 
+                                   checked={!cadSurveys.some(s => checkedSurveyNos.includes(s.surveyNo) && s.isVisible)} 
+                                   onChange={(e) => { e.stopPropagation(); setCadSurveys(prev => prev.map(s => checkedSurveyNos.includes(s.surveyNo) ? { ...s, isVisible: false } : s)); }} 
+                                   onClick={(e) => e.stopPropagation()}
+                                   className="w-3.5 h-3.5 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700 cursor-pointer" 
+                               />
+                               <span className="text-xs font-bold text-slate-200">- (All Sub-divisions)</span>
+                           </div>
+
+                           {/* DEPENDENT CASCADE ROWS */}
+                           {cadSurveys.filter(s => checkedSurveyNos.includes(s.surveyNo)).length === 0 ? (
+                               <div className="px-4 py-2 text-xs text-slate-400 italic text-center">No active sub-divisions</div>
+                           ) : (
+                               cadSurveys.filter(s => checkedSurveyNos.includes(s.surveyNo)).map(survey => (
+                                   <div key={survey.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { e.stopPropagation(); setCadSurveys(prev => prev.map(s => s.id === survey.id ? { ...s, isVisible: !s.isVisible } : s)); setCadActiveSurveyId(survey.id); }}>
+                                       <div className="flex items-center gap-3">
+                                           <input 
+                                               type="checkbox" 
+                                               checked={survey.isVisible} 
+                                               onChange={(e) => { e.stopPropagation(); setCadSurveys(prev => prev.map(s => s.id === survey.id ? { ...s, isVisible: e.target.checked } : s)); setCadActiveSurveyId(survey.id); }} 
+                                               onClick={(e) => e.stopPropagation()}
+                                               className="w-3.5 h-3.5 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700 cursor-pointer" 
+                                           />
+                                           <span className={`text-xs font-bold ${cadActiveSurveyId === survey.id ? 'text-white' : 'text-slate-300'}`}>{survey.subDivisionNo || '-'}</span>
+                                       </div>
+                                       <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: survey.hexColor }}></div>
+                                   </div>
+                               ))
+                           )}
+                        </div>
+                      </>
+                   )}
                </div>
 
                {/* RIGHT-TOP CORNER VERTICAL FLOATING ICONS */}
@@ -3171,14 +3449,17 @@ const AdminDashboard = ({ setCurrentView }) => {
                          <image href={cadBackgroundImage} x={0} y={0} width={2000} height={2000} preserveAspectRatio="xMidYMid meet" opacity={0.5} pointerEvents="none" />
                       )}
 
-                  {cadPolygons.map(p => {
+                  {visibleCadPolygons.map(p => {
                     const isSelected = cadSelectedPolygon === p.id;
+                    const polySurvey = p.surveyId ? cadSurveys.find(s => s.id === p.surveyId) : null;
+                    const baseColor = polySurvey ? polySurvey.hexColor : '#38bdf8';
+                    const fillColor = isSelected ? baseColor + '80' : baseColor + '26';
                     return (
                         <polygon
                             key={p.id}
                             points={p.pts.map(pt => `${pt.x},${pt.y}`).join(' ')}
-                            fill={isSelected ? "rgba(56, 189, 248, 0.4)" : "rgba(255,255,255,0.02)"}
-                            stroke={isSelected ? "#38bdf8" : "rgba(255,255,255,0.1)"}
+                            fill={fillColor}
+                            stroke={isSelected ? baseColor : "rgba(255,255,255,0.1)"}
                             strokeWidth={cadViewport.width * 0.001}
                             style={{ pointerEvents: 'none' }} 
                         />
@@ -3202,7 +3483,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
                   {(() => {
                     const renderedMetrics = [];
-                    return cadLines.map(l => {
+                    return visibleCadLines.map(l => {
                     const isSelected = cadSelectedLine === l.id;
                     const isMetricHovered = cadHoveredNode === null && !cadPointerGesture?.isDragging && !isSelected; // basic fallback
                     const isMetricSelected = cadSelectedMetric === l.id;
@@ -3505,7 +3786,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                    </g>
                 </svg>
 
-                 {/* FLOATING MAGNIFIER MIRROR */}
+                 {/* FLOATING MAGNIFIER MIRROR — pin-free, crosshair only */}
                  {cadMagnifierPos && (() => {
                     const isRightHalf = cadMagnifierPos.screenX > (window.innerWidth / 2);
                     let mLeft = isRightHalf ? (cadMagnifierPos.screenX - 270) : (cadMagnifierPos.screenX + 150);
@@ -3513,24 +3794,84 @@ const AdminDashboard = ({ setCurrentView }) => {
                     if (mLeft < 10) mLeft = 10;
                     if (mLeft + 130 > window.innerWidth) mLeft = window.innerWidth - 130;
                     if (mTop < 10) mTop = 10;
+                    const vbX = cadMagnifierPos.svgX - (cadViewport.width / 8);
+                    const vbY = cadMagnifierPos.svgY - (cadViewport.height / 8);
+                    const vbW = cadViewport.width / 4;
+                    const vbH = cadViewport.height / 4;
+                    const chLen = cadViewport.width * 0.014; // crosshair arm length
+                    const dotR  = cadViewport.width * 0.004; // center dot radius
+                    const sw    = cadViewport.width * 0.0022; // stroke width
                     return (
                     <div style={{
                        position: 'absolute',
                        left: mLeft,
                        top: mTop,
-                       width: '120px', height: '120px',
+                       width: '140px', height: '140px',
                        borderRadius: '50%',
-                       border: '3px solid #fbbf24',
+                       border: '2.5px solid #fbbf24',
                        overflow: 'hidden',
                        background: '#020617',
                        pointerEvents: 'none',
                        zIndex: 200,
-                       boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                       boxShadow: '0 0 0 1px rgba(251,191,36,0.3), 0 12px 28px rgba(0,0,0,0.6)'
                     }}>
-                       <svg width="120" height="120" viewBox={`${cadMagnifierPos.svgX - (cadViewport.width / 8)} ${cadMagnifierPos.svgY - (cadViewport.height / 8)} ${cadViewport.width / 4} ${cadViewport.height / 4}`}>
-                          <use href="#cad-drawing-layer" />
-                          <line x1={cadMagnifierPos.svgX - (cadViewport.width * 0.01)} y1={cadMagnifierPos.svgY} x2={cadMagnifierPos.svgX + (cadViewport.width * 0.01)} y2={cadMagnifierPos.svgY} stroke="#fbbf24" strokeWidth={cadViewport.width * 0.002} />
-                          <line x1={cadMagnifierPos.svgX} y1={cadMagnifierPos.svgY - (cadViewport.width * 0.01)} x2={cadMagnifierPos.svgX} y2={cadMagnifierPos.svgY + (cadViewport.width * 0.01)} stroke="#fbbf24" strokeWidth={cadViewport.width * 0.002} />
+                       <svg width="140" height="140" viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}>
+                          {/* Grid lines for spatial context */}
+                          <line
+                            x1={vbX} y1={cadMagnifierPos.svgY}
+                            x2={vbX + vbW} y2={cadMagnifierPos.svgY}
+                            stroke="rgba(255,255,255,0.04)" strokeWidth={sw * 0.6}
+                          />
+                          <line
+                            x1={cadMagnifierPos.svgX} y1={vbY}
+                            x2={cadMagnifierPos.svgX} y2={vbY + vbH}
+                            stroke="rgba(255,255,255,0.04)" strokeWidth={sw * 0.6}
+                          />
+                          {/* Render only raw line geometry — NO map pin, NO background image */}
+                          {visibleCadLines.map(l => (
+                                <line
+                                key={`mag-l-${l.id}`}
+                              x1={l.p1.x} y1={l.p1.y}
+                              x2={l.p2.x} y2={l.p2.y}
+                              stroke={l.hexColor || '#38bdf8'}
+                              strokeWidth={cadViewport.width * 0.003}
+                              strokeLinecap="round"
+                            />
+                          ))}
+                          {/* Render circle geometry */}
+                          {cadCircles.map(c => (
+                            <circle
+                              key={`mag-c-${c.id}`}
+                              cx={c.center.x} cy={c.center.y}
+                              r={c.radiusPixels}
+                              fill="none"
+                              stroke={c.hexColor || '#38bdf8'}
+                              strokeWidth={cadViewport.width * 0.003}
+                            />
+                          ))}
+                          {/* Vertex endpoint dots — show p1 and p2 of every line */}
+                          {visibleCadLines.map(l => (
+                              <React.Fragment key={`mag-pts-${l.id}`}>
+                              <circle cx={l.p1.x} cy={l.p1.y} r={dotR * 1.4} fill="#10b981" />
+                              <circle cx={l.p2.x} cy={l.p2.y} r={dotR * 1.4} fill="#38bdf8" />
+                            </React.Fragment>
+                          ))}
+                          {/* Center crosshair — amber plus + tiny dot, NO map pin */}
+                          <line
+                            x1={cadMagnifierPos.svgX - chLen} y1={cadMagnifierPos.svgY}
+                            x2={cadMagnifierPos.svgX + chLen} y2={cadMagnifierPos.svgY}
+                            stroke="#fbbf24" strokeWidth={sw}
+                          />
+                          <line
+                            x1={cadMagnifierPos.svgX} y1={cadMagnifierPos.svgY - chLen}
+                            x2={cadMagnifierPos.svgX} y2={cadMagnifierPos.svgY + chLen}
+                            stroke="#fbbf24" strokeWidth={sw}
+                          />
+                          <circle
+                            cx={cadMagnifierPos.svgX} cy={cadMagnifierPos.svgY}
+                            r={dotR}
+                            fill="#fbbf24"
+                          />
                        </svg>
                     </div>
                     );
@@ -3569,6 +3910,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                       }}
                     >
                       Radius
+                    </button>
+                    <button 
+                      className="w-full text-left px-3 py-2 text-xs font-black text-emerald-400 hover:bg-slate-700 hover:text-emerald-300 rounded-lg transition-colors border-t border-slate-700 mt-1 pt-3"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCadPrompt({ type: 'NEW_SURVEY', x: window.innerWidth / 2 - 140, y: window.innerHeight - 200, node: cadSelectedNode });
+                        setCadSelectedNode(null);
+                      }}
+                    >
+                      New Survey
                     </button>
                   </div>
                   );
@@ -3731,11 +4082,11 @@ const AdminDashboard = ({ setCurrentView }) => {
 
 
             {cadComputedArea ? (
-               isPolygonAreaCardVisible && (
-                <div className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto">
+               isPolygonAreaCardVisible ? (
+                <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto animate-in slide-in-from-bottom-4">
                   <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1 gap-4">
                      <span className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest">Polygon Area</span>
-                     <button onClick={() => setIsPolygonAreaCardVisible(false)} className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-slate-800">
+                     <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(false); }} className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-slate-800" title="Minimize">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                      </button>
                   </div>
@@ -3747,6 +4098,10 @@ const AdminDashboard = ({ setCurrentView }) => {
                     <span className="text-slate-400 text-left">Sq. Ft:</span><span className="font-bold text-right">{cadComputedArea.sqFt.toFixed(2)}</span>
                   </div>
                 </div>
+               ) : (
+                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(true); }} className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 text-fuchsia-400 hover:text-fuchsia-300 pointer-events-auto flex items-center justify-center animate-in zoom-in-75 hover:bg-slate-800 transition-colors" title="Restore Polygon Area">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                </button>
                )
              ) : (
                 cadLines.length >= 3 && cadOpenNodes && cadOpenNodes.length > 0 && (
@@ -3782,7 +4137,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                            setCadAnchorNode(null);
                         } else {
                            setCadTool('ADD_LINE');
-                           setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2 });
+                           setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2, isInitialCenter: true });
                         }
                         setCadSelectedNode(null); 
                      }}
@@ -3843,6 +4198,46 @@ const AdminDashboard = ({ setCurrentView }) => {
                   let t = cadPrompt.y;
                   if (l + 200 > window.innerWidth) l = cadPrompt.x - 200; // Flip left
                   if (t < 50) t = cadPrompt.y + 50; // Flip down
+                  if (cadPrompt.type === 'FIRST_SURVEY' || cadPrompt.type === 'NEW_SURVEY') {
+                        return (
+                            <form 
+                                onSubmit={submitCadPrompt}
+                                className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-[180px] flex flex-col gap-1.5 pointer-events-auto animate-in slide-in-from-bottom-4" 
+                                onClick={e => e.stopPropagation()}
+                                onPointerDown={e => e.stopPropagation()}
+                            >
+                                <div className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest border-b border-slate-700 pb-1 mb-1 text-center">
+                                    {cadPrompt.type === 'FIRST_SURVEY' ? 'Survey Attributes' : 'New Survey'}
+                                </div>
+                                <div className="flex flex-row items-center justify-between gap-2">
+                                      <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Metric</label>
+                                      <div className="flex items-center w-[90px] gap-1">
+                                          <input type="number" step="0.01" value={cadPromptValue} onChange={e => setCadPromptValue(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-0.5 text-white w-full text-[10px] font-bold outline-none focus:border-sky-500 text-right" placeholder="0.00" required={!!cadPrompt.targetId} />
+                                          <select value={cadPromptUnit} onChange={e => setCadPromptUnit(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 text-white text-[9px] font-bold outline-none focus:border-sky-500 cursor-pointer appearance-none">
+                                              <option value="meters">▼ M</option>
+                                              <option value="feet">▼ Ft</option>
+                                          </select>
+                                      </div>
+                                  </div>
+                                <div className="flex flex-row items-center justify-between gap-2">
+                                    <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Survey No.</label>
+                                    <input autoFocus type="text" value={cadPromptSurveyNo} onChange={e => setCadPromptSurveyNo(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-0.5 text-white w-[90px] text-[10px] font-bold outline-none focus:border-sky-500 text-right" placeholder="e.g. 101" required />
+                                </div>
+                                <div className="flex flex-row items-center justify-between gap-2">
+                                    <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Sub-div</label>
+                                    <input type="text" value={cadPromptSubDiv} onChange={e => setCadPromptSubDiv(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-0.5 text-white w-[90px] text-[10px] font-bold outline-none focus:border-sky-500 text-right" placeholder="Opt." />
+                                </div>
+                                {cadPrompt.type === 'NEW_SURVEY' && (
+                                    <div className="flex flex-row items-center justify-between gap-2">
+                                        <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Color</label>
+                                        <input type="color" value={cadPromptColor} onChange={e => setCadPromptColor(e.target.value)} className="w-[90px] h-5 cursor-pointer rounded border border-slate-600 bg-slate-800 p-0 outline-none focus:border-sky-500" />
+                                    </div>
+                                )}
+                                <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-1 mt-1 rounded text-[10px] uppercase tracking-wider transition-colors w-full outline-none">OK</button>
+                            </form>
+                        );
+                    }
+
                   return (
                   <form 
                     onSubmit={submitCadPrompt}
