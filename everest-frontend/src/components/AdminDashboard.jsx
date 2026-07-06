@@ -771,8 +771,6 @@ const AdminDashboard = ({ setCurrentView }) => {
       const cx = (pts[0].clientX + pts[1].clientX) / 2;
       const cy = (pts[0].clientY + pts[1].clientY) / 2;
       setCadPinchInitial({ dist, cx, cy, view: { ...cadViewport } });
-      setCadAnchorNode(null); 
-      setCadTool('IDLE');
       return;
     }
 
@@ -807,7 +805,7 @@ const AdminDashboard = ({ setCurrentView }) => {
          if ((cadTool === 'IDLE' && !isAddRadiusEnabled) || (cadTool === 'ADD_LINE' && cadPrompt)) {
             for (const line of cadLines) {
                if (Math.hypot(line.p1.x - rawPt.x, line.p1.y - rawPt.y) < minSnapDist) {
-                  setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: rawPt.x, svgY: rawPt.y });
+                  setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: line.p1.x, svgY: line.p1.y });
                   if (cadTool === 'ADD_LINE') {
                       setCadAnchorNode(line.p1);
                       if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
@@ -820,7 +818,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                   return;
                }
                if (Math.hypot(line.p2.x - rawPt.x, line.p2.y - rawPt.y) < minSnapDist) {
-                  setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: rawPt.x, svgY: rawPt.y });
+                  setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: line.p2.x, svgY: line.p2.y });
                   if (cadTool === 'ADD_LINE') {
                       setCadAnchorNode(line.p2);
                       if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
@@ -919,7 +917,6 @@ const AdminDashboard = ({ setCurrentView }) => {
   };
 
   const handleCadPointerMove = (e) => {
-    e.preventDefault(); 
     if (!cadPointersRef.current.has(e.pointerId)) return;
     cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
 
@@ -960,7 +957,25 @@ const AdminDashboard = ({ setCurrentView }) => {
       setCadHoveredNode(hoveredNode);
 
       if (cadDraggingNode || cadPointerGesture?.isDragging || cadPointerGesture?.isDraggingAnchor) {
-         setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: rawPt.x, svgY: rawPt.y });
+         let magSvgX = rawPt.x;
+         let magSvgY = rawPt.y;
+         if (cadPointerGesture?.isDraggingAnchor) {
+             magSvgX = rawPt.x + cadPointerGesture.offsetX;
+             magSvgY = rawPt.y + cadPointerGesture.offsetY;
+         } else if (cadDraggingNode) {
+             if (isSketchExtendEnabled) {
+                 const snapPt = getCadSnapPoint(rawPt, false);
+                 magSvgX = snapPt.x;
+                 magSvgY = snapPt.y;
+             } else {
+                 const dragLine = cadLines.find(l => l.id === cadDraggingNode.lineId);
+                 if (dragLine) {
+                     magSvgX = dragLine[cadDraggingNode.end].x;
+                     magSvgY = dragLine[cadDraggingNode.end].y;
+                 }
+             }
+         }
+         setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: magSvgX, svgY: magSvgY });
       } else {
          setCadMagnifierPos(null);
       }
@@ -1317,7 +1332,6 @@ const AdminDashboard = ({ setCurrentView }) => {
 
   const cadWheelTimeoutRef = React.useRef(null);
   const handleCadWheel = (e) => {
-    if (cadPrompt || cadSelectedNode || cadSelectedLine || cadSelectedCircle) return;
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
     const rawPt = getCadSvgCoords(e.clientX, e.clientY);
@@ -1348,7 +1362,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       el.addEventListener('wheel', handleCadWheel, { passive: false });
       return () => el.removeEventListener('wheel', handleCadWheel);
     }
-  }, [cadViewport, cadPrompt, cadSelectedNode, cadSelectedLine, cadSelectedCircle]);
+  }, [cadViewport, cadPrompt, cadSelectedNode, cadSelectedLine, cadSelectedCircle, activeLandSurveyView, cadBackgroundImage]);
 
 
   
@@ -3151,6 +3165,31 @@ const AdminDashboard = ({ setCurrentView }) => {
                           setPdfScale(''); setPdfScaleStatus(''); setCadScale(null);
                           setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });
                           setShowDarkDrawSettings(false);
+                          
+                          // STRICT HARD RESET
+                          setCadBackgroundImage(null);
+                          setCadSurveys([]);
+                          setCadActiveSurveyId(null);
+                          setCheckedSurveyNos([]);
+                          setCadPromptSurveyNo('');
+                          setCadPromptSubDiv('');
+
+                          // ABSOLUTE RESET OF PINS AND ACTIVE TOOLS
+                          setCadAnchorNode(null);
+                          setCadHoveredNode(null);
+                          setCadDraggingNode(null);
+                          setCadSelectedNode(null);
+                          setCadSelectedLine(null);
+                          setCadSelectedCircle(null);
+                          setCadSelectedText(null);
+                          setCadSelectedMetric(null);
+                          setCadTool('IDLE');
+                          setCadPointerGesture(null);
+                          setCadMagnifierPos(null);
+                          setIsLineMoving(false);
+                          setIsEditingLineMode(false);
+                          setCadPrompt(null);
+                          setCadPinchInitial(null);
                        }}>New Canvas</button>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-black text-emerald-400 hover:bg-slate-700 hover:text-emerald-300 transition-colors border-t border-slate-700 uppercase tracking-widest" onClick={handleSaveProject}>Save Project</button>
                      </div>
@@ -3454,15 +3493,104 @@ const AdminDashboard = ({ setCurrentView }) => {
                     const polySurvey = p.surveyId ? cadSurveys.find(s => s.id === p.surveyId) : null;
                     const baseColor = polySurvey ? polySurvey.hexColor : '#38bdf8';
                     const fillColor = isSelected ? baseColor + '80' : baseColor + '26';
+
+                    let labelText = '';
+                    if (polySurvey) {
+                       labelText = polySurvey.surveyNo + (polySurvey.subDivisionNo ? '/' + polySurvey.subDivisionNo : '');
+                    }
+                    
+                    let textNode = null;
+                    if (labelText) {
+                        let signedArea = 0;
+                        let cxSum = 0;
+                        let cySum = 0;
+                        const pts = p.pts;
+                        const n = pts.length;
+                        for (let i = 0; i < n; i++) {
+                            const p1 = pts[i];
+                            const p2 = pts[(i + 1) % n];
+                            const a = p1.x * p2.y - p2.x * p1.y;
+                            signedArea += a;
+                            cxSum += (p1.x + p2.x) * a;
+                            cySum += (p1.y + p2.y) * a;
+                        }
+                        signedArea *= 0.5;
+                        
+                        let cx = 0, cy = 0;
+                        if (Math.abs(signedArea) > 1e-6) {
+                            cx = cxSum / (6 * signedArea);
+                            cy = cySum / (6 * signedArea);
+                        } else {
+                            const minX = Math.min(...pts.map(pt => pt.x));
+                            const maxX = Math.max(...pts.map(pt => pt.x));
+                            const minY = Math.min(...pts.map(pt => pt.y));
+                            const maxY = Math.max(...pts.map(pt => pt.y));
+                            cx = (minX + maxX) / 2;
+                            cy = (minY + maxY) / 2;
+                        }
+                        
+                        let ixx = 0, iyy = 0, ixy = 0;
+                        for (let i = 0; i < n; i++) {
+                            ixx += (pts[i].x - cx) ** 2;
+                            iyy += (pts[i].y - cy) ** 2;
+                            ixy += (pts[i].x - cx) * (pts[i].y - cy);
+                        }
+                        let angleRad = 0.5 * Math.atan2(2 * ixy, ixx - iyy);
+                        let angleDeg = angleRad * (180 / Math.PI);
+                        
+                        if (angleDeg > 90) angleDeg -= 180;
+                        if (angleDeg < -90) angleDeg += 180;
+                        
+                        const cosA = Math.cos(angleRad);
+                        const sinA = Math.sin(angleRad);
+                        let minU = Infinity, maxU = -Infinity;
+                        let minV = Infinity, maxV = -Infinity;
+                        for (let i = 0; i < n; i++) {
+                            const dx = pts[i].x - cx;
+                            const dy = pts[i].y - cy;
+                            const u = dx * cosA + dy * sinA;
+                            const v = -dx * sinA + dy * cosA;
+                            if (u < minU) minU = u;
+                            if (u > maxU) maxU = u;
+                            if (v < minV) minV = v;
+                            if (v > maxV) maxV = v;
+                        }
+                        
+                        const polyWidthAlongAxis = maxU - minU;
+                        const polyHeightAlongAxis = maxV - minV;
+                        
+                        const lengthConstraint = (polyWidthAlongAxis * 0.7) / Math.max(1, labelText.length * 0.6);
+                        const heightConstraint = polyHeightAlongAxis * 0.6;
+                        let calculatedFontSize = Math.min(18, Math.max(4, Math.min(lengthConstraint, heightConstraint)));
+                        
+                        textNode = (
+                            <text
+                                x={cx}
+                                y={cy}
+                                fill="#ffffff"
+                                fontSize={calculatedFontSize}
+                                fontWeight="bold"
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                style={{ pointerEvents: 'none' }}
+                                transform={`rotate(${angleDeg}, ${cx}, ${cy})`}
+                            >
+                                {labelText}
+                            </text>
+                        );
+                    }
+
                     return (
-                        <polygon
-                            key={p.id}
-                            points={p.pts.map(pt => `${pt.x},${pt.y}`).join(' ')}
-                            fill={fillColor}
-                            stroke={isSelected ? baseColor : "rgba(255,255,255,0.1)"}
-                            strokeWidth={cadViewport.width * 0.001}
-                            style={{ pointerEvents: 'none' }} 
-                        />
+                        <g key={p.id}>
+                            <polygon
+                                points={p.pts.map(pt => `${pt.x},${pt.y}`).join(' ')}
+                                fill={fillColor}
+                                stroke={isSelected ? baseColor : "rgba(255,255,255,0.1)"}
+                                strokeWidth={cadViewport.width * 0.001}
+                                style={{ pointerEvents: 'none' }} 
+                            />
+                            {textNode}
+                        </g>
                     );
                   })}
 
@@ -3810,7 +3938,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                        borderRadius: '50%',
                        border: '2.5px solid #fbbf24',
                        overflow: 'hidden',
-                       background: '#020617',
+                       background: 'transparent',
                        pointerEvents: 'none',
                        zIndex: 200,
                        boxShadow: '0 0 0 1px rgba(251,191,36,0.3), 0 12px 28px rgba(0,0,0,0.6)'
@@ -3971,7 +4099,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                    );
                  })()}
 
-                 {typeof cadSelectedText !== 'undefined' && cadSelectedText && (() => {
+                 {typeof cadSelectedText !== 'undefined' && cadSelectedText && !cadEditInputs.isMovingText && (() => {
                    const txt = cadTexts.find(t => t.id === cadSelectedText);
                    if (!txt) return null;
                    const ctCoords = getSvgPtToContainer(txt.x, txt.y);
@@ -4011,9 +4139,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                           ))}
                        </div>
                        <div className="flex flex-row gap-2 mt-2 w-full">
-                         <button onClick={() => setCadEditInputs(p => ({ ...p, isMovingText: !p.isMovingText }))} className={`flex-1 font-bold py-1.5 rounded text-[10px] transition-colors ${cadEditInputs.isMovingText ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-                           {cadEditInputs.isMovingText ? 'MOVING' : 'MOVE'}
-                         </button>
+                         <button onClick={(e) => { e.stopPropagation(); setCadEditInputs(p => ({ ...p, isMovingText: true })); setCadPointerGesture({ startX: e.clientX, startY: e.clientY, isDragging: false, isDraggingMetric: false, isDraggingText: true, isDraggingLineBody: false, targetText: txt, targetNode: null, targetLine: null, targetCircle: null, targetMetric: null }); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-1.5 rounded text-[10px] transition-colors">MOVE</button>
                          <button onClick={() => { setCadTexts(prev => prev.filter(t => t.id !== txt.id)); setCadSelectedText(null); }} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1.5 rounded text-[10px] transition-colors">DEL</button>
                        </div>
                        <div onPointerDown={handlePopupResizeDown} className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-end justify-end p-1.5 text-slate-500 hover:text-white transition-colors opacity-70"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 0L10 10L0 10L10 0Z" /></svg></div>
