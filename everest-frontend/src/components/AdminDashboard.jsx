@@ -118,7 +118,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadPromptUnit, setCadPromptUnit] = React.useState('meters');
   const cadSvgRef = React.useRef(null);
   
-  const [isFloatingStackExpanded, setIsFloatingStackExpanded] = React.useState(true);
+  const [isFloatingStackExpanded, setIsFloatingStackExpanded] = React.useState(false);
   const [isPolygonAreaCardVisible, setIsPolygonAreaCardVisible] = React.useState(true);
 
   const [selectedAreaUnit, setSelectedAreaUnit] = React.useState('Ares');
@@ -897,6 +897,18 @@ const AdminDashboard = ({ setCurrentView }) => {
          cadTexts.forEach(txt => {
             if (Math.hypot(txt.x - rawPt.x, txt.y - rawPt.y) < minSnapDist * 1.5) targetText = txt;
          });
+         if (!targetText) {
+             visibleCadPolygons.forEach(p => {
+                if (Math.hypot(p.centroid.x - rawPt.x, p.centroid.y - rawPt.y) < minSnapDist * 2) {
+                   const polySurvey = p.surveyId ? cadSurveys.find(s => s.id === p.surveyId) : null;
+                   if (polySurvey) {
+                       const labelText = polySurvey.surveyNo + (polySurvey.subDivisionNo ? '/' + polySurvey.subDivisionNo : '');
+                       targetText = { id: `poly-${p.id}`, text: labelText, x: p.centroid.x, y: p.centroid.y, fontSize: Math.max(10, cadViewport.width * 0.02), hexColor: '#ffffff' };
+                       setCadTexts(prev => [...prev, targetText]);
+                   }
+                }
+             });
+         }
       } else if (cadTool === 'SELECT_METRIC') {
          cadLines.forEach(l => {
             if (l.fixedLength && isMetricsVisible) {
@@ -1195,7 +1207,7 @@ const AdminDashboard = ({ setCurrentView }) => {
          }
 
          if (cadTool === 'ADD_LINE' && cadAnchorNode?.isInitialCenter && !cadPrompt) {
-             const tPt = effTargetNode ? { x: effTargetNode.x, y: effTargetNode.y } : getCadSnapPoint(rawPt, true);
+             const tPt = effTargetNode ? { x: effTargetNode.x, y: effTargetNode.y } : getCadSnapPoint(rawPt, false);
              setCadAnchorNode({ x: tPt.x, y: tPt.y });
              setCadSelectedNode(null);
              setShowDarkDrawSettings(false);
@@ -1246,7 +1258,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                  setShowDarkDrawSettings(false);
              }
          } else if (cadTool === 'ADD_LINE' && cadAnchorNode && !cadPrompt && !cadPointerGesture.targetLine && !cadPointerGesture.targetCircle && !cadPointerGesture.targetText && !cadPointerGesture.targetMetric) {
-            const snapPt = getCadSnapPoint(rawPt, true);
+            const snapPt = getCadSnapPoint(rawPt, false);
             
             if (cadStateBeforeActionRef.current) saveCadStateToHistory(cadStateBeforeActionRef.current);
             const newId = Date.now().toString();
@@ -1282,7 +1294,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                   setCadSelectedNode(cadPointerGesture.targetNode);
                }
                setCadSelectedPolygon(null);
-            } else if (cadPointerGesture.targetLine) {
+            } else if (cadPointerGesture.targetLine && isEditingLineMode) {
                setShowDarkDrawSettings(false); 
                setCadSelectedLine(cadPointerGesture.targetLine.id); setCadSelectedNode(null); setCadSelectedCircle(null);
                setCadSelectedPolygon(null);
@@ -1524,7 +1536,7 @@ const AdminDashboard = ({ setCurrentView }) => {
      }
      setIsLineMoving(false);
      setIsEditingLineMode(false);
-     setCadTool('IDLE');
+     if (cadTool !== 'EDIT_RADIUS') setCadTool('IDLE');
   };
   
   const handleCadEditDelete = () => {
@@ -1534,7 +1546,7 @@ const AdminDashboard = ({ setCurrentView }) => {
      setCadSelectedCircle(null);
      setIsLineMoving(false);
      setIsEditingLineMode(false);
-     setCadTool('IDLE');
+     if (cadTool !== 'EDIT_RADIUS') setCadTool('IDLE');
   };
   // --- END MANUAL CAD ENGINE STATE ---
 
@@ -3154,10 +3166,25 @@ const AdminDashboard = ({ setCurrentView }) => {
                        </div>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_LINE'); setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2 }); setShowDarkDrawSettings(false); }}>Add Line</button>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(true); setIsLineMoving(false); setCadTool('EDIT_LINE'); setShowDarkDrawSettings(false); }}>Edit Line Attributes</button>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('EDIT_RADIUS'); setShowDarkDrawSettings(false); }}>Edit Radius</button>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_TEXT'); setShowDarkDrawSettings(false); }}>Add Text</button>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('SELECT_METRIC'); setShowDarkDrawSettings(false); }}>Select Metric</button>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('SELECT_TEXT'); setShowDarkDrawSettings(false); }}>Select Text</button>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (cadTool === 'EDIT_RADIUS') { setCadTool('IDLE'); setCadSelectedNode(null); setCadHoveredNode(null); setCadDraggingNode(null); } else { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('EDIT_RADIUS'); } }}>
+                         <span>Edit Radius</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${cadTool === 'EDIT_RADIUS' ? 'bg-fuchsia-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${cadTool === 'EDIT_RADIUS' ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors border-b border-slate-700" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_TEXT'); setShowDarkDrawSettings(false); }}>Add Text</button>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (cadTool === 'SELECT_METRIC') { setCadTool('IDLE'); setCadSelectedNode(null); setCadHoveredNode(null); setCadDraggingNode(null); } else { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('SELECT_METRIC'); } }}>
+                         <span>Select Metric</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${cadTool === 'SELECT_METRIC' ? 'bg-fuchsia-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${cadTool === 'SELECT_METRIC' ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (cadTool === 'SELECT_TEXT') { setCadTool('IDLE'); setCadSelectedNode(null); setCadHoveredNode(null); setCadDraggingNode(null); setCadSelectedText(null); } else { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('SELECT_TEXT'); } }}>
+                         <span>Select Text</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${cadTool === 'SELECT_TEXT' ? 'bg-fuchsia-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${cadTool === 'SELECT_TEXT' ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
                        <button className="w-full text-left px-5 py-3 text-[13px] font-black text-rose-500 hover:bg-slate-700 hover:text-rose-400 transition-colors border-t border-slate-700 uppercase tracking-widest" onClick={() => {
                           setCadLines([]); setCadCircles([]); setCadTexts([]); setCadMetricOffsets({});
                           setCadHistory({ past: [], future: [] }); setCadLoadedProjectId(null);
@@ -3485,7 +3512,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                    
                      <g id="cad-drawing-layer">
                       {(cadBackgroundImage && isBackgroundImageVisible) && (
-                         <image href={cadBackgroundImage} x={0} y={0} width={2000} height={2000} preserveAspectRatio="xMidYMid meet" opacity={0.5} pointerEvents="none" />
+                         <image href={cadBackgroundImage} x={0} y={0} width={2000} height={2000} preserveAspectRatio="xMidYMid meet" pointerEvents="none" />
                       )}
 
                   {visibleCadPolygons.map(p => {
@@ -3499,8 +3526,10 @@ const AdminDashboard = ({ setCurrentView }) => {
                        labelText = polySurvey.surveyNo + (polySurvey.subDivisionNo ? '/' + polySurvey.subDivisionNo : '');
                     }
                     
+                    const isPromoted = cadTexts.some(t => t.id === `poly-${p.id}`);
+                    
                     let textNode = null;
-                    if (labelText) {
+                    if (labelText && isPolygonAreaCardVisible && !isPromoted) {
                         let signedArea = 0;
                         let cxSum = 0;
                         let cySum = 0;
@@ -3529,6 +3558,50 @@ const AdminDashboard = ({ setCurrentView }) => {
                             cy = (minY + maxY) / 2;
                         }
                         
+                        // 1. Calculate horizontal space AT the centroid
+                        let lefts = [], rights = [], tops = [], bottoms = [];
+                        for (let i = 0; i < n; i++) {
+                            const p1 = pts[i];
+                            const p2 = pts[(i + 1) % n];
+                            
+                            // Intersect horizontal line y = cy
+                            if ((p1.y <= cy && p2.y > cy) || (p1.y > cy && p2.y <= cy)) {
+                                const xInt = p1.x + (cy - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
+                                if (xInt <= cx) lefts.push(xInt);
+                                if (xInt >= cx) rights.push(xInt);
+                            }
+                            // Intersect vertical line x = cx
+                            if ((p1.x <= cx && p2.x > cx) || (p1.x > cx && p2.x <= cx)) {
+                                const yInt = p1.y + (cx - p1.x) * (p2.y - p1.y) / (p2.x - p1.x);
+                                if (yInt <= cy) tops.push(yInt);
+                                if (yInt >= cy) bottoms.push(yInt);
+                            }
+                        }
+                        
+                        let horizW = 0;
+                        if (lefts.length > 0 && rights.length > 0) {
+                            horizW = Math.min(...rights) - Math.max(...lefts);
+                        } else {
+                            // Fallback to bounding box width
+                            const minX = Math.min(...pts.map(pt => pt.x));
+                            const maxX = Math.max(...pts.map(pt => pt.x));
+                            horizW = maxX - minX;
+                        }
+                        
+                        let horizH = 0;
+                        if (tops.length > 0 && bottoms.length > 0) {
+                            horizH = Math.min(...bottoms) - Math.max(...tops);
+                        } else {
+                            const minY = Math.min(...pts.map(pt => pt.y));
+                            const maxY = Math.max(...pts.map(pt => pt.y));
+                            horizH = maxY - minY;
+                        }
+                        
+                        const horizLenConst = (horizW * 0.75) / Math.max(1, labelText.length * 0.6);
+                        const horizHeightConst = horizH * 0.65;
+                        const horizFontSize = Math.min(horizLenConst, horizHeightConst);
+
+                        // 2. Calculate Diagonal Space (Principal Axis) AT the centroid
                         let ixx = 0, iyy = 0, ixy = 0;
                         for (let i = 0; i < n; i++) {
                             ixx += (pts[i].x - cx) ** 2;
@@ -3537,43 +3610,105 @@ const AdminDashboard = ({ setCurrentView }) => {
                         }
                         let angleRad = 0.5 * Math.atan2(2 * ixy, ixx - iyy);
                         let angleDeg = angleRad * (180 / Math.PI);
-                        
                         if (angleDeg > 90) angleDeg -= 180;
                         if (angleDeg < -90) angleDeg += 180;
                         
                         const cosA = Math.cos(angleRad);
                         const sinA = Math.sin(angleRad);
-                        let minU = Infinity, maxU = -Infinity;
-                        let minV = Infinity, maxV = -Infinity;
+                        
+                        let uMins = [], uMaxs = [], vMins = [], vMaxs = [];
                         for (let i = 0; i < n; i++) {
-                            const dx = pts[i].x - cx;
-                            const dy = pts[i].y - cy;
-                            const u = dx * cosA + dy * sinA;
-                            const v = -dx * sinA + dy * cosA;
-                            if (u < minU) minU = u;
-                            if (u > maxU) maxU = u;
-                            if (v < minV) minV = v;
-                            if (v > maxV) maxV = v;
+                            const p1 = pts[i];
+                            const p2 = pts[(i + 1) % n];
+                            
+                            const u1 = (p1.x - cx) * cosA + (p1.y - cy) * sinA;
+                            const v1 = -(p1.x - cx) * sinA + (p1.y - cy) * cosA;
+                            const u2 = (p2.x - cx) * cosA + (p2.y - cy) * sinA;
+                            const v2 = -(p2.x - cx) * sinA + (p2.y - cy) * cosA;
+                            
+                            // Intersect V=0
+                            if ((v1 <= 0 && v2 > 0) || (v1 > 0 && v2 <= 0)) {
+                                const uInt = u1 + (0 - v1) * (u2 - u1) / (v2 - v1);
+                                if (uInt <= 0) uMins.push(uInt);
+                                if (uInt >= 0) uMaxs.push(uInt);
+                            }
+                            
+                            // Intersect U=0
+                            if ((u1 <= 0 && u2 > 0) || (u1 > 0 && u2 <= 0)) {
+                                const vInt = v1 + (0 - u1) * (v2 - v1) / (u2 - u1);
+                                if (vInt <= 0) vMins.push(vInt);
+                                if (vInt >= 0) vMaxs.push(vInt);
+                            }
                         }
                         
-                        const polyWidthAlongAxis = maxU - minU;
-                        const polyHeightAlongAxis = maxV - minV;
+                        let diagW = 0, diagH = 0;
+                        if (uMins.length > 0 && uMaxs.length > 0) {
+                            diagW = Math.min(...uMaxs) - Math.max(...uMins);
+                        } else {
+                            diagW = horizW; // Fallback
+                        }
                         
-                        const lengthConstraint = (polyWidthAlongAxis * 0.7) / Math.max(1, labelText.length * 0.6);
-                        const heightConstraint = polyHeightAlongAxis * 0.6;
-                        let calculatedFontSize = Math.min(18, Math.max(4, Math.min(lengthConstraint, heightConstraint)));
+                        if (vMins.length > 0 && vMaxs.length > 0) {
+                            diagH = Math.min(...vMaxs) - Math.max(...vMins);
+                        } else {
+                            diagH = horizH; // Fallback
+                        }
+
+                        const diagLenConst = (diagW * 0.75) / Math.max(1, labelText.length * 0.6);
+                        const diagHeightConst = diagH * 0.65;
+                        const diagFontSize = Math.min(diagLenConst, diagHeightConst);
+
+                        // 3. Evaluation & Orientation
+                        let finalAngle = 0;
+                        let finalFontSize = horizFontSize;
+                        
+                        // Strict check: if horizontal fits fine (e.g. >= 14px), keep it straight!
+                        // Only flip to diagonal if horizontal is very tight (< 14) and diagonal actually helps.
+                        if (horizFontSize < 14 && diagFontSize > horizFontSize * 1.3) {
+                            finalAngle = angleDeg;
+                            finalFontSize = diagFontSize;
+                        }
+                        
+                        // Scale proportionally: Restrict min 8px, safely uncap max to 60px 
+                        let calculatedFontSize = Math.max(8, Math.min(60, finalFontSize));
+                        
+                        // Pass finalAngle down to the transform block
+                        const angleDegTransform = finalAngle;
                         
                         textNode = (
                             <text
                                 x={cx}
                                 y={cy}
-                                fill="#ffffff"
+                                fill="#FFFFFF"
                                 fontSize={calculatedFontSize}
                                 fontWeight="bold"
                                 textAnchor="middle"
                                 dominantBaseline="central"
-                                style={{ pointerEvents: 'none' }}
-                                transform={`rotate(${angleDeg}, ${cx}, ${cy})`}
+                                style={{ pointerEvents: cadTool === 'SELECT_TEXT' ? 'auto' : 'none', cursor: cadTool === 'SELECT_TEXT' ? 'pointer' : 'default' }}
+                                transform={`rotate(${angleDegTransform}, ${cx}, ${cy})`}
+                                stroke="#000000"
+                                strokeWidth="1.5px"
+                                paintOrder="stroke fill"
+                                onPointerDown={(e) => {
+                                    if (cadTool === 'SELECT_TEXT') {
+                                        e.stopPropagation();
+                                        const newTxt = { 
+                                            id: `poly-${p.id}`, 
+                                            text: labelText, 
+                                            x: cx, 
+                                            y: cy, 
+                                            fontSize: calculatedFontSize, 
+                                            hexColor: '#ffffff', 
+                                            rotation: angleDegTransform 
+                                        };
+                                        setCadTexts(prev => {
+                                            if (prev.some(t => t.id === newTxt.id)) return prev;
+                                            return [...prev, newTxt];
+                                        });
+                                        setCadSelectedText(`poly-${p.id}`);
+                                        setCadPopupOffset({ x: 0, y: 0 });
+                                    }
+                                }}
                             >
                                 {labelText}
                             </text>
@@ -3597,15 +3732,67 @@ const AdminDashboard = ({ setCurrentView }) => {
                   {cadCircles.map(c => {
                     const isSelected = cadSelectedCircle === c.id;
                     const isGlowing = cadGlowingCircles.includes(c.id);
+                    
+                    let angles = [];
+                    cadLines.forEach(l => {
+                        if (Math.hypot(l.p1.x - c.center.x, l.p1.y - c.center.y) < 1) angles.push(Math.atan2(l.p2.y - c.center.y, l.p2.x - c.center.x));
+                        else if (Math.hypot(l.p2.x - c.center.x, l.p2.y - c.center.y) < 1) angles.push(Math.atan2(l.p1.y - c.center.y, l.p1.x - c.center.x));
+                    });
+                    angles.sort((a,b) => a-b);
+                    let bestAngle = -Math.PI / 4;
+                    if (angles.length === 1) {
+                        bestAngle = angles[0] + Math.PI;
+                    } else if (angles.length > 1) {
+                        let maxGap = 0;
+                        for (let i=0; i<angles.length; i++) {
+                            let gap = angles[(i+1)%angles.length] - angles[i];
+                            if (gap < 0) gap += 2 * Math.PI;
+                            if (gap > maxGap) {
+                                maxGap = gap;
+                                bestAngle = angles[i] + gap / 2;
+                            }
+                        }
+                    }
+                    
+                    const rayEndX = c.center.x + c.radiusPixels * Math.cos(bestAngle);
+                    const rayEndY = c.center.y + c.radiusPixels * Math.sin(bestAngle);
+                    const textX = c.center.x + (c.radiusPixels / 2) * Math.cos(bestAngle);
+                    const textY = c.center.y + (c.radiusPixels / 2) * Math.sin(bestAngle);
+                    
+                    const strokeW = cadViewport.width * (c.strokeWidth ? c.strokeWidth / 1000 : 0.003);
+                    const drawColor = isSelected ? "#ec4899" : isGlowing ? "#ff2a6d" : (c.hexColor || "#4f46e5");
+                    const guideColor = "#FF1493";
+                    
                     return (
                     <g key={c.id}>
                       <circle 
                         cx={c.center.x} cy={c.center.y} r={c.radiusPixels} 
                         fill={isSelected ? "rgba(236,72,153,0.1)" : "none"}
-                        stroke={isSelected ? "#ec4899" : isGlowing ? "#ff2a6d" : (c.hexColor || "#4f46e5")} 
-                        strokeWidth={cadViewport.width * (c.strokeWidth ? c.strokeWidth / 1000 : 0.003)} 
+                        stroke={drawColor} 
+                        strokeWidth={strokeW} 
                         className={cadBlinkingRadius === c.id || isGlowing ? "animate-pulse" : "transition-colors duration-200"}
+                        style={{ pointerEvents: cadTool === 'SELECT_TEXT' ? 'none' : 'auto' }}
                       />
+                      <line
+                        x1={c.center.x} y1={c.center.y} x2={rayEndX} y2={rayEndY}
+                        stroke={guideColor}
+                        strokeWidth={cadViewport.width * 0.0015}
+                        strokeDasharray={`${cadViewport.width * 0.005},${cadViewport.width * 0.005}`}
+                        className="pointer-events-none"
+                      />
+                      <text
+                        x={textX} y={textY}
+                        fill={guideColor}
+                        fontSize={cadViewport.width * 0.012}
+                        fontWeight="bold"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        className="pointer-events-none"
+                        style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8)' }}
+                      >
+                        {c.radiusMeters ? parseFloat(c.radiusMeters).toFixed(2) + ' m' : ''}
+                      </text>
+                      <circle cx={c.center.x} cy={c.center.y} r={cadViewport.width * 0.004} fill={guideColor} stroke="#ffffff" strokeWidth={cadViewport.width * 0.001} className="pointer-events-none" />
                     </g>
                   )})}
 
@@ -3660,7 +3847,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                         else if (defaultRot < -90) defaultRot += 180;
                         finalRot = l.metricRotation !== undefined ? l.metricRotation : defaultRot;
                         
-                        textStr = isGlobalMetricFeet ? (displayLen * 3.28084).toFixed(2) + ' ft' : displayLen.toFixed(2) + ' m';
+                        textStr = isGlobalMetricFeet ? (displayLen * 3.28084).toFixed(1) + ' ft' : displayLen.toFixed(1) + ' m';
                         const svgLen = Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y);
                         const baseFontSize = l.metricFontSize || (isMetricSelected || isLiveDrag ? 50 : (isInternalPartition ? 12 : 32));
                         const maxAllowedFontSize = (svgLen * 0.9) / (Math.max(1, textStr.length) * 0.65);
@@ -3755,19 +3942,20 @@ const AdminDashboard = ({ setCurrentView }) => {
                         stroke={isSelected ? "#ec4899" : (l.hexColor || "#38bdf8")} 
                         strokeWidth={cadViewport.width * (l.strokeWidth ? l.strokeWidth / 1000 : 0.004)} 
                         strokeLinecap="round" 
+                        style={{ pointerEvents: cadTool === 'SELECT_TEXT' ? 'none' : 'auto' }}
                       />
                       {isMetricsVisible && displayLen > 0 && (() => {
                         return (
                           <text 
                             x={mx} y={my} 
-                            fill={isSelected || isMetricSelected || isLiveDrag ? "#fbcfe8" : (l.metricHexColor || "#ffffff")} 
+                            fill={isSelected || isMetricSelected || isLiveDrag ? "#fbcfe8" : (l.metricHexColor || "#38bdf8")} 
                             fontSize={scaledFontSize} 
                             fontWeight="bold" textAnchor="middle"
-                            className="transition-all duration-200 pointer-events-none select-none"
+                            className="transition-colors duration-200 pointer-events-none select-none"
                             transform={`rotate(${finalRot}, ${mx}, ${my})`}
                             paintOrder="stroke"
-                            stroke="rgba(15, 23, 42, 0.75)"
-                            strokeWidth={scaledFontSize * 0.3}
+                            stroke={l.metricStrokeColor || "transparent"}
+                            strokeWidth={l.metricStrokeColor && l.metricStrokeColor !== "transparent" ? scaledFontSize * 0.15 : 0}
                             strokeLinejoin="round"
                           >
                             {textStr}
@@ -3955,7 +4143,11 @@ const AdminDashboard = ({ setCurrentView }) => {
                             x2={cadMagnifierPos.svgX} y2={vbY + vbH}
                             stroke="rgba(255,255,255,0.04)" strokeWidth={sw * 0.6}
                           />
-                          {/* Render only raw line geometry — NO map pin, NO background image */}
+                          {/* Background image injected to mirror main canvas zoom */}
+                          {(cadBackgroundImage && isBackgroundImageVisible) && (
+                             <image href={cadBackgroundImage} x={0} y={0} width={2000} height={2000} preserveAspectRatio="xMidYMid meet" pointerEvents="none" />
+                          )}
+                          {/* Render only raw line geometry — NO map pin */}
                           {visibleCadLines.map(l => (
                                 <line
                                 key={`mag-l-${l.id}`}
@@ -4159,7 +4351,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                    return (
                      <div 
                        className="absolute z-[110] bg-slate-800 p-4 rounded-xl shadow-2xl border border-slate-600 flex flex-col gap-3 min-w-[14rem] animate-in slide-in-from-bottom-2" 
-                       style={{ left: Math.min(ctCoords.left + cadPopupOffset.x, window.innerWidth - 250), top: Math.max(ctCoords.top - 180 + cadPopupOffset.y, 20), transform: `scale(${cadPopupScale})`, transformOrigin: 'top left' }}
+                       style={{ left: Math.min(ctCoords.left + 80 + cadPopupOffset.x, window.innerWidth - 250), top: Math.max(ctCoords.top - 80 + cadPopupOffset.y, 20), transform: `scale(${cadPopupScale})`, transformOrigin: 'top left' }}
                        onClick={e => e.stopPropagation()}
                        onPointerDown={e => e.stopPropagation()}
                      >
@@ -4179,17 +4371,30 @@ const AdminDashboard = ({ setCurrentView }) => {
                        </div>
                        
                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-slate-500 uppercase">Font Size</span>
-                          <input type="range" min="10" max={200} value={line.metricFontSize || 40} onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricFontSize: parseInt(e.target.value)} : l))} className="accent-fuchsia-500" />
+                          <div className="flex items-center justify-between">
+                             <span className="text-[10px] text-slate-500 uppercase">Font Size</span>
+                             <input 
+                               type="number" min="10" max="200" 
+                               value={line.metricFontSize || 40} 
+                               onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricFontSize: parseInt(e.target.value) || 40} : l))} 
+                               className="w-14 bg-slate-700 text-white text-[10px] text-center rounded border border-slate-600 focus:outline-none focus:border-fuchsia-500 py-0.5" 
+                             />
+                          </div>
+                          <input type="range" min="10" max="200" value={line.metricFontSize || 40} onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricFontSize: parseInt(e.target.value)} : l))} className="accent-fuchsia-500" />
                        </div>
                        <div className="flex flex-col gap-1">
                           <span className="text-[10px] text-slate-500 uppercase">Rotation: {Math.round(line.metricRotation || 0)}°</span>
                           <input type="range" min="0" max="360" value={line.metricRotation || 0} onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricRotation: parseInt(e.target.value)} : l))} className="accent-fuchsia-500" />
                        </div>
                        <div className="flex gap-2">
-                          {['#ffffff', '#38bdf8', '#ec4899', '#10b981', '#f59e0b', '#a855f7'].map(hex => (
-                             <button key={hex} onClick={() => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricHexColor: hex} : l))} className={`w-6 h-6 rounded-full border-2 ${line.metricHexColor === hex ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: hex }}></button>
-                          ))}
+                          <div className="flex-1 flex flex-col gap-1">
+                             <span className="text-[10px] text-slate-500 uppercase text-center">Fill Color</span>
+                             <input type="color" value={line.metricHexColor || '#38bdf8'} onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricHexColor: e.target.value} : l))} className="w-full h-8 cursor-pointer rounded bg-transparent p-0 border-0" />
+                          </div>
+                          <div className="flex-1 flex flex-col gap-1">
+                             <span className="text-[10px] text-slate-500 uppercase text-center">Border Color</span>
+                             <input type="color" value={line.metricStrokeColor || '#transparent'} onChange={e => setCadLines(prev => prev.map(l => l.id === line.id ? {...l, metricStrokeColor: e.target.value} : l))} className="w-full h-8 cursor-pointer rounded bg-transparent p-0 border-0" />
+                          </div>
                        </div>
 
                        <div className="flex flex-row gap-2 mt-2 w-full">
