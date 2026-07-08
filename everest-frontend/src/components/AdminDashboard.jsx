@@ -192,6 +192,12 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadBlinkingRadius, setCadBlinkingRadius] = React.useState(null);
   const [cadSnapIndicator, setCadSnapIndicator] = React.useState(null);
   const [cadSelectedPolygon, setCadSelectedPolygon] = React.useState(null);
+  const [cadMultiSelectMode, setCadMultiSelectMode] = React.useState(false);
+  const [cadMultiSelectedPolygons, setCadMultiSelectedPolygons] = React.useState([]);
+  const [cadContextMenu, setCadContextMenu] = React.useState(null);
+  const cadLongPressTimerRef = React.useRef(null);
+  const cadMultiSelectModeRef = React.useRef(false);
+  const [cadRotation, setCadRotation] = React.useState(0);
   // Extended Editing
   const [isEditingLineMode, setIsEditingLineMode] = React.useState(false);
   const [isLineMoving, setIsLineMoving] = React.useState(false);
@@ -223,6 +229,39 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadLoadedProjectId, setCadLoadedProjectId] = React.useState(null);
   const [cadMagnifierPos, setCadMagnifierPos] = React.useState(null);
   const cadStateBeforeActionRef = React.useRef(null);
+
+  const resetCadState = () => {
+     setCadLines([]);
+     setCadCircles([]);
+     setCadTexts([]);
+     setCadMetricOffsets({});
+     setCadSurveys([]);
+     setCadActiveSurveyId(null);
+     setCheckedSurveyNos([]);
+     setCadScale(null);
+     setCadTool('IDLE');
+     setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });
+     setCadAnchorNode(null);
+     setCadPrompt(null);
+     setCadPromptValue('');
+     setCadPromptUnit('meters');
+     setCadBackgroundImage(null);
+     setCadHoveredNode(null);
+     setCadSelectedNode(null);
+     setCadPointerGesture(null);
+     setCadGlowingCircles([]);
+     setCadBlinkingRadius(null);
+     setCadSnapIndicator(null);
+     setCadSelectedPolygon(null);
+     setCadSelectedLine(null);
+     setCadSelectedCircle(null);
+     setCadSelectedText(null);
+     setCadSelectedMetric(null);
+     setCadDraggingNode(null);
+     setCadHistory({ past: [], future: [] });
+     setCadLoadedProjectId(null);
+     setCadMagnifierPos(null);
+  };
 
   // Auto-Split Intersection Engine
   React.useEffect(() => {
@@ -642,12 +681,17 @@ const AdminDashboard = ({ setCurrentView }) => {
     if (!cadScale || cadLines.length < 3 || visibleCadPolygons.length === 0) return null;
     
     let areaPixels = 0;
-    if (cadSelectedPolygon) {
+    if (cadMultiSelectMode && cadMultiSelectedPolygons.length > 0) {
+        cadMultiSelectedPolygons.forEach(id => {
+            const poly = visibleCadPolygons.find(p => p.id === id);
+            if (poly) areaPixels += poly.area;
+        });
+    } else if (!cadMultiSelectMode && cadSelectedPolygon) {
         const poly = visibleCadPolygons.find(p => p.id === cadSelectedPolygon);
         if (poly) areaPixels = poly.area;
     } else {
-          areaPixels = visibleCadPolygons.reduce((sum, p) => sum + p.area, 0);
-      }
+        areaPixels = visibleCadPolygons.reduce((sum, p) => sum + p.area, 0);
+    }
     
     if (areaPixels <= 0) return null;
     
@@ -660,7 +704,7 @@ const AdminDashboard = ({ setCurrentView }) => {
        cent: sqMeters / 40.4686,
        sqFt: sqMeters * 10.7639
     };
-  }, [cadLines, cadScale, visibleCadPolygons, cadSelectedPolygon, cadNodes]);
+  }, [cadLines, cadScale, visibleCadPolygons, cadSelectedPolygon, cadMultiSelectMode, cadMultiSelectedPolygons, cadNodes]);
 
   const cadOpenNodes = React.useMemo(() => {
       if (visibleCadLines.length < 3) return [];
@@ -860,7 +904,8 @@ const AdminDashboard = ({ setCurrentView }) => {
       const dist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
       const cx = (pts[0].clientX + pts[1].clientX) / 2;
       const cy = (pts[0].clientY + pts[1].clientY) / 2;
-      setCadPinchInitial({ dist, cx, cy, view: { ...cadViewport } });
+      const angle = Math.atan2(pts[1].clientY - pts[0].clientY, pts[1].clientX - pts[0].clientX) * (180 / Math.PI);
+      setCadPinchInitial({ dist, cx, cy, angle, rotation: cadRotation, view: { ...cadViewport } });
       return;
     }
 
@@ -976,30 +1021,20 @@ const AdminDashboard = ({ setCurrentView }) => {
             return;
          }
       } else if (cadTool === 'SELECT_TEXT') {
-         cadTexts.forEach(txt => {
-            if (Math.hypot(txt.x - rawPt.x, txt.y - rawPt.y) < minSnapDist * 1.5) targetText = txt;
-         });
-         if (!targetText) {
-             visibleCadPolygons.forEach(p => {
-                if (Math.hypot(p.centroid.x - rawPt.x, p.centroid.y - rawPt.y) < minSnapDist * 2) {
-                   const polySurvey = p.surveyId ? cadSurveys.find(s => s.id === p.surveyId) : null;
-                   if (polySurvey) {
-                       const labelText = polySurvey.surveyNo + (polySurvey.subDivisionNo ? '/' + polySurvey.subDivisionNo : '');
-                       targetText = { id: `poly-${p.id}`, text: labelText, x: p.centroid.x, y: p.centroid.y, fontSize: Math.max(10, cadViewport.width * 0.02), hexColor: '#ffffff' };
-                       setCadTexts(prev => [...prev, targetText]);
-                   }
-                }
-             });
-         }
+         // Target text hit detection is now handled natively by SVG invisible padded bounding boxes.
       } else if (cadTool === 'SELECT_METRIC') {
-         cadLines.forEach(l => {
-            if (l.fixedLength && isMetricsVisible) {
-               const offset = cadMetricOffsets[l.id] || getMetricDefaultOffset(l);
-               const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
-               const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
-               if (Math.hypot(mx - rawPt.x, my - rawPt.y) < minSnapDist * 1.5) targetMetric = l;
-            }
-         });
+         // Target metric hit detection is now handled natively by SVG invisible padded bounding boxes.
+      }
+
+      if (!isAddRadiusEnabled && cadTool === 'IDLE') {
+          if (e.target && e.target.tagName === 'polygon' && e.target.id && e.target.id.startsWith('poly-svg-')) {
+              const polyId = e.target.id.replace('poly-svg-', '');
+              if (e.pointerType === 'touch') {
+                  cadLongPressTimerRef.current = setTimeout(() => {
+                      setCadContextMenu({ x: e.clientX, y: e.clientY, type: 'POLYGON', targetId: polyId });
+                  }, 600);
+              }
+          }
       }
 
       setCadPointerGesture({ 
@@ -1011,6 +1046,10 @@ const AdminDashboard = ({ setCurrentView }) => {
   };
 
   const handleCadPointerMove = (e) => {
+    if (cadLongPressTimerRef.current) {
+        clearTimeout(cadLongPressTimerRef.current);
+        cadLongPressTimerRef.current = null;
+    }
     if (!cadPointersRef.current.has(e.pointerId)) return;
     cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
 
@@ -1019,6 +1058,10 @@ const AdminDashboard = ({ setCurrentView }) => {
       const dist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
       const cx = (pts[0].clientX + pts[1].clientX) / 2;
       const cy = (pts[0].clientY + pts[1].clientY) / 2;
+
+      const currentAngle = Math.atan2(pts[1].clientY - pts[0].clientY, pts[1].clientX - pts[0].clientX) * (180 / Math.PI);
+      const angleDelta = currentAngle - cadPinchInitial.angle;
+      setCadRotation(cadPinchInitial.rotation + angleDelta);
 
       const scaleDelta = dist > 5 ? cadPinchInitial.dist / dist : 1;
       const newWidth = cadPinchInitial.view.width * scaleDelta;
@@ -1431,26 +1474,57 @@ const AdminDashboard = ({ setCurrentView }) => {
                setCadSelectedPolygon(null);
                setCadPopupOffset({x:0, y:0});
             } else {
-               if (cadTool === 'IDLE' && cadPolygons.length > 0) {
+               if (cadLongPressTimerRef.current) {
+                   clearTimeout(cadLongPressTimerRef.current);
+                   cadLongPressTimerRef.current = null;
+               }
+               if (cadTool === 'IDLE' && !isAddRadiusEnabled && cadPolygons.length > 0) {
                      const rawPt = getCadSvgCoords(e.clientX, e.clientY);
                        let hitPoly = null;
                        let hitSurveyId = null;
-                       for (let p of visibleCadPolygons) {
-                         if (pointInPolygon(rawPt, p.pts)) {
-                             hitPoly = p.id;
-                             hitSurveyId = p.surveyId;
-                             break;
+
+                       if (e.target && e.target.tagName === 'polygon' && e.target.id && e.target.id.startsWith('poly-svg-')) {
+                           const targetId = e.target.id.replace('poly-svg-', '');
+                           const matchingPoly = visibleCadPolygons.find(vp => String(vp.id) === String(targetId));
+                           if (matchingPoly) {
+                               hitPoly = matchingPoly.id;
+                               hitSurveyId = matchingPoly.surveyId;
+                           }
+                       }
+
+                       if (!hitPoly) {
+                           for (let p of visibleCadPolygons) {
+                             if (pointInPolygon(rawPt, p.pts)) {
+                                 hitPoly = p.id;
+                                 hitSurveyId = p.surveyId;
+                                 break;
+                             }
+                         }
+                       }
+                     if (hitPoly) {
+                         if (cadMultiSelectModeRef.current) {
+                             setCadMultiSelectedPolygons(prev => {
+                                 if (prev.includes(hitPoly)) {
+                                     return prev.filter(id => id !== hitPoly);
+                                 } else {
+                                     return [...prev, hitPoly];
+                                 }
+                             });
+                         } else {
+                             setCadSelectedPolygon(prev => {
+                                 if (prev === hitPoly) return null;
+                                 if (hitSurveyId) setCadActiveSurveyId(hitSurveyId);
+                                 return hitPoly;
+                             });
+                         }
+                         setCadSelectedNode(null);
+                         setCadSelectedLine(null);
+                         setCadSelectedCircle(null);
+                     } else {
+                         if (!cadMultiSelectModeRef.current) {
+                             setCadSelectedPolygon(null);
                          }
                      }
-                     if (hitPoly) {
-                         setCadSelectedPolygon(hitPoly);
-                         if (hitSurveyId) setCadActiveSurveyId(hitSurveyId);
-                       setCadSelectedNode(null);
-                       setCadSelectedLine(null);
-                       setCadSelectedCircle(null);
-                   } else {
-                       setCadSelectedPolygon(null);
-                   }
                }
             }
          }
@@ -2147,6 +2221,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const closeLandSurvey = () => {
     setShowLandSurveyDashboard(false);
     setActiveLandSurveyView('menu');
+    resetCadState();
   };
 
   const [staffImages, setStaffImages] = React.useState({
@@ -3144,10 +3219,10 @@ const AdminDashboard = ({ setCurrentView }) => {
              <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-slate-50 animate-in slide-in-from-right-8 duration-300">
                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
                  <h3 className="font-black text-[#0369a1] text-lg uppercase tracking-wide border-b border-slate-100 pb-2 flex items-center gap-3">
-                   <button onClick={() => setActiveLandSurveyView('menu')} className="hover:text-slate-500 transition-colors">⬅️</button>
+                   <button onClick={() => { setActiveLandSurveyView('menu'); resetCadState(); }} className="hover:text-slate-500 transition-colors">⬅️</button>
                    Dark Draw Setup
                  </h3>
-                 <button onClick={() => setActiveLandSurveyView('dark_draw_manual')} className="w-full text-left bg-slate-50 hover:bg-[#0369a1] hover:text-white text-slate-800 p-4 rounded-xl border border-slate-200 transition-colors font-bold flex justify-between items-center group">
+                 <button onClick={() => { resetCadState(); setActiveLandSurveyView('dark_draw_manual'); }} className="w-full text-left bg-slate-50 hover:bg-[#0369a1] hover:text-white text-slate-800 p-4 rounded-xl border border-slate-200 transition-colors font-bold flex justify-between items-center group">
                    Manual Drawing Canvas
                    <span className="text-slate-400 group-hover:text-white">→</span>
                  </button>
@@ -3165,7 +3240,7 @@ const AdminDashboard = ({ setCurrentView }) => {
              <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-slate-50 animate-in slide-in-from-right-8 duration-300">
                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
                  <h3 className="font-black text-[#0369a1] text-lg uppercase tracking-wide border-b border-slate-100 pb-2 flex items-center gap-3">
-                   <button onClick={() => setActiveLandSurveyView('dark_draw_submenu')} className="hover:text-slate-500 transition-colors">⬅️</button>
+                   <button onClick={() => { setActiveLandSurveyView('dark_draw_submenu'); resetCadState(); }} className="hover:text-slate-500 transition-colors">⬅️</button>
                    Saved Projects
                  </h3>
                  {savedProjects.length === 0 ? (
@@ -3174,6 +3249,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                    savedProjects.map(proj => (
                      <div key={proj.id} className="relative bg-slate-50 hover:bg-[#0369a1] text-slate-800 hover:text-white p-2 rounded-xl border border-slate-200 transition-colors flex items-center justify-between group">
                         <button onClick={() => {
+                           resetCadState();
                            setCadLoadedProjectId(proj.id);
                            setCadLines(proj.state.lines);
                            setCadCircles(proj.state.circles);
@@ -3218,6 +3294,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                             setCadHistory({ past: [], future: [] }); setCadLoadedProjectId(null);
                          }
                          setActiveLandSurveyView('dark_draw_submenu');
+                        resetCadState();
                       }}
                       className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors"
                     >
@@ -3254,7 +3331,21 @@ const AdminDashboard = ({ setCurrentView }) => {
                    
                    {showDarkDrawSettings && (
                      <div className="absolute right-0 top-12 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[150] overflow-hidden py-1">
-                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsAddRadiusEnabled(!isAddRadiusEnabled); }}>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { 
+                          e.preventDefault(); 
+                          e.stopPropagation(); 
+                          const nextVal = !isAddRadiusEnabled;
+                          setIsAddRadiusEnabled(nextVal);
+                          if (!nextVal) {
+                              setCadTool('IDLE');
+                          } else {
+                              setCadSelectedPolygon(null);
+                              setCadMultiSelectMode(false);
+                              cadMultiSelectModeRef.current = false;
+                              setCadMultiSelectedPolygons([]);
+                              if (cadContextMenu) setCadContextMenu(null);
+                          }
+                      }}>
                          <span>Add Radius</span>
                          <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isAddRadiusEnabled ? 'bg-sky-500' : 'bg-slate-600'}`}>
                            <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isAddRadiusEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
@@ -3614,10 +3705,95 @@ const AdminDashboard = ({ setCurrentView }) => {
                 onPointerUp={handleCadPointerUp}
                 onPointerLeave={handleCadPointerUp}
                 onClick={() => setShowDarkDrawSettings(false)}
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (!isAddRadiusEnabled && cadTool === 'IDLE') {
+                        if (e.target && e.target.tagName === 'polygon' && e.target.id && e.target.id.startsWith('poly-svg-')) {
+                            const polyId = e.target.id.replace('poly-svg-', '');
+                            setCadContextMenu({ x: e.clientX, y: e.clientY, type: 'POLYGON', targetId: polyId });
+                        } else {
+                            setCadContextMenu({ x: e.clientX, y: e.clientY, type: 'CANVAS' });
+                        }
+                    }
+                }}
               >
+              {cadContextMenu && (
+                <div 
+                    className="absolute bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[200] overflow-hidden py-1 text-sm font-medium text-slate-200"
+                    style={{ left: cadContextMenu.x, top: cadContextMenu.y }}
+                >
+                    {cadContextMenu.type === 'CANVAS' && (
+                        <div 
+                            className="px-4 py-2 hover:bg-slate-700 cursor-pointer"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const newMode = !cadMultiSelectMode;
+                                setCadMultiSelectMode(newMode);
+                                cadMultiSelectModeRef.current = newMode;
+                                if (newMode && cadSelectedPolygon) {
+                                    setCadMultiSelectedPolygons([cadSelectedPolygon]);
+                                    setCadSelectedPolygon(null);
+                                } else if (!newMode) {
+                                    setCadMultiSelectedPolygons([]);
+                                }
+                                setCadContextMenu(null);
+                            }}
+                        >
+                            {cadMultiSelectMode ? "Disable Multi-selection" : "Enable Multi-selection"}
+                        </div>
+                    )}
+                    {cadContextMenu.type === 'POLYGON' && (
+                        <>
+                            {!cadMultiSelectModeRef.current && (
+                                <div 
+                                    className="px-4 py-2 hover:bg-slate-700 cursor-pointer"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCadMultiSelectMode(true);
+                                        cadMultiSelectModeRef.current = true;
+                                        const newSelections = [cadContextMenu.targetId];
+                                        if (cadSelectedPolygon && cadSelectedPolygon !== cadContextMenu.targetId) {
+                                            newSelections.push(cadSelectedPolygon);
+                                        }
+                                        setCadMultiSelectedPolygons(newSelections);
+                                        setCadSelectedPolygon(null);
+                                        setCadContextMenu(null);
+                                    }}
+                                >
+                                    Select Multiple
+                                </div>
+                            )}
+                            {cadMultiSelectModeRef.current && (
+                                <div 
+                                    className="px-4 py-2 hover:bg-red-600 hover:text-white text-red-400 cursor-pointer border-t border-slate-700"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCadMultiSelectedPolygons([]);
+                                        setCadMultiSelectMode(false);
+                                        cadMultiSelectModeRef.current = false;
+                                        setCadContextMenu(null);
+                                    }}
+                                >
+                                    Clear All
+                                </div>
+                            )}
+                            <div 
+                                className="px-4 py-2 hover:bg-slate-700 cursor-pointer border-t border-slate-700 text-slate-400"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCadContextMenu(null);
+                                }}
+                            >
+                                Close Menu
+                            </div>
+                        </>
+                    )}
+                </div>
+              )}
                  <svg 
                    ref={cadSvgRef}
-                   className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
+                   className="absolute inset-0 w-full h-full cursor-crosshair touch-none transition-transform duration-75 ease-linear"
+                   style={{ transform: `rotate(${cadRotation}deg)` }}
                    viewBox={`${cadViewport.x} ${cadViewport.y} ${cadViewport.width} ${cadViewport.height}`}
                    preserveAspectRatio="xMidYMid slice"
                  >
@@ -3634,7 +3810,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                       )}
 
                   {visibleCadPolygons.map(p => {
-                    const isSelected = cadSelectedPolygon === p.id;
+                    const isSelected = cadMultiSelectMode ? cadMultiSelectedPolygons.includes(p.id) : (cadSelectedPolygon === p.id);
                     const polySurvey = p.surveyId ? cadSurveys.find(s => s.id === p.surveyId) : null;
                     const baseColor = polySurvey ? polySurvey.hexColor : '#38bdf8';
                     const fillColor = isSelected ? baseColor + '80' : baseColor + '26';
@@ -3798,19 +3974,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                         const angleDegTransform = finalAngle;
                         
                         textNode = (
-                            <text
-                                x={cx}
-                                y={cy}
-                                fill="#FFFFFF"
-                                fontSize={calculatedFontSize}
-                                fontWeight="bold"
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                                style={{ pointerEvents: cadTool === 'SELECT_TEXT' ? 'auto' : 'none', cursor: cadTool === 'SELECT_TEXT' ? 'pointer' : 'default' }}
-                                transform={`rotate(${angleDegTransform}, ${cx}, ${cy})`}
-                                stroke="#000000"
-                                strokeWidth="1.5px"
-                                paintOrder="stroke fill"
+                            <g
+                                className={`transition-transform duration-200 ${cadTool === 'SELECT_TEXT' ? 'cursor-pointer hover:scale-[1.15] group' : ''}`}
+                                style={{ transformOrigin: 'center', transformBox: 'fill-box', pointerEvents: cadTool === 'SELECT_TEXT' ? 'auto' : 'none' }}
                                 onPointerDown={(e) => {
                                     if (cadTool === 'SELECT_TEXT') {
                                         e.stopPropagation();
@@ -3827,18 +3993,73 @@ const AdminDashboard = ({ setCurrentView }) => {
                                             if (prev.some(t => t.id === newTxt.id)) return prev;
                                             return [...prev, newTxt];
                                         });
-                                        setCadSelectedText(`poly-${p.id}`);
-                                        setCadPopupOffset({ x: 0, y: 0 });
+                                        if (cadEditInputs.isMovingText) {
+                                            if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
+                                            cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+                                            const rawPt = getCadSvgCoords(e.clientX, e.clientY);
+                                            setCadPointerGesture({
+                                                startX: e.clientX, startY: e.clientY,
+                                                offsetX: cx - rawPt.x,
+                                                offsetY: cy - rawPt.y,
+                                                isDraggingText: true,
+                                                targetText: newTxt
+                                            });
+                                        } else {
+                                            setCadSelectedText(`poly-${p.id}`);
+                                            setCadPopupOffset({ x: 0, y: 0 });
+                                        }
                                     }
                                 }}
                             >
-                                {labelText}
-                            </text>
+                                <text
+                                    x={cx}
+                                    y={cy}
+                                    fill="transparent"
+                                    fontSize={calculatedFontSize}
+                                    fontWeight="bold"
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    className={`${cadTool === 'SELECT_TEXT' ? 'pointer-events-auto' : 'pointer-events-none'} select-none`}
+                                    transform={`rotate(${angleDegTransform}, ${cx}, ${cy})`}
+                                    paintOrder="stroke"
+                                    stroke="transparent"
+                                    strokeWidth={calculatedFontSize * 1.5}
+                                >
+                                    {labelText}
+                                </text>
+                                <text
+                                    x={cx}
+                                    y={cy}
+                                    fill="#FFFFFF"
+                                    fontSize={calculatedFontSize}
+                                    fontWeight="bold"
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    className="pointer-events-none select-none"
+                                    transform={`rotate(${angleDegTransform}, ${cx}, ${cy})`}
+                                    stroke="#000000"
+                                    strokeWidth="1.5px"
+                                    paintOrder="stroke fill"
+                                >
+                                    {labelText}
+                                </text>
+                            </g>
                         );
                     }
 
                     return (
                         <g key={p.id}>
+                            {/* Hitbox buffer polygon to guarantee easy touch/click on small polygons */}
+                            <polygon
+                                id={`poly-svg-${p.id}`}
+                                points={p.pts.map(pt => `${pt.x},${pt.y}`).join(' ')}
+                                fill="transparent"
+                                stroke="transparent"
+                                strokeWidth={cadViewport.width * 0.02}
+                                strokeLinejoin="round"
+                                style={{ pointerEvents: cadTool === 'IDLE' ? 'all' : 'none', cursor: cadTool === 'IDLE' ? 'pointer' : 'crosshair' }} 
+                            />
+                            {/* Visual polygon */}
                             <polygon
                                 points={p.pts.map(pt => `${pt.x},${pt.y}`).join(' ')}
                                 fill={fillColor}
@@ -4067,26 +4288,78 @@ const AdminDashboard = ({ setCurrentView }) => {
                         style={{ pointerEvents: (cadTool === 'IDLE' || cadTool === 'SELECT_TEXT' || cadTool === 'SELECT_METRIC') ? 'none' : 'auto' }}
                       />
                       {isMetricsVisible && displayLen > 0 && (() => {
+                        const isSelectedMetricNow = isSelected || isMetricSelected || isLiveDrag;
                         return (
-                          <text 
-                            x={mx} y={my} 
-                            fill={isSelected || isMetricSelected || isLiveDrag ? "#fbcfe8" : (l.metricHexColor || "#38bdf8")} 
-                            fontSize={scaledFontSize} 
-                            fontWeight="bold" textAnchor="middle"
-                            className="transition-colors duration-200 pointer-events-none select-none"
-                            transform={`rotate(${finalRot}, ${mx}, ${my})`}
-                            paintOrder="stroke"
-                            stroke={l.metricStrokeColor || "transparent"}
-                            strokeWidth={l.metricStrokeColor && l.metricStrokeColor !== "transparent" ? scaledFontSize * 0.15 : 0}
-                            strokeLinejoin="round"
+                          <g
+                             className={`transition-transform duration-200 ${cadTool === 'SELECT_METRIC' ? 'cursor-pointer hover:scale-[1.15] group' : ''}`}
+                             style={{ transformOrigin: 'center', transformBox: 'fill-box', pointerEvents: cadTool === 'SELECT_METRIC' ? 'auto' : 'none' }}
+                             onPointerDown={(e) => {
+                                if (cadTool === 'SELECT_METRIC') {
+                                    e.stopPropagation();
+                                    if (cadEditInputs.isMovingMetric) {
+                                        if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
+                                        cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+                                        const rawPt = getCadSvgCoords(e.clientX, e.clientY);
+                                        const offset = cadMetricOffsets[l.id] || getMetricDefaultOffset(l);
+                                        const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
+                                        const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
+                                        setCadPointerGesture({
+                                            startX: e.clientX, startY: e.clientY,
+                                            offsetX: mx - rawPt.x,
+                                            offsetY: my - rawPt.y,
+                                            isDraggingMetric: true,
+                                            targetMetric: l
+                                        });
+                                    } else {
+                                        setCadSelectedMetric(l.id);
+                                        setCadSelectedLine(l.id);
+                                        setCadPopupOffset({x:0, y:0});
+                                    }
+                                }
+                             }}
                           >
-                            {textStr}
-                          </text>
+                            <rect
+                               x={mx - textLen/2 - (scaledFontSize * 0.4)}
+                               y={my - (scaledFontSize * 0.6)}
+                               width={textLen + (scaledFontSize * 0.8)}
+                               height={scaledFontSize * 1.2}
+                               fill="transparent"
+                               stroke="#fbcfe8"
+                               strokeWidth={scaledFontSize * 0.05}
+                               strokeDasharray={`${scaledFontSize * 0.2},${scaledFontSize * 0.2}`}
+                               className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                               transform={`rotate(${finalRot}, ${mx}, ${my})`}
+                            />
+                            <text 
+                              x={mx} y={my} 
+                              fill="transparent"
+                              fontSize={scaledFontSize} 
+                              fontWeight="bold" textAnchor="middle"
+                              className={`${cadTool === 'SELECT_METRIC' ? 'pointer-events-auto' : 'pointer-events-none'} select-none`}
+                              transform={`rotate(${finalRot}, ${mx}, ${my})`}
+                              paintOrder="stroke"
+                              stroke="transparent"
+                              strokeWidth={scaledFontSize * 1.5}
+                            >
+                              {textStr}
+                            </text>
+                            <text 
+                              x={mx} y={my} 
+                              fill={isSelectedMetricNow ? "#fbcfe8" : (l.metricHexColor || "#38bdf8")} 
+                              fontSize={scaledFontSize} 
+                              fontWeight="bold" textAnchor="middle"
+                              className="transition-colors duration-200 pointer-events-none select-none"
+                              transform={`rotate(${finalRot}, ${mx}, ${my})`}
+                              paintOrder="stroke"
+                              stroke={l.metricStrokeColor || "transparent"}
+                              strokeWidth={l.metricStrokeColor && l.metricStrokeColor !== "transparent" ? scaledFontSize * 0.15 : 0}
+                              strokeLinejoin="round"
+                            >
+                              {textStr}
+                            </text>
+                          </g>
                         );
                       })()}
-                      {isMetricsVisible && isMetricSelected && l.fixedLength && (
-                         <rect x={mx - (textLen/2) - 10} y={my - (scaledFontSize/2) - 5} width={textLen + 20} height={scaledFontSize + 10} fill="none" stroke="#fbcfe8" strokeWidth={2} strokeDasharray="5,5" />
-                      )}
                     </g>
                   );
                 });
@@ -4189,17 +4462,59 @@ const AdminDashboard = ({ setCurrentView }) => {
 
                      const isSelected = cadSelectedText === txt.id;
                      return (
-                        <text
+                        <g
                            key={txt.id}
-                           x={txt.x} y={txt.y}
-                           fill={isSelected ? "#fbcfe8" : (txt.hexColor || "#e2e8f0")}
-                           fontSize={txt.fontSize || 40}
-                           fontWeight="bold"
-                           className="transition-colors duration-200 cursor-pointer"
-                           transform={txt.rotation ? `rotate(${txt.rotation}, ${txt.x}, ${txt.y})` : undefined}
+                           className={`transition-transform duration-200 ${cadTool === 'SELECT_TEXT' ? 'cursor-pointer hover:scale-[1.15] group' : ''}`}
+                           style={{ transformOrigin: 'center', transformBox: 'fill-box', pointerEvents: cadTool === 'SELECT_TEXT' ? 'auto' : 'none' }}
+                           onPointerDown={(e) => {
+                              if (cadTool === 'SELECT_TEXT') {
+                                 e.stopPropagation();
+                                 if (cadEditInputs.isMovingText) {
+                                     if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
+                                     cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+                                     const rawPt = getCadSvgCoords(e.clientX, e.clientY);
+                                     setCadPointerGesture({
+                                         startX: e.clientX, startY: e.clientY,
+                                         offsetX: txt.x - rawPt.x,
+                                         offsetY: txt.y - rawPt.y,
+                                         isDraggingText: true,
+                                         targetText: txt
+                                     });
+                                 } else {
+                                     setCadSelectedText(txt.id);
+                                     setCadPopupOffset({x:0, y:0});
+                                 }
+                              }
+                           }}
                         >
-                           {displayText}
-                        </text>
+                           <text
+                              x={txt.x} y={txt.y}
+                              fill="transparent"
+                              fontSize={txt.fontSize || 40}
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              className={`${cadTool === 'SELECT_TEXT' ? 'pointer-events-auto' : 'pointer-events-none'} select-none`}
+                              transform={txt.rotation ? `rotate(${txt.rotation}, ${txt.x}, ${txt.y})` : undefined}
+                              paintOrder="stroke"
+                              stroke="transparent"
+                              strokeWidth={txt.fontSize ? txt.fontSize * 1.5 : 60}
+                           >
+                              {displayText}
+                           </text>
+                           <text
+                              x={txt.x} y={txt.y}
+                              fill={isSelected ? "#fbcfe8" : (txt.hexColor || "#e2e8f0")}
+                              fontSize={txt.fontSize || 40}
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              className="transition-colors duration-200 pointer-events-none select-none"
+                              transform={txt.rotation ? `rotate(${txt.rotation}, ${txt.x}, ${txt.y})` : undefined}
+                           >
+                              {displayText}
+                           </text>
+                        </g>
                      );
                   })}
                   
@@ -4251,8 +4566,18 @@ const AdminDashboard = ({ setCurrentView }) => {
                     if (mLeft < 10) mLeft = 10;
                     if (mLeft + 130 > window.innerWidth) mLeft = window.innerWidth - 130;
                     if (mTop < 10) mTop = 10;
-                    const vbX = cadMagnifierPos.svgX - (cadViewport.width / 8);
-                    const vbY = cadMagnifierPos.svgY - (cadViewport.height / 8);
+                    let focusX = cadMagnifierPos.svgX;
+                    let focusY = cadMagnifierPos.svgY;
+                    const isDraggingMetric = cadPointerGesture && cadPointerGesture.isDraggingMetric && cadPointerGesture.targetMetric;
+                    const isDraggingText = cadPointerGesture && cadPointerGesture.isDraggingText && cadPointerGesture.targetText;
+                    
+                    if (isDraggingMetric || isDraggingText) {
+                         focusX += (cadPointerGesture.offsetX || 0);
+                         focusY += (cadPointerGesture.offsetY || 0);
+                    }
+
+                    const vbX = focusX - (cadViewport.width / 8);
+                    const vbY = focusY - (cadViewport.height / 8);
                     const vbW = cadViewport.width / 4;
                     const vbH = cadViewport.height / 4;
                     const chLen = cadViewport.width * 0.014; // crosshair arm length
@@ -4275,13 +4600,13 @@ const AdminDashboard = ({ setCurrentView }) => {
                        <svg width="140" height="140" viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}>
                           {/* Grid lines for spatial context */}
                           <line
-                            x1={vbX} y1={cadMagnifierPos.svgY}
-                            x2={vbX + vbW} y2={cadMagnifierPos.svgY}
+                            x1={vbX} y1={focusY}
+                            x2={vbX + vbW} y2={focusY}
                             stroke="rgba(255,255,255,0.04)" strokeWidth={sw * 0.6}
                           />
                           <line
-                            x1={cadMagnifierPos.svgX} y1={vbY}
-                            x2={cadMagnifierPos.svgX} y2={vbY + vbH}
+                            x1={focusX} y1={vbY}
+                            x2={focusX} y2={vbY + vbH}
                             stroke="rgba(255,255,255,0.04)" strokeWidth={sw * 0.6}
                           />
                           {/* Background image injected to mirror main canvas zoom */}
@@ -4319,16 +4644,13 @@ const AdminDashboard = ({ setCurrentView }) => {
                           ))}
                           {/* Contextual Center: Crosshair or Dragged String */}
                           {(() => {
-                             const isDraggingMetric = cadPointerGesture && cadPointerGesture.isDraggingMetric && cadPointerGesture.targetMetric;
-                             const isDraggingText = cadPointerGesture && cadPointerGesture.isDraggingText && cadPointerGesture.targetText;
-                             
                              if (isDraggingMetric) {
                                  const mLine = visibleCadLines.find(l => l.id === cadPointerGesture.targetMetric.id) || cadPointerGesture.targetMetric;
                                  const scaledFontSize = Math.max(cadViewport.width * 0.01, 14);
                                  let defaultRot = Math.atan2(mLine.p2.y - mLine.p1.y, mLine.p2.x - mLine.p1.x) * (180 / Math.PI);
                                  if (defaultRot > 90 || defaultRot < -90) defaultRot += 180;
                                  return (
-                                     <text transform={`rotate(${defaultRot}, ${cadMagnifierPos.svgX}, ${cadMagnifierPos.svgY})`} x={cadMagnifierPos.svgX} y={cadMagnifierPos.svgY} fill="#fbcfe8" fontSize={scaledFontSize} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">
+                                     <text transform={`rotate(${defaultRot}, ${focusX}, ${focusY})`} x={focusX} y={focusY} fill="#fbcfe8" fontSize={scaledFontSize} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">
                                          {mLine.fixedLength} m
                                      </text>
                                  );
@@ -4351,16 +4673,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                                  }
                                  const rot = cadPointerGesture.targetText.rotation || 0;
                                  return (
-                                     <text transform={rot ? `rotate(${rot}, ${cadMagnifierPos.svgX}, ${cadMagnifierPos.svgY})` : undefined} x={cadMagnifierPos.svgX} y={cadMagnifierPos.svgY} fill="#fbcfe8" fontSize={cadPointerGesture.targetText.fontSize || 40} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">
+                                     <text transform={rot ? `rotate(${rot}, ${focusX}, ${focusY})` : undefined} x={focusX} y={focusY} fill="#fbcfe8" fontSize={cadPointerGesture.targetText.fontSize || 40} fontWeight="bold" textAnchor="middle" dominantBaseline="central">
                                          {displayText}
                                      </text>
                                  );
                              } else {
                                  return (
                                      <>
-                                         <line x1={cadMagnifierPos.svgX - chLen} y1={cadMagnifierPos.svgY} x2={cadMagnifierPos.svgX + chLen} y2={cadMagnifierPos.svgY} stroke="#fbbf24" strokeWidth={sw} />
-                                         <line x1={cadMagnifierPos.svgX} y1={cadMagnifierPos.svgY - chLen} x2={cadMagnifierPos.svgX} y2={cadMagnifierPos.svgY + chLen} stroke="#fbbf24" strokeWidth={sw} />
-                                         <circle cx={cadMagnifierPos.svgX} cy={cadMagnifierPos.svgY} r={dotR} fill="#fbbf24" />
+                                         <line x1={focusX - chLen} y1={focusY} x2={focusX + chLen} y2={focusY} stroke="#fbbf24" strokeWidth={sw} />
+                                         <line x1={focusX} y1={focusY - chLen} x2={focusX} y2={focusY + chLen} stroke="#fbbf24" strokeWidth={sw} />
+                                         <circle cx={focusX} cy={focusY} r={dotR} fill="#fbbf24" />
                                      </>
                                  );
                              }
