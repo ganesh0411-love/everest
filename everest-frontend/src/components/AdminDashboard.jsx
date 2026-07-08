@@ -172,7 +172,8 @@ const AdminDashboard = ({ setCurrentView }) => {
   }, [cadLines.length, cadScale]);
   
   // Multi-Touch & Gesture State
-    const cadPointersRef = React.useRef(new Map());
+  const cadPointersRef = React.useRef(new Map());
+  const cadMultiTouchActiveRef = React.useRef(false);
   const [isGlobalMetricFeet, setIsGlobalMetricFeet] = React.useState(false);
   const [isScaleModalOpen, setIsScaleModalOpen] = React.useState(false);
   const [scaleDisplayUnit, setScaleDisplayUnit] = React.useState('mm');
@@ -184,6 +185,8 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [isAddRadiusEnabled, setIsAddRadiusEnabled] = React.useState(false);
   const [isSketchExtendEnabled, setIsSketchExtendEnabled] = React.useState(false);
   const [isMetricsVisible, setIsMetricsVisible] = React.useState(true);
+  const [isSurveyNoVisible, setIsSurveyNoVisible] = React.useState(true);
+  const [isSubDivVisible, setIsSubDivVisible] = React.useState(true);
   const [cadPointerGesture, setCadPointerGesture] = React.useState(null);
   const [cadGlowingCircles, setCadGlowingCircles] = React.useState([]);
   const [cadBlinkingRadius, setCadBlinkingRadius] = React.useState(null);
@@ -363,6 +366,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       faces.forEach(face => {
           if (face.polySurveyId === null) {
               face.polySurveyId = face.fallbackSurveyId;
+              face._isSurplus = true;
           }
           // Normalize the output format expected by the rest of the app
           face.surveyId = face.polySurveyId;
@@ -370,6 +374,46 @@ const AdminDashboard = ({ setCurrentView }) => {
 
       return faces;
   }, [cadLines, cadSurveys]);
+
+  // Auto-Isolation Engine for Surplus Polygons
+  React.useEffect(() => {
+      const surplusFaces = cadPolygons.filter(f => f._isSurplus);
+      if (surplusFaces.length === 0) return;
+
+      const newSurveys = [];
+      const linesToUpdate = new Map();
+
+      surplusFaces.forEach(face => {
+          const fallbackSurvey = cadSurveys.find(s => s.id === face.fallbackSurveyId);
+          const newSurveyId = 's_' + Math.random().toString(36).substr(2, 9);
+          
+          let sNo = fallbackSurvey ? fallbackSurvey.surveyNo : 'New';
+          let sdNo = fallbackSurvey ? fallbackSurvey.subDivisionNo : '';
+          
+          newSurveys.push({
+              id: newSurveyId,
+              surveyNo: sNo,
+              subDivisionNo: sdNo,
+              hexColor: fallbackSurvey ? fallbackSurvey.hexColor : '#38bdf8',
+              isVisible: fallbackSurvey ? fallbackSurvey.isVisible : true,
+              created_at: Date.now()
+          });
+
+          face.faceEdges.forEach(edge => {
+              linesToUpdate.set(edge.line.id, newSurveyId);
+          });
+      });
+
+      if (newSurveys.length > 0) {
+          setCadSurveys(prev => [...prev, ...newSurveys]);
+          const newSurveyNos = [...new Set(newSurveys.map(s => s.surveyNo))];
+          setCheckedSurveyNos(prev => {
+              const toAdd = newSurveyNos.filter(no => !prev.includes(no));
+              return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+          });
+          setCadLines(prev => prev.map(l => linesToUpdate.has(l.id) ? { ...l, surveyId: linesToUpdate.get(l.id) } : l));
+      }
+  }, [cadPolygons, cadSurveys]);
 
   const visibleCadLines = React.useMemo(() => {
     const visibleSurveyIds = new Set(cadSurveys.filter(s => {
@@ -803,6 +847,10 @@ const AdminDashboard = ({ setCurrentView }) => {
     e.target.setPointerCapture(e.pointerId);
     cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
 
+    if (cadPointersRef.current.size > 1) {
+      cadMultiTouchActiveRef.current = true;
+    }
+
     if (cadPointersRef.current.size === 2) {
       const pts = Array.from(cadPointersRef.current.values());
       const dist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
@@ -812,7 +860,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       return;
     }
 
-    if (cadPointersRef.current.size === 1) {
+    if (cadPointersRef.current.size === 1 && !cadMultiTouchActiveRef.current) {
       const rawPt = getCadSvgCoords(e.clientX, e.clientY);
 
       const targetDataType = e.target.getAttribute?.('data-type') || e.target.parentElement?.getAttribute?.('data-type');
@@ -842,32 +890,22 @@ const AdminDashboard = ({ setCurrentView }) => {
 
       if (cadTool === 'IDLE' || isEditingLineMode || cadTool === 'SKETCH_LINE' || cadTool === 'ADD_LINE' || cadTool === 'ADD_RADIUS') {
          // TWO-WAY VERTEX HIT-TEST: check both p1 (start) and p2 (end) for all lines
-         if ((cadTool === 'IDLE' && !isAddRadiusEnabled) || (cadTool === 'ADD_LINE' && cadPrompt)) {
+         if (cadTool === 'ADD_LINE' && cadPrompt) {
             for (const line of cadLines) {
                if (Math.hypot(line.p1.x - rawPt.x, line.p1.y - rawPt.y) < minSnapDist) {
                   setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: line.p1.x, svgY: line.p1.y });
-                  if (cadTool === 'ADD_LINE') {
-                      setCadAnchorNode(line.p1);
-                      if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
-                      const connectedLineRefs = cadLines.filter(l => Math.hypot(l.p1.x - line.p1.x, l.p1.y - line.p1.y) < 1e-4 || Math.hypot(l.p2.x - line.p1.x, l.p2.y - line.p1.y) < 1e-4).map(l => ({ id: l.id, isP1: Math.hypot(l.p1.x - line.p1.x, l.p1.y - line.p1.y) < 1e-4 }));
-                      setCadPointerGesture({ isDraggingAnchor: true, startX: e.clientX, startY: e.clientY, offsetX: line.p1.x - rawPt.x, offsetY: line.p1.y - rawPt.y, connectedLineRefs });
-                  } else {
-                      setCadDraggingNode({ lineId: line.id, end: 'p1' });
-                      setCadSelectedLine(line.id);
-                  }
+                  setCadAnchorNode(line.p1);
+                  if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
+                  const connectedLineRefs = cadLines.filter(l => Math.hypot(l.p1.x - line.p1.x, l.p1.y - line.p1.y) < 1e-4 || Math.hypot(l.p2.x - line.p1.x, l.p2.y - line.p1.y) < 1e-4).map(l => ({ id: l.id, isP1: Math.hypot(l.p1.x - line.p1.x, l.p1.y - line.p1.y) < 1e-4 }));
+                  setCadPointerGesture({ isDraggingAnchor: true, startX: e.clientX, startY: e.clientY, offsetX: line.p1.x - rawPt.x, offsetY: line.p1.y - rawPt.y, connectedLineRefs });
                   return;
                }
                if (Math.hypot(line.p2.x - rawPt.x, line.p2.y - rawPt.y) < minSnapDist) {
                   setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: line.p2.x, svgY: line.p2.y });
-                  if (cadTool === 'ADD_LINE') {
-                      setCadAnchorNode(line.p2);
-                      if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
-                      const connectedLineRefs = cadLines.filter(l => Math.hypot(l.p1.x - line.p2.x, l.p1.y - line.p2.y) < 1e-4 || Math.hypot(l.p2.x - line.p2.x, l.p2.y - line.p2.y) < 1e-4).map(l => ({ id: l.id, isP1: Math.hypot(l.p1.x - line.p2.x, l.p1.y - line.p2.y) < 1e-4 }));
-                      setCadPointerGesture({ isDraggingAnchor: true, startX: e.clientX, startY: e.clientY, offsetX: line.p2.x - rawPt.x, offsetY: line.p2.y - rawPt.y, connectedLineRefs });
-                  } else {
-                      setCadDraggingNode({ lineId: line.id, end: 'p2' });
-                      setCadSelectedLine(line.id);
-                  }
+                  setCadAnchorNode(line.p2);
+                  if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
+                  const connectedLineRefs = cadLines.filter(l => Math.hypot(l.p1.x - line.p2.x, l.p1.y - line.p2.y) < 1e-4 || Math.hypot(l.p2.x - line.p2.x, l.p2.y - line.p2.y) < 1e-4).map(l => ({ id: l.id, isP1: Math.hypot(l.p1.x - line.p2.x, l.p1.y - line.p2.y) < 1e-4 }));
+                  setCadPointerGesture({ isDraggingAnchor: true, startX: e.clientX, startY: e.clientY, offsetX: line.p2.x - rawPt.x, offsetY: line.p2.y - rawPt.y, connectedLineRefs });
                   return;
                }
             }
@@ -996,7 +1034,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       return;
     }
 
-    if (cadPointersRef.current.size === 1) {
+    if (cadPointersRef.current.size === 1 && !cadMultiTouchActiveRef.current) {
       const rawPt = getCadSvgCoords(e.clientX, e.clientY);
       const svgRect = cadSvgRef.current?.getBoundingClientRect();
       const uniformScale = svgRect ? Math.max(cadViewport.width / svgRect.width, cadViewport.height / svgRect.height) : 1;
@@ -1026,6 +1064,20 @@ const AdminDashboard = ({ setCurrentView }) => {
                      magSvgY = dragLine[cadDraggingNode.end].y;
                  }
              }
+         } else if (cadPointerGesture?.isDraggingText) {
+             const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
+             const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
+             const basePos = cadPointerGesture.basePos || { x: cadPointerGesture.targetText.x, y: cadPointerGesture.targetText.y };
+             magSvgX = basePos.x + dxSvg;
+             magSvgY = basePos.y + dySvg;
+         } else if (cadPointerGesture?.isDraggingMetric) {
+             const lineId = cadPointerGesture.targetMetric.id;
+             const baseOffset = cadPointerGesture.baseOffset || cadMetricOffsets[lineId] || getMetricDefaultOffset(cadPointerGesture.targetMetric);
+             const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
+             const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
+             const targetLine = cadLines.find(l => l.id === lineId) || cadPointerGesture.targetMetric;
+             magSvgX = (targetLine.p1.x + targetLine.p2.x) / 2 + baseOffset.dx + dxSvg;
+             magSvgY = (targetLine.p1.y + targetLine.p2.y) / 2 + baseOffset.dy + dySvg;
          }
          setCadMagnifierPos({ screenX: e.clientX, screenY: e.clientY, svgX: magSvgX, svgY: magSvgY });
       } else {
@@ -1194,8 +1246,16 @@ const AdminDashboard = ({ setCurrentView }) => {
     if (cadPointersRef.current.size < 2) setCadPinchInitial(null);
 
     if (cadPointersRef.current.size === 0) {
+      const wasMultiTouch = cadMultiTouchActiveRef.current;
+      cadMultiTouchActiveRef.current = false;
+
       setCadSnapIndicator(null);
       setCadGlowingCircles([]);
+
+      if (wasMultiTouch) {
+         setCadPointerGesture(null);
+         return; // Abort single-finger click logic!
+      }
       
       if (cadDraggingNode) { 
          if (cadStateBeforeActionRef.current && JSON.stringify(cadStateBeforeActionRef.current) !== JSON.stringify(captureCadState())) saveCadStateToHistory(cadStateBeforeActionRef.current);
@@ -1241,6 +1301,15 @@ const AdminDashboard = ({ setCurrentView }) => {
       if (cadPointerGesture && !cadPointerGesture.isDragging && !cadPointerGesture.isDraggingMetric && !cadPointerGesture.isDraggingText && !cadPointerGesture.isDraggingLineBody && !cadPointerGesture.isDraggingPan && !cadPointerGesture.isDraggingAnchor) {
          const rawPt = getCadSvgCoords(e.clientX, e.clientY);
          
+         // 1. Strict Event Guard with requested variable names
+         const addRadiusActive = isAddRadiusEnabled;
+         const isDrawingMode = ['ADD_LINE', 'SKETCH_LINE', 'EDIT_LINE'].includes(cadTool) || isSketchExtendEnabled;
+         
+         // If we are strictly in read-only pan/inspection mode and somehow a drafting tool is triggered
+         if (!addRadiusActive && !isDrawingMode && cadTool !== 'IDLE' && cadTool !== 'SELECT_TEXT' && cadTool !== 'SELECT_METRIC' && cadTool !== 'ADD_TEXT') {
+             return; // Stop execution immediately, do NOT drop dots or lines!
+         }
+
          let effTargetNode = cadPointerGesture.targetNode;
          if (cadTool === 'ADD_LINE' && !effTargetNode) {
              let minSnapDist = 50 * (cadViewport.width / 1000);
@@ -1331,11 +1400,14 @@ const AdminDashboard = ({ setCurrentView }) => {
          } else {
             if (cadPointerGesture.targetNode) {
                setShowDarkDrawSettings(false); 
-               if (isAddRadiusEnabled) {
-                  setCadSelectedNode(cadPointerGesture.targetNode);
-               } else {
-                  setCadSelectedNode(cadPointerGesture.targetNode);
+               
+               const addRadiusActive = isAddRadiusEnabled;
+               if (!addRadiusActive) {
+                   setCadSelectedNode(null); // Force dismiss/hide the menu box
+                   return; // Break out immediately to prevent rendering
                }
+               
+               setCadSelectedNode(cadPointerGesture.targetNode);
                setCadSelectedPolygon(null);
             } else if (cadPointerGesture.targetLine && isEditingLineMode) {
                setShowDarkDrawSettings(false); 
@@ -2189,20 +2261,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                   strokeWidth="4"
                 />
               
-                  {cadTexts.map(t => {
-                     const isSelected = cadSelectedText === t.id;
-                     return (
-                        <text 
-                           key={t.id} x={t.x} y={t.y} fill={isSelected ? "#fbcfe8" : (t.hexColor || "#ffffff")} 
-                           fontSize={t.fontSize || cadViewport.width * 0.02} fontWeight="bold" textAnchor="middle"
-                           pointerEvents="auto"
-                           transform={t.rotation ? `rotate(${t.rotation}, ${t.x}, ${t.y})` : undefined}
-                           style={{ opacity: 1, visibility: 'visible' }}
-                        >
-                           {t.text}
-                        </text>
-                     );
-                  })}
+
 </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-white/80 text-[8px] font-bold">Collected:</span>
@@ -3207,15 +3266,25 @@ const AdminDashboard = ({ setCurrentView }) => {
                            <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isMetricsVisible ? 'translate-x-5' : 'translate-x-0'}`}></div>
                          </div>
                        </div>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_LINE'); setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2 }); setShowDarkDrawSettings(false); }}>Add Line</button>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors" onClick={() => { setIsEditingLineMode(true); setIsLineMoving(false); setCadTool('EDIT_LINE'); setShowDarkDrawSettings(false); }}>Edit Line Attributes</button>
+                       
+                       <div className="flex items-center justify-between w-full px-5 py-3 border-b border-slate-700 gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer text-[13px] font-bold text-slate-300 hover:text-white transition-colors" onClick={e => e.stopPropagation()}>
+                              <span>S/n.o</span>
+                              <input type="checkbox" className="accent-fuchsia-500 w-4 h-4 cursor-pointer" checked={isSurveyNoVisible} onChange={(e) => { e.stopPropagation(); setIsSurveyNoVisible(e.target.checked); }} />
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer text-[13px] font-bold text-slate-300 hover:text-white transition-colors" onClick={e => e.stopPropagation()}>
+                              <span>SUB</span>
+                              <input type="checkbox" className="accent-fuchsia-500 w-4 h-4 cursor-pointer" checked={isSubDivVisible} onChange={(e) => { e.stopPropagation(); setIsSubDivVisible(e.target.checked); }} />
+                          </label>
+                       </div>
+
                        <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (cadTool === 'EDIT_RADIUS') { setCadTool('IDLE'); setCadSelectedNode(null); setCadHoveredNode(null); setCadDraggingNode(null); } else { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('EDIT_RADIUS'); } }}>
                          <span>Edit Radius</span>
                          <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${cadTool === 'EDIT_RADIUS' ? 'bg-fuchsia-500' : 'bg-slate-600'}`}>
                            <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${cadTool === 'EDIT_RADIUS' ? 'translate-x-5' : 'translate-x-0'}`}></div>
                          </div>
                        </div>
-                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors border-b border-slate-700" onClick={() => { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_TEXT'); setShowDarkDrawSettings(false); }}>Add Text</button>
+                       <button className="w-full text-left px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors border-b border-slate-700" onClick={() => { if (cadTool === 'ADD_TEXT') { setCadTool('IDLE'); } else { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('ADD_TEXT'); } setShowDarkDrawSettings(false); }}>Add Text</button>
                        <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (cadTool === 'SELECT_METRIC') { setCadTool('IDLE'); setCadSelectedNode(null); setCadHoveredNode(null); setCadDraggingNode(null); } else { setIsEditingLineMode(false); setIsLineMoving(false); setCadSelectedLine(null); setCadTool('SELECT_METRIC'); } }}>
                          <span>Select Metric</span>
                          <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${cadTool === 'SELECT_METRIC' ? 'bg-fuchsia-500' : 'bg-slate-600'}`}>
@@ -3566,13 +3635,17 @@ const AdminDashboard = ({ setCurrentView }) => {
 
                     let labelText = '';
                     if (polySurvey) {
-                       labelText = polySurvey.surveyNo + (polySurvey.subDivisionNo ? '/' + polySurvey.subDivisionNo : '');
+                       const sNo = isSurveyNoVisible ? polySurvey.surveyNo : '';
+                       const sdNo = (isSubDivVisible && polySurvey.subDivisionNo) ? polySurvey.subDivisionNo : '';
+                       if (sNo && sdNo) labelText = sNo + '/' + sdNo;
+                       else if (sNo) labelText = sNo;
+                       else if (sdNo) labelText = sdNo;
                     }
                     
                     const isPromoted = cadTexts.some(t => t.id === `poly-${p.id}`);
                     
                     let textNode = null;
-                    if (labelText && isPolygonAreaCardVisible && !isPromoted) {
+                    if (labelText && !isPromoted) {
                         let signedArea = 0;
                         let cxSum = 0;
                         let cySum = 0;
@@ -3814,7 +3887,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                         stroke={drawColor} 
                         strokeWidth={strokeW} 
                         className={cadBlinkingRadius === c.id || isGlowing ? "animate-pulse" : "transition-colors duration-200"}
-                        style={{ pointerEvents: cadTool === 'SELECT_TEXT' ? 'none' : 'auto' }}
+                        style={{ pointerEvents: (cadTool === 'IDLE' || cadTool === 'SELECT_TEXT' || cadTool === 'SELECT_METRIC') ? 'none' : 'auto' }}
                       />
                       <line
                         x1={c.center.x} y1={c.center.y} x2={rayEndX} y2={rayEndY}
@@ -3985,7 +4058,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                         stroke={isSelected ? "#ec4899" : (l.hexColor || "#38bdf8")} 
                         strokeWidth={cadViewport.width * (l.strokeWidth ? l.strokeWidth / 1000 : 0.004)} 
                         strokeLinecap="round" 
-                        style={{ pointerEvents: cadTool === 'SELECT_TEXT' ? 'none' : 'auto' }}
+                        style={{ pointerEvents: (cadTool === 'IDLE' || cadTool === 'SELECT_TEXT' || cadTool === 'SELECT_METRIC') ? 'none' : 'auto' }}
                       />
                       {isMetricsVisible && displayLen > 0 && (() => {
                         return (
@@ -4089,6 +4162,25 @@ const AdminDashboard = ({ setCurrentView }) => {
                   )}
 
                                     {cadTexts.map(txt => {
+                     let displayText = txt.text;
+                     if (txt.id.startsWith('poly-')) {
+                         const polyId = txt.id.replace('poly-', '');
+                         const poly = visibleCadPolygons.find(p => p.id === polyId);
+                         if (!poly) return null;
+                         if (poly && poly.surveyId) {
+                             const polySurvey = cadSurveys.find(s => s.id === poly.surveyId);
+                             if (polySurvey) {
+                                 const sNo = isSurveyNoVisible ? polySurvey.surveyNo : '';
+                                 const sdNo = (isSubDivVisible && polySurvey.subDivisionNo) ? polySurvey.subDivisionNo : '';
+                                 if (sNo && sdNo) displayText = sNo + '/' + sdNo;
+                                 else if (sNo) displayText = sNo;
+                                 else if (sdNo) displayText = sdNo;
+                                 else displayText = '';
+                             }
+                         }
+                     }
+                     if (!displayText) return null;
+
                      const isSelected = cadSelectedText === txt.id;
                      return (
                         <text
@@ -4100,13 +4192,13 @@ const AdminDashboard = ({ setCurrentView }) => {
                            className="transition-colors duration-200 cursor-pointer"
                            transform={txt.rotation ? `rotate(${txt.rotation}, ${txt.x}, ${txt.y})` : undefined}
                         >
-                           {txt.text}
+                           {displayText}
                         </text>
                      );
                   })}
                   
                   {/* Dynamic Nodes */}
-                  {(interactiveNodes || []).map(n => {
+                  {cadTool !== 'IDLE' && cadTool !== 'SELECT_TEXT' && cadTool !== 'SELECT_METRIC' && (interactiveNodes || []).map(n => {
                     const isHovered = cadHoveredNode && cadHoveredNode.id === n.id;
                     const isSelected = cadSelectedNode && cadSelectedNode.id === n.id;
                     const nodeScale = isHovered || isSelected ? 2.5 : 1;
@@ -4169,7 +4261,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                        borderRadius: '50%',
                        border: '2.5px solid #fbbf24',
                        overflow: 'hidden',
-                       background: 'transparent',
+                       background: '#0f172a',
                        pointerEvents: 'none',
                        zIndex: 200,
                        boxShadow: '0 0 0 1px rgba(251,191,36,0.3), 0 12px 28px rgba(0,0,0,0.6)'
@@ -4213,34 +4305,66 @@ const AdminDashboard = ({ setCurrentView }) => {
                             />
                           ))}
                           {/* Vertex endpoint dots — show p1 and p2 of every line */}
-                          {visibleCadLines.map(l => (
+                          {cadTool !== 'IDLE' && cadTool !== 'SELECT_TEXT' && cadTool !== 'SELECT_METRIC' && visibleCadLines.map(l => (
                               <React.Fragment key={`mag-pts-${l.id}`}>
                               <circle cx={l.p1.x} cy={l.p1.y} r={dotR * 1.4} fill="#10b981" />
                               <circle cx={l.p2.x} cy={l.p2.y} r={dotR * 1.4} fill="#38bdf8" />
                             </React.Fragment>
                           ))}
-                          {/* Center crosshair — amber plus + tiny dot, NO map pin */}
-                          <line
-                            x1={cadMagnifierPos.svgX - chLen} y1={cadMagnifierPos.svgY}
-                            x2={cadMagnifierPos.svgX + chLen} y2={cadMagnifierPos.svgY}
-                            stroke="#fbbf24" strokeWidth={sw}
-                          />
-                          <line
-                            x1={cadMagnifierPos.svgX} y1={cadMagnifierPos.svgY - chLen}
-                            x2={cadMagnifierPos.svgX} y2={cadMagnifierPos.svgY + chLen}
-                            stroke="#fbbf24" strokeWidth={sw}
-                          />
-                          <circle
-                            cx={cadMagnifierPos.svgX} cy={cadMagnifierPos.svgY}
-                            r={dotR}
-                            fill="#fbbf24"
-                          />
+                          {/* Contextual Center: Crosshair or Dragged String */}
+                          {(() => {
+                             const isDraggingMetric = cadPointerGesture && cadPointerGesture.isDraggingMetric && cadPointerGesture.targetMetric;
+                             const isDraggingText = cadPointerGesture && cadPointerGesture.isDraggingText && cadPointerGesture.targetText;
+                             
+                             if (isDraggingMetric) {
+                                 const mLine = visibleCadLines.find(l => l.id === cadPointerGesture.targetMetric.id) || cadPointerGesture.targetMetric;
+                                 const scaledFontSize = Math.max(cadViewport.width * 0.01, 14);
+                                 let defaultRot = Math.atan2(mLine.p2.y - mLine.p1.y, mLine.p2.x - mLine.p1.x) * (180 / Math.PI);
+                                 if (defaultRot > 90 || defaultRot < -90) defaultRot += 180;
+                                 return (
+                                     <text transform={`rotate(${defaultRot}, ${cadMagnifierPos.svgX}, ${cadMagnifierPos.svgY})`} x={cadMagnifierPos.svgX} y={cadMagnifierPos.svgY} fill="#fbcfe8" fontSize={scaledFontSize} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">
+                                         {mLine.fixedLength} m
+                                     </text>
+                                 );
+                             } else if (isDraggingText) {
+                                 let displayText = cadPointerGesture.targetText.text;
+                                 if (cadPointerGesture.targetText.id.startsWith('poly-')) {
+                                     const polyId = cadPointerGesture.targetText.id.replace('poly-', '');
+                                     const poly = visibleCadPolygons.find(p => p.id === polyId);
+                                     if (poly && poly.surveyId) {
+                                         const polySurvey = cadSurveys.find(s => s.id === poly.surveyId);
+                                         if (polySurvey) {
+                                             const sNo = isSurveyNoVisible ? polySurvey.surveyNo : '';
+                                             const sdNo = (isSubDivVisible && polySurvey.subDivisionNo) ? polySurvey.subDivisionNo : '';
+                                             if (sNo && sdNo) displayText = sNo + '/' + sdNo;
+                                             else if (sNo) displayText = sNo;
+                                             else if (sdNo) displayText = sdNo;
+                                             else displayText = '';
+                                         }
+                                     }
+                                 }
+                                 const rot = cadPointerGesture.targetText.rotation || 0;
+                                 return (
+                                     <text transform={rot ? `rotate(${rot}, ${cadMagnifierPos.svgX}, ${cadMagnifierPos.svgY})` : undefined} x={cadMagnifierPos.svgX} y={cadMagnifierPos.svgY} fill="#fbcfe8" fontSize={cadPointerGesture.targetText.fontSize || 40} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">
+                                         {displayText}
+                                     </text>
+                                 );
+                             } else {
+                                 return (
+                                     <>
+                                         <line x1={cadMagnifierPos.svgX - chLen} y1={cadMagnifierPos.svgY} x2={cadMagnifierPos.svgX + chLen} y2={cadMagnifierPos.svgY} stroke="#fbbf24" strokeWidth={sw} />
+                                         <line x1={cadMagnifierPos.svgX} y1={cadMagnifierPos.svgY - chLen} x2={cadMagnifierPos.svgX} y2={cadMagnifierPos.svgY + chLen} stroke="#fbbf24" strokeWidth={sw} />
+                                         <circle cx={cadMagnifierPos.svgX} cy={cadMagnifierPos.svgY} r={dotR} fill="#fbbf24" />
+                                     </>
+                                 );
+                             }
+                          })()}
                        </svg>
                     </div>
                     );
                  })()}
 
-                {cadSelectedNode && (() => {
+                {cadSelectedNode && isAddRadiusEnabled && (() => {
                   const pt = getSvgPtToContainer(cadSelectedNode.x, cadSelectedNode.y);
                   let pLeft = pt.left + 15;
                   let pTop = pt.top - 40;
@@ -4338,15 +4462,19 @@ const AdminDashboard = ({ setCurrentView }) => {
                    const txt = cadTexts.find(t => t.id === cadSelectedText);
                    if (!txt) return null;
                    const ctCoords = getSvgPtToContainer(txt.x, txt.y);
+                   const polyId = txt.id.startsWith('poly-') ? txt.id.replace('poly-', '') : null;
+                   const poly = polyId ? cadPolygons.find(p => p.id === polyId) : null;
+                   const polySurvey = (poly && poly.surveyId) ? cadSurveys.find(s => s.id === poly.surveyId) : null;
+
                    return (
                      <div 
-                       className="absolute z-[110] bg-slate-800 p-4 rounded-xl shadow-2xl border border-slate-600 flex flex-col gap-3 min-w-[14rem] animate-in slide-in-from-bottom-2" 
-                       style={{ left: Math.min(ctCoords.left + cadPopupOffset.x, window.innerWidth - 250), top: Math.max(ctCoords.top - 180 + cadPopupOffset.y, 20), transform: `scale(${cadPopupScale})`, transformOrigin: 'top left' }}
+                       className="absolute z-[110] bg-slate-800 p-3 rounded-xl shadow-2xl border border-slate-600 flex flex-col gap-2.5 w-44 animate-in slide-in-from-bottom-2" 
+                       style={{ left: Math.min(ctCoords.left + cadPopupOffset.x, window.innerWidth - 190), top: Math.max(ctCoords.top - 180 + cadPopupOffset.y, 20), transform: `scale(${cadPopupScale})`, transformOrigin: 'top left' }}
                        onClick={e => e.stopPropagation()}
                        onPointerDown={e => e.stopPropagation()}
                      >
                        <div 
-                         className="flex justify-between items-center cursor-move bg-slate-700 -mx-4 -mt-4 p-3 rounded-t-xl"
+                         className="flex justify-between items-center cursor-move bg-slate-700 -mx-3 -mt-3 p-2 rounded-t-xl"
                          onPointerDown={e => { e.stopPropagation(); e.target.setPointerCapture(e.pointerId); e.target.dataset.dragStart = JSON.stringify({x: e.clientX, y: e.clientY, ox: cadPopupOffset.x, oy: cadPopupOffset.y}); }}
                          onPointerMove={e => {
                            if (e.target.hasPointerCapture(e.pointerId) && e.target.dataset.dragStart) {
@@ -4356,25 +4484,51 @@ const AdminDashboard = ({ setCurrentView }) => {
                          }}
                          onPointerUp={e => { e.target.releasePointerCapture(e.pointerId); delete e.target.dataset.dragStart; }}
                        >
-                          <span className="text-xs font-bold text-slate-300 pointer-events-none">EDIT TEXT</span>
-                          <button onClick={() => { setCadSelectedText(null); setCadPopupOffset({x:0, y:0}); }} className="text-xs font-black text-slate-400 hover:text-white">✕</button>
+                          <span className="text-[11px] font-bold text-slate-300 pointer-events-none px-1">EDIT TEXT</span>
+                          <button onClick={() => { setCadSelectedText(null); setCadPopupOffset({x:0, y:0}); }} className="text-xs font-black text-slate-400 hover:text-white px-1">✕</button>
                        </div>
-                       <input type="text" value={txt.text} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, text: e.target.value} : t))} className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm" />
-                       <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-slate-500 uppercase">Font Size: {Math.round(txt.fontSize || 40)}</span>
-                          <input type="range" min="10" max={200} value={txt.fontSize || 40} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, fontSize: parseInt(e.target.value)} : t))} className="accent-fuchsia-500" />
+                       
+                       <div className="flex gap-1.5 w-full mt-1">
+                           <input type="text" value={txt.text} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, text: e.target.value} : t))} className="bg-slate-900 border border-slate-700 rounded p-1.5 text-white text-xs min-w-0 flex-1" />
+                           <button onClick={(e) => {
+                               e.stopPropagation();
+                               if (polySurvey) {
+                                   const parts = txt.text.split('/');
+                                   const newSurveyNo = parts[0]?.trim() || '';
+                                   const newSubDivNo = parts[1]?.trim() || '';
+                                   setCadSurveys(prev => prev.map(s => s.id === polySurvey.id ? { ...s, surveyNo: newSurveyNo, subDivisionNo: newSubDivNo } : s));
+                               }
+                               setCadSelectedText(null);
+                               setCadPopupOffset({x:0, y:0});
+                           }} className="bg-green-600 hover:bg-green-500 text-white font-bold px-3 py-1.5 rounded text-[10px] transition-colors shrink-0">OK</button>
                        </div>
-                       <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-slate-500 uppercase">Rotation: {Math.round(txt.rotation || 0)}°</span>
-                          <input type="range" min="0" max="360" value={txt.rotation || 0} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, rotation: parseInt(e.target.value)} : t))} className="accent-fuchsia-500" />
+
+                       <div className="flex flex-col gap-2 w-full mt-1">
+                           <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-slate-500 uppercase font-bold w-6">Size</span>
+                              <input type="range" min="10" max={200} value={txt.fontSize || 40} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, fontSize: parseInt(e.target.value)} : t))} className="accent-fuchsia-500 flex-1 min-w-0" />
+                           </div>
+                           <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-slate-500 uppercase font-bold w-6">Rot</span>
+                              <input type="range" min="0" max="360" value={txt.rotation || 0} onChange={e => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, rotation: parseInt(e.target.value)} : t))} className="accent-fuchsia-500 flex-1 min-w-0" />
+                           </div>
                        </div>
-                       <div className="flex gap-2">
-                          {['#38bdf8', '#4f46e5', '#ec4899', '#10b981', '#f59e0b', '#e2e8f0'].map(hex => (
-                             <button key={hex} onClick={() => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, hexColor: hex} : t))} className={`w-6 h-6 rounded-full border-2 ${txt.hexColor === hex ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: hex }}></button>
-                          ))}
+
+                       <div className="flex flex-row items-center justify-between gap-2 mt-1 bg-slate-900/50 p-2 rounded border border-slate-700/50">
+                           <div className="flex flex-col items-center gap-1 flex-1">
+                               <span className="text-[9px] font-bold text-slate-400 uppercase">Fill Color</span>
+                               <input type="color" value={txt.hexColor || '#ffffff'} onChange={(e) => setCadTexts(prev => prev.map(t => t.id === txt.id ? {...t, hexColor: e.target.value} : t))} className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
+                           </div>
+                           {polySurvey && (
+                               <div className="flex flex-col items-center gap-1 flex-1 border-l border-slate-700/50 pl-2">
+                                   <span className="text-[9px] font-bold text-slate-400 uppercase">Border</span>
+                                   <input type="color" value={polySurvey.hexColor || '#38bdf8'} onChange={(e) => setCadSurveys(prev => prev.map(s => s.id === polySurvey.id ? {...s, hexColor: e.target.value} : s))} className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
+                               </div>
+                           )}
                        </div>
-                       <div className="flex flex-row gap-2 mt-2 w-full">
-                         <button onClick={(e) => { e.stopPropagation(); setCadEditInputs(p => ({ ...p, isMovingText: true })); setCadPointerGesture({ startX: e.clientX, startY: e.clientY, isDragging: false, isDraggingMetric: false, isDraggingText: true, isDraggingLineBody: false, targetText: txt, targetNode: null, targetLine: null, targetCircle: null, targetMetric: null }); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-1.5 rounded text-[10px] transition-colors">MOVE</button>
+
+                       <div className="flex flex-row gap-2 w-full mt-1">
+                         <button onClick={(e) => { e.stopPropagation(); setCadEditInputs(p => ({ ...p, isMovingText: true })); setCadSelectedText(null); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-1.5 rounded text-[10px] transition-colors">MOVE</button>
                          <button onClick={() => { setCadTexts(prev => prev.filter(t => t.id !== txt.id)); setCadSelectedText(null); }} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1.5 rounded text-[10px] transition-colors">DEL</button>
                        </div>
                        <div onPointerDown={handlePopupResizeDown} className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-end justify-end p-1.5 text-slate-500 hover:text-white transition-colors opacity-70"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 0L10 10L0 10L10 0Z" /></svg></div>
