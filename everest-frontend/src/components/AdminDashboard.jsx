@@ -306,10 +306,11 @@ const AdminDashboard = ({ setCurrentView }) => {
                 curr = curr.next;
             }
             area /= 2;
-            if (area < -1e-4) {
+              if (area < -1e-4) {
                   const surveyCounts = {};
+                  const surveyLengths = {};
                   let maxCount = 0;
-                  let polySurveyId = null;
+                  let fallbackSurveyId = null;
                   faceEdges.forEach(edge => {
                       const lnIdx = cadLines.findIndex(l => 
                           (Math.hypot(l.p1.x - edge.from.x, l.p1.y - edge.from.y) < 1e-3 && Math.hypot(l.p2.x - edge.to.x, l.p2.y - edge.to.y) < 1e-3) ||
@@ -317,21 +318,58 @@ const AdminDashboard = ({ setCurrentView }) => {
                       );
                       if (lnIdx !== -1) {
                           const sId = cadLines[lnIdx].surveyId;
+                          const len = Math.hypot(edge.to.x - edge.from.x, edge.to.y - edge.from.y);
                           if (sId) {
                              surveyCounts[sId] = (surveyCounts[sId] || 0) + 1;
+                             surveyLengths[sId] = (surveyLengths[sId] || 0) + len;
                              if (surveyCounts[sId] > maxCount) {
                                  maxCount = surveyCounts[sId];
-                                 polySurveyId = sId;
+                                 fallbackSurveyId = sId;
                              }
                           }
                       }
                   });
-                faces.push({ id: `poly_${faceId++}`, pts, area: Math.abs(area), surveyId: polySurveyId, faceEdges });
-            }
-        }
-    });
-    return faces;
-  }, [cadLines]);
+                  faces.push({ id: `poly_${faceId++}`, pts, area: Math.abs(area), faceEdges, surveyCounts, surveyLengths, fallbackSurveyId, polySurveyId: null });
+              }
+          }
+      });
+
+      // Bipartite Resolution Algorithm for Topological FMB Sync
+      // 1. Sort surveys by created_at descending (newest first)
+      const sortedSurveys = [...cadSurveys].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      
+      sortedSurveys.forEach(survey => {
+          const sId = survey.id;
+          let bestFace = null;
+          let highestPercentage = -1;
+          
+          faces.forEach(face => {
+              if (face.polySurveyId === null && face.surveyLengths[sId]) {
+                  const totalLen = Object.values(face.surveyLengths).reduce((acc, val) => acc + val, 0);
+                  const perc = face.surveyLengths[sId] / totalLen;
+                  if (perc > highestPercentage) {
+                      highestPercentage = perc;
+                      bestFace = face;
+                  }
+              }
+          });
+          
+          if (bestFace) {
+              bestFace.polySurveyId = sId;
+          }
+      });
+      
+      // Fallback for any unassigned faces
+      faces.forEach(face => {
+          if (face.polySurveyId === null) {
+              face.polySurveyId = face.fallbackSurveyId;
+          }
+          // Normalize the output format expected by the rest of the app
+          face.surveyId = face.polySurveyId;
+      });
+
+      return faces;
+  }, [cadLines, cadSurveys]);
 
   const visibleCadLines = React.useMemo(() => {
     const visibleSurveyIds = new Set(cadSurveys.filter(s => {
@@ -792,7 +830,9 @@ const AdminDashboard = ({ setCurrentView }) => {
            setIsLineMoving(false);
            setIsEditingLineMode(false);
            setCadPopupOffset({ x: 0, y: 0 }); 
-           setCadTool('IDLE');
+           if (cadTool !== 'SELECT_METRIC' && cadTool !== 'SELECT_TEXT') {
+               setCadTool('IDLE');
+           }
         }
         return; 
       }
@@ -968,7 +1008,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       }
       setCadHoveredNode(hoveredNode);
 
-      if (cadDraggingNode || cadPointerGesture?.isDragging || cadPointerGesture?.isDraggingAnchor) {
+      if (cadDraggingNode || cadPointerGesture?.isDragging || cadPointerGesture?.isDraggingAnchor || cadPointerGesture?.isDraggingMetric || cadPointerGesture?.isDraggingText) {
          let magSvgX = rawPt.x;
          let magSvgY = rawPt.y;
          if (cadPointerGesture?.isDraggingAnchor) {
@@ -1193,6 +1233,9 @@ const AdminDashboard = ({ setCurrentView }) => {
              setIsEditingLineMode(false);
              setCadTool('IDLE');
          }
+         if (cadPointerGesture.isDraggingMetric || cadPointerGesture.isDraggingText) {
+             setCadEditInputs(p => ({ ...p, isMovingMetric: false, isMovingText: false }));
+         }
       }
       
       if (cadPointerGesture && !cadPointerGesture.isDragging && !cadPointerGesture.isDraggingMetric && !cadPointerGesture.isDraggingText && !cadPointerGesture.isDraggingLineBody && !cadPointerGesture.isDraggingPan && !cadPointerGesture.isDraggingAnchor) {
@@ -1396,7 +1439,7 @@ const AdminDashboard = ({ setCurrentView }) => {
           if (!cadPromptSurveyNo.trim()) { alert("Survey No is required"); return; }
           const newSurveyId = Date.now().toString();
           const surveyColor = cadPrompt.type === 'NEW_SURVEY' ? cadPromptColor : '#3b82f6';
-          setCadSurveys(prev => [...prev, { id: newSurveyId, surveyNo: cadPromptSurveyNo, subDivisionNo: cadPromptSubDiv, hexColor: surveyColor, isVisible: false }]);
+          setCadSurveys(prev => [...prev, { id: newSurveyId, surveyNo: cadPromptSurveyNo, subDivisionNo: cadPromptSubDiv, hexColor: surveyColor, isVisible: false, created_at: Date.now() }]);
           setCheckedSurveyNos(prev => prev.includes(cadPromptSurveyNo) ? prev : [...prev, cadPromptSurveyNo]);
           setCadActiveSurveyId(newSurveyId);
           
@@ -4398,8 +4441,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                        </div>
 
                        <div className="flex flex-row gap-2 mt-2 w-full">
-                         <button onClick={() => setCadEditInputs(p => ({ ...p, isMovingMetric: !p.isMovingMetric }))} className={`flex-1 font-bold py-1.5 rounded text-[10px] transition-colors ${cadEditInputs.isMovingMetric ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-                           {cadEditInputs.isMovingMetric ? 'MOVING' : 'MOVE'}
+                         <button onClick={(e) => { e.stopPropagation(); setCadEditInputs(p => ({ ...p, isMovingMetric: true })); setCadSelectedMetric(null); }} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-1.5 rounded text-[10px] transition-colors">
+                           MOVE
                          </button>
                          <button onClick={() => { 
                             setCadLines(prev => prev.map(l => l.id === line.id ? {...l, fixedLength: null} : l));
