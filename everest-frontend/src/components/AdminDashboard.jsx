@@ -469,7 +469,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                         texts: cadTexts,
                         metricOffsets: cadMetricOffsets,
                         viewport: cadViewport,
-                        scale: cadScale
+                        scale: cadScale,
+                        surveys: cadSurveys
                      }
                  };
              }
@@ -497,7 +498,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                texts: cadTexts,
                metricOffsets: cadMetricOffsets,
                viewport: cadViewport,
-               scale: cadScale
+               scale: cadScale,
+               surveys: cadSurveys
             }
          };
          setCadLoadedProjectId(project.id);
@@ -3177,6 +3179,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                            setCadMetricOffsets(proj.state.metricOffsets);
                            setCadViewport(proj.state.viewport);
                            setCadScale(proj.state.scale);
+                           if (proj.state.surveys) setCadSurveys(proj.state.surveys); else setCadSurveys([]);
                            setCadHistory({ past: [], future: [] }); // Reset history
                            setActiveLandSurveyView('dark_draw_manual');
                         }} className="flex-1 text-left font-bold text-sm bg-transparent border-none outline-none">
