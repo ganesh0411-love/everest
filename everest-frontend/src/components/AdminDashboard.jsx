@@ -223,6 +223,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   React.useEffect(() => {
     localStorage.setItem('cad_saved_projects', JSON.stringify(savedProjects));
   }, [savedProjects]);
+
   const [cadMetricOffsets, setCadMetricOffsets] = React.useState({});
 
   const [cadHistory, setCadHistory] = React.useState({ past: [], future: [] });
@@ -263,6 +264,11 @@ const AdminDashboard = ({ setCurrentView }) => {
      setCadHoveredNode(null);
      setCadSelectedNode(null);
      setCadPointerGesture(null);
+     setIsMetricsVisible(true);
+     setIsSurveyNoVisible(true);
+     setIsSubDivVisible(true);
+     setIsAddRadiusEnabled(false);
+     setIsSketchExtendEnabled(false);
      setCadGlowingCircles([]);
      setCadBlinkingRadius(null);
      setCadSnapIndicator(null);
@@ -275,6 +281,15 @@ const AdminDashboard = ({ setCurrentView }) => {
      setCadHistory({ past: [], future: [] });
      setCadLoadedProjectId(null);
      setCadMagnifierPos(null);
+     setIsFloatingStackExpanded(false);
+     setIsPolygonAreaCardVisible(true);
+     setIsAreaDropdownOpen(false);
+     setIsSurveyDropdownOpen(false);
+     setIsSubDivisionDropdownOpen(false);
+     setIsScaleModalOpen(false);
+     setCadContextMenu(null);
+     setIsGalleryPopupOpen(false);
+     setShowDarkDrawSettings(false);
   };
 
   // Auto-Split Intersection Engine
@@ -525,6 +540,20 @@ const AdminDashboard = ({ setCurrentView }) => {
                         scale: cadScale,
                         surveys: cadSurveys,
                         checkedSurveys: checkedSurveyNos
+                     },
+                     uiSettings: {
+                        isMetricsVisible,
+                        isSurveyNoVisible,
+                        isSubDivVisible,
+                        isAddRadiusEnabled,
+                        isSketchExtendEnabled,
+                        showDarkDrawSettings,
+                        isFloatingStackExpanded,
+                        isGalleryPopupOpen,
+                        isScaleModalOpen,
+                        isAreaDropdownOpen,
+                        isSurveyDropdownOpen,
+                        isSubDivisionDropdownOpen
                      }
                  };
              }
@@ -555,6 +584,20 @@ const AdminDashboard = ({ setCurrentView }) => {
                scale: cadScale,
                surveys: cadSurveys,
                checkedSurveys: checkedSurveyNos
+            },
+            uiSettings: {
+               isMetricsVisible,
+               isSurveyNoVisible,
+               isSubDivVisible,
+               isAddRadiusEnabled,
+               isSketchExtendEnabled,
+               showDarkDrawSettings,
+               isFloatingStackExpanded,
+               isGalleryPopupOpen,
+               isScaleModalOpen,
+               isAreaDropdownOpen,
+               isSurveyDropdownOpen,
+               isSubDivisionDropdownOpen
             }
          };
          setCadLoadedProjectId(project.id);
@@ -985,7 +1028,7 @@ const AdminDashboard = ({ setCurrentView }) => {
          
          // Legacy Move Mode removed for Sketch integration
 
-         if (cadTool !== 'IDLE' && cadTool !== 'SELECT_TEXT' && cadTool !== 'SELECT_METRIC') {
+         if ((cadTool !== 'IDLE' || isAddRadiusEnabled) && cadTool !== 'SELECT_TEXT' && cadTool !== 'SELECT_METRIC') {
              interactiveNodes.forEach(n => {
                 if (Math.hypot(n.x - rawPt.x, n.y - rawPt.y) < minSnapDist) targetNode = n;
              });
@@ -1780,6 +1823,41 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [isMetricSquare, setIsMetricSquare] = React.useState(false);
   const [isFmbMetricSquare, setIsFmbMetricSquare] = React.useState(false);
   const [isLoadingWorkspace, setIsLoadingWorkspace] = React.useState(false);
+
+  // Auto-sync active UI settings to the loaded project
+  React.useEffect(() => {
+    if (cadLoadedProjectId) {
+       setSavedProjects(prev => prev.map(p => {
+          if (p.id === cadLoadedProjectId) {
+             return {
+                ...p,
+                uiSettings: {
+                   isMetricsVisible,
+                   isSurveyNoVisible,
+                   isSubDivVisible,
+                   isAddRadiusEnabled,
+                   isSketchExtendEnabled,
+                   showDarkDrawSettings,
+                   isFloatingStackExpanded,
+                   isGalleryPopupOpen,
+                   isScaleModalOpen,
+                   isAreaDropdownOpen,
+                   isSurveyDropdownOpen,
+                   isSubDivisionDropdownOpen
+                }
+             };
+          }
+          return p;
+       }));
+    }
+  }, [
+    cadLoadedProjectId,
+    isMetricsVisible, isSurveyNoVisible, isSubDivVisible,
+    isAddRadiusEnabled, isSketchExtendEnabled,
+    showDarkDrawSettings, isFloatingStackExpanded,
+    isGalleryPopupOpen, isScaleModalOpen,
+    isAreaDropdownOpen, isSurveyDropdownOpen, isSubDivisionDropdownOpen
+  ]);
 
   const getHVal = () => workspaceArea ? (parseInt(workspaceArea.h, 10) || 0) : 0;
   const getAVal = () => workspaceArea ? (parseFloat(workspaceArea.a) || 0) : 0;
@@ -3275,6 +3353,21 @@ const AdminDashboard = ({ setCurrentView }) => {
                            setCadScale(proj.state.scale);
                            if (proj.state.surveys) setCadSurveys(proj.state.surveys); else setCadSurveys([]);
                            if (proj.state.checkedSurveys) setCheckedSurveyNos(proj.state.checkedSurveys); else if (proj.state.surveys) setCheckedSurveyNos([...new Set(proj.state.surveys.map(s => s.surveyNo))]); else setCheckedSurveyNos([]);
+                           
+                           const ui = proj.uiSettings || {};
+                           setIsMetricsVisible(ui.isMetricsVisible !== undefined ? ui.isMetricsVisible : (proj.state.isMetricsVisible !== undefined ? proj.state.isMetricsVisible : true));
+                           setIsSurveyNoVisible(ui.isSurveyNoVisible !== undefined ? ui.isSurveyNoVisible : (proj.state.isSurveyNoVisible !== undefined ? proj.state.isSurveyNoVisible : true));
+                           setIsSubDivVisible(ui.isSubDivVisible !== undefined ? ui.isSubDivVisible : (proj.state.isSubDivVisible !== undefined ? proj.state.isSubDivVisible : true));
+                           setIsAddRadiusEnabled(ui.isAddRadiusEnabled || false);
+                           setIsSketchExtendEnabled(ui.isSketchExtendEnabled || false);
+                           setShowDarkDrawSettings(ui.showDarkDrawSettings || false);
+                           setIsFloatingStackExpanded(ui.isFloatingStackExpanded || false);
+                           setIsGalleryPopupOpen(ui.isGalleryPopupOpen || false);
+                           setIsScaleModalOpen(ui.isScaleModalOpen || false);
+                           setIsAreaDropdownOpen(ui.isAreaDropdownOpen || false);
+                           setIsSurveyDropdownOpen(ui.isSurveyDropdownOpen || false);
+                           setIsSubDivisionDropdownOpen(ui.isSubDivisionDropdownOpen || false);
+
                            setCadHistory({ past: [], future: [] }); // Reset history
                            setActiveLandSurveyView('dark_draw_manual');
                         }} className="flex-1 text-left font-bold text-sm bg-transparent border-none outline-none">
@@ -3308,8 +3401,10 @@ const AdminDashboard = ({ setCurrentView }) => {
                          if (cadLoadedProjectId) {
                             setCadLines([]); setCadCircles([]); setCadTexts([]); setCadMetricOffsets({});
                             setCadHistory({ past: [], future: [] }); setCadLoadedProjectId(null);
+                            setActiveLandSurveyView('dark_draw_projects');
+                         } else {
+                            setActiveLandSurveyView('dark_draw_submenu');
                          }
-                         setActiveLandSurveyView('dark_draw_submenu');
                         resetCadState();
                       }}
                       className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors"
