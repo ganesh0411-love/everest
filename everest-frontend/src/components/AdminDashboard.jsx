@@ -229,6 +229,20 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadLoadedProjectId, setCadLoadedProjectId] = React.useState(null);
   const [cadMagnifierPos, setCadMagnifierPos] = React.useState(null);
   const cadStateBeforeActionRef = React.useRef(null);
+  const [cadWindowSize, setCadWindowSize] = React.useState({ width: '100vw', height: '100vh' });
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setCadWindowSize({ width: `${window.innerWidth}px`, height: `${window.innerHeight}px` });
+    };
+    handleResize(); // Initialize on mount
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
 
   const resetCadState = () => {
      setCadLines([]);
@@ -971,20 +985,22 @@ const AdminDashboard = ({ setCurrentView }) => {
          
          // Legacy Move Mode removed for Sketch integration
 
-         interactiveNodes.forEach(n => {
-            if (Math.hypot(n.x - rawPt.x, n.y - rawPt.y) < minSnapDist) targetNode = n;
-         });
-         
-         let minLineDist = 20 * (cadViewport.width / 1000);
-         cadLines.forEach(l => {
-            const L2 = Math.pow(l.p1.x - l.p2.x, 2) + Math.pow(l.p1.y - l.p2.y, 2);
-            if (L2 === 0) return;
-            let t = ((rawPt.x - l.p1.x) * (l.p2.x - l.p1.x) + (rawPt.y - l.p1.y) * (l.p2.y - l.p1.y)) / L2;
-            t = Math.max(0, Math.min(1, t));
-            const projX = l.p1.x + t * (l.p2.x - l.p1.x);
-            const projY = l.p1.y + t * (l.p2.y - l.p1.y);
-            if (Math.hypot(rawPt.x - projX, rawPt.y - projY) < minLineDist) targetLine = l;
-         });
+         if (cadTool !== 'IDLE' && cadTool !== 'SELECT_TEXT' && cadTool !== 'SELECT_METRIC') {
+             interactiveNodes.forEach(n => {
+                if (Math.hypot(n.x - rawPt.x, n.y - rawPt.y) < minSnapDist) targetNode = n;
+             });
+             
+             let minLineDist = 20 * (cadViewport.width / 1000);
+             cadLines.forEach(l => {
+                const L2 = Math.pow(l.p1.x - l.p2.x, 2) + Math.pow(l.p1.y - l.p2.y, 2);
+                if (L2 === 0) return;
+                let t = ((rawPt.x - l.p1.x) * (l.p2.x - l.p1.x) + (rawPt.y - l.p1.y) * (l.p2.y - l.p1.y)) / L2;
+                t = Math.max(0, Math.min(1, t));
+                const projX = l.p1.x + t * (l.p2.x - l.p1.x);
+                const projY = l.p1.y + t * (l.p2.y - l.p1.y);
+                if (Math.hypot(rawPt.x - projX, rawPt.y - projY) < minLineDist) targetLine = l;
+             });
+         }
 
          if (isEditingLineMode) {
             targetNode = null; // Prevent nodes from swallowing the line tap event
@@ -1288,6 +1304,10 @@ const AdminDashboard = ({ setCurrentView }) => {
   };
 
   const handleCadPointerUp = (e) => {
+    if (cadLongPressTimerRef.current) {
+        clearTimeout(cadLongPressTimerRef.current);
+        cadLongPressTimerRef.current = null;
+    }
     cadPointersRef.current.delete(e.pointerId);
     setCadMagnifierPos(null);
     if (cadPointersRef.current.size < 2) setCadPinchInitial(null);
@@ -1474,10 +1494,6 @@ const AdminDashboard = ({ setCurrentView }) => {
                setCadSelectedPolygon(null);
                setCadPopupOffset({x:0, y:0});
             } else {
-               if (cadLongPressTimerRef.current) {
-                   clearTimeout(cadLongPressTimerRef.current);
-                   cadLongPressTimerRef.current = null;
-               }
                if (cadTool === 'IDLE' && !isAddRadiusEnabled && cadPolygons.length > 0) {
                      const rawPt = getCadSvgCoords(e.clientX, e.clientY);
                        let hitPoly = null;
@@ -2567,7 +2583,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
       {/* Land Survey Dashboard Overlay Route */}
       {showLandSurveyDashboard && (
-        <div className="fixed inset-0 z-[120] bg-[#f8fafc] flex flex-col animate-in slide-in-from-right-full duration-300">
+        <div className="fixed inset-0 z-[120] bg-[#f8fafc] flex flex-col animate-in slide-in-from-right-full duration-300" style={{ width: cadWindowSize.width, height: cadWindowSize.height }}>
           {activeLandSurveyView !== 'dark_draw_manual' && activeLandSurveyView !== 'dark_draw_submenu' && activeLandSurveyView !== 'dark_draw_projects' && (
           <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-10">
             <button 
@@ -3707,6 +3723,11 @@ const AdminDashboard = ({ setCurrentView }) => {
                 onClick={() => setShowDarkDrawSettings(false)}
                 onContextMenu={(e) => {
                     e.preventDefault();
+                    // On touch devices, we rely solely on the 600ms long press timer loop to trigger this menu.
+                    // This blocks mobile browsers from firing fake context menus on short taps or default long presses.
+                    if (e.nativeEvent.pointerType === 'touch' || ('ontouchstart' in window && e.type !== 'contextmenu')) return;
+                    if ('ontouchstart' in window && navigator.maxTouchPoints > 0) return;
+                    
                     if (!isAddRadiusEnabled && cadTool === 'IDLE') {
                         if (e.target && e.target.tagName === 'polygon' && e.target.id && e.target.id.startsWith('poly-svg-')) {
                             const polyId = e.target.id.replace('poly-svg-', '');
