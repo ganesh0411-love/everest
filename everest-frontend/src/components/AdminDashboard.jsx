@@ -515,13 +515,14 @@ const AdminDashboard = ({ setCurrentView }) => {
       });
   }, [cadLines, cadSurveys, cadPolygons, checkedSurveyNos]);
 
-  const getMetricDefaultOffset = (l) => {
+  const getMetricDefaultOffset = (l, fontSize = 24) => {
       let rot = Math.atan2(l.p2.y - l.p1.y, l.p2.x - l.p1.x) * (180 / Math.PI);
       if (rot > 90) rot -= 180;
       else if (rot < -90) rot += 180;
       const finalRot = l.metricRotation !== undefined ? l.metricRotation : rot;
       const theta = finalRot * (Math.PI / 180);
-      return { dx: 25 * Math.sin(theta), dy: -25 * Math.cos(theta) };
+      const pad = (fontSize / 2) + 4;
+      return { dx: pad * Math.sin(theta), dy: -pad * Math.cos(theta) };
   };
 
   const handleSaveProject = () => {
@@ -3929,33 +3930,57 @@ const AdminDashboard = ({ setCurrentView }) => {
                     
                     let textNode = null;
                     if (labelText && !isPromoted) {
-                        let signedArea = 0;
-                        let cxSum = 0;
-                        let cySum = 0;
                         const pts = p.pts;
                         const n = pts.length;
-                        for (let i = 0; i < n; i++) {
-                            const p1 = pts[i];
-                            const p2 = pts[(i + 1) % n];
-                            const a = p1.x * p2.y - p2.x * p1.y;
-                            signedArea += a;
-                            cxSum += (p1.x + p2.x) * a;
-                            cySum += (p1.y + p2.y) * a;
-                        }
-                        signedArea *= 0.5;
+                        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                        pts.forEach(pt => {
+                            if (pt.x < minX) minX = pt.x;
+                            if (pt.x > maxX) maxX = pt.x;
+                            if (pt.y < minY) minY = pt.y;
+                            if (pt.y > maxY) maxY = pt.y;
+                        });
+
+                        const stepX = (maxX - minX) / 20;
+                        const stepY = (maxY - minY) / 20;
+                        const step = Math.max(stepX, stepY, 0.1);
                         
-                        let cx = 0, cy = 0;
-                        if (Math.abs(signedArea) > 1e-6) {
-                            cx = cxSum / (6 * signedArea);
-                            cy = cySum / (6 * signedArea);
-                        } else {
-                            const minX = Math.min(...pts.map(pt => pt.x));
-                            const maxX = Math.max(...pts.map(pt => pt.x));
-                            const minY = Math.min(...pts.map(pt => pt.y));
-                            const maxY = Math.max(...pts.map(pt => pt.y));
-                            cx = (minX + maxX) / 2;
-                            cy = (minY + maxY) / 2;
+                        let bestPt = { x: (minX + maxX)/2, y: (minY + maxY)/2 };
+                        let maxDist = -Infinity;
+
+                        const distToSegment = (pt, v, w) => {
+                            const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+                            if (l2 === 0) return Math.hypot(pt.x - v.x, pt.y - v.y);
+                            let t = ((pt.x - v.x) * (w.x - v.x) + (pt.y - v.y) * (w.y - v.y)) / l2;
+                            t = Math.max(0, Math.min(1, t));
+                            return Math.hypot(pt.x - (v.x + t * (w.x - v.x)), pt.y - (v.y + t * (w.y - v.y)));
+                        };
+
+                        const distToPoly = (pt) => {
+                            let minDist = Infinity;
+                            for (let i = 0; i < n; i++) {
+                                const d = distToSegment(pt, pts[i], pts[(i + 1) % n]);
+                                if (d < minDist) minDist = d;
+                            }
+                            return minDist;
+                        };
+
+                        if (n >= 3) {
+                            for (let x = minX + step/2; x < maxX; x += step) {
+                                for (let y = minY + step/2; y < maxY; y += step) {
+                                    const testPt = { x, y };
+                                    if (pointInPolygon(testPt, pts)) {
+                                        const d = distToPoly(testPt);
+                                        if (d > maxDist) {
+                                            maxDist = d;
+                                            bestPt = testPt;
+                                        }
+                                    }
+                                }
+                            }
                         }
+                        
+                        let cx = bestPt.x;
+                        let cy = bestPt.y;
                         
                         // 1. Calculate horizontal space AT the centroid
                         let lefts = [], rights = [], tops = [], bottoms = [];
@@ -4068,8 +4093,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                             finalFontSize = diagFontSize;
                         }
                         
-                        // Scale proportionally: Restrict min 8px, safely uncap max to 60px 
-                        let calculatedFontSize = Math.max(8, Math.min(60, finalFontSize));
+                        let calculatedFontSize = Math.min(60, Math.max(1, finalFontSize));
                         
                         // Pass finalAngle down to the transform block
                         const angleDegTransform = finalAngle;
@@ -4295,16 +4319,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                         const svgLen = Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y);
                         const baseFontSize = l.metricFontSize || (isMetricSelected || isLiveDrag ? 50 : (isInternalPartition ? 12 : 32));
                         const maxAllowedFontSize = (svgLen * 0.9) / (Math.max(1, textStr.length) * 0.65);
-                        scaledFontSize = Math.min(baseFontSize, Math.max(10, maxAllowedFontSize));
+                        scaledFontSize = Math.min(baseFontSize, Math.max(1, maxAllowedFontSize));
                         textLen = textStr.length * (scaledFontSize * 0.65);
                     }
                     
-                    let offset = cadMetricOffsets[l.id] || getMetricDefaultOffset(l);
+                    let offset = cadMetricOffsets[l.id] || getMetricDefaultOffset(l, scaledFontSize);
                     
                     // Override default offset magnitude with scaledFontSize padding
                     if (!cadMetricOffsets[l.id] && displayLen && isMetricsVisible) {
                         const theta = finalRot * (Math.PI / 180);
-                        const pad = (scaledFontSize / 2) + (isInternalPartition ? 8 : 15);
+                        const pad = (scaledFontSize / 2) + 4;
                         offset = { dx: pad * Math.sin(theta), dy: -pad * Math.cos(theta) };
                         
                         // Push outer boundary labels OUTSIDE the polygon
