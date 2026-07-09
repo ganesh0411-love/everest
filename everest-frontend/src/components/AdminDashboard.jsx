@@ -197,7 +197,6 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadContextMenu, setCadContextMenu] = React.useState(null);
   const cadLongPressTimerRef = React.useRef(null);
   const cadMultiSelectModeRef = React.useRef(false);
-  const [cadRotation, setCadRotation] = React.useState(0);
   // Extended Editing
   const [isEditingLineMode, setIsEditingLineMode] = React.useState(false);
   const [isLineMoving, setIsLineMoving] = React.useState(false);
@@ -961,8 +960,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       const dist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
       const cx = (pts[0].clientX + pts[1].clientX) / 2;
       const cy = (pts[0].clientY + pts[1].clientY) / 2;
-      const angle = Math.atan2(pts[1].clientY - pts[0].clientY, pts[1].clientX - pts[0].clientX) * (180 / Math.PI);
-      setCadPinchInitial({ dist, cx, cy, angle, rotation: cadRotation, view: { ...cadViewport } });
+      setCadPinchInitial({ dist, cx, cy, view: { ...cadViewport } });
       return;
     }
 
@@ -1117,10 +1115,6 @@ const AdminDashboard = ({ setCurrentView }) => {
       const dist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
       const cx = (pts[0].clientX + pts[1].clientX) / 2;
       const cy = (pts[0].clientY + pts[1].clientY) / 2;
-
-      const currentAngle = Math.atan2(pts[1].clientY - pts[0].clientY, pts[1].clientX - pts[0].clientX) * (180 / Math.PI);
-      const angleDelta = currentAngle - cadPinchInitial.angle;
-      setCadRotation(cadPinchInitial.rotation + angleDelta);
 
       const scaleDelta = dist > 5 ? cadPinchInitial.dist / dist : 1;
       const newWidth = cadPinchInitial.view.width * scaleDelta;
@@ -2218,7 +2212,6 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [fmbRight, setFmbRight] = React.useState('');
   const [fmbUnit, setFmbUnit] = React.useState('Meter');
   const [fmbScale, setFmbScale] = React.useState(1);
-  const [fmbRotation, setFmbRotation] = React.useState(0);
   const [fmbPanX, setFmbPanX] = React.useState(0);
   const [fmbPanY, setFmbPanY] = React.useState(0);
   const [isFmbFullScreen, setIsFmbFullScreen] = React.useState(false);
@@ -2230,8 +2223,7 @@ const AdminDashboard = ({ setCurrentView }) => {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const distance = Math.hypot(dx, dy);
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      initialTouchRef.current = { type: 'pinch', distance, angle, scale: fmbScale, rotation: fmbRotation };
+      initialTouchRef.current = { type: 'pinch', distance, scale: fmbScale };
     } else if (e.touches.length === 1) {
       initialTouchRef.current = {
         type: 'pan',
@@ -2249,18 +2241,13 @@ const AdminDashboard = ({ setCurrentView }) => {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const distance = Math.hypot(dx, dy);
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
       
       const scaleFactor = distance / initialTouchRef.current.distance;
       let newScale = initialTouchRef.current.scale * scaleFactor;
-      if (newScale < 0.2) newScale = 0.2;
+      if (newScale < 0.1) newScale = 0.1;
       if (newScale > 5) newScale = 5;
       
-      let angleDiff = angle - initialTouchRef.current.angle;
-      let newRotation = initialTouchRef.current.rotation + angleDiff;
-      
       setFmbScale(newScale);
-      setFmbRotation(newRotation);
     } else if (e.touches.length === 1 && initialTouchRef.current?.type === 'pan') {
       if (e.cancelable) e.preventDefault();
       const dx = e.touches[0].clientX - initialTouchRef.current.startX;
@@ -2280,7 +2267,6 @@ const AdminDashboard = ({ setCurrentView }) => {
     setFmbLeft('');
     setFmbRight('');
     setFmbScale(1);
-    setFmbRotation(0);
     setFmbPanX(0);
     setFmbPanY(0);
   };
@@ -2913,7 +2899,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                       const p4 = `${cx - b/2},${cy + hMax/2}`;
 
                       return (
-                        <div style={{ transform: `translate(${fmbPanX}px, ${fmbPanY}px) scale(${fmbScale}) rotate(${fmbRotation}deg)`, transformOrigin: 'center', transition: fmbPanX === 0 && fmbPanY === 0 && fmbScale === 1 ? 'transform 0.2s ease-out' : 'none', width: '100%', height: '100%' }}>
+                        <div style={{ transform: `translate(${fmbPanX}px, ${fmbPanY}px) scale(${fmbScale})`, transformOrigin: 'center', transition: fmbPanX === 0 && fmbPanY === 0 && fmbScale === 1 ? 'transform 0.2s ease-out' : 'none', width: '100%', height: '100%' }}>
                           <svg viewBox={`0 0 ${vWidth} ${vHeight}`} className="w-full h-full max-h-full drop-shadow-md">
                             {/* Closed Path Geometry */}
                             <polygon 
@@ -3909,7 +3895,6 @@ const AdminDashboard = ({ setCurrentView }) => {
                  <svg 
                    ref={cadSvgRef}
                    className="absolute inset-0 w-full h-full cursor-crosshair touch-none transition-transform duration-75 ease-linear"
-                   style={{ transform: `rotate(${cadRotation}deg)` }}
                    viewBox={`${cadViewport.x} ${cadViewport.y} ${cadViewport.width} ${cadViewport.height}`}
                    preserveAspectRatio="xMidYMid slice"
                  >
