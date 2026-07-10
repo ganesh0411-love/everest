@@ -4364,8 +4364,78 @@ const AdminDashboard = ({ setCurrentView }) => {
                   )})}
 
                   {(() => {
+                    let linesToRender = [...visibleCadLines];
+                    if (visibleCadPolygons.length === 1) {
+                        const p = visibleCadPolygons[0];
+                        const pts = p.pts;
+                        if (pts && pts.length >= 3) {
+                            let cornerIdx = 0;
+                            for (let k = 0; k < pts.length; k++) {
+                                const A = pts[k];
+                                const B = pts[(k + 1) % pts.length];
+                                const C = pts[(k + 2) % pts.length];
+                                const crossProduct = (B.x - A.x) * (C.y - B.y) - (B.y - A.y) * (C.x - B.x);
+                                if (Math.abs(crossProduct) > 0.1) {
+                                    cornerIdx = (k + 1) % pts.length;
+                                    break;
+                                }
+                            }
+                            const rotatedPts = [...pts.slice(cornerIdx), ...pts.slice(0, cornerIdx)];
+                            const consolidatedLines = [];
+                            const linesToRemove = new Set();
+                            let i = 0;
+                            while (i < rotatedPts.length) {
+                                let j = i;
+                                const startPt = rotatedPts[i];
+                                let currentSubLines = [];
+                                while (j < rotatedPts.length) {
+                                    const A = rotatedPts[j];
+                                    const B = rotatedPts[(j + 1) % rotatedPts.length];
+                                    const matchedLine = linesToRender.find(l => 
+                                        (Math.hypot(l.p1.x - A.x, l.p1.y - A.y) < 1e-3 && Math.hypot(l.p2.x - B.x, l.p2.y - B.y) < 1e-3) ||
+                                        (Math.hypot(l.p2.x - A.x, l.p2.y - A.y) < 1e-3 && Math.hypot(l.p1.x - B.x, l.p1.y - B.y) < 1e-3)
+                                    );
+                                    if (!matchedLine) break; 
+                                    currentSubLines.push(matchedLine);
+                                    if (j + 2 <= rotatedPts.length) {
+                                        const C = rotatedPts[(j + 2) % rotatedPts.length];
+                                        const crossProduct = (B.x - A.x) * (C.y - B.y) - (B.y - A.y) * (C.x - B.x);
+                                        const dotProduct = (B.x - A.x) * (C.x - B.x) + (B.y - A.y) * (C.y - B.y);
+                                        const isCollinear = Math.abs(crossProduct) < 0.1 && dotProduct > 0;
+                                        if (isCollinear) {
+                                            j++;
+                                        } else {
+                                            break;
+                                        }
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                if (currentSubLines.length > 1) {
+                                    currentSubLines.forEach(l => linesToRemove.add(l.id));
+                                    let sumFixedLength = 0;
+                                    currentSubLines.forEach(l => {
+                                        if (l.fixedLength) sumFixedLength += parseFloat(l.fixedLength);
+                                        else sumFixedLength += Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y) * (cadScale || 1);
+                                    });
+                                    const endPt = rotatedPts[(j + 1) % rotatedPts.length];
+                                    consolidatedLines.push({
+                                        ...currentSubLines[0], 
+                                        id: `consolidated-${currentSubLines.map(l=>l.id).join('-')}`,
+                                        p1: startPt,
+                                        p2: endPt,
+                                        fixedLength: sumFixedLength.toFixed(2),
+                                        isConsolidated: true
+                                    });
+                                }
+                                i = j + 1;
+                            }
+                            linesToRender = linesToRender.filter(l => !linesToRemove.has(l.id)).concat(consolidatedLines);
+                        }
+                    }
+
                     const renderedMetrics = [];
-                    return visibleCadLines.map(l => {
+                    return linesToRender.map(l => {
                     const isSelected = cadSelectedLine === l.id;
                     const isMetricHovered = cadHoveredNode === null && !cadPointerGesture?.isDragging && !isSelected; // basic fallback
                     const isMetricSelected = cadSelectedMetric === l.id;
