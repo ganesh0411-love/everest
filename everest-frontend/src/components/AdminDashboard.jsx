@@ -1,4 +1,5 @@
 import React from 'react';
+import { flushSync } from 'react-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
@@ -1360,36 +1361,26 @@ const AdminDashboard = ({ setCurrentView }) => {
         const hitPoly = cadActiveHitPolyRef.current;
         const hitSurveyId = cadActiveHitSurveyRef.current;
         
-        if (cadLongPressTriggeredRef.current) {
-            cadLongPressTriggeredRef.current = false;
-        } else {
-            if (cadMultiSelectModeRef.current || e.ctrlKey || e.metaKey) {
-                if (!cadMultiSelectModeRef.current) {
-                    setCadMultiSelectMode(true);
-                    cadMultiSelectModeRef.current = true;
-                    setCadMultiSelectedPolygons(prev => {
-                        const newSelections = [];
-                        if (cadSelectedPolygon && cadSelectedPolygon !== hitPoly) {
-                            newSelections.push(cadSelectedPolygon);
-                        }
-                        if (!newSelections.includes(hitPoly)) newSelections.push(hitPoly);
-                        return newSelections;
-                    });
-                    setCadSelectedPolygon(null);
-                } else {
-                    setCadMultiSelectedPolygons(prev => {
-                        if (prev.includes(hitPoly)) {
-                            return prev.filter(id => id !== hitPoly);
-                        } else {
-                            return [...prev, hitPoly];
-                        }
-                    });
-                }
+        if (e.pointerType === 'touch') {
+            if (cadLongPressTriggeredRef.current) {
+                cadLongPressTriggeredRef.current = false;
             } else {
-                setCadSelectedPolygon(prev => {
-                    if (prev === hitPoly) return null;
-                    if (hitSurveyId) setCadActiveSurveyId(hitSurveyId);
-                    return hitPoly;
+                flushSync(() => {
+                    if (cadMultiSelectModeRef.current) {
+                        setCadMultiSelectedPolygons(prev => {
+                            if (prev.includes(hitPoly)) {
+                                return prev.filter(id => id !== hitPoly);
+                            } else {
+                                return [...prev, hitPoly];
+                            }
+                        });
+                    } else {
+                        setCadSelectedPolygon(prev => {
+                            if (prev === hitPoly) return null;
+                            if (hitSurveyId) setCadActiveSurveyId(hitSurveyId);
+                            return hitPoly;
+                        });
+                    }
                 });
             }
         }
@@ -1616,18 +1607,54 @@ const AdminDashboard = ({ setCurrentView }) => {
                              cadLongPressTimerRef.current = setTimeout(() => {
                                  if (navigator.vibrate) navigator.vibrate(50);
                                  cadLongPressTriggeredRef.current = true;
-                                 setCadMultiSelectMode(true);
-                                 cadMultiSelectModeRef.current = true;
-                                 setCadMultiSelectedPolygons(prev => {
-                                     const newSelections = [];
-                                     if (cadSelectedPolygon && cadSelectedPolygon !== hitPoly) {
-                                         newSelections.push(cadSelectedPolygon);
+                                 
+                                 flushSync(() => {
+                                     if (cadMultiSelectModeRef.current && cadMultiSelectedPolygons.includes(hitPoly)) {
+                                         setCadContextMenu({ x: e.clientX, y: e.clientY, type: 'CLEAR_ALL' });
+                                     } else {
+                                         setCadMultiSelectMode(true);
+                                         cadMultiSelectModeRef.current = true;
+                                         setCadMultiSelectedPolygons(prev => {
+                                             const newSelections = [];
+                                             if (cadSelectedPolygon && cadSelectedPolygon !== hitPoly) {
+                                                 newSelections.push(cadSelectedPolygon);
+                                             }
+                                             if (!newSelections.includes(hitPoly)) newSelections.push(hitPoly);
+                                             return newSelections;
+                                         });
+                                         setCadSelectedPolygon(null);
                                      }
-                                     if (!newSelections.includes(hitPoly)) newSelections.push(hitPoly);
-                                     return newSelections;
                                  });
-                                 setCadSelectedPolygon(null);
                              }, 1500);
+                         } else {
+                             flushSync(() => {
+                                 if (cadMultiSelectModeRef.current || e.ctrlKey || e.metaKey) {
+                                     if (!cadMultiSelectModeRef.current) {
+                                         setCadMultiSelectMode(true);
+                                         cadMultiSelectModeRef.current = true;
+                                         setCadMultiSelectedPolygons(prev => {
+                                             const newSelections = [];
+                                             if (cadSelectedPolygon && cadSelectedPolygon !== hitPoly) {
+                                                 newSelections.push(cadSelectedPolygon);
+                                             }
+                                             if (!newSelections.includes(hitPoly)) newSelections.push(hitPoly);
+                                             return newSelections;
+                                         });
+                                         setCadSelectedPolygon(null);
+                                     } else {
+                                         setCadMultiSelectedPolygons(prev => {
+                                             if (prev.includes(hitPoly)) return prev.filter(id => id !== hitPoly);
+                                             return [...prev, hitPoly];
+                                         });
+                                     }
+                                 } else {
+                                     setCadSelectedPolygon(prev => {
+                                         if (prev === hitPoly) return null;
+                                         if (hitSurveyId) setCadActiveSurveyId(hitSurveyId);
+                                         return hitPoly;
+                                     });
+                                 }
+                             });
                          }
                          setCadSelectedNode(null);
                          setCadSelectedLine(null);
@@ -3903,6 +3930,20 @@ const AdminDashboard = ({ setCurrentView }) => {
                             {cadMultiSelectMode ? "Disable Multi-selection" : "Enable Multi-selection"}
                         </div>
                     )}
+                    {cadContextMenu.type === 'CLEAR_ALL' && (
+                        <div 
+                            className="px-4 py-2 hover:bg-red-600 hover:text-white text-red-400 cursor-pointer border-t border-slate-700"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setCadMultiSelectedPolygons([]);
+                                setCadMultiSelectMode(false);
+                                cadMultiSelectModeRef.current = false;
+                                setCadContextMenu(null);
+                            }}
+                        >
+                            Clear All
+                        </div>
+                    )}
                     {cadContextMenu.type === 'POLYGON' && (
                         <>
                             {!cadMultiSelectModeRef.current && (
@@ -5162,23 +5203,6 @@ const AdminDashboard = ({ setCurrentView }) => {
                 )
              )}
              
-            {cadMultiSelectMode && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[150] pointer-events-auto">
-                    <button
-                        onPointerDown={(e) => {
-                            e.stopPropagation();
-                            setCadMultiSelectedPolygons([]);
-                            setCadMultiSelectMode(false);
-                            cadMultiSelectModeRef.current = false;
-                        }}
-                        className="bg-red-600/90 hover:bg-red-500 text-white font-bold py-2 px-6 rounded-full shadow-2xl border border-red-400 backdrop-blur-sm animate-in fade-in slide-in-from-top-4 flex items-center gap-2"
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        Clear All
-                    </button>
-                </div>
-            )}
-
             {/* VIRTUAL JOYSTICK D-PAD */}
             <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none scale-75 origin-bottom-right"
                  onPointerDown={e => e.stopPropagation()}
