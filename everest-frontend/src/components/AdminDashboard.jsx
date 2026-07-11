@@ -1,6 +1,7 @@
 import React from 'react';
 import { flushSync } from 'react-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { Geolocation } from '@capacitor/geolocation';
 
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.100:5000';
@@ -92,10 +93,65 @@ const splitIntersectingLines = (lines, cadMetricOffsets) => {
   return { lines: newLines, offsets: newOffsets };
 };
 
+const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
+    if (!baseMercX) return null;
+    const R = 6378137;
+    const maxMerc = Math.PI * R;
+    const zFloat = Math.log2(40075016 / viewport.width) + 1.5;
+    const z = Math.max(0, Math.min(22, Math.round(zFloat)));
+    const n = Math.pow(2, z);
+    const tileSizeMeters = 40075016 / n;
+    
+    const vMinX = baseMercX + viewport.x;
+    const vMaxX = baseMercX + viewport.x + viewport.width;
+    const vMaxY = baseMercY - viewport.y;
+    const vMinY = baseMercY - (viewport.y + viewport.height);
+    
+    const txMin = Math.floor((vMinX + maxMerc) / 40075016 * n);
+    const txMax = Math.floor((vMaxX + maxMerc) / 40075016 * n);
+    const tyMin = Math.floor((maxMerc - vMaxY) / 40075016 * n);
+    const tyMax = Math.floor((maxMerc - vMinY) / 40075016 * n);
+    
+    const tiles = [];
+    if ((txMax - txMin) * (tyMax - tyMin) < 100) {
+        for (let x = txMin; x <= txMax; x++) {
+            for (let y = tyMin; y <= tyMax; y++) {
+                if (x >= 0 && x < n && y >= 0 && y < n) tiles.push({ x, y, z });
+            }
+        }
+    }
+    
+    return (
+        <g id="satellite-layer" pointerEvents="none">
+            {tiles.map(tile => {
+                const mercX = (tile.x / n) * 40075016 - maxMerc;
+                const mercY = maxMerc - (tile.y / n) * 40075016;
+                const svgX = mercX - baseMercX;
+                const svgY = baseMercY - mercY;
+                return (
+                    <image
+                        key={`${tile.z}-${tile.x}-${tile.y}`}
+                        x={svgX}
+                        y={svgY}
+                        width={tileSizeMeters + 0.5}
+                        height={tileSizeMeters + 0.5}
+                        href={`https://mt1.google.com/vt/lyrs=s&x=${tile.x}&y=${tile.y}&z=${tile.z}`}
+                        preserveAspectRatio="none"
+                        opacity={1}
+                    />
+                );
+            })}
+        </g>
+    );
+};
+
 const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);
   const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
+
+  const [mapConfig, setMapConfig] = React.useState({ active: false, baseMercX: 0, baseMercY: 0 });
+
 
   // --- MANUAL CAD ENGINE STATE ---
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
@@ -4054,7 +4110,10 @@ const AdminDashboard = ({ setCurrentView }) => {
                        <path d={`M ${cadViewport.width * 0.05} 0 L 0 0 0 ${cadViewport.width * 0.05}`} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={cadViewport.width * 0.001}/>
                      </pattern>
                    </defs>
-                   <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
+                    {mapConfig.active && (
+                       <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                    )}
+                    <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
                    
                      <g id="cad-drawing-layer">
                       {(cadBackgroundImage && isBackgroundImageVisible) && (
@@ -5401,8 +5460,36 @@ const AdminDashboard = ({ setCurrentView }) => {
                   
                   {/* Bottom Button: Map Layers */}
                   <button 
-                     className="w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex justify-center items-center font-bold transition-colors"
-                     title="Map Layers"
+                     className={`w-10 h-10 rounded-full flex justify-center items-center font-bold transition-colors ${mapConfig.active ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                     onClick={async () => {
+                        if (mapConfig.active) {
+                            setMapConfig(prev => ({ ...prev, active: false }));
+                            return;
+                        }
+                        try {
+                            const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+                            const lat = position.coords.latitude;
+                            const lon = position.coords.longitude;
+                            const R = 6378137;
+                            const baseMercX = R * (lon * Math.PI / 180);
+                            const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+                            
+                            setMapConfig(prev => {
+                                if (prev.baseMercX !== 0) {
+                                    const targetX = baseMercX - prev.baseMercX;
+                                    const targetY = prev.baseMercY - baseMercY;
+                                    setCadViewport({ x: targetX - cadViewport.width/2, y: targetY - cadViewport.height/2, width: cadViewport.width, height: cadViewport.height });
+                                    return { ...prev, active: true };
+                                } else {
+                                    setCadViewport({ x: -cadViewport.width/2, y: -cadViewport.height/2, width: cadViewport.width, height: cadViewport.height });
+                                    return { active: true, baseMercX, baseMercY };
+                                }
+                            });
+                        } catch (e) {
+                            alert("Geolocation failed: " + e.message);
+                        }
+                     }}
+                     title="Live Satellite Map"
                   >
                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polygon points="12 2 2 7 12 12 22 7 12 2"/>
