@@ -820,7 +820,7 @@ const AdminDashboard = ({ setCurrentView }) => {
     }, [cadPolygons, cadSurveys, checkedSurveyNos, selectedSubDivisions]);
 
   const cadComputedArea = React.useMemo(() => {
-    if (!cadScale || cadLines.length < 3 || visibleCadPolygons.length === 0) return null;
+    if (cadLines.length < 3 || visibleCadPolygons.length === 0) return null;
     
     let areaPixels = 0;
     if (cadMultiSelectMode && cadMultiSelectedPolygons.length > 0) {
@@ -837,7 +837,11 @@ const AdminDashboard = ({ setCurrentView }) => {
     
     if (areaPixels <= 0) return null;
     
-    const sqMeters = areaPixels * cadScale * cadScale;
+    // Geodesic Mercator scale adjustment for live satellite map, or raw cadScale for FMB
+    const effectiveScale = mapConfig.active ? Math.cos(mapConfig.baseLat * Math.PI / 180) : cadScale;
+    if (!effectiveScale) return null;
+
+    const sqMeters = areaPixels * effectiveScale * effectiveScale;
     return {
        sqMeters,
        hectare: sqMeters / 10000,
@@ -846,7 +850,7 @@ const AdminDashboard = ({ setCurrentView }) => {
        cent: sqMeters / 40.4686,
        sqFt: sqMeters * 10.7639
     };
-  }, [cadLines, cadScale, visibleCadPolygons, cadSelectedPolygon, cadMultiSelectMode, cadMultiSelectedPolygons, cadNodes]);
+  }, [cadLines, cadScale, visibleCadPolygons, cadSelectedPolygon, cadMultiSelectMode, cadMultiSelectedPolygons, cadNodes, mapConfig]);
 
   const cadOpenNodes = React.useMemo(() => {
       if (visibleCadLines.length < 3) return [];
@@ -2039,10 +2043,10 @@ const AdminDashboard = ({ setCurrentView }) => {
     isAreaDropdownOpen, isSurveyDropdownOpen, isSubDivisionDropdownOpen
   ]);
 
-  const getHVal = () => workspaceArea ? (parseInt(workspaceArea.h, 10) || 0) : 0;
-  const getAVal = () => workspaceArea ? (parseFloat(workspaceArea.a) || 0) : 0;
-  const getSqm = () => ( (getHVal() + (getAVal() / 100)) * 10000 ).toFixed(2);
-  const getSqft = () => ( (getHVal() + (getAVal() / 100)) * 107639.1 ).toFixed(2);
+  const getHVal = () => cadComputedArea ? Math.floor(cadComputedArea.hectare) : (workspaceArea ? (parseInt(workspaceArea.h, 10) || 0) : 0);
+  const getAVal = () => cadComputedArea ? cadComputedArea.are : (workspaceArea ? (parseFloat(workspaceArea.a) || 0) : 0);
+  const getSqm = () => cadComputedArea ? cadComputedArea.sqMeters.toFixed(2) : ( (getHVal() + (getAVal() / 100)) * 10000 ).toFixed(2);
+  const getSqft = () => cadComputedArea ? cadComputedArea.sqFt.toFixed(2) : ( (getHVal() + (getAVal() / 100)) * 107639.1 ).toFixed(2);
 
   const handleSaveCalculations = async () => {
     if (!currentProjectId) return;
@@ -3439,15 +3443,15 @@ const AdminDashboard = ({ setCurrentView }) => {
                                </div>
                              </div>
                              <div className="flex justify-between items-center">
-                               <div className="flex-1 flex flex-col items-center border-r border-slate-200">
-                                 <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Acre</span>
-                                 <span className="text-lg font-black text-slate-800">{calculatedLandArea.acre}</span>
-                               </div>
-                               <div className="flex-1 flex flex-col items-center">
-                                 <span className="text-emerald-600/80 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Cent</span>
-                                 <span className="text-xl font-black text-emerald-700">{calculatedLandArea.cent}</span>
-                               </div>
-                             </div>
+                                <div className="flex-1 flex flex-col items-center border-r border-slate-200">
+                                  <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Acre</span>
+                                  <span className="text-lg font-black text-slate-800">{cadComputedArea ? cadComputedArea.acre.toFixed(4) : calculatedLandArea.acre}</span>
+                                </div>
+                                <div className="flex-1 flex flex-col items-center">
+                                  <span className="text-emerald-600/80 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Cent</span>
+                                  <span className="text-xl font-black text-emerald-700">{cadComputedArea ? cadComputedArea.cent.toFixed(2) : calculatedLandArea.cent}</span>
+                                </div>
+                              </div>
                            </div>
                        )}
                        <div className="mt-8 flex justify-end">
@@ -5448,38 +5452,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                    </button>
                   </div>
                 )
-             )}
-             
-            {/* FLOATING MY LOCATION BUTTON */}
-            <div className="absolute bottom-40 right-8 z-[120]">
-              <button 
-                 className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 border-2 border-slate-600 text-sky-400 flex justify-center items-center shadow-2xl transition-colors"
-                 onClick={async () => {
-                    try {
-                        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        if (mapConfig.active) {
-                            const R = 6378137;
-                            const mercX = R * (lon * Math.PI / 180);
-                            const mercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
-                            const targetX = mercX - mapConfig.baseMercX;
-                            const targetY = mapConfig.baseMercY - mercY;
-                            // Dynamically translate and scale viewport matrix to 500x500 map scale!
-                            setCadViewport(v => ({ ...v, x: targetX - 500/2, y: targetY - 500/2, width: 500, height: 500 }));
-                        }
-                    } catch(e) {
-                        alert("GPS Error: " + e.message);
-                    }
-                 }}
-                 title="Re-center Location"
-              >
-                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <circle cx="12" cy="12" r="3"></circle>
-                 </svg>
-              </button>
-            </div>
+                  })()}
+
 
             {/* VIRTUAL JOYSTICK D-PAD */}
             <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none scale-75 origin-bottom-right"
@@ -5523,7 +5497,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                         onClick={async () => {
                             if (mapConfig.active) {
                                 try {
-                                    const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+                                    const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
                                     const lat = position.coords.latitude;
                                     const lon = position.coords.longitude;
                                     const R = 6378137;
@@ -5593,7 +5567,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                             return;
                         }
                         try {
-                            const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+                            const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
                             const lat = position.coords.latitude;
                             const lon = position.coords.longitude;
                             const R = 6378137;
