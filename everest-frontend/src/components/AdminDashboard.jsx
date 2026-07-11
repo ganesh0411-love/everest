@@ -106,6 +106,9 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
     const [isSubDivisionDropdownOpen, setIsSubDivisionDropdownOpen] = React.useState(false);
     const [checkedSurveyNos, setCheckedSurveyNos] = React.useState([]);
+    const [selectedSubDivisions, setSelectedSubDivisions] = React.useState([]);
+    const [surveySearchText, setSurveySearchText] = React.useState('');
+    const [subDivSearchText, setSubDivSearchText] = React.useState('');
   const [cadLines, setCadLines] = React.useState([]);
   const [cadCircles, setCadCircles] = React.useState([]);
   const [cadScale, setCadScale] = React.useState(null);
@@ -491,10 +494,10 @@ const AdminDashboard = ({ setCurrentView }) => {
     const visibleSurveyIds = new Set(cadSurveys.filter(s => {
           if (!checkedSurveyNos.includes(s.surveyNo)) return false;
           
-          const isMasterDash = !cadSurveys.some(sub => sub.surveyNo === s.surveyNo && sub.isVisible);
-          if (isMasterDash) return true;
+          if (selectedSubDivisions.length === 0) return true;
           
-          return s.isVisible;
+          const compositeKey = `${s.surveyNo}_${s.subDivisionNo || '-'}`;
+          return selectedSubDivisions.includes(compositeKey);
       }).map(s => s.id));
       return cadLines.filter(l => {
           const parentSurveys = new Set();
@@ -518,7 +521,7 @@ const AdminDashboard = ({ setCurrentView }) => {
           if (!l.surveyId && cadSurveys.length > 0) return false;
           return surveyIds.some(id => visibleSurveyIds.has(id));
       });
-  }, [cadLines, cadSurveys, cadPolygons, checkedSurveyNos]);
+  }, [cadLines, cadSurveys, cadPolygons, checkedSurveyNos, selectedSubDivisions]);
 
   const getMetricDefaultOffset = (l, fontSize = 24) => {
       let rot = Math.atan2(l.p2.y - l.p1.y, l.p2.x - l.p1.x) * (180 / Math.PI);
@@ -732,12 +735,12 @@ const AdminDashboard = ({ setCurrentView }) => {
          if (!s) return true;
          if (!checkedSurveyNos.includes(s.surveyNo)) return false;
          
-         const isMasterDash = !cadSurveys.some(sub => sub.surveyNo === s.surveyNo && sub.isVisible);
-         if (isMasterDash) return true;
+         if (selectedSubDivisions.length === 0) return true;
          
-         return s.isVisible;
+         const compositeKey = `${s.surveyNo}_${s.subDivisionNo || '-'}`;
+         return selectedSubDivisions.includes(compositeKey);
       });
-    }, [cadPolygons, cadSurveys, checkedSurveyNos]);
+    }, [cadPolygons, cadSurveys, checkedSurveyNos, selectedSubDivisions]);
 
   const cadComputedArea = React.useMemo(() => {
     if (!cadScale || cadLines.length < 3 || visibleCadPolygons.length === 0) return null;
@@ -3661,27 +3664,35 @@ const AdminDashboard = ({ setCurrentView }) => {
                     </button>
                  </div>
                  <div className="flex-1 flex flex-col justify-center px-3 py-1.5 min-w-0">
-                    <button onClick={() => { setIsSurveyDropdownOpen(!isSurveyDropdownOpen); setIsSubDivisionDropdownOpen(false); }} className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-sky-400 transition-colors outline-none leading-tight">
-                      <span className="truncate">
-                        {(() => {
-                           const activeObj = cadSurveys.find(s => s.id === cadActiveSurveyId);
-                           if (activeObj) return `Survey No ${activeObj.surveyNo}`;
-                           return checkedSurveyNos.length > 0 ? `Survey No ${checkedSurveyNos[0]}` : 'Survey No';
+                    <div className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-sky-400 transition-colors outline-none leading-tight relative cursor-text" onClick={() => { setIsSurveyDropdownOpen(true); setIsSubDivisionDropdownOpen(false); }}>
+                      <input 
+                        className="bg-transparent outline-none w-full truncate placeholder-slate-400 cursor-text"
+                        value={isSurveyDropdownOpen ? surveySearchText : (() => {
+                            if (checkedSurveyNos.length === 1) return `Survey No ${checkedSurveyNos[0]}`;
+                            if (checkedSurveyNos.length > 1) return 'FULL';
+                            return 'Survey No';
                         })()}
-                      </span> 
-                      <span className="text-[10px] text-slate-400">▼</span>
-                    </button>
-                    <button onClick={() => { setIsSubDivisionDropdownOpen(!isSubDivisionDropdownOpen); setIsSurveyDropdownOpen(false); }} className="flex items-center justify-between w-full text-slate-400 font-bold text-[10px] hover:text-sky-400 transition-colors outline-none leading-tight mt-0.5">
-                      <span className="truncate">
-                        {(() => {
-                           if (checkedSurveyNos.length === 0) return 'Sub-division -';
-                           const activeObj = cadSurveys.find(s => s.id === cadActiveSurveyId);
-                           if (activeObj) return `Sub-division - ${activeObj.subDivisionNo || '-'}`;
-                           return 'Sub-division - All';
+                        onChange={(e) => setSurveySearchText(e.target.value)}
+                        placeholder="Search Survey No..."
+                      />
+                      <span className="text-[10px] text-slate-400 absolute right-0 pointer-events-none bg-slate-800 pl-1">▼</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between w-full text-slate-400 font-bold text-[10px] hover:text-sky-400 transition-colors outline-none leading-tight mt-0.5 relative cursor-text" onClick={() => { setIsSubDivisionDropdownOpen(true); setIsSurveyDropdownOpen(false); }}>
+                      <input 
+                        className="bg-transparent outline-none w-full truncate placeholder-slate-500 cursor-text"
+                        value={isSubDivisionDropdownOpen ? subDivSearchText : (() => {
+                            if (selectedSubDivisions.length === 0) return 'Sub-division - All';
+                            const uniqueActiveSD = new Set(selectedSubDivisions.map(k => k.split('_')[1]));
+                            if (uniqueActiveSD.size === 1) return Array.from(uniqueActiveSD)[0];
+                            if (uniqueActiveSD.size > 1) return 'ALL';
+                            return 'Sub-division -';
                         })()}
-                      </span> 
-                      <span className="text-[9px]">▼</span>
-                    </button>
+                        onChange={(e) => setSubDivSearchText(e.target.value)}
+                        placeholder="Search Sub-division..."
+                      />
+                      <span className="text-[9px] absolute right-0 pointer-events-none bg-slate-800 pl-1">▼</span>
+                    </div>
                  </div>
 
                  {/* DROPDOWNS OUTSIDE OVERFLOW CONTEXTS */}
@@ -3699,12 +3710,14 @@ const AdminDashboard = ({ setCurrentView }) => {
                  )}
                  {isSurveyDropdownOpen && (
                       <>
-                        <div className="fixed inset-0 z-40" onClick={() => setIsSurveyDropdownOpen(false)}></div>
+                        <div className="fixed inset-0 z-40" onClick={() => { setIsSurveyDropdownOpen(false); setSurveySearchText(''); }}></div>
                         <div className="absolute top-full right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[120px] flex flex-col max-h-[300px] overflow-y-auto">
                            {cadSurveys.length === 0 ? (
                                <div className="px-4 py-2 text-xs text-slate-400 italic text-center">No surveys</div>
                            ) : (
-                               Array.from(new Set(cadSurveys.map(s => s.surveyNo))).map(surveyNo => (
+                               Array.from(new Set(cadSurveys.map(s => s.surveyNo)))
+                               .filter(surveyNo => !surveySearchText || String(surveyNo).toLowerCase().includes(surveySearchText.toLowerCase()))
+                               .map(surveyNo => (
                                    <div key={surveyNo} className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { e.stopPropagation(); setCheckedSurveyNos(prev => prev.includes(surveyNo) ? prev.filter(n => n !== surveyNo) : [...prev, surveyNo]); }}>
                                        <input 
                                            type="checkbox" 
@@ -3722,14 +3735,14 @@ const AdminDashboard = ({ setCurrentView }) => {
                    )}
                    {isSubDivisionDropdownOpen && (
                       <>
-                        <div className="fixed inset-0 z-40" onClick={() => setIsSubDivisionDropdownOpen(false)}></div>
+                        <div className="fixed inset-0 z-40" onClick={() => { setIsSubDivisionDropdownOpen(false); setSubDivSearchText(''); }}></div>
                         <div className="absolute top-full right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[180px] flex flex-col max-h-[300px] overflow-y-auto">
                            {/* MASTER DASH ROW */}
-                           <div className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50" onClick={(e) => { e.stopPropagation(); setCadSurveys(prev => prev.map(s => checkedSurveyNos.includes(s.surveyNo) ? { ...s, isVisible: false } : s)); }}>
+                           <div className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50" onClick={(e) => { e.stopPropagation(); setSelectedSubDivisions([]); }}>
                                <input 
                                    type="checkbox" 
-                                   checked={!cadSurveys.some(s => checkedSurveyNos.includes(s.surveyNo) && s.isVisible)} 
-                                   onChange={(e) => { e.stopPropagation(); setCadSurveys(prev => prev.map(s => checkedSurveyNos.includes(s.surveyNo) ? { ...s, isVisible: false } : s)); }} 
+                                   checked={selectedSubDivisions.length === 0} 
+                                   onChange={(e) => { e.stopPropagation(); setSelectedSubDivisions([]); }} 
                                    onClick={(e) => e.stopPropagation()}
                                    className="w-3.5 h-3.5 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700 cursor-pointer" 
                                />
@@ -3737,25 +3750,66 @@ const AdminDashboard = ({ setCurrentView }) => {
                            </div>
 
                            {/* DEPENDENT CASCADE ROWS */}
-                           {cadSurveys.filter(s => checkedSurveyNos.includes(s.surveyNo)).length === 0 ? (
-                               <div className="px-4 py-2 text-xs text-slate-400 italic text-center">No active sub-divisions</div>
-                           ) : (
-                               cadSurveys.filter(s => checkedSurveyNos.includes(s.surveyNo)).map(survey => (
-                                   <div key={survey.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { e.stopPropagation(); setCadSurveys(prev => prev.map(s => s.id === survey.id ? { ...s, isVisible: !s.isVisible } : s)); setCadActiveSurveyId(survey.id); }}>
-                                       <div className="flex items-center gap-3">
-                                           <input 
-                                               type="checkbox" 
-                                               checked={survey.isVisible} 
-                                               onChange={(e) => { e.stopPropagation(); setCadSurveys(prev => prev.map(s => s.id === survey.id ? { ...s, isVisible: e.target.checked } : s)); setCadActiveSurveyId(survey.id); }} 
-                                               onClick={(e) => e.stopPropagation()}
-                                               className="w-3.5 h-3.5 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700 cursor-pointer" 
-                                           />
-                                           <span className={`text-xs font-bold ${cadActiveSurveyId === survey.id ? 'text-white' : 'text-slate-300'}`}>{survey.subDivisionNo || '-'}</span>
+                           {(() => {
+                               const activeSurveys = cadSurveys.filter(s => checkedSurveyNos.includes(s.surveyNo));
+                               if (activeSurveys.length === 0) {
+                                   return <div className="px-4 py-2 text-xs text-slate-400 italic text-center">No active sub-divisions</div>;
+                               }
+                               
+                               const sdToSurveys = new Map();
+                               activeSurveys.forEach(s => {
+                                   const sdNo = s.subDivisionNo || '-';
+                                   if (!sdToSurveys.has(sdNo)) sdToSurveys.set(sdNo, new Set());
+                                   sdToSurveys.get(sdNo).add(s.surveyNo);
+                               });
+                               
+                               const uniqueSubDivsMap = new Map();
+                               activeSurveys.forEach(s => {
+                                   const sdNo = s.subDivisionNo || '-';
+                                   const hasCollision = sdToSurveys.get(sdNo).size > 1;
+                                   const displayLabel = hasCollision ? `${sdNo} (${s.surveyNo})` : sdNo;
+                                   const groupKey = displayLabel;
+                                   const compositeKey = `${s.surveyNo}_${sdNo}`;
+                                   
+                                   if (!uniqueSubDivsMap.has(groupKey)) {
+                                       uniqueSubDivsMap.set(groupKey, {
+                                           sdNo,
+                                           displayLabel,
+                                           compositeKey,
+                                           ids: [s.id],
+                                           hexColor: s.hexColor
+                                       });
+                                   } else {
+                                       const entry = uniqueSubDivsMap.get(groupKey);
+                                       entry.ids.push(s.id);
+                                   }
+                               });
+                               
+                               const uniqueSubDivs = Array.from(uniqueSubDivsMap.values())
+                               .filter(group => !subDivSearchText || String(group.displayLabel).toLowerCase().includes(subDivSearchText.toLowerCase()))
+                               .sort((a, b) => {
+                                   return a.displayLabel.localeCompare(b.displayLabel, undefined, { numeric: true, sensitivity: 'base' });
+                               });
+
+                               return uniqueSubDivs.map(group => {
+                                   const isChecked = selectedSubDivisions.includes(group.compositeKey);
+                                   return (
+                                       <div key={group.displayLabel} className="flex items-center justify-between px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { e.stopPropagation(); setSelectedSubDivisions(prev => isChecked ? prev.filter(k => k !== group.compositeKey) : [...prev, group.compositeKey]); }}>
+                                           <div className="flex items-center gap-3">
+                                               <input 
+                                                   type="checkbox" 
+                                                   checked={isChecked} 
+                                                   onChange={(e) => { e.stopPropagation(); setSelectedSubDivisions(prev => e.target.checked ? [...prev, group.compositeKey] : prev.filter(k => k !== group.compositeKey)); }} 
+                                                   onClick={(e) => e.stopPropagation()}
+                                                   className="w-3.5 h-3.5 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700 cursor-pointer" 
+                                               />
+                                               <span className={`text-xs font-bold text-slate-300`}>{group.displayLabel}</span>
+                                           </div>
+                                           <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: group.hexColor }}></div>
                                        </div>
-                                       <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: survey.hexColor }}></div>
-                                   </div>
-                               ))
-                           )}
+                                   );
+                               });
+                           })()}
                         </div>
                       </>
                    )}
@@ -4081,121 +4135,96 @@ const AdminDashboard = ({ setCurrentView }) => {
                         let cx = bestPt.x;
                         let cy = bestPt.y;
                         
-                        // 1. Calculate horizontal space AT the centroid
-                        let lefts = [], rights = [], tops = [], bottoms = [];
+                        // 1. Candidate angles: 0 (horizontal), and all edge angles
+                        const candidateAngles = [0];
                         for (let i = 0; i < n; i++) {
                             const p1 = pts[i];
                             const p2 = pts[(i + 1) % n];
-                            
-                            // Intersect horizontal line y = cy
-                            if ((p1.y <= cy && p2.y > cy) || (p1.y > cy && p2.y <= cy)) {
-                                const xInt = p1.x + (cy - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
-                                if (xInt <= cx) lefts.push(xInt);
-                                if (xInt >= cx) rights.push(xInt);
-                            }
-                            // Intersect vertical line x = cx
-                            if ((p1.x <= cx && p2.x > cx) || (p1.x > cx && p2.x <= cx)) {
-                                const yInt = p1.y + (cx - p1.x) * (p2.y - p1.y) / (p2.x - p1.x);
-                                if (yInt <= cy) tops.push(yInt);
-                                if (yInt >= cy) bottoms.push(yInt);
+                            const dx = p2.x - p1.x;
+                            const dy = p2.y - p1.y;
+                            if (dx !== 0 || dy !== 0) {
+                                let a = Math.atan2(dy, dx);
+                                if (a < 0) a += Math.PI;
+                                candidateAngles.push(a);
                             }
                         }
                         
-                        let horizW = 0;
-                        if (lefts.length > 0 && rights.length > 0) {
-                            horizW = Math.min(...rights) - Math.max(...lefts);
-                        } else {
-                            // Fallback to bounding box width
-                            const minX = Math.min(...pts.map(pt => pt.x));
-                            const maxX = Math.max(...pts.map(pt => pt.x));
-                            horizW = maxX - minX;
-                        }
+                        let bestAngle = 0;
+                        let bestScore = -1;
+                        let actualBestFont = 1;
                         
-                        let horizH = 0;
-                        if (tops.length > 0 && bottoms.length > 0) {
-                            horizH = Math.min(...bottoms) - Math.max(...tops);
-                        } else {
-                            const minY = Math.min(...pts.map(pt => pt.y));
-                            const maxY = Math.max(...pts.map(pt => pt.y));
-                            horizH = maxY - minY;
-                        }
-                        
-                        const horizLenConst = (horizW * 0.75) / Math.max(1, labelText.length * 0.6);
-                        const horizHeightConst = horizH * 0.65;
-                        const horizFontSize = Math.min(horizLenConst, horizHeightConst);
-
-                        // 2. Calculate Diagonal Space (Principal Axis) AT the centroid
-                        let ixx = 0, iyy = 0, ixy = 0;
-                        for (let i = 0; i < n; i++) {
-                            ixx += (pts[i].x - cx) ** 2;
-                            iyy += (pts[i].y - cy) ** 2;
-                            ixy += (pts[i].x - cx) * (pts[i].y - cy);
-                        }
-                        let angleRad = 0.5 * Math.atan2(2 * ixy, ixx - iyy);
-                        let angleDeg = angleRad * (180 / Math.PI);
-                        if (angleDeg > 90) angleDeg -= 180;
-                        if (angleDeg < -90) angleDeg += 180;
-                        
-                        const cosA = Math.cos(angleRad);
-                        const sinA = Math.sin(angleRad);
-                        
-                        let uMins = [], uMaxs = [], vMins = [], vMaxs = [];
-                        for (let i = 0; i < n; i++) {
-                            const p1 = pts[i];
-                            const p2 = pts[(i + 1) % n];
+                        for (let a of candidateAngles) {
+                            const cosA = Math.cos(a);
+                            const sinA = Math.sin(a);
                             
-                            const u1 = (p1.x - cx) * cosA + (p1.y - cy) * sinA;
-                            const v1 = -(p1.x - cx) * sinA + (p1.y - cy) * cosA;
-                            const u2 = (p2.x - cx) * cosA + (p2.y - cy) * sinA;
-                            const v2 = -(p2.x - cx) * sinA + (p2.y - cy) * cosA;
-                            
-                            // Intersect V=0
-                            if ((v1 <= 0 && v2 > 0) || (v1 > 0 && v2 <= 0)) {
-                                const uInt = u1 + (0 - v1) * (u2 - u1) / (v2 - v1);
-                                if (uInt <= 0) uMins.push(uInt);
-                                if (uInt >= 0) uMaxs.push(uInt);
+                            let uMins = [], uMaxs = [];
+                            for (let i = 0; i < n; i++) {
+                                const p1 = pts[i];
+                                const p2 = pts[(i + 1) % n];
+                                
+                                const u1 = (p1.x - cx) * cosA + (p1.y - cy) * sinA;
+                                const v1 = -(p1.x - cx) * sinA + (p1.y - cy) * cosA;
+                                const u2 = (p2.x - cx) * cosA + (p2.y - cy) * sinA;
+                                const v2 = -(p2.x - cx) * sinA + (p2.y - cy) * cosA;
+                                
+                                if ((v1 <= 0 && v2 > 0) || (v1 > 0 && v2 <= 0)) {
+                                    const uInt = u1 + (0 - v1) * (u2 - u1) / (v2 - v1);
+                                    if (uInt <= 0) uMins.push(uInt);
+                                    if (uInt >= 0) uMaxs.push(uInt);
+                                }
                             }
                             
-                            // Intersect U=0
-                            if ((u1 <= 0 && u2 > 0) || (u1 > 0 && u2 <= 0)) {
-                                const vInt = v1 + (0 - u1) * (v2 - v1) / (u2 - u1);
-                                if (vInt <= 0) vMins.push(vInt);
-                                if (vInt >= 0) vMaxs.push(vInt);
+                            let diagW = 0;
+                            if (uMins.length > 0 && uMaxs.length > 0) {
+                                diagW = Math.min(...uMaxs) - Math.max(...uMins);
+                            }
+                            
+                            let minFontForPoly = Infinity;
+                            for (let i = 0; i < n; i++) {
+                                const A = pts[i];
+                                const B = pts[(i + 1) % n];
+                                const dx = B.x - A.x;
+                                const dy = B.y - A.y;
+                                const L = Math.hypot(dx, dy);
+                                if (L === 0) continue;
+                                
+                                let t = ((cx - A.x) * dx + (cy - A.y) * dy) / (L * L);
+                                t = Math.max(0, Math.min(1, t));
+                                const projX = A.x + t * dx;
+                                const projY = A.y + t * dy;
+                                const D = Math.hypot(cx - projX, cy - projY);
+                                
+                                const Nx = -dy / L;
+                                const Ny = dx / L;
+                                const dotX = Math.abs(Nx * cosA + Ny * sinA);
+                                const dotY = Math.abs(Nx * -sinA + Ny * cosA);
+                                
+                                const extCoeff = (Math.max(1, labelText.length) * 0.3) * dotX + 0.5 * dotY;
+                                if (extCoeff > 0) {
+                                    const limit = (D * 0.9) / extCoeff;
+                                    if (limit < minFontForPoly) {
+                                        minFontForPoly = limit;
+                                    }
+                                }
+                            }
+                            
+                            const chordLimit = (diagW * 0.8) / Math.max(1, labelText.length * 0.6);
+                            const allowedF = Math.min(minFontForPoly, chordLimit);
+                            
+                            const score = allowedF * (a === 0 ? 1.2 : 1);
+                            
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestAngle = a;
+                                actualBestFont = allowedF;
                             }
                         }
                         
-                        let diagW = 0, diagH = 0;
-                        if (uMins.length > 0 && uMaxs.length > 0) {
-                            diagW = Math.min(...uMaxs) - Math.max(...uMins);
-                        } else {
-                            diagW = horizW; // Fallback
-                        }
+                        let angleDegTransform = bestAngle * (180 / Math.PI);
+                        if (angleDegTransform > 90) angleDegTransform -= 180;
+                        if (angleDegTransform < -90) angleDegTransform += 180;
                         
-                        if (vMins.length > 0 && vMaxs.length > 0) {
-                            diagH = Math.min(...vMaxs) - Math.max(...vMins);
-                        } else {
-                            diagH = horizH; // Fallback
-                        }
-
-                        const diagLenConst = (diagW * 0.75) / Math.max(1, labelText.length * 0.6);
-                        const diagHeightConst = diagH * 0.65;
-                        const diagFontSize = Math.min(diagLenConst, diagHeightConst);
-
-                        // 3. Evaluation & Orientation
-                        let finalAngle = 0;
-                        let finalFontSize = horizFontSize;
-                        
-                        // Strict check: if horizontal fits fine (e.g. >= 14px), keep it straight!
-                        // Only flip to diagonal if horizontal is very tight (< 14) and diagonal actually helps.
-                        if (horizFontSize < 14 && diagFontSize > horizFontSize * 1.3) {
-                            finalAngle = angleDeg;
-                            finalFontSize = diagFontSize;
-                        }
-                        
-                        let calculatedFontSize = Math.min(60, Math.max(1, finalFontSize));
-                        
-                        // Pass finalAngle down to the transform block
-                        const angleDegTransform = finalAngle;
+                        let calculatedFontSize = Math.min(60, Math.max(1, actualBestFont));
                         
                         textNode = (
                             <g
