@@ -5451,9 +5451,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                      Fix Error
                    </button>
                   </div>
-                )
-                  })()}
-
+             )}
 
             {/* VIRTUAL JOYSTICK D-PAD */}
             <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none scale-75 origin-bottom-right"
