@@ -5562,7 +5562,6 @@ const AdminDashboard = ({ setCurrentView }) => {
                                 <div className="flex flex-row items-center justify-between gap-2">
                                     <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Survey No.</label>
                                     <input autoFocus type="text" value={cadPromptSurveyNo} onChange={e => setCadPromptSurveyNo(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-0.5 text-white w-[90px] text-[10px] font-bold outline-none focus:border-sky-500 text-right" placeholder="Opt." />
-                                </div>1" required />
                                 </div>
                                 <div className="flex flex-row items-center justify-between gap-2">
                                     <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Sub-div</label>
