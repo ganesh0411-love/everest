@@ -4754,6 +4754,49 @@ const AdminDashboard = ({ setCurrentView }) => {
                      }
                      if (!displayText) return null;
 
+                     let finalFontSize = txt.fontSize || 40;
+                     if (txt.id.startsWith('poly-')) {
+                         const polyId = txt.id.replace('poly-', '');
+                         const poly = visibleCadPolygons.find(p => p.id === polyId);
+                         if (poly && poly.pts && poly.pts.length > 2) {
+                             let minFontForPoly = Infinity;
+                             const theta = (txt.rotation || 0) * (Math.PI / 180);
+                             const cosT = Math.cos(theta);
+                             const sinT = Math.sin(theta);
+                             
+                             for (let i = 0; i < poly.pts.length; i++) {
+                                 const A = poly.pts[i];
+                                 const B = poly.pts[(i + 1) % poly.pts.length];
+                                 const dx = B.x - A.x;
+                                 const dy = B.y - A.y;
+                                 const L = Math.hypot(dx, dy);
+                                 if (L === 0) continue;
+                                 
+                                 let t = ((txt.x - A.x) * dx + (txt.y - A.y) * dy) / (L * L);
+                                 t = Math.max(0, Math.min(1, t));
+                                 const projX = A.x + t * dx;
+                                 const projY = A.y + t * dy;
+                                 const D = Math.hypot(txt.x - projX, txt.y - projY);
+                                 
+                                 const Nx = -dy / L;
+                                 const Ny = dx / L;
+                                 const dotX = Math.abs(Nx * cosT + Ny * sinT);
+                                 const dotY = Math.abs(Nx * -sinT + Ny * cosT);
+                                 
+                                 const extCoeff = (Math.max(1, displayText.length) * 0.3) * dotX + 0.5 * dotY;
+                                 if (extCoeff > 0) {
+                                     const limit = (D * 0.9) / extCoeff;
+                                     if (limit < minFontForPoly) {
+                                         minFontForPoly = limit;
+                                     }
+                                 }
+                             }
+                             if (minFontForPoly < finalFontSize) {
+                                 finalFontSize = Math.max(1, minFontForPoly);
+                             }
+                         }
+                     }
+
                      const isSelected = cadSelectedText === txt.id;
                      return (
                         <g
@@ -4784,7 +4827,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                            <text
                               x={txt.x} y={txt.y}
                               fill="transparent"
-                              fontSize={txt.fontSize || 40}
+                              fontSize={finalFontSize}
                               fontWeight="bold"
                               textAnchor="middle"
                               dominantBaseline="central"
@@ -4792,14 +4835,14 @@ const AdminDashboard = ({ setCurrentView }) => {
                               transform={txt.rotation ? `rotate(${txt.rotation}, ${txt.x}, ${txt.y})` : undefined}
                               paintOrder="stroke"
                               stroke="transparent"
-                              strokeWidth={txt.fontSize ? txt.fontSize * 1.5 : 60}
+                              strokeWidth={finalFontSize * 1.5}
                            >
                               {displayText}
                            </text>
                            <text
                               x={txt.x} y={txt.y}
                               fill={isSelected ? "#fbcfe8" : (txt.hexColor || "#e2e8f0")}
-                              fontSize={txt.fontSize || 40}
+                              fontSize={finalFontSize}
                               fontWeight="bold"
                               textAnchor="middle"
                               dominantBaseline="central"
