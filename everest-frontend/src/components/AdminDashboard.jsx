@@ -5541,7 +5541,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                                 onSubmit={submitCadPrompt}
                                 className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-[180px] flex flex-col gap-1.5 pointer-events-auto animate-in slide-in-from-bottom-4" 
                                 onClick={e => e.stopPropagation()}
-                                onPointerDown={e => e.s                                <div className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest border-b border-slate-700 pb-1 mb-1 text-center relative">
+                                onPointerDown={e => e.stopPropagation()}
+                            >
+                                <div className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest border-b border-slate-700 pb-1 mb-1 text-center relative">
                                     {cadPrompt.type === 'FIRST_SURVEY' ? 'Survey Attributes' : 'New Survey'}
                                     <button type="button" onClick={() => { setCadPrompt(null); setCadPromptSurveyNo(''); setCadPromptSubDiv(''); setCadPromptValue(''); }} className="absolute right-0 top-0 text-slate-400 hover:text-white">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
