@@ -150,6 +150,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
 
   const [mapConfig, setMapConfig] = React.useState({ active: false, baseMercX: 0, baseMercY: 0, baseLat: 0 });
+  const [userLocationMarker, setUserLocationMarker] = React.useState(null);
 
   // --- MANUAL CAD ENGINE STATE -----
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
@@ -4859,6 +4860,14 @@ const AdminDashboard = ({ setCurrentView }) => {
                     <circle cx={cadSnapIndicator.x} cy={cadSnapIndicator.y} r={cadViewport.width * 0.01} fill="none" stroke="#d946ef" strokeWidth={cadViewport.width * 0.002} className="animate-ping" />
                   )}
 
+                  {/* Live Blue Dot Indicator */}
+                  {userLocationMarker && mapConfig.active && (
+                      <g>
+                        <circle cx={userLocationMarker.x} cy={userLocationMarker.y} r={cadViewport.width * 0.02} fill="#3b82f6" className="animate-ping opacity-75" />
+                        <circle cx={userLocationMarker.x} cy={userLocationMarker.y} r={cadViewport.width * 0.005} fill="#ffffff" stroke="#2563eb" strokeWidth={cadViewport.width * 0.002} />
+                      </g>
+                  )}
+
                                     {cadTexts.map(txt => {
                      let displayText = txt.text;
                      if (txt.id.startsWith('poly-')) {
@@ -5508,22 +5517,58 @@ const AdminDashboard = ({ setCurrentView }) => {
                         </svg>
                      </button>
                      
-                     {/* Center Axis Button: Reset Origin */}
+                     {/* Center Axis Button: Reset Origin / GPS Re-Center */}
                      <button 
                         className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-fuchsia-400 border border-slate-600 flex justify-center items-center font-bold text-xl transition-colors"
-                        onClick={() => setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 })}
-                        title="Reset Origin"
+                        onClick={async () => {
+                            if (mapConfig.active) {
+                                try {
+                                    const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+                                    const lat = position.coords.latitude;
+                                    const lon = position.coords.longitude;
+                                    const R = 6378137;
+                                    const mercX = R * (lon * Math.PI / 180);
+                                    const mercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+                                    const targetX = mercX - mapConfig.baseMercX;
+                                    const targetY = mapConfig.baseMercY - mercY;
+                                    
+                                    setUserLocationMarker({ x: targetX, y: targetY });
+
+                                    const tWidth = 500;
+                                    const tHeight = 500;
+                                    const tX = targetX - tWidth/2;
+                                    const tY = targetY - tHeight/2;
+                                    
+                                    const startX = cadViewport.x;
+                                    const startY = cadViewport.y;
+                                    const startW = cadViewport.width;
+                                    const startH = cadViewport.height;
+                                    
+                                    let startTime = null;
+                                    const animate = (time) => {
+                                        if (!startTime) startTime = time;
+                                        const elapsed = time - startTime;
+                                        const t = Math.min(elapsed / 600, 1);
+                                        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                                        setCadViewport({
+                                            x: startX + (tX - startX) * ease,
+                                            y: startY + (tY - startY) * ease,
+                                            width: startW + (tWidth - startW) * ease,
+                                            height: startH + (tHeight - startH) * ease
+                                        });
+                                        if (t < 1) requestAnimationFrame(animate);
+                                    };
+                                    requestAnimationFrame(animate);
+                                } catch(e) {
+                                    alert("GPS Error: " + e.message);
+                                }
+                            } else {
+                                setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });
+                            }
+                        }}
+                        title="My Location / Reset Origin"
                      >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2"/></svg>
-                     </button>
-
-                     {/* Reset Draw Action Button */}
-                     <button 
-                        className="w-10 h-10 rounded-full bg-slate-900 hover:bg-red-900 text-red-400 border border-slate-600 flex justify-center items-center font-bold text-xl transition-colors"
-                        onClick={() => resetCadState()}
-                        title="Reset Draw"
-                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                      </button>
 
                      
@@ -5559,10 +5604,12 @@ const AdminDashboard = ({ setCurrentView }) => {
                                 if (prev.baseMercX !== 0) {
                                     const targetX = baseMercX - prev.baseMercX;
                                     const targetY = prev.baseMercY - baseMercY;
-                                    setCadViewport({ x: targetX - cadViewport.width/2, y: targetY - cadViewport.height/2, width: cadViewport.width, height: cadViewport.height });
+                                    setUserLocationMarker({ x: targetX, y: targetY });
+                                    setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
                                     return { ...prev, active: true, baseLat: lat };
                                 } else {
-                                    setCadViewport({ x: -cadViewport.width/2, y: -cadViewport.height/2, width: cadViewport.width, height: cadViewport.height });
+                                    setUserLocationMarker({ x: 0, y: 0 });
+                                    setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
                                     return { active: true, baseMercX, baseMercY, baseLat: lat };
                                 }
                             });
