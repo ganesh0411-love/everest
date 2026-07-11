@@ -147,13 +147,11 @@ const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
 
 const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
-  const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);
-  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
+  const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
 
-  const [mapConfig, setMapConfig] = React.useState({ active: false, baseMercX: 0, baseMercY: 0 });
+  const [mapConfig, setMapConfig] = React.useState({ active: false, baseMercX: 0, baseMercY: 0, baseLat: 0 });
 
-
-  // --- MANUAL CAD ENGINE STATE ---
+  // --- MANUAL CAD ENGINE STATE -----
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
   const [cadPromptSurveyNo, setCadPromptSurveyNo] = React.useState('');
   const [cadPromptSubDiv, setCadPromptSubDiv] = React.useState('');
@@ -1287,33 +1285,35 @@ const AdminDashboard = ({ setCurrentView }) => {
              setCadLines(prev => prev.map(l => {
                  const ref = cadPointerGesture.connectedLineRefs.find(r => r.id === l.id);
                  if (ref) {
-                     return { ...l, [ref.isP1 ? 'p1' : 'p2']: newAnchor };
-                 }
-                 return l;
-             }));
-             if (cadPrompt?.type === 'LINE' && cadScale) {
-                 const activeL = cadLines.find(x => x.id === cadPrompt.targetId);
-                 if (activeL) {
-                     const ref = cadPointerGesture.connectedLineRefs.find(r => r.id === activeL.id);
-                     if (ref) {
-                         const otherX = ref.isP1 ? activeL.p2.x : activeL.p1.x;
-                         const otherY = ref.isP1 ? activeL.p2.y : activeL.p1.y;
-                         setCadPromptValue((Math.hypot(otherX - newAnchor.x, otherY - newAnchor.y) * cadScale).toFixed(2));
-                     }
-                 }
-             }
-         } else if (cadPrompt?.type === 'LINE' && cadPrompt.targetId) {
-             setCadLines(prev => prev.map(l => l.id === cadPrompt.targetId ? { ...l, p2: newAnchor } : l));
-             if (cadScale) {
-                 const activeL = cadLines.find(x => x.id === cadPrompt.targetId);
-                 if (activeL) {
-                     setCadPromptValue((Math.hypot(activeL.p1.x - newAnchor.x, activeL.p1.y - newAnchor.y) * cadScale).toFixed(2));
-                 }
-             }
-         }
+                    return { ...l, [ref.isP1 ? 'p1' : 'p2']: newAnchor };
+                }
+                return l;
+            }));
+            const effectiveScale = mapConfig.active ? Math.cos(mapConfig.baseLat * Math.PI / 180) : cadScale;
+            if (cadPrompt?.type === 'LINE' && effectiveScale) {
+                const activeL = cadLines.find(x => x.id === cadPrompt.targetId);
+                if (activeL) {
+                    const ref = cadPointerGesture.connectedLineRefs.find(r => r.id === activeL.id);
+                    if (ref) {
+                        const otherX = ref.isP1 ? activeL.p2.x : activeL.p1.x;
+                        const otherY = ref.isP1 ? activeL.p2.y : activeL.p1.y;
+                        setCadPromptValue((Math.hypot(otherX - newAnchor.x, otherY - newAnchor.y) * effectiveScale).toFixed(2));
+                    }
+                }
+            }
+        } else if (cadPrompt?.type === 'LINE' && cadPrompt.targetId) {
+            setCadLines(prev => prev.map(l => l.id === cadPrompt.targetId ? { ...l, p2: newAnchor } : l));
+            const effectiveScale = mapConfig.active ? Math.cos(mapConfig.baseLat * Math.PI / 180) : cadScale;
+            if (effectiveScale) {
+                const activeL = cadLines.find(x => x.id === cadPrompt.targetId);
+                if (activeL) {
+                    setCadPromptValue((Math.hypot(activeL.p1.x - newAnchor.x, activeL.p1.y - newAnchor.y) * effectiveScale).toFixed(2));
+                }
+            }
+        }
 
-         setCadAnchorNode(newAnchor);
-         return;
+        setCadAnchorNode(newAnchor);
+        return;
       }
 
       if (cadPointerGesture?.isDraggingPan) {
@@ -1784,7 +1784,6 @@ const AdminDashboard = ({ setCurrentView }) => {
       }
 
       if (cadPrompt.type === 'FIRST_SURVEY' || cadPrompt.type === 'NEW_SURVEY') {
-          if (!cadPromptSurveyNo.trim()) { alert("Survey No is required"); return; }
           const newSurveyId = Date.now().toString();
           const surveyColor = cadPrompt.type === 'NEW_SURVEY' ? cadPromptColor : '#3b82f6';
           setCadSurveys(prev => [...prev, { id: newSurveyId, surveyNo: cadPromptSurveyNo, subDivisionNo: cadPromptSubDiv, hexColor: surveyColor, isVisible: false, created_at: Date.now() }]);
@@ -1804,11 +1803,12 @@ const AdminDashboard = ({ setCurrentView }) => {
                 const line = cadLines.find(l => l.id === cadPrompt.targetId);
                 if (line) {
                    const pxLength = Math.hypot(line.p1.x - line.p2.x, line.p1.y - line.p2.y);
-                   if (!cadScale) {
+                   const effectiveScale = mapConfig.active ? Math.cos(mapConfig.baseLat * Math.PI / 180) : cadScale;
+                   if (!effectiveScale) {
                      setCadScale(num / pxLength);
                      setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, fixedLength: valStr, surveyId: newSurveyId, hexColor: surveyColor } : l));
                    } else {
-                     const targetPx = num / cadScale;
+                     const targetPx = num / effectiveScale;
                      const ratio = targetPx / pxLength;
                      const newP2 = {
                        x: line.p1.x + (line.p2.x - line.p1.x) * ratio,
@@ -1843,11 +1843,12 @@ const AdminDashboard = ({ setCurrentView }) => {
         const line = cadLines.find(l => l.id === cadPrompt.targetId);
         if (!line) { setCadPrompt(null); return; }
         const pxLength = Math.hypot(line.p1.x - line.p2.x, line.p1.y - line.p2.y);
-        if (!cadScale) {
+        const effectiveScale = mapConfig.active ? Math.cos(mapConfig.baseLat * Math.PI / 180) : cadScale;
+        if (!effectiveScale) {
           setCadScale(num / pxLength);
           setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, fixedLength: valStr } : l));
         } else {
-          const targetPx = num / cadScale;
+          const targetPx = num / effectiveScale;
           const ratio = targetPx / pxLength;
           const newP2 = {
             x: line.p1.x + (line.p2.x - line.p1.x) * ratio,
@@ -3689,13 +3690,13 @@ const AdminDashboard = ({ setCurrentView }) => {
                       <span>{(() => {
                           if (cadPointerGesture?.isDraggingAnchor) {
                               let activeSegmentMeters = null;
-                              
+                              const effectiveScale = mapConfig.active ? Math.cos(mapConfig.baseLat * Math.PI / 180) : cadScale;
                               if (cadPointerGesture.connectedLineRefs && cadPointerGesture.connectedLineRefs.length > 0) {
                                   const activeL = cadLines.find(x => x.id === cadPointerGesture.connectedLineRefs[0].id);
-                                  if (activeL && cadScale) activeSegmentMeters = Math.hypot(activeL.p1.x - activeL.p2.x, activeL.p1.y - activeL.p2.y) * cadScale;
+                                  if (activeL && effectiveScale) activeSegmentMeters = Math.hypot(activeL.p1.x - activeL.p2.x, activeL.p1.y - activeL.p2.y) * effectiveScale;
                               } else if (cadPrompt?.type === 'LINE') {
                                   const activeL = cadLines.find(x => x.id === cadPrompt.targetId);
-                                  if (activeL && cadScale) activeSegmentMeters = Math.hypot(activeL.p1.x - activeL.p2.x, activeL.p1.y - activeL.p2.y) * cadScale;
+                                  if (activeL && effectiveScale) activeSegmentMeters = Math.hypot(activeL.p1.x - activeL.p2.x, activeL.p1.y - activeL.p2.y) * effectiveScale;
                               }
 
                               if (activeSegmentMeters !== null) {
@@ -5401,6 +5402,36 @@ const AdminDashboard = ({ setCurrentView }) => {
                 )
              )}
              
+            {/* FLOATING MY LOCATION BUTTON */}
+            <div className="absolute bottom-40 right-8 z-[120]">
+              <button 
+                 className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 border-2 border-slate-600 text-sky-400 flex justify-center items-center shadow-2xl transition-colors"
+                 onClick={async () => {
+                    try {
+                        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        if (mapConfig.active) {
+                            const R = 6378137;
+                            const mercX = R * (lon * Math.PI / 180);
+                            const mercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+                            const targetX = mercX - mapConfig.baseMercX;
+                            const targetY = mapConfig.baseMercY - mercY;
+                            setCadViewport(v => ({ ...v, x: targetX - v.width/2, y: targetY - v.height/2 }));
+                        }
+                    } catch(e) {
+                        alert("GPS Error: " + e.message);
+                    }
+                 }}
+                 title="Re-center Location"
+              >
+                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <circle cx="12" cy="12" r="3"></circle>
+                 </svg>
+              </button>
+            </div>
+
             {/* VIRTUAL JOYSTICK D-PAD */}
             <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none scale-75 origin-bottom-right"
                  onPointerDown={e => e.stopPropagation()}
@@ -5479,10 +5510,10 @@ const AdminDashboard = ({ setCurrentView }) => {
                                     const targetX = baseMercX - prev.baseMercX;
                                     const targetY = prev.baseMercY - baseMercY;
                                     setCadViewport({ x: targetX - cadViewport.width/2, y: targetY - cadViewport.height/2, width: cadViewport.width, height: cadViewport.height });
-                                    return { ...prev, active: true };
+                                    return { ...prev, active: true, baseLat: lat };
                                 } else {
                                     setCadViewport({ x: -cadViewport.width/2, y: -cadViewport.height/2, width: cadViewport.width, height: cadViewport.height });
-                                    return { active: true, baseMercX, baseMercY };
+                                    return { active: true, baseMercX, baseMercY, baseLat: lat };
                                 }
                             });
                         } catch (e) {
@@ -5510,24 +5541,26 @@ const AdminDashboard = ({ setCurrentView }) => {
                                 onSubmit={submitCadPrompt}
                                 className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-[180px] flex flex-col gap-1.5 pointer-events-auto animate-in slide-in-from-bottom-4" 
                                 onClick={e => e.stopPropagation()}
-                                onPointerDown={e => e.stopPropagation()}
-                            >
-                                <div className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest border-b border-slate-700 pb-1 mb-1 text-center">
+                                onPointerDown={e => e.s                                <div className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest border-b border-slate-700 pb-1 mb-1 text-center relative">
                                     {cadPrompt.type === 'FIRST_SURVEY' ? 'Survey Attributes' : 'New Survey'}
+                                    <button type="button" onClick={() => { setCadPrompt(null); setCadPromptSurveyNo(''); setCadPromptSubDiv(''); setCadPromptValue(''); }} className="absolute right-0 top-0 text-slate-400 hover:text-white">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
                                 </div>
                                 <div className="flex flex-row items-center justify-between gap-2">
                                       <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Metric</label>
                                       <div className="flex items-center w-[90px] gap-1">
                                           <input type="number" step="0.01" value={cadPromptValue} onChange={e => setCadPromptValue(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-0.5 text-white w-full text-[10px] font-bold outline-none focus:border-sky-500 text-right" placeholder="0.00" required={!!cadPrompt.targetId} />
                                           <select value={cadPromptUnit} onChange={e => setCadPromptUnit(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1 py-0.5 text-white text-[9px] font-bold outline-none focus:border-sky-500 cursor-pointer appearance-none">
-                                              <option value="meters">▼ M</option>
-                                              <option value="feet">▼ Ft</option>
+                                              <option value="meters">  M</option>
+                                              <option value="feet">  Ft</option>
                                           </select>
                                       </div>
                                   </div>
                                 <div className="flex flex-row items-center justify-between gap-2">
                                     <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Survey No.</label>
-                                    <input autoFocus type="text" value={cadPromptSurveyNo} onChange={e => setCadPromptSurveyNo(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-0.5 text-white w-[90px] text-[10px] font-bold outline-none focus:border-sky-500 text-right" placeholder="e.g. 101" required />
+                                    <input autoFocus type="text" value={cadPromptSurveyNo} onChange={e => setCadPromptSurveyNo(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-0.5 text-white w-[90px] text-[10px] font-bold outline-none focus:border-sky-500 text-right" placeholder="Opt." />
+                                </div>1" required />
                                 </div>
                                 <div className="flex flex-row items-center justify-between gap-2">
                                     <label className="text-[9px] text-slate-400 font-bold whitespace-nowrap">Sub-div</label>
