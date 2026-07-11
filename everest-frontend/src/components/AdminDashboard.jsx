@@ -306,6 +306,28 @@ const AdminDashboard = ({ setCurrentView }) => {
     };
   }, []);
 
+  const getLatLonFromCadPoint = (px, py) => {
+      const R = 6378137;
+      const mercX = px + mapConfig.baseMercX;
+      const mercY = mapConfig.baseMercY - py;
+      const lon = (mercX / R) * 180 / Math.PI;
+      const lat = (2 * Math.atan(Math.exp(mercY / R)) - Math.PI / 2) * 180 / Math.PI;
+      return { lat, lon };
+  };
+
+  const calculateHaversineDistance = (p1, p2) => {
+      const c1 = getLatLonFromCadPoint(p1.x, p1.y);
+      const c2 = getLatLonFromCadPoint(p2.x, p2.y);
+      const R = 6371000;
+      const dLat = (c2.lat - c1.lat) * Math.PI / 180;
+      const dLon = (c2.lon - c1.lon) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(c1.lat * Math.PI / 180) * Math.cos(c2.lat * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+  };
+
   const resetCadState = () => {
      setCadLines([]);
      setCadCircles([]);
@@ -1297,7 +1319,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                     if (ref) {
                         const otherX = ref.isP1 ? activeL.p2.x : activeL.p1.x;
                         const otherY = ref.isP1 ? activeL.p2.y : activeL.p1.y;
-                        setCadPromptValue((Math.hypot(otherX - newAnchor.x, otherY - newAnchor.y) * effectiveScale).toFixed(2));
+                        const pt1 = { x: otherX, y: otherY };
+                        const dist = mapConfig.active ? calculateHaversineDistance(pt1, newAnchor) : Math.hypot(otherX - newAnchor.x, otherY - newAnchor.y) * effectiveScale;
+                        setCadPromptValue(dist.toFixed(2));
                     }
                 }
             }
@@ -1307,7 +1331,8 @@ const AdminDashboard = ({ setCurrentView }) => {
             if (effectiveScale) {
                 const activeL = cadLines.find(x => x.id === cadPrompt.targetId);
                 if (activeL) {
-                    setCadPromptValue((Math.hypot(activeL.p1.x - newAnchor.x, activeL.p1.y - newAnchor.y) * effectiveScale).toFixed(2));
+                    const dist = mapConfig.active ? calculateHaversineDistance(activeL.p1, newAnchor) : Math.hypot(activeL.p1.x - newAnchor.x, activeL.p1.y - newAnchor.y) * effectiveScale;
+                    setCadPromptValue(dist.toFixed(2));
                 }
             }
         }
@@ -1551,19 +1576,24 @@ const AdminDashboard = ({ setCurrentView }) => {
                  } else {
                      if (cadStateBeforeActionRef.current) saveCadStateToHistory(cadStateBeforeActionRef.current);
                      const newId = Date.now().toString();
-                     let finalLen = cadScale ? (Math.hypot(cadAnchorNode.x - tNode.x, cadAnchorNode.y - tNode.y) * cadScale).toFixed(2) : null;
+                     let finalLen = null;
+                     if (mapConfig.active) {
+                         finalLen = calculateHaversineDistance(cadAnchorNode, tNode).toFixed(2);
+                     } else if (cadScale) {
+                         finalLen = (Math.hypot(cadAnchorNode.x - tNode.x, cadAnchorNode.y - tNode.y) * cadScale).toFixed(2);
+                     }
                      
                      const activeSurvey = cadSurveys.find(s => s.id === cadActiveSurveyId);
                      const assignedHexColor = activeSurvey ? activeSurvey.hexColor : '#38bdf8';
                      setCadLines(prev => [...prev, { id: newId, p1: { x: cadAnchorNode.x, y: cadAnchorNode.y }, p2: { x: tNode.x, y: tNode.y }, fixedLength: finalLen, strokeWidth: 4, hexColor: assignedHexColor, surveyId: cadActiveSurveyId }]);
                      
-                     if (!finalLen) {
+                     if (!finalLen || mapConfig.active || cadSurveys.length === 0) {
                          if (cadSurveys.length === 0) {
                              setCadPrompt({ type: 'FIRST_SURVEY', targetId: newId, x: 32, y: window.innerHeight - 200 });
                          } else {
                              setCadPrompt({ type: 'LINE', targetId: newId, x: window.innerWidth / 2 - 140, y: window.innerHeight - 200 });
                          }
-                         setCadPromptValue('');
+                         setCadPromptValue(finalLen || '');
                      }
                      
                      setCadAnchorNode({ x: tNode.x, y: tNode.y });
@@ -1580,20 +1610,25 @@ const AdminDashboard = ({ setCurrentView }) => {
             
             if (cadStateBeforeActionRef.current) saveCadStateToHistory(cadStateBeforeActionRef.current);
             const newId = Date.now().toString();
-            let finalLen = cadScale ? (Math.hypot(cadAnchorNode.x - snapPt.x, cadAnchorNode.y - snapPt.y) * cadScale).toFixed(2) : null;
+            let finalLen = null;
+            if (mapConfig.active) {
+                finalLen = calculateHaversineDistance(cadAnchorNode, snapPt).toFixed(2);
+            } else if (cadScale) {
+                finalLen = (Math.hypot(cadAnchorNode.x - snapPt.x, cadAnchorNode.y - snapPt.y) * cadScale).toFixed(2);
+            }
               
               const activeSurvey = cadSurveys.find(s => s.id === cadActiveSurveyId);
               const assignedHexColor = activeSurvey ? activeSurvey.hexColor : '#38bdf8';
               
               setCadLines(prev => [...prev, { id: newId, p1: { x: cadAnchorNode.x, y: cadAnchorNode.y }, p2: snapPt, fixedLength: finalLen, strokeWidth: 4, hexColor: assignedHexColor, surveyId: cadActiveSurveyId }]);
             
-            if (!finalLen) {
+            if (!finalLen || mapConfig.active || cadSurveys.length === 0) {
                  if (cadSurveys.length === 0) {
                      setCadPrompt({ type: 'FIRST_SURVEY', targetId: newId, x: 32, y: window.innerHeight - 200 });
                  } else {
                      setCadPrompt({ type: 'LINE', targetId: newId, x: window.innerWidth / 2 - 140, y: window.innerHeight - 200 });
                  }
-                 setCadPromptValue('');
+                 setCadPromptValue(finalLen || '');
             }
             
             setCadAnchorNode(snapPt);
@@ -1848,17 +1883,21 @@ const AdminDashboard = ({ setCurrentView }) => {
           setCadScale(num / pxLength);
           setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, fixedLength: valStr } : l));
         } else {
-          const targetPx = num / effectiveScale;
-          const ratio = targetPx / pxLength;
-          const newP2 = {
-            x: line.p1.x + (line.p2.x - line.p1.x) * ratio,
-            y: line.p1.y + (line.p2.y - line.p1.y) * ratio
-          };
-          setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, p2: newP2, fixedLength: valStr } : l));
-          if (cadTool === 'ADD_LINE' && cadAnchorNode) {
-             if (Math.hypot(cadAnchorNode.x - line.p2.x, cadAnchorNode.y - line.p2.y) < 1e-4) {
-                setCadAnchorNode(newP2);
-             }
+          if (mapConfig.active) {
+              setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, fixedLength: valStr } : l));
+          } else {
+              const targetPx = num / effectiveScale;
+              const ratio = targetPx / pxLength;
+              const newP2 = {
+                x: line.p1.x + (line.p2.x - line.p1.x) * ratio,
+                y: line.p1.y + (line.p2.y - line.p1.y) * ratio
+              };
+              setCadLines(prev => prev.map(l => l.id === line.id ? { ...l, p2: newP2, fixedLength: valStr } : l));
+              if (cadTool === 'ADD_LINE' && cadAnchorNode) {
+                 if (Math.hypot(cadAnchorNode.x - line.p2.x, cadAnchorNode.y - line.p2.y) < 1e-4) {
+                    setCadAnchorNode(newP2);
+                 }
+              }
           }
         }
       } else if (cadPrompt.type === 'RADIUS') {
@@ -5417,7 +5456,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                             const mercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
                             const targetX = mercX - mapConfig.baseMercX;
                             const targetY = mapConfig.baseMercY - mercY;
-                            setCadViewport(v => ({ ...v, x: targetX - v.width/2, y: targetY - v.height/2 }));
+                            // Dynamically translate and scale viewport matrix to 500x500 map scale!
+                            setCadViewport(v => ({ ...v, x: targetX - 500/2, y: targetY - 500/2, width: 500, height: 500 }));
                         }
                     } catch(e) {
                         alert("GPS Error: " + e.message);
@@ -5476,6 +5516,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                      >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2"/></svg>
                      </button>
+
+                     {/* Reset Draw Action Button */}
+                     <button 
+                        className="w-10 h-10 rounded-full bg-slate-900 hover:bg-red-900 text-red-400 border border-slate-600 flex justify-center items-center font-bold text-xl transition-colors"
+                        onClick={() => resetCadState()}
+                        title="Reset Draw"
+                     >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                     </button>
+                  </div>
                      
                      {/* Right Button: METRIC INSTANT TOGGLE */}
                      <button 
