@@ -3395,10 +3395,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                    Manual Drawing Canvas
                    <span className="text-slate-400 group-hover:text-white">→</span>
                  </button>
-                 <button disabled className="w-full text-left bg-slate-50 text-slate-800 p-4 rounded-xl border border-slate-200 font-bold opacity-50 pointer-events-none flex justify-between items-center">
-                   Point 2
-                   <span className="text-slate-400">→</span>
-                 </button>
+
                  <button onClick={() => setActiveLandSurveyView('dark_draw_projects')} className="w-full text-left bg-slate-50 hover:bg-[#0369a1] hover:text-white text-slate-800 p-4 rounded-xl border border-slate-200 transition-colors font-bold flex justify-between items-center group">
                    My Projects
                    <span className="text-slate-400 group-hover:text-white">→</span>
