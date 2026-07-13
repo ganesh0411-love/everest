@@ -6,6 +6,72 @@ import { Geolocation } from '@capacitor/geolocation';
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.100:5000';
 
+const DB_NAME = 'EverestTileCache';
+const STORE_NAME = 'tiles';
+
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = e => {
+            e.target.result.createObjectStore(STORE_NAME);
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function getCachedTile(key) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function setCachedTile(key, blob) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const req = tx.objectStore(STORE_NAME).put(blob, key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+}
+
+const TileImage = React.memo(({ x, y, width, height, tileX, tileY, tileZ }) => {
+    const [blobUrl, setBlobUrl] = React.useState(null);
+    React.useEffect(() => {
+        let isMounted = true;
+        const key = `${tileZ}-${tileX}-${tileY}`;
+        const url = `https://mt1.google.com/vt/lyrs=s&x=${tileX}&y=${tileY}&z=${tileZ}`;
+        
+        getCachedTile(key).then(blob => {
+            if (blob) {
+                if (isMounted) setBlobUrl(URL.createObjectURL(blob));
+            } else {
+                fetch(url).then(r => r.blob()).then(newBlob => {
+                    setCachedTile(key, newBlob).catch(() => {});
+                    if (isMounted) setBlobUrl(URL.createObjectURL(newBlob));
+                }).catch(e => console.error(e));
+            }
+        }).catch(() => {
+            // fallback
+            if (isMounted) setBlobUrl(url);
+        });
+        
+        return () => {
+            isMounted = false;
+        };
+    }, [tileZ, tileX, tileY]);
+
+    if (!blobUrl) return null;
+    return (
+        <image x={x} y={y} width={width} height={height} href={blobUrl} preserveAspectRatio="none" opacity={1} />
+    );
+});
+
 const loadPdfJsScript = () => new Promise((resolve, reject) => {
   if (window.pdfjsLib) return resolve(window.pdfjsLib);
   const script = document.createElement('script');
@@ -112,10 +178,14 @@ const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
     const tyMin = Math.floor((maxMerc - vMaxY) / 40075016 * n);
     const tyMax = Math.floor((maxMerc - vMinY) / 40075016 * n);
     
+    // Aggressive buffer: pre-fetch 2 screens wide in all directions
+    const bufferWidth = Math.max(1, (txMax - txMin) * 2);
+    const bufferHeight = Math.max(1, (tyMax - tyMin) * 2);
+    
     const tiles = [];
-    if ((txMax - txMin) * (tyMax - tyMin) < 100) {
-        for (let x = txMin; x <= txMax; x++) {
-            for (let y = tyMin; y <= tyMax; y++) {
+    if ((txMax - txMin) * (tyMax - tyMin) < 400) {
+        for (let x = txMin - bufferWidth; x <= txMax + bufferWidth; x++) {
+            for (let y = tyMin - bufferHeight; y <= tyMax + bufferHeight; y++) {
                 if (x >= 0 && x < n && y >= 0 && y < n) tiles.push({ x, y, z });
             }
         }
@@ -129,15 +199,15 @@ const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
                 const svgX = mercX - baseMercX;
                 const svgY = baseMercY - mercY;
                 return (
-                    <image
+                    <TileImage
                         key={`${tile.z}-${tile.x}-${tile.y}`}
                         x={svgX}
                         y={svgY}
                         width={tileSizeMeters + 0.5}
                         height={tileSizeMeters + 0.5}
-                        href={`https://mt1.google.com/vt/lyrs=s&x=${tile.x}&y=${tile.y}&z=${tile.z}`}
-                        preserveAspectRatio="none"
-                        opacity={1}
+                        tileX={tile.x}
+                        tileY={tile.y}
+                        tileZ={tile.z}
                     />
                 );
             })}
@@ -149,7 +219,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
 
-  const [mapConfig, setMapConfig] = React.useState({ active: false, baseMercX: 0, baseMercY: 0, baseLat: 0 });
+  const [mapConfig, setMapConfig] = React.useState({ active: false, isLoading: false, baseMercX: 0, baseMercY: 0, baseLat: 0 });
   const [userLocationMarker, setUserLocationMarker] = React.useState(null);
 
   // --- MANUAL CAD ENGINE STATE -----
@@ -5560,43 +5630,53 @@ const AdminDashboard = ({ setCurrentView }) => {
                   {/* Bottom Button: Map Layers */}
                   <button 
                      className={`w-10 h-10 rounded-full flex justify-center items-center font-bold transition-colors ${mapConfig.active ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
-                     onClick={async () => {
+                     onClick={() => {
                         if (mapConfig.active) {
                             setMapConfig(prev => ({ ...prev, active: false }));
                             return;
                         }
-                        try {
-                            const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-                            const lat = position.coords.latitude;
-                            const lon = position.coords.longitude;
-                            const R = 6378137;
-                            const baseMercX = R * (lon * Math.PI / 180);
-                            const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
-                            
-                            setMapConfig(prev => {
-                                if (prev.baseMercX !== 0) {
-                                    const targetX = baseMercX - prev.baseMercX;
-                                    const targetY = prev.baseMercY - baseMercY;
-                                    setUserLocationMarker({ x: targetX, y: targetY });
-                                    setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
-                                    return { ...prev, active: true, baseLat: lat };
-                                } else {
-                                    setUserLocationMarker({ x: 0, y: 0 });
-                                    setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
-                                    return { active: true, baseMercX, baseMercY, baseLat: lat };
-                                }
+                        setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
+                        Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+                            .then(position => {
+                                const lat = position.coords.latitude;
+                                const lon = position.coords.longitude;
+                                const R = 6378137;
+                                const baseMercX = R * (lon * Math.PI / 180);
+                                const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+                                
+                                setMapConfig(prev => {
+                                    if (prev.baseMercX !== 0) {
+                                        const targetX = baseMercX - prev.baseMercX;
+                                        const targetY = prev.baseMercY - baseMercY;
+                                        setUserLocationMarker({ x: targetX, y: targetY });
+                                        setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
+                                        return { ...prev, active: true, isLoading: false, baseLat: lat };
+                                    } else {
+                                        setUserLocationMarker({ x: 0, y: 0 });
+                                        setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
+                                        return { active: true, isLoading: false, baseMercX, baseMercY, baseLat: lat };
+                                    }
+                                });
+                            })
+                            .catch(e => {
+                                alert("Geolocation failed: " + e.message);
+                                setMapConfig(prev => ({ ...prev, active: false, isLoading: false }));
                             });
-                        } catch (e) {
-                            alert("Geolocation failed: " + e.message);
-                        }
                      }}
                      title="Live Satellite Map"
                   >
-                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-                        <polyline points="2 12 12 17 22 12"/>
-                        <polyline points="2 17 12 22 22 17"/>
-                     </svg>
+                     {mapConfig.isLoading ? (
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                     ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                           <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                           <polyline points="2 12 12 17 22 12"/>
+                           <polyline points="2 17 12 22 22 17"/>
+                        </svg>
+                     )}
                   </button>
                </div>
             </div>
