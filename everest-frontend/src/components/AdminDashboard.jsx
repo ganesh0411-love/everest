@@ -5451,6 +5451,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                      Fix Error
                    </button>
                   </div>
+                )
              )}
 
             {/* VIRTUAL JOYSTICK D-PAD */}
