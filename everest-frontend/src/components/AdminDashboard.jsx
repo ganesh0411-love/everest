@@ -5496,7 +5496,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                         onClick={async () => {
                             if (mapConfig.active) {
                                 try {
-                                    const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                                    const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
                                     const lat = position.coords.latitude;
                                     const lon = position.coords.longitude;
                                     const R = 6378137;
@@ -5566,7 +5566,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                             return;
                         }
                         try {
-                            const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                            const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
                             const lat = position.coords.latitude;
                             const lon = position.coords.longitude;
                             const R = 6378137;
