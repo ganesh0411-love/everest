@@ -4643,6 +4643,78 @@ const AdminDashboard = ({ setCurrentView }) => {
                     }
 
                     const renderedMetrics = [];
+
+                    // PRE-CALCULATE SURVEY TEXT BOXES FOR COLLISION AVOIDANCE
+                    const surveyTextBoxes = [];
+                    cadTexts.forEach(txt => {
+                        let displayText = txt.text;
+                        if (txt.id.startsWith('poly-')) {
+                            const polyId = txt.id.replace('poly-', '');
+                            const poly = visibleCadPolygons.find(p => p.id === polyId);
+                            if (!poly) return;
+                            if (poly && poly.surveyId) {
+                                const polySurvey = cadSurveys.find(s => s.id === poly.surveyId);
+                                if (polySurvey) {
+                                    const sNo = isSurveyNoVisible ? polySurvey.surveyNo : '';
+                                    const sdNo = (isSubDivVisible && polySurvey.subDivisionNo) ? polySurvey.subDivisionNo : '';
+                                    if (sNo && sdNo) displayText = sNo + '/' + sdNo;
+                                    else if (sNo) displayText = sNo;
+                                    else if (sdNo) displayText = sdNo;
+                                    else displayText = '';
+                                }
+                            }
+                            if (!displayText) return;
+
+                            let finalFontSize = txt.fontSize || 40;
+                            if (poly && poly.pts && poly.pts.length > 2) {
+                                let minFontForPoly = Infinity;
+                                const theta = (txt.rotation || 0) * (Math.PI / 180);
+                                const cosT = Math.cos(theta);
+                                const sinT = Math.sin(theta);
+                                
+                                for (let i = 0; i < poly.pts.length; i++) {
+                                    const A = poly.pts[i];
+                                    const B = poly.pts[(i + 1) % poly.pts.length];
+                                    const dx = B.x - A.x;
+                                    const dy = B.y - A.y;
+                                    const L = Math.hypot(dx, dy);
+                                    if (L === 0) continue;
+                                    
+                                    let t = ((txt.x - A.x) * dx + (txt.y - A.y) * dy) / (L * L);
+                                    t = Math.max(0, Math.min(1, t));
+                                    const projX = A.x + t * dx;
+                                    const projY = A.y + t * dy;
+                                    const D = Math.hypot(txt.x - projX, txt.y - projY);
+                                    
+                                    const Nx = -dy / L;
+                                    const Ny = dx / L;
+                                    const dotX = Math.abs(Nx * cosT + Ny * sinT);
+                                    const dotY = Math.abs(Nx * -sinT + Ny * cosT);
+                                    
+                                    const extCoeff = (Math.max(1, displayText.length) * 0.3) * dotX + 0.5 * dotY;
+                                    if (extCoeff > 0) {
+                                        const limit = (D * 0.9) / extCoeff;
+                                        if (limit < minFontForPoly) {
+                                            minFontForPoly = limit;
+                                        }
+                                    }
+                                }
+                                if (minFontForPoly < finalFontSize) {
+                                    finalFontSize = Math.max(1, minFontForPoly);
+                                }
+                            }
+                            
+                            const w = displayText.length * finalFontSize * 0.65;
+                            const h = finalFontSize;
+                            surveyTextBoxes.push({
+                                cx: txt.x,
+                                cy: txt.y,
+                                w: w,
+                                h: h
+                            });
+                        }
+                    });
+
                     return linesToRender.map(l => {
                     const isSelected = cadSelectedLine === l.id;
                     const isMetricHovered = cadHoveredNode === null && !cadPointerGesture?.isDragging && !isSelected; // basic fallback
@@ -4705,7 +4777,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                     // Override default offset magnitude with scaledFontSize padding
                     if (!cadMetricOffsets[l.id] && displayLen && isMetricsVisible) {
                         const theta = finalRot * (Math.PI / 180);
-                        const pad = (scaledFontSize / 2) + 4;
+                        const dynamicGap = Math.max(cadViewport.width * 0.01, scaledFontSize * 0.6);
+                        const pad = (scaledFontSize / 2) + dynamicGap;
                         offset = { dx: pad * Math.sin(theta), dy: -pad * Math.cos(theta) };
                         
                         // Push outer boundary labels OUTSIDE the polygon
@@ -4762,6 +4835,17 @@ const AdminDashboard = ({ setCurrentView }) => {
                                     }
                                 }
                             }
+
+                            if (!isColliding) {
+                                for (let sbox of surveyTextBoxes) {
+                                    const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
+                                    const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(textLen, scaledFontSize)/2;
+                                    if (dist < requiredDist * 0.85) {
+                                        isColliding = true; break;
+                                    }
+                                }
+                            }
+
                             if (!isColliding) {
                                 bestMx = currentMx;
                                 bestMy = currentMy;
@@ -4771,6 +4855,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                         }
                         
                         if (!foundSafe) {
+                            scaledFontSize = Math.max(8, scaledFontSize * 0.6);
+                            textLen = textStr.length * (scaledFontSize * 0.65);
                             bestMx = (l.p1.x + l.p2.x) / 2 - offset.dx;
                             bestMy = (l.p1.y + l.p2.y) / 2 - offset.dy;
                         }
