@@ -3840,10 +3840,21 @@ const AdminDashboard = ({ setCurrentView }) => {
                     </button>
                  </div>
                  <div className="flex-1 flex flex-col justify-center px-3 py-1.5 min-w-0">
-                    <div className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-sky-400 transition-colors outline-none leading-tight relative cursor-text" onClick={() => { setIsSurveyDropdownOpen(true); setIsSubDivisionDropdownOpen(false); }}>
+                    <div className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-sky-400 transition-colors outline-none leading-tight relative cursor-text" onClick={(e) => { setIsSurveyDropdownOpen(true); setIsSubDivisionDropdownOpen(false); setTimeout(() => e.currentTarget.querySelector('input')?.focus(), 10); }}>
                       <input 
                         className="bg-transparent outline-none w-full truncate placeholder-slate-400 cursor-text"
                         value={isSurveyDropdownOpen ? surveySearchText : (() => {
+                            let activeSurveys = [];
+                            if (cadMultiSelectMode && cadMultiSelectedPolygons.length > 0) {
+                                activeSurveys = cadMultiSelectedPolygons.map(pid => visibleCadPolygons.find(p => p.id === pid)?.surveyId).filter(Boolean);
+                            } else if (cadSelectedPolygon) {
+                                activeSurveys = [visibleCadPolygons.find(p => p.id === cadSelectedPolygon)?.surveyId].filter(Boolean);
+                            }
+                            if (activeSurveys.length > 0) {
+                                const uniqueSNo = new Set(activeSurveys.map(sid => cadSurveys.find(s => s.id === sid)?.surveyNo).filter(Boolean));
+                                if (uniqueSNo.size === 1) return `Survey No ${Array.from(uniqueSNo)[0]}`;
+                                if (uniqueSNo.size > 1) return 'FULL';
+                            }
                             if (checkedSurveyNos.length === 1) return `Survey No ${checkedSurveyNos[0]}`;
                             if (checkedSurveyNos.length > 1) return 'FULL';
                             return 'Survey No';
@@ -3854,10 +3865,24 @@ const AdminDashboard = ({ setCurrentView }) => {
                       <span className="text-[10px] text-slate-400 absolute right-0 pointer-events-none bg-slate-800 pl-1">▼</span>
                     </div>
                     
-                    <div className="flex items-center justify-between w-full text-slate-400 font-bold text-[10px] hover:text-sky-400 transition-colors outline-none leading-tight mt-0.5 relative cursor-text" onClick={() => { setIsSubDivisionDropdownOpen(true); setIsSurveyDropdownOpen(false); }}>
+                    <div className="flex items-center justify-between w-full text-slate-400 font-bold text-[10px] hover:text-sky-400 transition-colors outline-none leading-tight mt-0.5 relative cursor-text" onClick={(e) => { setIsSubDivisionDropdownOpen(true); setIsSurveyDropdownOpen(false); setTimeout(() => e.currentTarget.querySelector('input')?.focus(), 10); }}>
                       <input 
                         className="bg-transparent outline-none w-full truncate placeholder-slate-500 cursor-text"
                         value={isSubDivisionDropdownOpen ? subDivSearchText : (() => {
+                            let activeSurveys = [];
+                            if (cadMultiSelectMode && cadMultiSelectedPolygons.length > 0) {
+                                activeSurveys = cadMultiSelectedPolygons.map(pid => visibleCadPolygons.find(p => p.id === pid)?.surveyId).filter(Boolean);
+                            } else if (cadSelectedPolygon) {
+                                activeSurveys = [visibleCadPolygons.find(p => p.id === cadSelectedPolygon)?.surveyId].filter(Boolean);
+                            }
+                            if (activeSurveys.length > 0) {
+                                const uniqueSDNo = new Set(activeSurveys.map(sid => cadSurveys.find(s => s.id === sid)?.subDivisionNo || '-').filter(Boolean));
+                                if (uniqueSDNo.size === 1) {
+                                    const sd = Array.from(uniqueSDNo)[0];
+                                    return sd === '-' ? 'Sub-division -' : sd;
+                                }
+                                if (uniqueSDNo.size > 1) return 'ALL';
+                            }
                             if (selectedSubDivisions.length === 0) return 'Sub-division - All';
                             const uniqueActiveSD = new Set(selectedSubDivisions.map(k => k.split('_')[1]));
                             if (uniqueActiveSD.size === 1) return Array.from(uniqueActiveSD)[0];
@@ -3894,7 +3919,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                                Array.from(new Set(cadSurveys.map(s => s.surveyNo)))
                                .filter(surveyNo => !surveySearchText || String(surveyNo).toLowerCase().includes(surveySearchText.toLowerCase()))
                                .map(surveyNo => (
-                                   <div key={surveyNo} className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { e.stopPropagation(); setCheckedSurveyNos(prev => prev.includes(surveyNo) ? prev.filter(n => n !== surveyNo) : [...prev, surveyNo]); }}>
+                                   <div key={surveyNo} className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { 
+                                       e.stopPropagation(); 
+                                       if (surveySearchText) {
+                                           setCheckedSurveyNos([surveyNo]);
+                                           setIsSurveyDropdownOpen(false);
+                                           setSurveySearchText('');
+                                       } else {
+                                           setCheckedSurveyNos(prev => prev.includes(surveyNo) ? prev.filter(n => n !== surveyNo) : [...prev, surveyNo]); 
+                                       }
+                                   }}>
                                        <input 
                                            type="checkbox" 
                                            checked={checkedSurveyNos.includes(surveyNo)} 
@@ -3914,16 +3948,18 @@ const AdminDashboard = ({ setCurrentView }) => {
                         <div className="fixed inset-0 z-40" onClick={() => { setIsSubDivisionDropdownOpen(false); setSubDivSearchText(''); }}></div>
                         <div className="absolute top-full right-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50 min-w-[180px] flex flex-col max-h-[300px] overflow-y-auto">
                            {/* MASTER DASH ROW */}
-                           <div className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50" onClick={(e) => { e.stopPropagation(); setSelectedSubDivisions([]); }}>
-                               <input 
-                                   type="checkbox" 
-                                   checked={selectedSubDivisions.length === 0} 
-                                   onChange={(e) => { e.stopPropagation(); setSelectedSubDivisions([]); }} 
-                                   onClick={(e) => e.stopPropagation()}
-                                   className="w-3.5 h-3.5 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700 cursor-pointer" 
-                               />
-                               <span className="text-xs font-bold text-slate-200">- (All Sub-divisions)</span>
-                           </div>
+                           {!subDivSearchText && (
+                               <div className="flex items-center gap-3 px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50" onClick={(e) => { e.stopPropagation(); setSelectedSubDivisions([]); setIsSubDivisionDropdownOpen(false); }}>
+                                   <input 
+                                       type="checkbox" 
+                                       checked={selectedSubDivisions.length === 0} 
+                                       onChange={(e) => { e.stopPropagation(); setSelectedSubDivisions([]); setIsSubDivisionDropdownOpen(false); }} 
+                                       onClick={(e) => e.stopPropagation()}
+                                       className="w-3.5 h-3.5 rounded border-slate-600 text-sky-500 focus:ring-sky-500 bg-slate-700 cursor-pointer" 
+                                   />
+                                   <span className="text-xs font-bold text-slate-200">- (All Sub-divisions)</span>
+                               </div>
+                           )}
 
                            {/* DEPENDENT CASCADE ROWS */}
                            {(() => {
@@ -3970,7 +4006,16 @@ const AdminDashboard = ({ setCurrentView }) => {
                                return uniqueSubDivs.map(group => {
                                    const isChecked = selectedSubDivisions.includes(group.compositeKey);
                                    return (
-                                       <div key={group.displayLabel} className="flex items-center justify-between px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { e.stopPropagation(); setSelectedSubDivisions(prev => isChecked ? prev.filter(k => k !== group.compositeKey) : [...prev, group.compositeKey]); }}>
+                                       <div key={group.displayLabel} className="flex items-center justify-between px-3 py-1.5 hover:bg-slate-700 transition-colors cursor-pointer border-b border-slate-700/50 last:border-0" onClick={(e) => { 
+                                           e.stopPropagation(); 
+                                           if (subDivSearchText) {
+                                               setSelectedSubDivisions([group.compositeKey]);
+                                               setIsSubDivisionDropdownOpen(false);
+                                               setSubDivSearchText('');
+                                           } else {
+                                               setSelectedSubDivisions(prev => isChecked ? prev.filter(k => k !== group.compositeKey) : [...prev, group.compositeKey]); 
+                                           }
+                                       }}>
                                            <div className="flex items-center gap-3">
                                                <input 
                                                    type="checkbox" 
