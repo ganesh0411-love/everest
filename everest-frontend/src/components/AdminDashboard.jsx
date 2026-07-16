@@ -4822,7 +4822,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                     // Override default offset magnitude with scaledFontSize padding
                     if (!cadMetricOffsets[l.id] && displayLen && isMetricsVisible) {
                         const theta = finalRot * (Math.PI / 180);
-                        const dynamicGap = Math.max(cadViewport.width * 0.01, scaledFontSize * 0.6);
+                        const dynamicGap = scaledFontSize * 0.6;
                         const pad = (scaledFontSize / 2) + dynamicGap;
                         offset = { dx: pad * Math.sin(theta), dy: -pad * Math.cos(theta) };
                         
@@ -4851,7 +4851,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                         
                         while (loopFontSize >= Math.max(6, scaledFontSize * 0.4) && !foundSafe) {
                             const theta = finalRot * (Math.PI / 180);
-                            const dynamicGap = Math.max(cadViewport.width * 0.01, loopFontSize * 0.6);
+                            const dynamicGap = loopFontSize * 0.6;
                             const curPad = (loopFontSize / 2) + dynamicGap;
                             const curOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
                             
