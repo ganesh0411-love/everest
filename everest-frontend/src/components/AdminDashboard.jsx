@@ -2,6 +2,8 @@ import React from 'react';
 import { flushSync } from 'react-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Geolocation } from '@capacitor/geolocation';
+import { db } from '../firebase';
+import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://192.168.1.100:5000';
@@ -342,19 +344,17 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadEditInputs, setCadEditInputs] = React.useState({ length: '', weight: 4, hex: '#38bdf8', isMovingMetric: false });
   const [cadPopupOffset, setCadPopupOffset] = React.useState({ x: 0, y: 0 });
   const [cadPopupScale, setCadPopupScale] = React.useState(1);
-  const [savedProjects, setSavedProjects] = React.useState(() => {
-    try {
-      const item = localStorage.getItem('cad_saved_projects');
-      return item ? JSON.parse(item) : [];
-    } catch (error) {
-      console.warn("localStorage read failed", error);
-      return [];
-    }
-  });
+  const [savedProjects, setSavedProjects] = React.useState([]);
 
   React.useEffect(() => {
-    localStorage.setItem('cad_saved_projects', JSON.stringify(savedProjects));
-  }, [savedProjects]);
+    const unsubscribe = onSnapshot(collection(db, 'cad_saved_projects'), (snapshot) => {
+      const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSavedProjects(projects.sort((a,b) => b.id.localeCompare(a.id)));
+    }, (error) => {
+      console.error("Error fetching cad_saved_projects:", error);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [cadMetricOffsets, setCadMetricOffsets] = React.useState({});
 
@@ -680,42 +680,45 @@ const AdminDashboard = ({ setCurrentView }) => {
       return { dx: pad * Math.sin(theta), dy: -pad * Math.cos(theta) };
   };
 
-  const handleSaveProject = () => {
+  const handleSaveProject = async () => {
      if (cadLoadedProjectId) {
-         setSavedProjects(prev => prev.map(p => {
-             if (p.id === cadLoadedProjectId) {
-                 return {
-                     ...p,
-                     state: {
-                        lines: cadLines,
-                        circles: cadCircles,
-                        texts: cadTexts,
-                        metricOffsets: cadMetricOffsets,
-                        viewport: cadViewport,
-                        scale: cadScale,
-                        surveys: cadSurveys,
-                        checkedSurveys: checkedSurveyNos
-                     },
-                     uiSettings: {
-                        isMetricsVisible,
-                        isSurveyNoVisible,
-                        isSubDivVisible,
-                        isAddRadiusEnabled,
-                        isSketchExtendEnabled,
-                        showDarkDrawSettings,
-                        isFloatingStackExpanded,
-                        isGalleryPopupOpen,
-                        isScaleModalOpen,
-                        isAreaDropdownOpen,
-                        isSurveyDropdownOpen,
-                        isSubDivisionDropdownOpen
-                     }
-                 };
+         const updatedProject = savedProjects.find(p => p.id === cadLoadedProjectId);
+         if (!updatedProject) return;
+         const newData = {
+             ...updatedProject,
+             state: {
+                lines: cadLines,
+                circles: cadCircles,
+                texts: cadTexts,
+                metricOffsets: cadMetricOffsets,
+                viewport: cadViewport,
+                scale: cadScale,
+                surveys: cadSurveys,
+                checkedSurveys: checkedSurveyNos
+             },
+             uiSettings: {
+                isMetricsVisible,
+                isSurveyNoVisible,
+                isSubDivVisible,
+                isAddRadiusEnabled,
+                isSketchExtendEnabled,
+                showDarkDrawSettings,
+                isFloatingStackExpanded,
+                isGalleryPopupOpen,
+                isScaleModalOpen,
+                isAreaDropdownOpen,
+                isSurveyDropdownOpen,
+                isSubDivisionDropdownOpen
              }
-             return p;
-         }));
-         setShowDarkDrawSettings(false);
-         alert("Project Updated Successfully!");
+         };
+         try {
+             await setDoc(doc(db, 'cad_saved_projects', cadLoadedProjectId), newData);
+             setShowDarkDrawSettings(false);
+             alert("Project Updated Successfully!");
+         } catch(e) {
+             console.error("Error updating project", e);
+             alert("Error updating project.");
+         }
      } else {
          const now = new Date();
          const d = String(now.getDate()).padStart(2, '0');
@@ -755,31 +758,36 @@ const AdminDashboard = ({ setCurrentView }) => {
                isSubDivisionDropdownOpen
             }
          };
-         setCadLoadedProjectId(project.id);
-         setSavedProjects(prev => [project, ...prev]);
-         setShowDarkDrawSettings(false);
-         alert("Project Saved Successfully to My Projects!");
+         try {
+             await setDoc(doc(db, 'cad_saved_projects', project.id), project);
+             setCadLoadedProjectId(project.id);
+             setShowDarkDrawSettings(false);
+             alert("Project Saved Successfully to My Projects!");
+         } catch(e) {
+             console.error("Error saving project", e);
+             alert("Error saving project.");
+         }
      }
   };
 
 
-  const handleDeleteSavedProject = (id) => {
+  const handleDeleteSavedProject = async (id) => {
     if (!confirm("Are you sure you want to delete this project?")) return;
-    setSavedProjects(prev => {
-       const filtered = prev.filter(p => p.id !== id);
-       localStorage.setItem('cad_saved_projects', JSON.stringify(filtered));
-       return filtered;
-    });
+    try {
+        await deleteDoc(doc(db, 'cad_saved_projects', id));
+    } catch(e) {
+        console.error("Error deleting project", e);
+    }
   };
 
-  const handleRenameSavedProject = (id) => {
+  const handleRenameSavedProject = async (id) => {
     const newName = prompt("Enter new project name:");
     if (!newName) return;
-    setSavedProjects(prev => {
-       const updated = prev.map(p => p.id === id ? { ...p, date: newName } : p);
-       localStorage.setItem('cad_saved_projects', JSON.stringify(updated));
-       return updated;
-    });
+    try {
+        await updateDoc(doc(db, 'cad_saved_projects', id), { date: newName });
+    } catch(e) {
+        console.error("Error renaming project", e);
+    }
   };
 
   const cadNodes = React.useMemo(() => {
