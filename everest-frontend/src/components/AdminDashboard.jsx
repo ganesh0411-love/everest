@@ -4801,66 +4801,102 @@ const AdminDashboard = ({ setCurrentView }) => {
                         let bestMx = mx;
                         let bestMy = my;
                         let foundSafe = false;
+                        let loopFontSize = scaledFontSize;
+                        let loopTextLen = textLen;
                         
-                        const states = [
-                            { dx: offset.dx, dy: offset.dy, shift: 0 },
-                            { dx: -offset.dx, dy: -offset.dy, shift: 0 },
-                            { dx: offset.dx, dy: offset.dy, shift: textLen * 0.6 },
-                            { dx: offset.dx, dy: offset.dy, shift: -textLen * 0.6 },
-                            { dx: -offset.dx, dy: -offset.dy, shift: textLen * 0.6 },
-                            { dx: -offset.dx, dy: -offset.dy, shift: -textLen * 0.6 },
-                            { dx: offset.dx, dy: offset.dy, shift: textLen * 1.0 },
-                            { dx: offset.dx, dy: offset.dy, shift: -textLen * 1.0 },
-                            { dx: -offset.dx, dy: -offset.dy, shift: textLen * 1.0 },
-                            { dx: -offset.dx, dy: -offset.dy, shift: -textLen * 1.0 }
-                        ];
-                        
-                        for (let state of states) {
-                            let currentMx = (l.p1.x + l.p2.x) / 2 + state.dx + dirX * state.shift;
-                            let currentMy = (l.p1.y + l.p2.y) / 2 + state.dy + dirY * state.shift;
+                        while (loopFontSize >= Math.max(6, scaledFontSize * 0.4) && !foundSafe) {
+                            const theta = finalRot * (Math.PI / 180);
+                            const dynamicGap = Math.max(cadViewport.width * 0.01, loopFontSize * 0.6);
+                            const curPad = (loopFontSize / 2) + dynamicGap;
+                            const curOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
                             
-                            let isColliding = false;
-                            for (let c of renderedMetrics) {
-                                const angleDiff = Math.abs(c.rot - finalRot);
-                                const isParallel = angleDiff < 5 || (angleDiff > 175 && angleDiff < 185);
-                                const dist = Math.hypot(c.mx - currentMx, c.my - currentMy);
+                            if (count === 1 && parentPoly) {
+                                const testMx = (l.p1.x + l.p2.x) / 2 + curOffset.dx;
+                                const testMy = (l.p1.y + l.p2.y) / 2 + curOffset.dy;
+                                if (pointInPolygon({x: testMx, y: testMy}, parentPoly.pts)) {
+                                    curOffset.dx *= -1;
+                                    curOffset.dy *= -1;
+                                }
+                            }
+                            
+                            const states = [
+                                { dx: curOffset.dx, dy: curOffset.dy, shift: 0 },
+                                { dx: curOffset.dx, dy: curOffset.dy, shift: loopTextLen * 0.6 },
+                                { dx: curOffset.dx, dy: curOffset.dy, shift: -loopTextLen * 0.6 },
+                                { dx: curOffset.dx, dy: curOffset.dy, shift: loopTextLen * 1.0 },
+                                { dx: curOffset.dx, dy: curOffset.dy, shift: -loopTextLen * 1.0 }
+                            ];
+                            
+                            for (let state of states) {
+                                let currentMx = (l.p1.x + l.p2.x) / 2 + state.dx + dirX * state.shift;
+                                let currentMy = (l.p1.y + l.p2.y) / 2 + state.dy + dirY * state.shift;
                                 
-                                if (isParallel) {
-                                    if (dist < (c.len / 2) + (textLen / 2) + 5) {
-                                        isColliding = true; break;
-                                    }
-                                } else {
-                                    if (dist < (c.len / 2 + textLen / 2) * 0.75) {
-                                        isColliding = true; break;
-                                    }
-                                }
-                            }
-
-                            if (!isColliding) {
-                                for (let sbox of surveyTextBoxes) {
-                                    const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
-                                    const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(textLen, scaledFontSize)/2;
-                                    if (dist < requiredDist * 0.85) {
-                                        isColliding = true; break;
+                                let isColliding = false;
+                                for (let c of renderedMetrics) {
+                                    const angleDiff = Math.abs(c.rot - finalRot);
+                                    const isParallel = angleDiff < 5 || (angleDiff > 175 && angleDiff < 185);
+                                    const dist = Math.hypot(c.mx - currentMx, c.my - currentMy);
+                                    
+                                    if (isParallel) {
+                                        if (dist < (c.len / 2) + (loopTextLen / 2) + 5) {
+                                            isColliding = true; break;
+                                        }
+                                    } else {
+                                        if (dist < (c.len / 2 + loopTextLen / 2) * 0.75) {
+                                            isColliding = true; break;
+                                        }
                                     }
                                 }
-                            }
 
-                            if (!isColliding) {
-                                bestMx = currentMx;
-                                bestMy = currentMy;
-                                foundSafe = true;
-                                break;
+                                if (!isColliding) {
+                                    for (let sbox of surveyTextBoxes) {
+                                        const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
+                                        const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(loopTextLen, loopFontSize)/2;
+                                        if (dist < requiredDist * 0.85) {
+                                            isColliding = true; break;
+                                        }
+                                    }
+                                }
+
+                                if (!isColliding) {
+                                    bestMx = currentMx;
+                                    bestMy = currentMy;
+                                    foundSafe = true;
+                                    break;
+                                }
                             }
+                            
+                            if (foundSafe) break;
+                            loopFontSize *= 0.8;
+                            loopTextLen = textStr.length * (loopFontSize * 0.65);
                         }
                         
                         if (!foundSafe) {
-                            scaledFontSize = Math.max(8, scaledFontSize * 0.6);
-                            textLen = textStr.length * (scaledFontSize * 0.65);
-                            bestMx = (l.p1.x + l.p2.x) / 2 - offset.dx;
-                            bestMy = (l.p1.y + l.p2.y) / 2 - offset.dy;
+                            loopFontSize = Math.max(6, scaledFontSize * 0.45);
+                            loopTextLen = textStr.length * (loopFontSize * 0.65);
+                            const theta = finalRot * (Math.PI / 180);
+                            const extremeGap = Math.max(cadViewport.width * 0.02, loopFontSize * 1.5);
+                            const curPad = (loopFontSize / 2) + extremeGap;
+                            let extOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
+                            
+                            if (count === 1 && parentPoly) {
+                                const testMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
+                                const testMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
+                                if (pointInPolygon({x: testMx, y: testMy}, parentPoly.pts)) {
+                                    extOffset.dx *= -1;
+                                    extOffset.dy *= -1;
+                                }
+                            } else {
+                                extOffset.dx *= -1;
+                                extOffset.dy *= -1;
+                            }
+
+                            bestMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
+                            bestMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
                         }
                         
+                        scaledFontSize = loopFontSize;
+                        textLen = loopTextLen;
                         mx = bestMx;
                         my = bestMy;
                         renderedMetrics.push({ mx, my, rot: finalRot, len: textLen, size: scaledFontSize });
