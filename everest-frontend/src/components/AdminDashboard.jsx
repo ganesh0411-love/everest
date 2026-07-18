@@ -4849,7 +4849,15 @@ const AdminDashboard = ({ setCurrentView }) => {
                         let loopFontSize = scaledFontSize;
                         let loopTextLen = textLen;
                         
-                        while (loopFontSize >= Math.max(6, scaledFontSize * 0.4) && !foundSafe) {
+                        const distToSegment = (px, py, x1, y1, x2, y2) => {
+                            const l2 = Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2);
+                            if (l2 === 0) return Math.hypot(px - x1, py - y1);
+                            let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+                            t = Math.max(0, Math.min(1, t));
+                            return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+                        };
+                        
+                        while (loopFontSize >= Math.max(4, scaledFontSize * 0.25) && !foundSafe) {
                             const theta = finalRot * (Math.PI / 180);
                             const dynamicGap = loopFontSize * 0.6;
                             const curPad = (loopFontSize / 2) + dynamicGap;
@@ -4878,26 +4886,27 @@ const AdminDashboard = ({ setCurrentView }) => {
                                 
                                 let isColliding = false;
                                 for (let c of renderedMetrics) {
-                                    const angleDiff = Math.abs(c.rot - finalRot);
-                                    const isParallel = angleDiff < 5 || (angleDiff > 175 && angleDiff < 185);
                                     const dist = Math.hypot(c.mx - currentMx, c.my - currentMy);
-                                    
-                                    if (isParallel) {
-                                        if (dist < (c.len / 2) + (loopTextLen / 2) + 5) {
-                                            isColliding = true; break;
-                                        }
-                                    } else {
-                                        if (dist < (c.len / 2 + loopTextLen / 2) * 0.75) {
-                                            isColliding = true; break;
-                                        }
+                                    if (dist < (c.len / 2 + loopTextLen / 2) * 0.85) {
+                                        isColliding = true; break;
                                     }
                                 }
-
+                                
                                 if (!isColliding) {
                                     for (let sbox of surveyTextBoxes) {
                                         const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
                                         const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(loopTextLen, loopFontSize)/2;
                                         if (dist < requiredDist * 0.85) {
+                                            isColliding = true; break;
+                                        }
+                                    }
+                                }
+                                
+                                if (!isColliding) {
+                                    for (let otherL of cadLines) {
+                                        if (otherL.id === l.id) continue;
+                                        const d = distToSegment(currentMx, currentMy, otherL.p1.x, otherL.p1.y, otherL.p2.x, otherL.p2.y);
+                                        if (d < loopFontSize / 2 + 2) {
                                             isColliding = true; break;
                                         }
                                     }
@@ -4917,27 +4926,65 @@ const AdminDashboard = ({ setCurrentView }) => {
                         }
                         
                         if (!foundSafe) {
-                            loopFontSize = Math.max(6, scaledFontSize * 0.45);
+                            loopFontSize = Math.max(4, scaledFontSize * 0.25);
                             loopTextLen = textStr.length * (loopFontSize * 0.65);
                             const theta = finalRot * (Math.PI / 180);
-                            const extremeGap = Math.max(cadViewport.width * 0.02, loopFontSize * 1.5);
-                            const curPad = (loopFontSize / 2) + extremeGap;
-                            let extOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
                             
-                            if (count === 1 && parentPoly) {
-                                const testMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
-                                const testMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
-                                if (pointInPolygon({x: testMx, y: testMy}, parentPoly.pts)) {
+                            let multiplier = 1.0;
+                            while (!foundSafe && multiplier < 50) {
+                                const curPad = (loopFontSize / 2) + (loopFontSize * 0.6) + (multiplier * loopFontSize);
+                                let extOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
+                                
+                                if (count === 1 && parentPoly) {
+                                    const testMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
+                                    const testMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
+                                    if (pointInPolygon({x: testMx, y: testMy}, parentPoly.pts)) {
+                                        extOffset.dx *= -1;
+                                        extOffset.dy *= -1;
+                                    }
+                                } else {
                                     extOffset.dx *= -1;
                                     extOffset.dy *= -1;
                                 }
-                            } else {
-                                extOffset.dx *= -1;
-                                extOffset.dy *= -1;
+                                
+                                let currentMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
+                                let currentMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
+                                
+                                let isColliding = false;
+                                for (let c of renderedMetrics) {
+                                    const dist = Math.hypot(c.mx - currentMx, c.my - currentMy);
+                                    if (dist < (c.len / 2 + loopTextLen / 2) * 0.85) { isColliding = true; break; }
+                                }
+                                if (!isColliding) {
+                                    for (let sbox of surveyTextBoxes) {
+                                        const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
+                                        const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(loopTextLen, loopFontSize)/2;
+                                        if (dist < requiredDist * 0.85) { isColliding = true; break; }
+                                    }
+                                }
+                                if (!isColliding) {
+                                    for (let otherL of cadLines) {
+                                        if (otherL.id === l.id) continue;
+                                        const d = distToSegment(currentMx, currentMy, otherL.p1.x, otherL.p1.y, otherL.p2.x, otherL.p2.y);
+                                        if (d < loopFontSize / 2 + 2) { isColliding = true; break; }
+                                    }
+                                }
+                                
+                                if (!isColliding) {
+                                    bestMx = currentMx;
+                                    bestMy = currentMy;
+                                    foundSafe = true;
+                                } else {
+                                    multiplier += 1.0;
+                                }
                             }
-
-                            bestMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
-                            bestMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
+                            
+                            if (!foundSafe) {
+                                const curPad = (loopFontSize / 2) + (loopFontSize * 5);
+                                let extOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
+                                bestMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
+                                bestMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
+                            }
                         }
                         
                         scaledFontSize = loopFontSize;
