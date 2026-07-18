@@ -4905,10 +4905,14 @@ const AdminDashboard = ({ setCurrentView }) => {
                                 if (!isColliding) {
                                     for (let otherL of cadLines) {
                                         if (otherL.id === l.id) continue;
-                                        const d = distToSegment(currentMx, currentMy, otherL.p1.x, otherL.p1.y, otherL.p2.x, otherL.p2.y);
-                                        if (d < loopFontSize / 2 + 2) {
-                                            isColliding = true; break;
+                                        const pts = [0, 0.25, -0.25, 0.45, -0.45].map(s => ({ x: currentMx + dirX * loopTextLen * s, y: currentMy + dirY * loopTextLen * s }));
+                                        for (let pt of pts) {
+                                            const d = distToSegment(pt.x, pt.y, otherL.p1.x, otherL.p1.y, otherL.p2.x, otherL.p2.y);
+                                            if (d < loopFontSize / 2 + 2) {
+                                                isColliding = true; break;
+                                            }
                                         }
+                                        if (isColliding) break;
                                     }
                                 }
 
@@ -4947,34 +4951,51 @@ const AdminDashboard = ({ setCurrentView }) => {
                                     extOffset.dy *= -1;
                                 }
                                 
-                                let currentMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
-                                let currentMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
+                                const fbStates = [
+                                    { dx: extOffset.dx, dy: extOffset.dy, shift: 0 },
+                                    { dx: extOffset.dx, dy: extOffset.dy, shift: loopTextLen * 0.6 },
+                                    { dx: extOffset.dx, dy: extOffset.dy, shift: -loopTextLen * 0.6 },
+                                    { dx: extOffset.dx, dy: extOffset.dy, shift: loopTextLen * 1.0 },
+                                    { dx: extOffset.dx, dy: extOffset.dy, shift: -loopTextLen * 1.0 }
+                                ];
                                 
-                                let isColliding = false;
-                                for (let c of renderedMetrics) {
-                                    const dist = Math.hypot(c.mx - currentMx, c.my - currentMy);
-                                    if (dist < (c.len / 2 + loopTextLen / 2) * 0.85) { isColliding = true; break; }
-                                }
-                                if (!isColliding) {
-                                    for (let sbox of surveyTextBoxes) {
-                                        const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
-                                        const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(loopTextLen, loopFontSize)/2;
-                                        if (dist < requiredDist * 0.85) { isColliding = true; break; }
+                                for (let state of fbStates) {
+                                    let currentMx = (l.p1.x + l.p2.x) / 2 + state.dx + dirX * state.shift;
+                                    let currentMy = (l.p1.y + l.p2.y) / 2 + state.dy + dirY * state.shift;
+                                    
+                                    let isColliding = false;
+                                    for (let c of renderedMetrics) {
+                                        const dist = Math.hypot(c.mx - currentMx, c.my - currentMy);
+                                        if (dist < (c.len / 2 + loopTextLen / 2) * 0.85) { isColliding = true; break; }
+                                    }
+                                    if (!isColliding) {
+                                        for (let sbox of surveyTextBoxes) {
+                                            const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
+                                            const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(loopTextLen, loopFontSize)/2;
+                                            if (dist < requiredDist * 0.85) { isColliding = true; break; }
+                                        }
+                                    }
+                                    if (!isColliding) {
+                                        for (let otherL of cadLines) {
+                                            if (otherL.id === l.id) continue;
+                                            const pts = [0, 0.25, -0.25, 0.45, -0.45].map(s => ({ x: currentMx + dirX * loopTextLen * s, y: currentMy + dirY * loopTextLen * s }));
+                                            for (let pt of pts) {
+                                                const d = distToSegment(pt.x, pt.y, otherL.p1.x, otherL.p1.y, otherL.p2.x, otherL.p2.y);
+                                                if (d < loopFontSize / 2 + 2) { isColliding = true; break; }
+                                            }
+                                            if (isColliding) break;
+                                        }
+                                    }
+                                    
+                                    if (!isColliding) {
+                                        bestMx = currentMx;
+                                        bestMy = currentMy;
+                                        foundSafe = true;
+                                        break;
                                     }
                                 }
-                                if (!isColliding) {
-                                    for (let otherL of cadLines) {
-                                        if (otherL.id === l.id) continue;
-                                        const d = distToSegment(currentMx, currentMy, otherL.p1.x, otherL.p1.y, otherL.p2.x, otherL.p2.y);
-                                        if (d < loopFontSize / 2 + 2) { isColliding = true; break; }
-                                    }
-                                }
                                 
-                                if (!isColliding) {
-                                    bestMx = currentMx;
-                                    bestMy = currentMy;
-                                    foundSafe = true;
-                                } else {
+                                if (!foundSafe) {
                                     multiplier += 1.0;
                                 }
                             }
