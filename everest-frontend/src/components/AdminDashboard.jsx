@@ -3611,13 +3611,13 @@ const AdminDashboard = ({ setCurrentView }) => {
                            setIsSubDivVisible(ui.isSubDivVisible !== undefined ? ui.isSubDivVisible : (proj.state.isSubDivVisible !== undefined ? proj.state.isSubDivVisible : true));
                            setIsAddRadiusEnabled(ui.isAddRadiusEnabled || false);
                            setIsSketchExtendEnabled(ui.isSketchExtendEnabled || false);
-                           setShowDarkDrawSettings(ui.showDarkDrawSettings || false);
-                           setIsFloatingStackExpanded(ui.isFloatingStackExpanded || false);
-                           setIsGalleryPopupOpen(ui.isGalleryPopupOpen || false);
-                           setIsScaleModalOpen(ui.isScaleModalOpen || false);
-                           setIsAreaDropdownOpen(ui.isAreaDropdownOpen || false);
-                           setIsSurveyDropdownOpen(ui.isSurveyDropdownOpen || false);
-                           setIsSubDivisionDropdownOpen(ui.isSubDivisionDropdownOpen || false);
+                           setShowDarkDrawSettings(false);
+                           setIsFloatingStackExpanded(false);
+                           setIsGalleryPopupOpen(false);
+                           setIsScaleModalOpen(false);
+                           setIsAreaDropdownOpen(false);
+                           setIsSurveyDropdownOpen(false);
+                           setIsSubDivisionDropdownOpen(false);
 
                            setCadHistory({ past: [], future: [] }); // Reset history
                            setActiveLandSurveyView('dark_draw_manual');
