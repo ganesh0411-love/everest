@@ -4317,9 +4317,12 @@ const AdminDashboard = ({ setCurrentView }) => {
                             if (pt.y > maxY) maxY = pt.y;
                         });
 
-                        const stepX = (maxX - minX) / 20;
-                        const stepY = (maxY - minY) / 20;
-                        const step = Math.max(stepX, stepY, 0.1);
+                        const stepX = Math.max((maxX - minX) / 40, 0.1);
+                        const stepY = Math.max((maxY - minY) / 40, 0.1);
+                        
+                        let sumX = 0, sumY = 0;
+                        pts.forEach(p => { sumX += p.x; sumY += p.y; });
+                        let trueCentroid = { x: sumX / n, y: sumY / n };
                         
                         let bestPt = { x: (minX + maxX)/2, y: (minY + maxY)/2 };
                         let maxDist = -Infinity;
@@ -4342,8 +4345,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                         };
 
                         if (n >= 3) {
-                            for (let x = minX + step/2; x < maxX; x += step) {
-                                for (let y = minY + step/2; y < maxY; y += step) {
+                            for (let x = minX + stepX/2; x < maxX; x += stepX) {
+                                for (let y = minY + stepY/2; y < maxY; y += stepY) {
                                     const testPt = { x, y };
                                     if (pointInPolygon(testPt, pts)) {
                                         const d = distToPoly(testPt);
@@ -4353,6 +4356,27 @@ const AdminDashboard = ({ setCurrentView }) => {
                                         }
                                     }
                                 }
+                            }
+                        }
+                        
+                        if (maxDist === -Infinity) {
+                            if (pointInPolygon(trueCentroid, pts)) {
+                                bestPt = trueCentroid;
+                            } else {
+                                let maxEdge = -Infinity;
+                                let longestMid = bestPt;
+                                let inwardVec = {dx: 0, dy: 0};
+                                for (let i = 0; i < n; i++) {
+                                    const A = pts[i];
+                                    const B = pts[(i + 1) % n];
+                                    const len = Math.hypot(B.x - A.x, B.y - A.y);
+                                    if (len > maxEdge) {
+                                        maxEdge = len;
+                                        longestMid = { x: (A.x + B.x)/2, y: (A.y + B.y)/2 };
+                                        inwardVec = { dx: trueCentroid.x - longestMid.x, dy: trueCentroid.y - longestMid.y };
+                                    }
+                                }
+                                bestPt = { x: longestMid.x + inwardVec.dx * 0.01, y: longestMid.y + inwardVec.dy * 0.01 };
                             }
                         }
                         
