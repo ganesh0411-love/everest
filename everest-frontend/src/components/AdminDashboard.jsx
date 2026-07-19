@@ -1378,8 +1378,10 @@ const AdminDashboard = ({ setCurrentView }) => {
          } else if (cadPointerGesture?.isDraggingMetric) {
              const lineId = cadPointerGesture.targetMetric.id;
              const baseOffset = cadPointerGesture.baseOffset || cadMetricOffsets[lineId] || getMetricDefaultOffset(cadPointerGesture.targetMetric);
-             const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
-             const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
+             const currentRaw = getCadSvgCoords(e.clientX, e.clientY);
+             const startRaw = cadPointerGesture.startRawPt || currentRaw;
+             const dxSvg = currentRaw.x - startRaw.x;
+             const dySvg = currentRaw.y - startRaw.y;
              const targetLine = cadLines.find(l => l.id === lineId) || cadPointerGesture.targetMetric;
              magSvgX = (targetLine.p1.x + targetLine.p2.x) / 2 + baseOffset.dx + dxSvg;
              magSvgY = (targetLine.p1.y + targetLine.p2.y) / 2 + baseOffset.dy + dySvg;
@@ -1486,11 +1488,13 @@ const AdminDashboard = ({ setCurrentView }) => {
       }
 
       if (cadPointerGesture?.isDraggingMetric) {
-         const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
-         const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
+         const currentRaw = getCadSvgCoords(e.clientX, e.clientY);
+         const startRaw = cadPointerGesture.startRawPt || currentRaw;
+         const dxSvg = currentRaw.x - startRaw.x;
+         const dySvg = currentRaw.y - startRaw.y;
          const lineId = cadPointerGesture.targetMetric.id;
          const baseOffset = cadPointerGesture.baseOffset || cadMetricOffsets[lineId] || getMetricDefaultOffset(cadPointerGesture.targetMetric);
-         if (!cadPointerGesture.baseOffset) setCadPointerGesture(p => ({ ...p, baseOffset }));
+         if (!cadPointerGesture.baseOffset) setCadPointerGesture(p => ({ ...p, baseOffset, startRawPt: startRaw }));
          
          setCadMetricOffsets(prev => ({ ...prev, [lineId]: { dx: baseOffset.dx + dxSvg, dy: baseOffset.dy + dySvg } }));
          return;
@@ -4878,7 +4882,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                     // Override default offset magnitude with scaledFontSize padding
                     if (!cadMetricOffsets[l.id] && displayLen && isMetricsVisible) {
                         const theta = finalRot * (Math.PI / 180);
-                        const dynamicGap = scaledFontSize * 0.6;
+                        const dynamicGap = scaledFontSize * 0.4;
                         const pad = (scaledFontSize / 2) + dynamicGap;
                         offset = { dx: pad * Math.sin(theta), dy: -pad * Math.cos(theta) };
                         
@@ -4897,177 +4901,6 @@ const AdminDashboard = ({ setCurrentView }) => {
                     let my = (l.p1.y + l.p2.y) / 2 + offset.dy;
                     
                     if (!cadMetricOffsets[l.id] && isMetricsVisible && displayLen) {
-                        const dirX = Math.cos(finalRot * Math.PI / 180);
-                        const dirY = Math.sin(finalRot * Math.PI / 180);
-                        let bestMx = mx;
-                        let bestMy = my;
-                        let foundSafe = false;
-                        let loopFontSize = scaledFontSize;
-                        let loopTextLen = textLen;
-                        
-                        const distToSegment = (px, py, x1, y1, x2, y2) => {
-                            const l2 = Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2);
-                            if (l2 === 0) return Math.hypot(px - x1, py - y1);
-                            let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
-                            t = Math.max(0, Math.min(1, t));
-                            return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
-                        };
-                        
-                        while (loopFontSize >= Math.max(4, scaledFontSize * 0.25) && !foundSafe) {
-                            const theta = finalRot * (Math.PI / 180);
-                            const dynamicGap = loopFontSize * 0.6;
-                            const curPad = (loopFontSize / 2) + dynamicGap;
-                            const curOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
-                            
-                            if (count === 1 && parentPoly) {
-                                const testMx = (l.p1.x + l.p2.x) / 2 + curOffset.dx;
-                                const testMy = (l.p1.y + l.p2.y) / 2 + curOffset.dy;
-                                if (pointInPolygon({x: testMx, y: testMy}, parentPoly.pts)) {
-                                    curOffset.dx *= -1;
-                                    curOffset.dy *= -1;
-                                }
-                            }
-                            
-                            const states = [
-                                { dx: curOffset.dx, dy: curOffset.dy, shift: 0 },
-                                { dx: curOffset.dx, dy: curOffset.dy, shift: loopTextLen * 0.6 },
-                                { dx: curOffset.dx, dy: curOffset.dy, shift: -loopTextLen * 0.6 },
-                                { dx: curOffset.dx, dy: curOffset.dy, shift: loopTextLen * 1.0 },
-                                { dx: curOffset.dx, dy: curOffset.dy, shift: -loopTextLen * 1.0 }
-                            ];
-                            
-                            for (let state of states) {
-                                let currentMx = (l.p1.x + l.p2.x) / 2 + state.dx + dirX * state.shift;
-                                let currentMy = (l.p1.y + l.p2.y) / 2 + state.dy + dirY * state.shift;
-                                
-                                let isColliding = false;
-                                for (let c of renderedMetrics) {
-                                    const dist = Math.hypot(c.mx - currentMx, c.my - currentMy);
-                                    if (dist < (c.len / 2 + loopTextLen / 2) * 0.85) {
-                                        isColliding = true; break;
-                                    }
-                                }
-                                
-                                if (!isColliding) {
-                                    for (let sbox of surveyTextBoxes) {
-                                        const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
-                                        const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(loopTextLen, loopFontSize)/2;
-                                        if (dist < requiredDist * 0.85) {
-                                            isColliding = true; break;
-                                        }
-                                    }
-                                }
-                                
-                                if (!isColliding) {
-                                    for (let otherL of cadLines) {
-                                        if (otherL.id === l.id) continue;
-                                        const pts = [0, 0.25, -0.25, 0.45, -0.45].map(s => ({ x: currentMx + dirX * loopTextLen * s, y: currentMy + dirY * loopTextLen * s }));
-                                        for (let pt of pts) {
-                                            const d = distToSegment(pt.x, pt.y, otherL.p1.x, otherL.p1.y, otherL.p2.x, otherL.p2.y);
-                                            if (d < loopFontSize / 2 + 2) {
-                                                isColliding = true; break;
-                                            }
-                                        }
-                                        if (isColliding) break;
-                                    }
-                                }
-
-                                if (!isColliding) {
-                                    bestMx = currentMx;
-                                    bestMy = currentMy;
-                                    foundSafe = true;
-                                    break;
-                                }
-                            }
-                            
-                            if (foundSafe) break;
-                            loopFontSize *= 0.8;
-                            loopTextLen = textStr.length * (loopFontSize * 0.65);
-                        }
-                        
-                        if (!foundSafe) {
-                            loopFontSize = Math.max(4, scaledFontSize * 0.25);
-                            loopTextLen = textStr.length * (loopFontSize * 0.65);
-                            const theta = finalRot * (Math.PI / 180);
-                            
-                            let multiplier = 1.0;
-                            while (!foundSafe && multiplier < 50) {
-                                const curPad = (loopFontSize / 2) + (loopFontSize * 0.6) + (multiplier * loopFontSize);
-                                let extOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
-                                
-                                if (count === 1 && parentPoly) {
-                                    const testMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
-                                    const testMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
-                                    if (pointInPolygon({x: testMx, y: testMy}, parentPoly.pts)) {
-                                        extOffset.dx *= -1;
-                                        extOffset.dy *= -1;
-                                    }
-                                } else {
-                                    extOffset.dx *= -1;
-                                    extOffset.dy *= -1;
-                                }
-                                
-                                const fbStates = [
-                                    { dx: extOffset.dx, dy: extOffset.dy, shift: 0 },
-                                    { dx: extOffset.dx, dy: extOffset.dy, shift: loopTextLen * 0.6 },
-                                    { dx: extOffset.dx, dy: extOffset.dy, shift: -loopTextLen * 0.6 },
-                                    { dx: extOffset.dx, dy: extOffset.dy, shift: loopTextLen * 1.0 },
-                                    { dx: extOffset.dx, dy: extOffset.dy, shift: -loopTextLen * 1.0 }
-                                ];
-                                
-                                for (let state of fbStates) {
-                                    let currentMx = (l.p1.x + l.p2.x) / 2 + state.dx + dirX * state.shift;
-                                    let currentMy = (l.p1.y + l.p2.y) / 2 + state.dy + dirY * state.shift;
-                                    
-                                    let isColliding = false;
-                                    for (let c of renderedMetrics) {
-                                        const dist = Math.hypot(c.mx - currentMx, c.my - currentMy);
-                                        if (dist < (c.len / 2 + loopTextLen / 2) * 0.85) { isColliding = true; break; }
-                                    }
-                                    if (!isColliding) {
-                                        for (let sbox of surveyTextBoxes) {
-                                            const dist = Math.hypot(sbox.cx - currentMx, sbox.cy - currentMy);
-                                            const requiredDist = Math.max(sbox.w, sbox.h)/2 + Math.max(loopTextLen, loopFontSize)/2;
-                                            if (dist < requiredDist * 0.85) { isColliding = true; break; }
-                                        }
-                                    }
-                                    if (!isColliding) {
-                                        for (let otherL of cadLines) {
-                                            if (otherL.id === l.id) continue;
-                                            const pts = [0, 0.25, -0.25, 0.45, -0.45].map(s => ({ x: currentMx + dirX * loopTextLen * s, y: currentMy + dirY * loopTextLen * s }));
-                                            for (let pt of pts) {
-                                                const d = distToSegment(pt.x, pt.y, otherL.p1.x, otherL.p1.y, otherL.p2.x, otherL.p2.y);
-                                                if (d < loopFontSize / 2 + 2) { isColliding = true; break; }
-                                            }
-                                            if (isColliding) break;
-                                        }
-                                    }
-                                    
-                                    if (!isColliding) {
-                                        bestMx = currentMx;
-                                        bestMy = currentMy;
-                                        foundSafe = true;
-                                        break;
-                                    }
-                                }
-                                
-                                if (!foundSafe) {
-                                    multiplier += 1.0;
-                                }
-                            }
-                            
-                            if (!foundSafe) {
-                                const curPad = (loopFontSize / 2) + (loopFontSize * 5);
-                                let extOffset = { dx: curPad * Math.sin(theta), dy: -curPad * Math.cos(theta) };
-                                bestMx = (l.p1.x + l.p2.x) / 2 + extOffset.dx;
-                                bestMy = (l.p1.y + l.p2.y) / 2 + extOffset.dy;
-                            }
-                        }
-                        
-                        scaledFontSize = loopFontSize;
-                        textLen = loopTextLen;
-                        mx = bestMx;
-                        my = bestMy;
                         renderedMetrics.push({ mx, my, rot: finalRot, len: textLen, size: scaledFontSize });
                     }
                     
@@ -5098,8 +4931,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                                         const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
                                         setCadPointerGesture({
                                             startX: e.clientX, startY: e.clientY,
-                                            offsetX: mx - rawPt.x,
-                                            offsetY: my - rawPt.y,
+                                            startRawPt: rawPt,
+                                            baseOffset: offset,
                                             isDraggingMetric: true,
                                             targetMetric: l
                                         });
@@ -5420,10 +5253,11 @@ const AdminDashboard = ({ setCurrentView }) => {
                          focusY += (cadPointerGesture.offsetY || 0);
                     }
 
-                    const vbX = focusX - (cadViewport.width / 8);
-                    const vbY = focusY - (cadViewport.height / 8);
-                    const vbW = cadViewport.width / 4;
-                    const vbH = cadViewport.height / 4;
+                    const vbSize = Math.max(cadViewport.width, cadViewport.height) / 4;
+                    const vbX = focusX - (vbSize / 2);
+                    const vbY = focusY - (vbSize / 2);
+                    const vbW = vbSize;
+                    const vbH = vbSize;
                     const chLen = cadViewport.width * 0.014; // crosshair arm length
                     const dotR  = cadViewport.width * 0.004; // center dot radius
                     const sw    = cadViewport.width * 0.0022; // stroke width
@@ -5436,12 +5270,15 @@ const AdminDashboard = ({ setCurrentView }) => {
                        borderRadius: '50%',
                        border: '2.5px solid #fbbf24',
                        overflow: 'hidden',
-                       background: '#0f172a',
+                       background: mapConfig.active ? 'transparent' : '#0f172a',
                        pointerEvents: 'none',
                        zIndex: 200,
                        boxShadow: '0 0 0 1px rgba(251,191,36,0.3), 0 12px 28px rgba(0,0,0,0.6)'
                     }}>
                        <svg width="140" height="140" viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}>
+                          {mapConfig.active && (
+                              <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                          )}
                           {/* Grid lines for spatial context */}
                           <line
                             x1={vbX} y1={focusY}
@@ -5932,6 +5769,9 @@ const AdminDashboard = ({ setCurrentView }) => {
                      onClick={() => {
                         if (mapConfig.active) {
                             setMapConfig(prev => ({ ...prev, active: false }));
+                            if (!cadScale) {
+                                setCadScale(Math.cos(mapConfig.baseLat * Math.PI / 180));
+                            }
                             return;
                         }
                         setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
