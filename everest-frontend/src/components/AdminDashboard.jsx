@@ -707,7 +707,20 @@ const AdminDashboard = ({ setCurrentView }) => {
          const newData = {
              ...updatedProject,
              state: {
-                lines: cadLines,
+                mapConfig: mapConfig,
+                lines: cadLines.map(l => {
+                    if (mapConfig && mapConfig.baseMercX !== 0) {
+                        const getWgs84 = (x, y) => {
+                            const mercX = mapConfig.baseMercX + x;
+                            const mercY = mapConfig.baseMercY - y;
+                            const lng = (mercX / 6378137) * (180 / Math.PI);
+                            const lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+                            return { lat, lng };
+                        };
+                        return { ...l, p1: { ...l.p1, wgs84: getWgs84(l.p1.x, l.p1.y) }, p2: { ...l.p2, wgs84: getWgs84(l.p2.x, l.p2.y) } };
+                    }
+                    return l;
+                }),
                 circles: cadCircles,
                 texts: cadTexts,
                 metricOffsets: cadMetricOffsets,
@@ -754,15 +767,28 @@ const AdminDashboard = ({ setCurrentView }) => {
             id: Date.now().toString(),
             date: customName.trim() || defaultName,
             state: {
-               lines: cadLines,
-               circles: cadCircles,
-               texts: cadTexts,
-               metricOffsets: cadMetricOffsets,
-               viewport: cadViewport,
-               scale: cadScale,
-               surveys: cadSurveys,
-               checkedSurveys: checkedSurveyNos
-            },
+                mapConfig: mapConfig,
+                lines: cadLines.map(l => {
+                    if (mapConfig && mapConfig.baseMercX !== 0) {
+                        const getWgs84 = (x, y) => {
+                            const mercX = mapConfig.baseMercX + x;
+                            const mercY = mapConfig.baseMercY - y;
+                            const lng = (mercX / 6378137) * (180 / Math.PI);
+                            const lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+                            return { lat, lng };
+                        };
+                        return { ...l, p1: { ...l.p1, wgs84: getWgs84(l.p1.x, l.p1.y) }, p2: { ...l.p2, wgs84: getWgs84(l.p2.x, l.p2.y) } };
+                    }
+                    return l;
+                }),
+                circles: cadCircles,
+                texts: cadTexts,
+                metricOffsets: cadMetricOffsets,
+                viewport: cadViewport,
+                scale: cadScale,
+                surveys: cadSurveys,
+                checkedSurveys: checkedSurveyNos
+             },
             uiSettings: {
                isMetricsVisible,
                isSurveyNoVisible,
@@ -3632,6 +3658,12 @@ const AdminDashboard = ({ setCurrentView }) => {
                         <button onClick={() => {
                            resetCadState();
                            setCadLoadedProjectId(proj.id);
+                           if (proj.state.mapConfig && proj.state.mapConfig.baseMercX !== 0) {
+                               setMapConfig(proj.state.mapConfig);
+                               setActiveLandSurveyView('dark_draw_manual');
+                           } else {
+                               setMapConfig({ active: false, isLoading: false, baseMercX: 0, baseMercY: 0, baseLat: 0 });
+                           }
                            setCadLines(proj.state.lines);
                            setCadCircles(proj.state.circles);
                            setCadTexts(proj.state.texts);
@@ -3641,7 +3673,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                            if (proj.state.surveys) setCadSurveys(proj.state.surveys); else setCadSurveys([]);
                            if (proj.state.checkedSurveys) setCheckedSurveyNos(proj.state.checkedSurveys); else if (proj.state.surveys) setCheckedSurveyNos([...new Set(proj.state.surveys.map(s => s.surveyNo))]); else setCheckedSurveyNos([]);
                            
-                           const ui = proj.uiSettings || {};
+                           let ui = proj.uiSettings || {};
                            setIsMetricsVisible(ui.isMetricsVisible !== undefined ? ui.isMetricsVisible : (proj.state.isMetricsVisible !== undefined ? proj.state.isMetricsVisible : true));
                            setIsSurveyNoVisible(ui.isSurveyNoVisible !== undefined ? ui.isSurveyNoVisible : (proj.state.isSurveyNoVisible !== undefined ? proj.state.isSurveyNoVisible : true));
                            setIsSubDivVisible(ui.isSubDivVisible !== undefined ? ui.isSubDivVisible : (proj.state.isSubDivVisible !== undefined ? proj.state.isSubDivVisible : true));
