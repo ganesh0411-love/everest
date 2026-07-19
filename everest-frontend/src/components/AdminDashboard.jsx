@@ -936,7 +936,7 @@ const AdminDashboard = ({ setCurrentView }) => {
     if (areaPixels <= 0) return null;
     
     // Geodesic Mercator scale adjustment for live satellite map, or raw cadScale for FMB
-    const effectiveScale = mapConfig.active ? Math.cos(mapConfig.baseLat * Math.PI / 180) : cadScale;
+    const effectiveScale = (mapConfig.baseLat !== 0) ? Math.cos(mapConfig.baseLat * Math.PI / 180) : cadScale;
     if (!effectiveScale) return null;
 
     const sqMeters = areaPixels * effectiveScale * effectiveScale;
@@ -4871,7 +4871,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                         
                         textStr = isGlobalMetricFeet ? (displayLen * 3.28084).toFixed(1) + ' ft' : displayLen.toFixed(1) + ' m';
                         const svgLen = Math.hypot(l.p1.x - l.p2.x, l.p1.y - l.p2.y);
-                        const baseFontSize = l.metricFontSize || (isMetricSelected || isLiveDrag ? 50 : (isInternalPartition ? 12 : 32));
+                        const mapBaseFontSize = isMetricSelected || isLiveDrag ? cadViewport.width * 0.05 : (isInternalPartition ? cadViewport.width * 0.015 : cadViewport.width * 0.025);
+                        const baseFontSize = l.metricFontSize || (mapConfig.baseLat !== 0 ? mapBaseFontSize : (isMetricSelected || isLiveDrag ? 50 : (isInternalPartition ? 12 : 32)));
                         const maxAllowedFontSize = (svgLen * 0.9) / (Math.max(1, textStr.length) * 0.65);
                         scaledFontSize = Math.min(baseFontSize, Math.max(1, maxAllowedFontSize));
                         textLen = textStr.length * (scaledFontSize * 0.65);
@@ -4926,7 +4927,18 @@ const AdminDashboard = ({ setCurrentView }) => {
                                         if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
                                         cadPointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
                                         const rawPt = getCadSvgCoords(e.clientX, e.clientY);
-                                        const offset = cadMetricOffsets[l.id] || getMetricDefaultOffset(l);
+                                        let offset = cadMetricOffsets[l.id];
+                                        if (!offset) {
+                                            const mapBaseFontSize = cadViewport.width * 0.05;
+                                            const baseFs = l.metricFontSize || (mapConfig.baseLat !== 0 ? mapBaseFontSize : 50);
+                                            const maxAllowed = (displayLen * 0.9) / (Math.max(1, String(displayLen.toFixed(1)).length + 2) * 0.65);
+                                            const sFontSize = Math.min(baseFs, Math.max(1, maxAllowed));
+                                            let r = Math.atan2(l.p2.y - l.p1.y, l.p2.x - l.p1.x) * (180 / Math.PI);
+                                            if (r > 90) r -= 180; else if (r < -90) r += 180;
+                                            const theta = (l.metricRotation !== undefined ? l.metricRotation : r) * (Math.PI / 180);
+                                            const dynamicGap = sFontSize * 0.4;
+                                            offset = { dx: dynamicGap * Math.sin(theta), dy: -dynamicGap * Math.cos(theta) };
+                                        }
                                         const mx = (l.p1.x + l.p2.x) / 2 + offset.dx;
                                         const my = (l.p1.y + l.p2.y) / 2 + offset.dy;
                                         setCadPointerGesture({
@@ -5700,6 +5712,18 @@ const AdminDashboard = ({ setCurrentView }) => {
                      <button 
                         className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-fuchsia-400 border border-slate-600 flex justify-center items-center font-bold text-xl transition-colors"
                         onClick={async () => {
+                            if (cadNodes && cadNodes.length > 0 && mapConfig.baseLat !== 0) {
+                                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                                cadNodes.forEach(n => {
+                                    if (n.x < minX) minX = n.x;
+                                    if (n.x > maxX) maxX = n.x;
+                                    if (n.y < minY) minY = n.y;
+                                    if (n.y > maxY) maxY = n.y;
+                                });
+                                const margin = Math.max(maxX - minX, maxY - minY) * 0.1 || 10;
+                                setCadViewport({ x: minX - margin, y: minY - margin, width: (maxX - minX) + margin * 2, height: (maxY - minY) + margin * 2 });
+                                return;
+                            }
                             if (mapConfig.active) {
                                 try {
                                     const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
