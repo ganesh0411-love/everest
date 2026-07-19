@@ -192,21 +192,41 @@ const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
             }
         }
     }
+
+    const [cachedTiles, setCachedTiles] = React.useState({});
     
+    React.useEffect(() => {
+        setCachedTiles(prev => {
+            const next = { ...prev };
+            Object.keys(next).forEach(k => {
+                if (Math.abs(next[k].z - z) > 1) {
+                    delete next[k];
+                }
+            });
+            tiles.forEach(t => {
+                next[`${t.z}-${t.x}-${t.y}`] = t;
+            });
+            return next;
+        });
+    }, [viewport.x, viewport.y, viewport.width, viewport.height]);
+
+    const renderTiles = Object.values(cachedTiles).sort((a, b) => a.z - b.z);
+
     return (
         <g id="satellite-layer" pointerEvents="none">
-            {tiles.map(tile => {
-                const mercX = (tile.x / n) * 40075016 - maxMerc;
-                const mercY = maxMerc - (tile.y / n) * 40075016;
+            {renderTiles.map(tile => {
+                const mercX = (tile.x / Math.pow(2, tile.z)) * 40075016 - maxMerc;
+                const mercY = maxMerc - (tile.y / Math.pow(2, tile.z)) * 40075016;
                 const svgX = mercX - baseMercX;
                 const svgY = baseMercY - mercY;
+                const tileM = 40075016 / Math.pow(2, tile.z);
                 return (
                     <TileImage
                         key={`${tile.z}-${tile.x}-${tile.y}`}
                         x={svgX}
                         y={svgY}
-                        width={tileSizeMeters + 0.5}
-                        height={tileSizeMeters + 0.5}
+                        width={tileM + 0.5}
+                        height={tileM + 0.5}
                         tileX={tile.x}
                         tileY={tile.y}
                         tileZ={tile.z}
@@ -1303,7 +1323,19 @@ const AdminDashboard = ({ setCurrentView }) => {
       const zdx = (centroidSvgX - cadPinchInitial.view.x) * (1 - scaleDelta);
       const zdy = (centroidSvgY - cadPinchInitial.view.y) * (1 - scaleDelta);
 
-      setCadViewport({ x: cadPinchInitial.view.x + dx + zdx, y: cadPinchInitial.view.y + dy + zdy, width: newWidth, height: newHeight });
+      const newX = cadPinchInitial.view.x + dx + zdx;
+      const newY = cadPinchInitial.view.y + dy + zdy;
+      const nextViewport = { x: newX, y: newY, width: newWidth, height: newHeight };
+      
+      cadViewportRef.current = nextViewport;
+      if (cadSvgRef.current) {
+          cadSvgRef.current.setAttribute('viewBox', `${newX} ${newY} ${newWidth} ${newHeight}`);
+      }
+      
+      if (cadWheelTimeoutRef.current) clearTimeout(cadWheelTimeoutRef.current);
+      cadWheelTimeoutRef.current = setTimeout(() => {
+          setCadViewport(cadViewportRef.current);
+      }, 150);
       return;
     }
 
@@ -1575,10 +1607,7 @@ const AdminDashboard = ({ setCurrentView }) => {
          if (cadStateBeforeActionRef.current && JSON.stringify(cadStateBeforeActionRef.current) !== JSON.stringify(captureCadState())) saveCadStateToHistory(cadStateBeforeActionRef.current);
          cadStateBeforeActionRef.current = null;
          setCadDraggingNode(null); 
-         if (cadPointerGesture?.isDraggingPan) {
-         setCadViewport(cadViewportRef.current);
-      }
-      setCadPointerGesture(null); 
+         setCadPointerGesture(null); 
          return; 
       }
 
@@ -1609,6 +1638,9 @@ const AdminDashboard = ({ setCurrentView }) => {
          }
          if (cadPointerGesture.isDraggingMetric || cadPointerGesture.isDraggingText) {
              setCadEditInputs(p => ({ ...p, isMovingMetric: false, isMovingText: false }));
+         }
+         if (cadPointerGesture.isDraggingPan) {
+             setCadViewport(cadViewportRef.current);
          }
       }
       
