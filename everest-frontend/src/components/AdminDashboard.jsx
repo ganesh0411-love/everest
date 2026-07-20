@@ -238,17 +238,41 @@ const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
 };
 
 const WMSTileImage = React.memo(({ x, y, width, height, tileX, tileY, tileZ }) => {
-    const maxMerc = Math.PI * 6378137;
-    const tileSizeMeters = 40075016 / Math.pow(2, tileZ);
-    const minx = tileX * tileSizeMeters - maxMerc;
-    const maxy = maxMerc - tileY * tileSizeMeters;
-    const maxx = minx + tileSizeMeters;
-    const miny = maxy - tileSizeMeters;
-    const bbox = `${minx},${miny},${maxx},${maxy}`;
-    const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=cadastral_data_wms:view_cadastral&styles=&bbox=${bbox}&width=256&height=256&srs=EPSG:3857&format=image/png&transparent=true`;
-    
+    const [blobUrl, setBlobUrl] = React.useState(null);
+    React.useEffect(() => {
+        let isMounted = true;
+        // Prefix key to avoid colliding with satellite tiles
+        const key = `wms-cadastral-${tileZ}-${tileX}-${tileY}`;
+        const maxMerc = Math.PI * 6378137;
+        const tileSizeMeters = 40075016 / Math.pow(2, tileZ);
+        const minx = tileX * tileSizeMeters - maxMerc;
+        const maxy = maxMerc - tileY * tileSizeMeters;
+        const maxx = minx + tileSizeMeters;
+        const miny = maxy - tileSizeMeters;
+        const bbox = `${minx},${miny},${maxx},${maxy}`;
+        const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=cadastral_data_wms:view_cadastral&styles=&bbox=${bbox}&width=256&height=256&srs=EPSG:3857&format=image/png&transparent=true`;
+        
+        getCachedTile(key).then(blob => {
+            if (blob) {
+                if (isMounted) setBlobUrl(URL.createObjectURL(blob));
+            } else {
+                fetch(url).then(r => r.blob()).then(newBlob => {
+                    setCachedTile(key, newBlob).catch(() => {});
+                    if (isMounted) setBlobUrl(URL.createObjectURL(newBlob));
+                }).catch(e => console.error(e));
+            }
+        }).catch(() => {
+            if (isMounted) setBlobUrl(url);
+        });
+        
+        return () => {
+            isMounted = false;
+        };
+    }, [tileZ, tileX, tileY]);
+
+    if (!blobUrl) return null;
     return (
-        <image x={x} y={y} width={width} height={height} href={url} preserveAspectRatio="none" opacity={1} />
+        <image x={x} y={y} width={width} height={height} href={blobUrl} preserveAspectRatio="none" opacity={1} />
     );
 });
 
