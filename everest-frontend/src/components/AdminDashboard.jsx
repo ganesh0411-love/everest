@@ -4541,19 +4541,19 @@ const AdminDashboard = ({ setCurrentView }) => {
                     {mapConfig.active && (
                        <>
                            <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
-                           {isFMBEnabled && (
-                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1" labelProperty="sub_division_no" labelColor="#00FF00" />
+                           {isFMBEnabled && cadViewport.width <= 1000 && (
+                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1" labelProperty="sub_division" labelColor="#00FF00" />
                            )}
-                           {isCadastralEnabled && (
+                           {isCadastralEnabled && cadViewport.width <= 5000 && (
                                <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                            )}
-                           {isVillageEnabled && (
+                           {isVillageEnabled && cadViewport.width > 1000 && cadViewport.width <= 30000 && (
                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#FFFFFF" strokeWidth="2" opacity={0.6} />
                            )}
-                           {isTalukEnabled && (
+                           {isTalukEnabled && cadViewport.width > 5000 && cadViewport.width <= 150000 && (
                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#FFA500" strokeWidth="2" opacity={0.7} />
                            )}
-                           {isDistrictEnabled && (
+                           {isDistrictEnabled && cadViewport.width > 20000 && (
                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#FF0000" strokeWidth="3" opacity={0.8} />
                            )}
                        </>
@@ -5532,19 +5532,19 @@ const AdminDashboard = ({ setCurrentView }) => {
                           {mapConfig.active && (
                               <>
                                   <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
-                                  {isFMBEnabled && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1" labelProperty="sub_division_no" labelColor="#00FF00" />
+                                  {isFMBEnabled && cadViewport.width <= 1000 && (
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1" labelProperty="sub_division" labelColor="#00FF00" />
                                   )}
-                                  {isCadastralEnabled && (
+                                  {isCadastralEnabled && cadViewport.width <= 5000 && (
                                       <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                                   )}
-                                  {isVillageEnabled && (
+                                  {isVillageEnabled && cadViewport.width > 1000 && cadViewport.width <= 30000 && (
                                       <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#FFFFFF" strokeWidth="2" opacity={0.6} />
                                   )}
-                                  {isTalukEnabled && (
+                                  {isTalukEnabled && cadViewport.width > 5000 && cadViewport.width <= 150000 && (
                                       <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#FFA500" strokeWidth="2" opacity={0.7} />
                                   )}
-                                  {isDistrictEnabled && (
+                                  {isDistrictEnabled && cadViewport.width > 20000 && (
                                       <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#FF0000" strokeWidth="3" opacity={0.8} />
                                   )}
                               </>
