@@ -273,7 +273,7 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
             const pxW = Math.min(2048, Math.round(window.innerWidth * 1.5));
             const pxH = Math.min(2048, Math.round(window.innerHeight * 1.5));
             
-            const textSymbolizer = labelProperty ? `<TextSymbolizer><Label><ogc:PropertyName>${labelProperty}</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">11</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">${labelColor || strokeColor}</CssParameter></Fill><VendorOption name="polygonAlign">mbr</VendorOption><VendorOption name="goodnessOfFit">0.5</VendorOption><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>` : '';
+            const textSymbolizer = labelProperty ? `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>${labelProperty}</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">11</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">${labelColor || strokeColor}</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>` : '';
             const sld = `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>${layerName}</Name><UserStyle><FeatureTypeStyle><Rule><LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer>${textSymbolizer}</Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
             const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=${layerName}&styles=&bbox=${bbox}&width=${pxW}&height=${pxH}&srs=EPSG:3857&format=image/png&transparent=true&format_options=text_antialias:on&sld_body=${encodeURIComponent(sld)}`;
             
@@ -298,7 +298,7 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
                     onLoad={() => {
                         setWmsViewports(prev => {
                             const updated = prev.map(p => p.id === v.id ? { ...p, loaded: true } : p);
-                            return updated.filter(p => p.loaded || p.id === v.id);
+                            return updated.filter(p => !p.loaded || p.id === v.id);
                         });
                     }} 
                 />
@@ -331,7 +331,7 @@ const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
             const pxH = Math.min(2048, Math.round(window.innerHeight * 1.5));
             
             // Single bounding box request guarantees label deduplication at polygon centroid
-            const textSymbolizer = `<TextSymbolizer><Label><ogc:PropertyName>survey_number</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">11</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">#FF1493</CssParameter></Fill><VendorOption name="polygonAlign">mbr</VendorOption><VendorOption name="goodnessOfFit">0.5</VendorOption><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>`;
+            const textSymbolizer = `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>survey_number</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">11</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Fill><CssParameter name="fill">#FF1493</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>`;
             const sld = `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>cadastral_data_wms:view_cadastral</Name><UserStyle><FeatureTypeStyle><Rule><LineSymbolizer><Stroke><CssParameter name="stroke">#FF1493</CssParameter><CssParameter name="stroke-width">1</CssParameter></Stroke></LineSymbolizer>${textSymbolizer}</Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
             const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=cadastral_data_wms:view_cadastral&styles=&bbox=${bbox}&width=${pxW}&height=${pxH}&srs=EPSG:3857&format=image/png&transparent=true&format_options=text_antialias:on&sld_body=${encodeURIComponent(sld)}`;
             
@@ -352,7 +352,10 @@ const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
                     key={v.id} 
                     {...v} 
                     onLoad={() => {
-                        setWmsViewports(prev => prev.map(p => p.id === v.id ? {...p, loaded: true} : p));
+                        setWmsViewports(prev => {
+                            const updated = prev.map(p => p.id === v.id ? { ...p, loaded: true } : p);
+                            return updated.filter(p => !p.loaded || p.id === v.id);
+                        });
                     }} 
                 />
             ))}
