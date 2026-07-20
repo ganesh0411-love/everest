@@ -246,6 +246,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
   // --- MANUAL CAD ENGINE STATE -----
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
+  const [isCadastralEnabled, setIsCadastralEnabled] = React.useState(false);
   const [cadPromptSurveyNo, setCadPromptSurveyNo] = React.useState('');
   const [cadPromptSubDiv, setCadPromptSubDiv] = React.useState('');
   const [cadPromptColor, setCadPromptColor] = React.useState('#3b82f6'); // Default to blue-500
@@ -3791,6 +3792,13 @@ const AdminDashboard = ({ setCurrentView }) => {
                          <span>Metrics</span>
                          <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isMetricsVisible ? 'bg-emerald-500' : 'bg-slate-600'}`}>
                            <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isMetricsVisible ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
+                       
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsCadastralEnabled(!isCadastralEnabled); }}>
+                         <span>Show Cadastral Overlay</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isCadastralEnabled ? 'bg-blue-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isCadastralEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
                          </div>
                        </div>
                        
