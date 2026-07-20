@@ -327,6 +327,146 @@ app.delete('/api/fmb-maps/:id', async (req, res) => {
     }
 });
 
+// ─── TNGIS WFS PROXY ROUTES ──────────────────────────────────────────────────────
+
+const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
+    try {
+        let url = `https://tngis.tn.gov.in/app/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json&srsName=EPSG:3857`;
+        if (propertyName) {
+            url += `&propertyName=${propertyName}`;
+        }
+        if (cqlFilter) {
+            url += `&cql_filter=${encodeURIComponent(cqlFilter)}`;
+        }
+        
+        console.log(`TNGIS Proxy Request: ${url}`);
+        // Use a short timeout of 10s for TNGIS requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`TNGIS API responded with status ${response.status}`);
+        }
+        return await response.json();
+    } catch (err) {
+        console.error(`TNGIS Proxy Error for ${typeName}:`, err.message);
+        throw err;
+    }
+};
+
+app.get('/api/tngis/districts', async (req, res) => {
+    try {
+        // We ask for only dname, and return unique values
+        const data = await fetchTNGIS('tngis:district_boundary', 'dname');
+        if (data && data.features) {
+            const districts = [...new Set(data.features.map(f => f.properties.dname).filter(Boolean))].sort();
+            return res.json({ success: true, data: districts });
+        }
+        res.json({ success: true, data: [] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to fetch districts' });
+    }
+});
+
+app.get('/api/tngis/taluks', async (req, res) => {
+    try {
+        const { district } = req.query;
+        if (!district) return res.status(400).json({ error: 'District is required' });
+        
+        const data = await fetchTNGIS('tngis:taluk_boundary', 'tname', `dname='${district}'`);
+        if (data && data.features) {
+            const taluks = [...new Set(data.features.map(f => f.properties.tname).filter(Boolean))].sort();
+            return res.json({ success: true, data: taluks });
+        }
+        res.json({ success: true, data: [] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to fetch taluks' });
+    }
+});
+
+app.get('/api/tngis/villages', async (req, res) => {
+    try {
+        const { taluk } = req.query;
+        if (!taluk) return res.status(400).json({ error: 'Taluk is required' });
+        
+        const data = await fetchTNGIS('tngis:revenue_village', 'vname', `tname='${taluk}'`);
+        if (data && data.features) {
+            const villages = [...new Set(data.features.map(f => f.properties.vname).filter(Boolean))].sort();
+            return res.json({ success: true, data: villages });
+        }
+        res.json({ success: true, data: [] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to fetch villages' });
+    }
+});
+
+app.get('/api/tngis/survey', async (req, res) => {
+    try {
+        const { village } = req.query;
+        if (!village) return res.status(400).json({ error: 'Village is required' });
+        
+        // Use cadastral layer to fetch survey numbers
+        const data = await fetchTNGIS('cadastral_data_wms:view_cadastral', 'survey_number', `vname='${village}'`);
+        if (data && data.features) {
+            const surveys = [...new Set(data.features.map(f => f.properties.survey_number).filter(Boolean))].sort((a,b) => {
+                const numA = parseInt(a, 10);
+                const numB = parseInt(b, 10);
+                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                return String(a).localeCompare(String(b));
+            });
+            return res.json({ success: true, data: surveys });
+        }
+        res.json({ success: true, data: [] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to fetch survey numbers' });
+    }
+});
+
+app.get('/api/tngis/subdivisions', async (req, res) => {
+    try {
+        const { village, survey } = req.query;
+        if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
+        
+        // Fetch subdivisions
+        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'sub_division_no', `vname='${village}' AND survey_number='${survey}'`);
+        if (data && data.features) {
+            const subdivs = [...new Set(data.features.map(f => f.properties.sub_division_no).filter(Boolean))].sort();
+            return res.json({ success: true, data: subdivs });
+        }
+        res.json({ success: true, data: [] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to fetch subdivisions' });
+    }
+});
+
+// Used for fly-to animation. Returns the full GeoJSON feature for bounding box calculation.
+app.get('/api/tngis/feature', async (req, res) => {
+    try {
+        const { village, survey, subdiv } = req.query;
+        if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
+        
+        let typeName = 'cadastral_data_wms:view_cadastral';
+        let cql = `vname='${village}' AND survey_number='${survey}'`;
+        
+        if (subdiv) {
+            typeName = 'cadastral_data_wms:view_fmb';
+            cql += ` AND sub_division_no='${subdiv}'`;
+        }
+        
+        // We omit propertyName to get the full feature including geometry
+        const data = await fetchTNGIS(typeName, null, cql);
+        if (data && data.features && data.features.length > 0) {
+            return res.json({ success: true, feature: data.features[0] });
+        }
+        res.status(404).json({ success: false, error: 'Feature not found' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Failed to fetch feature' });
+    }
+});
+
 // ─── Start Server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
     console.log(`✅ Everest Backend running on port ${PORT}`);

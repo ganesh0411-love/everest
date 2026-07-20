@@ -382,7 +382,22 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadPromptSubDiv, setCadPromptSubDiv] = React.useState('');
   const [cadPromptColor, setCadPromptColor] = React.useState('#3b82f6'); // Default to blue-500
   const [cadActiveSurveyId, setCadActiveSurveyId] = React.useState(null);
-  const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
+  
+  const [lsDistricts, setLsDistricts] = React.useState([]);
+  const [lsTaluks, setLsTaluks] = React.useState([]);
+  const [lsVillages, setLsVillages] = React.useState([]);
+  const [lsSurveys, setLsSurveys] = React.useState([]);
+  const [lsSubdivs, setLsSubdivs] = React.useState([]);
+  
+  const [selDistrict, setSelDistrict] = React.useState('');
+  const [selTaluk, setSelTaluk] = React.useState('');
+  const [selVillage, setSelVillage] = React.useState('');
+  const [selSurvey, setSelSurvey] = React.useState('');
+  const [selSubdiv, setSelSubdiv] = React.useState('');
+  const [lsLoading, setLsLoading] = React.useState('');
+  const [lsHighlightPoly, setLsHighlightPoly] = React.useState(null);
+  
+const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
     const [isSubDivisionDropdownOpen, setIsSubDivisionDropdownOpen] = React.useState(false);
     const [checkedSurveyNos, setCheckedSurveyNos] = React.useState([]);
@@ -395,7 +410,166 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadTool, setCadTool] = React.useState('IDLE');
   const [cadViewport, setCadViewport] = React.useState({ x: 0, y: 0, width: 2000, height: 2000 });
   const cadViewportRef = React.useRef({ x: 0, y: 0, width: 2000, height: 2000 });
-  React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
+  
+  // LAND SEARCH: Cascading Data Loaders
+  React.useEffect(() => {
+      if (isLandSearchModalOpen && lsDistricts.length === 0) {
+          setLsLoading('districts');
+          fetch(`${API_BASE}/api/tngis/districts`)
+            .then(res => res.json())
+            .then(res => setLsDistricts(res.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLsLoading(''));
+      }
+  }, [isLandSearchModalOpen, lsDistricts.length]);
+
+  React.useEffect(() => {
+      if (selDistrict) {
+          setLsLoading('taluks');
+          fetch(`${API_BASE}/api/tngis/taluks?district=${encodeURIComponent(selDistrict)}`)
+            .then(res => res.json())
+            .then(res => setLsTaluks(res.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLsLoading(''));
+          setSelTaluk('');
+          setLsTaluks([]);
+          setSelVillage('');
+          setLsVillages([]);
+          setSelSurvey('');
+          setLsSurveys([]);
+          setSelSubdiv('');
+          setLsSubdivs([]);
+      }
+  }, [selDistrict]);
+
+  React.useEffect(() => {
+      if (selTaluk) {
+          setLsLoading('villages');
+          fetch(`${API_BASE}/api/tngis/villages?taluk=${encodeURIComponent(selTaluk)}`)
+            .then(res => res.json())
+            .then(res => setLsVillages(res.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLsLoading(''));
+          setSelVillage('');
+          setLsVillages([]);
+          setSelSurvey('');
+          setLsSurveys([]);
+          setSelSubdiv('');
+          setLsSubdivs([]);
+      }
+  }, [selTaluk]);
+
+  React.useEffect(() => {
+      if (selVillage) {
+          setLsLoading('surveys');
+          fetch(`${API_BASE}/api/tngis/survey?village=${encodeURIComponent(selVillage)}`)
+            .then(res => res.json())
+            .then(res => setLsSurveys(res.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLsLoading(''));
+          setSelSurvey('');
+          setLsSurveys([]);
+          setSelSubdiv('');
+          setLsSubdivs([]);
+      }
+  }, [selVillage]);
+
+  React.useEffect(() => {
+      if (selSurvey) {
+          setLsLoading('subdivs');
+          fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}`)
+            .then(res => res.json())
+            .then(res => setLsSubdivs(res.data || []))
+            .catch(err => console.error(err))
+            .finally(() => setLsLoading(''));
+          setSelSubdiv('');
+          setLsSubdivs([]);
+      }
+  }, [selSurvey]);
+
+  const executeFlyTo = async () => {
+      if (!selVillage || !selSurvey) return;
+      setLsLoading('flyTo');
+      try {
+          const res = await fetch(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}` + (selSubdiv ? `&subdiv=${encodeURIComponent(selSubdiv)}` : ''));
+          const data = await res.json();
+          if (data.success && data.feature && data.feature.geometry) {
+              const geom = data.feature.geometry;
+              let coordinates = [];
+              if (geom.type === 'Polygon') coordinates = geom.coordinates[0];
+              else if (geom.type === 'MultiPolygon') coordinates = geom.coordinates[0][0]; // Outer ring of first polygon
+              
+              if (coordinates && coordinates.length > 0) {
+                  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                  
+                  const points = coordinates.map(coord => {
+                      // EPSG:3857 coordinates from WFS
+                      const mercX = coord[0];
+                      const mercY = coord[1];
+                      // Convert to SVG coordinates relative to baseMercX/Y
+                      const svgX = mercX - mapConfig.baseMercX;
+                      const svgY = mapConfig.baseMercY - mercY; // Invert Y
+                      
+                      if (svgX < minX) minX = svgX;
+                      if (svgX > maxX) maxX = svgX;
+                      if (svgY < minY) minY = svgY;
+                      if (svgY > maxY) maxY = svgY;
+                      
+                      return { x: svgX, y: svgY };
+                  });
+                  
+                  // Animate Pan and Zoom
+                  const targetWidth = Math.max(maxX - minX, 100); // Minimum 100px width
+                  const targetHeight = Math.max(maxY - minY, 100);
+                  const marginX = targetWidth * 0.2;
+                  const marginY = targetHeight * 0.2;
+                  
+                  const tX = minX - marginX;
+                  const tY = minY - marginY;
+                  const tW = targetWidth + marginX * 2;
+                  const tH = targetHeight + marginY * 2;
+                  
+                  const startX = cadViewport.x;
+                  const startY = cadViewport.y;
+                  const startW = cadViewport.width;
+                  const startH = cadViewport.height;
+                  
+                  let startTime = null;
+                  const animate = (time) => {
+                      if (!startTime) startTime = time;
+                      const elapsed = time - startTime;
+                      const t = Math.min(elapsed / 1000, 1);
+                      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                      
+                      setCadViewport({
+                          x: startX + (tX - startX) * ease,
+                          y: startY + (tY - startY) * ease,
+                          width: startW + (tW - startW) * ease,
+                          height: startH + (tH - startH) * ease
+                      });
+                      
+                      if (t < 1) {
+                          requestAnimationFrame(animate);
+                      } else {
+                          // Flash highlight polygon
+                          setLsHighlightPoly(points);
+                          setTimeout(() => setLsHighlightPoly(null), 3000); // Hide after 3 seconds
+                      }
+                  };
+                  requestAnimationFrame(animate);
+                  setIsLandSearchModalOpen(false); // Close modal
+              }
+          } else {
+              alert('Feature not found or no geometry returned.');
+          }
+      } catch (err) {
+          alert('Failed to execute search: ' + err.message);
+      } finally {
+          setLsLoading('');
+      }
+  };
+
+React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   const [cadAnchorNode, setCadAnchorNode] = React.useState(null);
   const [cadPrompt, setCadPrompt] = React.useState(null);
   const [cadPromptValue, setCadPromptValue] = React.useState('');
@@ -6213,10 +6387,11 @@ const AdminDashboard = ({ setCurrentView }) => {
         </div>
       )}
 
+      
       {/* LAND SEARCH MODAL (TAMIL NILAM MATCH) */}
       {isLandSearchModalOpen && (
         <div 
-          className="fixed inset-0 z-[500] flex items-start justify-center pt-32 px-4 pointer-events-auto"
+          className="fixed inset-0 z-[500] flex items-start justify-center pt-32 px-4 pointer-events-auto bg-slate-900/60 backdrop-blur-sm"
           onClick={() => setIsLandSearchModalOpen(false)}
         >
           <div 
@@ -6226,35 +6401,74 @@ const AdminDashboard = ({ setCurrentView }) => {
             {/* Red Close Button */}
             <button 
               onClick={() => setIsLandSearchModalOpen(false)}
-              className="absolute -top-3 right-2 bg-red-600 text-white rounded-md p-1.5 hover:bg-red-500 shadow-md transition-colors"
+              className="absolute -top-3 right-2 bg-red-600 text-white rounded-md p-1.5 hover:bg-red-500 shadow-md transition-colors z-[501]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
             
+            <h3 className="text-white font-bold text-center mb-1 text-lg">Land Search</h3>
+            
             {/* Dropdowns */}
-            <select className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm appearance-none cursor-pointer text-sm">
+            <select 
+              value={selDistrict} onChange={e => setSelDistrict(e.target.value)}
+              disabled={lsLoading === 'districts'}
+              className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
+            >
               <option value="">Select District</option>
+              {lsDistricts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
-            <select className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm appearance-none cursor-pointer text-sm">
+            
+            <select 
+              value={selTaluk} onChange={e => setSelTaluk(e.target.value)}
+              disabled={!selDistrict || lsLoading === 'taluks'}
+              className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
+            >
               <option value="">Select Taluk</option>
+              {lsTaluks.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-            <select className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm appearance-none cursor-pointer text-sm">
+            
+            <select 
+              value={selVillage} onChange={e => setSelVillage(e.target.value)}
+              disabled={!selTaluk || lsLoading === 'villages'}
+              className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
+            >
               <option value="">Select Village</option>
+              {lsVillages.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
-            <div className="relative">
-                <input type="text" placeholder="Select Survey Number" className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm text-sm" />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                </div>
-            </div>
-            <div className="relative">
-                <input type="text" placeholder="Select subdivision Number" className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm text-sm" />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                </div>
-            </div>
+            
+            <select 
+              value={selSurvey} onChange={e => setSelSurvey(e.target.value)}
+              disabled={!selVillage || lsLoading === 'surveys'}
+              className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
+            >
+              <option value="">Select Survey Number</option>
+              {lsSurveys.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            
+            <select 
+              value={selSubdiv} onChange={e => setSelSubdiv(e.target.value)}
+              disabled={!selSurvey || lsLoading === 'subdivs'}
+              className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
+            >
+              <option value="">Select Subdivision Number (Optional)</option>
+              {lsSubdivs.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            
+            <button
+               onClick={executeFlyTo}
+               disabled={!selVillage || !selSurvey || lsLoading === 'flyTo'}
+               className="w-full mt-2 bg-green-500 hover:bg-green-400 disabled:bg-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md shadow-md transition-colors flex items-center justify-center gap-2"
+            >
+               {lsLoading === 'flyTo' ? (
+                   <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+               ) : (
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+               )}
+               {lsLoading === 'flyTo' ? 'Searching...' : 'Search & Fly To Map'}
+            </button>
+            
           </div>
         </div>
       )}
