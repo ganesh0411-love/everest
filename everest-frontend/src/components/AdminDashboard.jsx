@@ -372,6 +372,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
   // --- MANUAL CAD ENGINE STATE -----
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
+  const [isLayerMenuOpen, setIsLayerMenuOpen] = React.useState(false);
   const [isCadastralEnabled, setIsCadastralEnabled] = React.useState(false);
   const [isFMBEnabled, setIsFMBEnabled] = React.useState(false);
   const [isVillageEnabled, setIsVillageEnabled] = React.useState(false);
@@ -4426,12 +4427,48 @@ const AdminDashboard = ({ setCurrentView }) => {
               </div>
 
               {/* RIGHT-SIDE CONTROLS */}
-              <div className="absolute top-1/2 right-6 -translate-y-1/2 z-[150] flex flex-col gap-4 pointer-events-none">
-                  <button className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 7l8-4 8 4-8 4-8-4zm0 4l8 4 8-4m-16 4l8 4 8-4" />
-                      </svg>
-                  </button>
+              <div className="absolute top-1/2 right-6 -translate-y-1/2 z-[150] flex flex-col gap-4 pointer-events-none items-end">
+                  <div className="relative pointer-events-auto">
+                      <button onClick={(e) => { e.stopPropagation(); setIsLayerMenuOpen(!isLayerMenuOpen); }} className={`w-10 h-10 rounded-full text-white shadow-lg border flex items-center justify-center transition-colors ${isLayerMenuOpen ? 'bg-cyan-600 border-cyan-400' : 'bg-slate-800/80 border-slate-600 hover:bg-slate-700'}`}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7l8-4 8 4-8 4-8-4zm0 4l8 4 8-4m-16 4l8 4 8-4" />
+                          </svg>
+                      </button>
+                      
+                      {isLayerMenuOpen && (
+                          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-4 bg-slate-900/95 backdrop-blur-md border border-slate-600 rounded-xl shadow-2xl p-4 w-56 animate-in fade-in slide-in-from-right-4" onClick={(e) => e.stopPropagation()}>
+                              <h3 className="text-white font-black text-xs uppercase tracking-widest border-b border-slate-700 pb-2 mb-3">Map Layers</h3>
+                              
+                              <div className="flex flex-col gap-3">
+                                  <label className="flex items-center gap-3 cursor-pointer group">
+                                      <div className="relative flex items-center justify-center">
+                                          <input 
+                                              type="checkbox" 
+                                              checked={isCadastralEnabled}
+                                              onChange={(e) => setIsCadastralEnabled(e.target.checked)}
+                                              className="peer appearance-none w-5 h-5 border border-slate-500 rounded bg-slate-800 checked:bg-[#FF1493] checked:border-[#FF1493] transition-colors cursor-pointer shadow-inner"
+                                          />
+                                          <svg className="absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                      </div>
+                                      <span className="text-[13px] font-bold text-slate-300 group-hover:text-white transition-colors">Cadastral</span>
+                                  </label>
+
+                                  <label className="flex items-center gap-3 cursor-pointer group">
+                                      <div className="relative flex items-center justify-center">
+                                          <input 
+                                              type="checkbox" 
+                                              checked={isFMBEnabled}
+                                              onChange={(e) => setIsFMBEnabled(e.target.checked)}
+                                              className="peer appearance-none w-5 h-5 border border-slate-500 rounded bg-slate-800 checked:bg-[#00FF00] checked:border-[#00FF00] transition-colors cursor-pointer shadow-inner"
+                                          />
+                                          <svg className="absolute w-3.5 h-3.5 text-slate-900 pointer-events-none opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                      </div>
+                                      <span className="text-[13px] font-bold text-slate-300 group-hover:text-white transition-colors">Subdivision</span>
+                                  </label>
+                              </div>
+                          </div>
+                      )}
+                  </div>
               </div>
 
               {/* BOTTOM-LEFT LEGEND */}
