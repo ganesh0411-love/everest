@@ -3926,19 +3926,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                            <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isMetricsVisible ? 'translate-x-5' : 'translate-x-0'}`}></div>
                          </div>
                        </div>
-                       
-                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsCadastralEnabled(!isCadastralEnabled); }}>
-                         <span>Show Cadastral Overlay</span>
-                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isCadastralEnabled ? 'bg-blue-500' : 'bg-slate-600'}`}>
-                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isCadastralEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                         </div>
-                       </div>
-                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsFMBEnabled(!isFMBEnabled); }}>
-                         <span>Show FMB (Subdivision)</span>
-                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isFMBEnabled ? 'bg-green-500' : 'bg-slate-600'}`}>
-                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isFMBEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                         </div>
-                       </div>
+
                        <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsVillageEnabled(!isVillageEnabled); }}>
                          <span>Show Village Boundary</span>
                          <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isVillageEnabled ? 'bg-white' : 'bg-slate-600'}`}>
@@ -4445,7 +4433,15 @@ const AdminDashboard = ({ setCurrentView }) => {
                                           <input 
                                               type="checkbox" 
                                               checked={isCadastralEnabled}
-                                              onChange={(e) => setIsCadastralEnabled(e.target.checked)}
+                                              onChange={(e) => {
+                                                  const checked = e.target.checked;
+                                                  setIsCadastralEnabled(checked);
+                                                  if (checked) {
+                                                      setIsVillageEnabled(true);
+                                                      setIsTalukEnabled(true);
+                                                      setIsDistrictEnabled(true);
+                                                  }
+                                              }}
                                               className="peer appearance-none w-5 h-5 border border-slate-500 rounded bg-slate-800 checked:bg-[#FF1493] checked:border-[#FF1493] transition-colors cursor-pointer shadow-inner"
                                           />
                                           <svg className="absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -4458,7 +4454,15 @@ const AdminDashboard = ({ setCurrentView }) => {
                                           <input 
                                               type="checkbox" 
                                               checked={isFMBEnabled}
-                                              onChange={(e) => setIsFMBEnabled(e.target.checked)}
+                                              onChange={(e) => {
+                                                  const checked = e.target.checked;
+                                                  setIsFMBEnabled(checked);
+                                                  if (checked) {
+                                                      setIsVillageEnabled(true);
+                                                      setIsTalukEnabled(true);
+                                                      setIsDistrictEnabled(true);
+                                                  }
+                                              }}
                                               className="peer appearance-none w-5 h-5 border border-slate-500 rounded bg-slate-800 checked:bg-[#00FF00] checked:border-[#00FF00] transition-colors cursor-pointer shadow-inner"
                                           />
                                           <svg className="absolute w-3.5 h-3.5 text-slate-900 pointer-events-none opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
