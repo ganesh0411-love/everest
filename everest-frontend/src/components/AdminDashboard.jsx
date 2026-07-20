@@ -251,6 +251,61 @@ const WMSDynamicImage = React.memo(({ x, y, w, h, url, loaded, onLoad }) => {
     );
 });
 
+const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, opacity = 1 }) => {
+    if (!baseMercX) return null;
+    const [wmsViewports, setWmsViewports] = React.useState([]);
+
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            const padX = viewport.width * 0.2;
+            const padY = viewport.height * 0.2;
+            const vX = viewport.x - padX;
+            const vY = viewport.y - padY;
+            const vW = viewport.width + padX * 2;
+            const vH = viewport.height + padY * 2;
+
+            const mercMinX = baseMercX + vX;
+            const mercMaxX = mercMinX + vW;
+            const mercMaxY = baseMercY - vY;
+            const mercMinY = baseMercY - (vY + vH);
+            
+            const bbox = `${mercMinX},${mercMinY},${mercMaxX},${mercMaxY}`;
+            const pxW = Math.min(2048, Math.round(window.innerWidth * 1.5));
+            const pxH = Math.min(2048, Math.round(window.innerHeight * 1.5));
+            
+            const sld = `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>${layerName}</Name><UserStyle><FeatureTypeStyle><Rule><PolygonSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></PolygonSymbolizer><LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
+            const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=${layerName}&styles=&bbox=${bbox}&width=${pxW}&height=${pxH}&srs=EPSG:3857&format=image/png&transparent=true&format_options=antialias:on&sld_body=${encodeURIComponent(sld)}`;
+            
+            const id = Date.now();
+            setWmsViewports(prev => {
+                const lastLoaded = prev.filter(p => p.loaded).slice(-1);
+                return [...lastLoaded, { id, x: vX, y: vY, w: vW, h: vH, url, loaded: false }];
+            });
+        }, 400);
+        
+        return () => clearTimeout(timer);
+    }, [viewport.x, viewport.y, viewport.width, viewport.height, baseMercX, baseMercY, layerName, strokeColor, strokeWidth]);
+
+    return (
+        <g opacity={opacity} pointerEvents="none">
+            {wmsViewports.map(v => (
+                <WMSDynamicImage 
+                    key={v.id} 
+                    x={v.x} y={v.y} w={v.w} h={v.h} 
+                    url={v.url} 
+                    loaded={v.loaded} 
+                    onLoad={() => {
+                        setWmsViewports(prev => {
+                            const updated = prev.map(p => p.id === v.id ? { ...p, loaded: true } : p);
+                            return updated.filter(p => p.loaded || p.id === v.id);
+                        });
+                    }} 
+                />
+            ))}
+        </g>
+    );
+};
+
 const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
     if (!baseMercX) return null;
     const [wmsViewports, setWmsViewports] = React.useState([]);
@@ -313,6 +368,10 @@ const AdminDashboard = ({ setCurrentView }) => {
   // --- MANUAL CAD ENGINE STATE -----
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
   const [isCadastralEnabled, setIsCadastralEnabled] = React.useState(false);
+  const [isFMBEnabled, setIsFMBEnabled] = React.useState(false);
+  const [isVillageEnabled, setIsVillageEnabled] = React.useState(false);
+  const [isTalukEnabled, setIsTalukEnabled] = React.useState(false);
+  const [isDistrictEnabled, setIsDistrictEnabled] = React.useState(false);
   const [cadPromptSurveyNo, setCadPromptSurveyNo] = React.useState('');
   const [cadPromptSubDiv, setCadPromptSubDiv] = React.useState('');
   const [cadPromptColor, setCadPromptColor] = React.useState('#3b82f6'); // Default to blue-500
@@ -3868,6 +3927,30 @@ const AdminDashboard = ({ setCurrentView }) => {
                            <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isCadastralEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
                          </div>
                        </div>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsFMBEnabled(!isFMBEnabled); }}>
+                         <span>Show FMB (Subdivision)</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isFMBEnabled ? 'bg-green-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isFMBEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsVillageEnabled(!isVillageEnabled); }}>
+                         <span>Show Village Boundary</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isVillageEnabled ? 'bg-white' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isVillageEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsTalukEnabled(!isTalukEnabled); }}>
+                         <span>Show Taluk Boundary</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isTalukEnabled ? 'bg-orange-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isTalukEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
+                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDistrictEnabled(!isDistrictEnabled); }}>
+                         <span>Show District Boundary</span>
+                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isDistrictEnabled ? 'bg-red-500' : 'bg-slate-600'}`}>
+                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isDistrictEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                         </div>
+                       </div>
                        
                        <div className="flex items-center justify-between w-full px-5 py-3 border-b border-slate-700 gap-4">
                           <label className="flex items-center gap-2 cursor-pointer text-[13px] font-bold text-slate-300 hover:text-white transition-colors" onClick={e => e.stopPropagation()}>
@@ -4459,6 +4542,18 @@ const AdminDashboard = ({ setCurrentView }) => {
                            <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                            {isCadastralEnabled && (
                                <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                           )}
+                           {isFMBEnabled && (
+                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1" />
+                           )}
+                           {isVillageEnabled && (
+                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#FFFFFF" strokeWidth="2" opacity={0.6} />
+                           )}
+                           {isTalukEnabled && (
+                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#FFA500" strokeWidth="2" opacity={0.7} />
+                           )}
+                           {isDistrictEnabled && (
+                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#FF0000" strokeWidth="3" opacity={0.8} />
                            )}
                        </>
                     )}
@@ -5438,6 +5533,18 @@ const AdminDashboard = ({ setCurrentView }) => {
                                   <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                                   {isCadastralEnabled && (
                                       <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                                  )}
+                                  {isFMBEnabled && (
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1" />
+                                  )}
+                                  {isVillageEnabled && (
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#FFFFFF" strokeWidth="2" opacity={0.6} />
+                                  )}
+                                  {isTalukEnabled && (
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#FFA500" strokeWidth="2" opacity={0.7} />
+                                  )}
+                                  {isDistrictEnabled && (
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#FF0000" strokeWidth="3" opacity={0.8} />
                                   )}
                               </>
                           )}

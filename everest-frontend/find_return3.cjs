@@ -1,0 +1,1 @@
+const fs = require('fs'); const lines = fs.readFileSync('src/components/AdminDashboard.jsx', 'utf8').split('\n'); for(let i=1000; i<3000; i++) { if(lines[i].includes('return (') && lines[i].trim() === 'return (') { console.log('Possible main return at ' + i); for(let j=Math.max(0, i-5); j<Math.min(lines.length, i+30); j++) console.log(j + ': ' + lines[j]); break; } }
