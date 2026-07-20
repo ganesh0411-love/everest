@@ -237,116 +237,68 @@ const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
     );
 };
 
-const WMSTileImage = React.memo(({ x, y, width, height, tileX, tileY, tileZ }) => {
-    const [blobUrl, setBlobUrl] = React.useState(null);
-    React.useEffect(() => {
-        let isMounted = true;
-        // Prefix key to avoid colliding with satellite tiles
-        const key = `wms-cadastral-${tileZ}-${tileX}-${tileY}`;
-        const maxMerc = Math.PI * 6378137;
-        const tileSizeMeters = 40075016 / Math.pow(2, tileZ);
-        const minx = tileX * tileSizeMeters - maxMerc;
-        const maxy = maxMerc - tileY * tileSizeMeters;
-        const maxx = minx + tileSizeMeters;
-        const miny = maxy - tileSizeMeters;
-        const bbox = `${minx},${miny},${maxx},${maxy}`;
-        const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=cadastral_data_wms:view_cadastral&styles=&bbox=${bbox}&width=256&height=256&srs=EPSG:3857&format=image/png&transparent=true`;
-        
-        getCachedTile(key).then(blob => {
-            if (blob) {
-                if (isMounted) setBlobUrl(URL.createObjectURL(blob));
-            } else {
-                fetch(url).then(r => r.blob()).then(newBlob => {
-                    setCachedTile(key, newBlob).catch(() => {});
-                    if (isMounted) setBlobUrl(URL.createObjectURL(newBlob));
-                }).catch(e => console.error(e));
-            }
-        }).catch(() => {
-            if (isMounted) setBlobUrl(url);
-        });
-        
-        return () => {
-            isMounted = false;
-        };
-    }, [tileZ, tileX, tileY]);
-
-    if (!blobUrl) return null;
+const WMSDynamicImage = React.memo(({ x, y, w, h, url, loaded, onLoad }) => {
     return (
-        <image x={x} y={y} width={width} height={height} href={blobUrl} preserveAspectRatio="none" opacity={1} />
+        <image 
+            x={x} y={y} width={w} height={h} href={url} 
+            preserveAspectRatio="none" 
+            onLoad={onLoad} 
+            opacity={loaded ? 1 : 0.5} 
+            style={{ 
+                transition: 'opacity 0.3s ease'
+            }}
+        />
     );
 });
 
 const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
     if (!baseMercX) return null;
-    const R = 6378137;
-    const maxMerc = Math.PI * R;
-    const zFloat = Math.log2(40075016 / viewport.width) + 1.5;
-    const z = Math.max(0, Math.min(22, Math.round(zFloat)));
-    const n = Math.pow(2, z);
-    
-    const vMinX = baseMercX + viewport.x;
-    const vMaxX = baseMercX + viewport.x + viewport.width;
-    const vMaxY = baseMercY - viewport.y;
-    const vMinY = baseMercY - (viewport.y + viewport.height);
-    
-    const txMin = Math.floor((vMinX + maxMerc) / 40075016 * n);
-    const txMax = Math.floor((vMaxX + maxMerc) / 40075016 * n);
-    const tyMin = Math.floor((maxMerc - vMaxY) / 40075016 * n);
-    const tyMax = Math.floor((maxMerc - vMinY) / 40075016 * n);
-    
-    // Aggressive buffer
-    const bufferWidth = Math.max(1, (txMax - txMin) * 2);
-    const bufferHeight = Math.max(1, (tyMax - tyMin) * 2);
-    
-    const tiles = [];
-    if ((txMax - txMin) * (tyMax - tyMin) < 400) {
-        for (let x = txMin - bufferWidth; x <= txMax + bufferWidth; x++) {
-            for (let y = tyMin - bufferHeight; y <= tyMax + bufferHeight; y++) {
-                if (x >= 0 && x < n && y >= 0 && y < n) tiles.push({ x, y, z });
-            }
-        }
-    }
+    const [wmsViewports, setWmsViewports] = React.useState([]);
 
-    const [cachedTiles, setCachedTiles] = React.useState({});
-    
     React.useEffect(() => {
-        setCachedTiles(prev => {
-            const next = { ...prev };
-            Object.keys(next).forEach(k => {
-                if (Math.abs(next[k].z - z) > 1) {
-                    delete next[k];
-                }
-            });
-            tiles.forEach(t => {
-                next[`${t.z}-${t.x}-${t.y}`] = t;
-            });
-            return next;
-        });
-    }, [viewport.x, viewport.y, viewport.width, viewport.height]);
+        const timer = setTimeout(() => {
+            // Expand bbox by 20% on all sides so small pans are smooth
+            const padX = viewport.width * 0.2;
+            const padY = viewport.height * 0.2;
+            const vX = viewport.x - padX;
+            const vY = viewport.y - padY;
+            const vW = viewport.width + padX * 2;
+            const vH = viewport.height + padY * 2;
 
-    const renderTiles = Object.values(cachedTiles).sort((a, b) => a.z - b.z);
+            const mercMinX = baseMercX + vX;
+            const mercMaxX = mercMinX + vW;
+            const mercMaxY = baseMercY - vY;
+            const mercMinY = baseMercY - (vY + vH);
+            
+            const bbox = `${mercMinX},${mercMinY},${mercMaxX},${mercMaxY}`;
+            const pxW = Math.min(2048, Math.round(window.innerWidth * 1.5));
+            const pxH = Math.min(2048, Math.round(window.innerHeight * 1.5));
+            
+            // Single bounding box request guarantees label deduplication at polygon centroid
+            const sld = `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>cadastral_data_wms:view_cadastral</Name><UserStyle><FeatureTypeStyle><Rule><PolygonSymbolizer><Stroke><CssParameter name="stroke">#FFFF00</CssParameter><CssParameter name="stroke-width">1</CssParameter></Stroke></PolygonSymbolizer><TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>survey_number</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">14</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">#FFFF00</CssParameter></Fill></TextSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
+            const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=cadastral_data_wms:view_cadastral&styles=&bbox=${bbox}&width=${pxW}&height=${pxH}&srs=EPSG:3857&format=image/png&transparent=true&format_options=antialias:on;text_antialias:on&sld_body=${encodeURIComponent(sld)}`;
+            
+            const id = Date.now();
+            setWmsViewports(prev => {
+                const lastLoaded = prev.filter(p => p.loaded).slice(-1);
+                return [...lastLoaded, { id, x: vX, y: vY, w: vW, h: vH, url, loaded: false }];
+            });
+        }, 400); // 400ms debounce
+        
+        return () => clearTimeout(timer);
+    }, [viewport.x, viewport.y, viewport.width, viewport.height, baseMercX, baseMercY]);
 
     return (
         <g id="cadastral-wms-layer" pointerEvents="none">
-            {renderTiles.map(tile => {
-                const mercX = (tile.x / Math.pow(2, tile.z)) * 40075016 - maxMerc;
-                const mercY = maxMerc - (tile.y / Math.pow(2, tile.z)) * 40075016;
-                const svgX = mercX - baseMercX;
-                const svgY = baseMercY - mercY;
-                const tileM = 40075016 / Math.pow(2, tile.z);
-                return (
-                    <WMSTileImage
-                        key={`${tile.z}-${tile.x}-${tile.y}`}
-                        x={svgX}
-                        y={svgY}
-                        width={tileM + 0.5}
-                        height={tileM + 0.5}
-                        tileX={tile.x}
-                        tileY={tile.y}
-                        tileZ={tile.z}
-                    />
-                );
-            })}
+            {wmsViewports.map(v => (
+                <WMSDynamicImage 
+                    key={v.id} 
+                    {...v} 
+                    onLoad={() => {
+                        setWmsViewports(prev => prev.map(p => p.id === v.id ? {...p, loaded: true} : p));
+                    }} 
+                />
+            ))}
         </g>
     );
 };
@@ -365,6 +317,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [cadPromptSubDiv, setCadPromptSubDiv] = React.useState('');
   const [cadPromptColor, setCadPromptColor] = React.useState('#3b82f6'); // Default to blue-500
   const [cadActiveSurveyId, setCadActiveSurveyId] = React.useState(null);
+  const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
     const [isSubDivisionDropdownOpen, setIsSubDivisionDropdownOpen] = React.useState(false);
     const [checkedSurveyNos, setCheckedSurveyNos] = React.useState([]);
@@ -4370,6 +4323,39 @@ const AdminDashboard = ({ setCurrentView }) => {
                     }
                 }}
               >
+              {/* TOP-LEFT CONTROLS */}
+              <div className="absolute top-6 left-6 z-[150] flex flex-col gap-4 pointer-events-none">
+                  <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(true); }} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                  </button>
+                  <button className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                  </button>
+              </div>
+
+              {/* RIGHT-SIDE CONTROLS */}
+              <div className="absolute top-1/2 right-6 -translate-y-1/2 z-[150] flex flex-col gap-4 pointer-events-none">
+                  <button className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 7l8-4 8 4-8 4-8-4zm0 4l8 4 8-4m-16 4l8 4 8-4" />
+                      </svg>
+                  </button>
+              </div>
+
+              {/* BOTTOM-LEFT LEGEND */}
+              <div className="absolute bottom-6 left-6 z-[150] pointer-events-none">
+                  <button className="bg-slate-800/80 px-4 py-2 rounded-full text-white text-xs font-bold shadow-lg border border-slate-600 hover:bg-slate-700 transition-colors flex items-center gap-2 pointer-events-auto">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Legend
+                  </button>
+              </div>
+
               {cadContextMenu && (
                 <div 
                     className="absolute bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[200] overflow-hidden py-1 text-sm font-medium text-slate-200"
@@ -5796,7 +5782,7 @@ const AdminDashboard = ({ setCurrentView }) => {
 
             {cadComputedArea ? (
                isPolygonAreaCardVisible ? (
-                <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto animate-in slide-in-from-bottom-4">
+                <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="absolute bottom-[4.5rem] left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto animate-in slide-in-from-bottom-4">
                   <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1 gap-4">
                      <span className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest">Polygon Area</span>
                      <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(false); }} className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-slate-800" title="Minimize">
@@ -5812,7 +5798,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                   </div>
                 </div>
                ) : (
-                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(true); }} className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 text-fuchsia-400 hover:text-fuchsia-300 pointer-events-auto flex items-center justify-center animate-in zoom-in-75 hover:bg-slate-800 transition-colors" title="Restore Polygon Area">
+                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(true); }} className="absolute bottom-[4.5rem] left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 text-fuchsia-400 hover:text-fuchsia-300 pointer-events-auto flex items-center justify-center animate-in zoom-in-75 hover:bg-slate-800 transition-colors" title="Restore Polygon Area">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                 </button>
                )
@@ -6016,7 +6002,7 @@ const AdminDashboard = ({ setCurrentView }) => {
                         return (
                             <form 
                                 onSubmit={submitCadPrompt}
-                                className="absolute bottom-8 left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-[180px] flex flex-col gap-1.5 pointer-events-auto animate-in slide-in-from-bottom-4" 
+                                className="absolute bottom-[4.5rem] left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-[180px] flex flex-col gap-1.5 pointer-events-auto animate-in slide-in-from-bottom-4" 
                                 onClick={e => e.stopPropagation()}
                                 onPointerDown={e => e.stopPropagation()}
                             >
@@ -6071,6 +6057,52 @@ const AdminDashboard = ({ setCurrentView }) => {
               </div>
             </div>
           ) : null}
+        </div>
+      )}
+
+      {/* LAND SEARCH MODAL (TAMIL NILAM MATCH) */}
+      {isLandSearchModalOpen && (
+        <div 
+          className="fixed inset-0 z-[500] flex items-start justify-center pt-32 px-4 pointer-events-auto"
+          onClick={() => setIsLandSearchModalOpen(false)}
+        >
+          <div 
+            className="bg-[#1e3a8a] rounded-xl shadow-2xl p-4 w-full max-w-sm flex flex-col gap-3 relative animate-in fade-in zoom-in-95 duration-200 border border-blue-800"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Red Close Button */}
+            <button 
+              onClick={() => setIsLandSearchModalOpen(false)}
+              className="absolute -top-3 right-2 bg-red-600 text-white rounded-md p-1.5 hover:bg-red-500 shadow-md transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            {/* Dropdowns */}
+            <select className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm appearance-none cursor-pointer text-sm">
+              <option value="">Select District</option>
+            </select>
+            <select className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm appearance-none cursor-pointer text-sm">
+              <option value="">Select Taluk</option>
+            </select>
+            <select className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm appearance-none cursor-pointer text-sm">
+              <option value="">Select Village</option>
+            </select>
+            <div className="relative">
+                <input type="text" placeholder="Select Survey Number" className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm text-sm" />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+            </div>
+            <div className="relative">
+                <input type="text" placeholder="Select subdivision Number" className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm text-sm" />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
