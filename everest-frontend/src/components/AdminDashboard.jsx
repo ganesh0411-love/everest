@@ -237,6 +237,96 @@ const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
     );
 };
 
+const WMSTileImage = React.memo(({ x, y, width, height, tileX, tileY, tileZ }) => {
+    const maxMerc = Math.PI * 6378137;
+    const tileSizeMeters = 40075016 / Math.pow(2, tileZ);
+    const minx = tileX * tileSizeMeters - maxMerc;
+    const maxy = maxMerc - tileY * tileSizeMeters;
+    const maxx = minx + tileSizeMeters;
+    const miny = maxy - tileSizeMeters;
+    const bbox = `${minx},${miny},${maxx},${maxy}`;
+    const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=cadastral_data_wms:view_cadastral&styles=&bbox=${bbox}&width=256&height=256&srs=EPSG:3857&format=image/png&transparent=true`;
+    
+    return (
+        <image x={x} y={y} width={width} height={height} href={url} preserveAspectRatio="none" opacity={1} />
+    );
+});
+
+const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
+    if (!baseMercX) return null;
+    const R = 6378137;
+    const maxMerc = Math.PI * R;
+    const zFloat = Math.log2(40075016 / viewport.width) + 1.5;
+    const z = Math.max(0, Math.min(22, Math.round(zFloat)));
+    const n = Math.pow(2, z);
+    
+    const vMinX = baseMercX + viewport.x;
+    const vMaxX = baseMercX + viewport.x + viewport.width;
+    const vMaxY = baseMercY - viewport.y;
+    const vMinY = baseMercY - (viewport.y + viewport.height);
+    
+    const txMin = Math.floor((vMinX + maxMerc) / 40075016 * n);
+    const txMax = Math.floor((vMaxX + maxMerc) / 40075016 * n);
+    const tyMin = Math.floor((maxMerc - vMaxY) / 40075016 * n);
+    const tyMax = Math.floor((maxMerc - vMinY) / 40075016 * n);
+    
+    // Aggressive buffer
+    const bufferWidth = Math.max(1, (txMax - txMin) * 2);
+    const bufferHeight = Math.max(1, (tyMax - tyMin) * 2);
+    
+    const tiles = [];
+    if ((txMax - txMin) * (tyMax - tyMin) < 400) {
+        for (let x = txMin - bufferWidth; x <= txMax + bufferWidth; x++) {
+            for (let y = tyMin - bufferHeight; y <= tyMax + bufferHeight; y++) {
+                if (x >= 0 && x < n && y >= 0 && y < n) tiles.push({ x, y, z });
+            }
+        }
+    }
+
+    const [cachedTiles, setCachedTiles] = React.useState({});
+    
+    React.useEffect(() => {
+        setCachedTiles(prev => {
+            const next = { ...prev };
+            Object.keys(next).forEach(k => {
+                if (Math.abs(next[k].z - z) > 1) {
+                    delete next[k];
+                }
+            });
+            tiles.forEach(t => {
+                next[`${t.z}-${t.x}-${t.y}`] = t;
+            });
+            return next;
+        });
+    }, [viewport.x, viewport.y, viewport.width, viewport.height]);
+
+    const renderTiles = Object.values(cachedTiles).sort((a, b) => a.z - b.z);
+
+    return (
+        <g id="cadastral-wms-layer" pointerEvents="none">
+            {renderTiles.map(tile => {
+                const mercX = (tile.x / Math.pow(2, tile.z)) * 40075016 - maxMerc;
+                const mercY = maxMerc - (tile.y / Math.pow(2, tile.z)) * 40075016;
+                const svgX = mercX - baseMercX;
+                const svgY = baseMercY - mercY;
+                const tileM = 40075016 / Math.pow(2, tile.z);
+                return (
+                    <WMSTileImage
+                        key={`${tile.z}-${tile.x}-${tile.y}`}
+                        x={svgX}
+                        y={svgY}
+                        width={tileM + 0.5}
+                        height={tileM + 0.5}
+                        tileX={tile.x}
+                        tileY={tile.y}
+                        tileZ={tile.z}
+                    />
+                );
+            })}
+        </g>
+    );
+};
+
 const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
@@ -4355,7 +4445,12 @@ const AdminDashboard = ({ setCurrentView }) => {
                      </pattern>
                    </defs>
                     {mapConfig.active && (
-                       <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                       <>
+                           <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                           {isCadastralEnabled && (
+                               <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                           )}
+                       </>
                     )}
                     <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
                    
@@ -5329,7 +5424,12 @@ const AdminDashboard = ({ setCurrentView }) => {
                     }}>
                        <svg width="140" height="140" viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}>
                           {mapConfig.active && (
-                              <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                              <>
+                                  <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                                  {isCadastralEnabled && (
+                                      <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                                  )}
+                              </>
                           )}
                           {/* Grid lines for spatial context */}
                           <line
