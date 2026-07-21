@@ -375,6 +375,7 @@ const FALLBACK_TALUKS = {
 const FALLBACK_VILLAGES = {
     "Dindigul West": ["Adiyanuthu", "Chettinaickenpatti", "Kurumbapatti", "Pallapatti", "Balakrishnapuram"],
     "Palani": ["Ayakudi", "Neikarapatti", "Sivagiripatti", "Kothaimangalam", "Pappampatti"],
+    "Nilakkottai": ["Nilakkottai", "Pattiveeranpatti", "Silukuvarpatti", "Ammayanaickanur", "Pallapatti"],
     "Egmore": ["Egmore Part 1", "Egmore Part 2"]
 };
 
@@ -427,7 +428,11 @@ app.get('/api/tngis/villages', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Villages WFS failed, returning fallback:", err.message);
-        const fallbackData = FALLBACK_VILLAGES[req.query.taluk] || [];
+        const fallbackData = FALLBACK_VILLAGES[req.query.taluk] || [
+            `${req.query.taluk} Village 1`,
+            `${req.query.taluk} Village 2`,
+            `${req.query.taluk} Village 3`
+        ];
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
@@ -454,7 +459,7 @@ app.get('/api/tngis/survey', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Survey WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: [], fallback: true });
+        res.json({ success: true, data: ["1A", "2B", "3C", "4D", "1", "2", "3", "4", "5"], fallback: true });
     }
 });
 
@@ -475,7 +480,7 @@ app.get('/api/tngis/subdivisions', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Subdivisions WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: [], fallback: true });
+        res.json({ success: true, data: ["1A", "2B", "3C", "4D", "1", "2", "3", "4", "5"], fallback: true });
     }
 });
 
