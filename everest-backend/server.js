@@ -357,6 +357,16 @@ const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
     }
 };
 
+const FALLBACK_DISTRICTS = [
+    "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri",
+    "Dindigul", "Erode", "Kallakurichi", "Kanchipuram", "Kanyakumari", "Karur",
+    "Krishnagiri", "Madurai", "Mayiladuthurai", "Nagapattinam", "Namakkal",
+    "Nilgiris", "Perambalur", "Pudukkottai", "Ramanathapuram", "Ranipet",
+    "Salem", "Sivaganga", "Tenkasi", "Thanjavur", "Theni", "Thoothukudi",
+    "Tiruchirappalli", "Tirunelveli", "Tirupathur", "Tiruppur", "Tiruvallur",
+    "Tiruvannamalai", "Tiruvarur", "Vellore", "Viluppuram", "Virudhunagar"
+];
+
 app.get('/api/tngis/districts', async (req, res) => {
     try {
         // We ask for only dname, and return unique values
@@ -365,9 +375,10 @@ app.get('/api/tngis/districts', async (req, res) => {
             const districts = [...new Set(data.features.map(f => f.properties.dname).filter(Boolean))].sort();
             return res.json({ success: true, data: districts });
         }
-        res.json({ success: true, data: [] });
+        res.json({ success: true, data: FALLBACK_DISTRICTS });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Failed to fetch districts' });
+        console.error("Districts WFS failed, returning fallback:", err.message);
+        res.json({ success: true, data: FALLBACK_DISTRICTS, fallback: true });
     }
 });
 
