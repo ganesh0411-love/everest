@@ -375,7 +375,15 @@ const FALLBACK_TALUKS = {
 const FALLBACK_VILLAGES = {
     "Dindigul West": ["Adiyanuthu", "Chettinaickenpatti", "Kurumbapatti", "Pallapatti", "Balakrishnapuram"],
     "Palani": ["Ayakudi", "Neikarapatti", "Sivagiripatti", "Kothaimangalam", "Pappampatti"],
-    "Nilakkottai": ["Nilakkottai", "Pattiveeranpatti", "Silukuvarpatti", "Ammayanaickanur", "Pallapatti", "Batlagundu", "Kanavapatti", "Viralveedu", "Arai Sevu Patti", "Reserved Forest", "Oruthattu", "Nakkaluthu", "Ramarajapuram", "Sithargal Natham", "Kullichettipatti", "Mattaparai", "Sengurichi", "Kodairoad", "Vilampatti", "Sivagnanapuram", "Bodinayakanpatti", "Musuvanuthu"],
+    "Nilakkottai": [
+        "Ammayanaickanur", "Arai Sevu Patti", "Bangalapatti", "Batlagundu", "Bodikamanpatti", 
+        "Chinnanaickenpatti", "Jambuduraikottai", "Kadaiyasalpatti", "Kanavapatti", "Kodairoad", 
+        "Koondoor", "Kulathupatti", "Kulichampatti", "Kullichettipatti", "Kunnuvayankottai", 
+        "Malayangondanpatti", "Mattaparai", "Mattarappatti", "Musuvanuthu", "Nakkaluthu", 
+        "Nilakkottai", "Noothulapuram", "Oruthattu", "Pallapatti", "Pattiveeranpatti", 
+        "Ramanathapuram", "Ramarajapuram", "Rangaiyampatti", "Sengurichi", "Settilodu", 
+        "Silukuvarpatti", "Sithargal Natham", "Sivagnanapuram", "Vilampatti", "Viralveedu"
+    ],
     "Athoor": ["Athoor", "Akkaraipatti", "Ambathurai", "Bodikamanpatti", "Gandhigram", "Sriramapuram"],
     "Egmore": ["Egmore Part 1", "Egmore Part 2"]
 };
@@ -408,7 +416,7 @@ app.get('/api/tngis/taluks', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Taluks WFS failed, returning fallback:", err.message);
-        const fallbackData = FALLBACK_TALUKS[req.query.district] || [];
+        const fallbackData = (FALLBACK_TALUKS[req.query.district] || []).sort((a, b) => a.localeCompare(b));
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
@@ -429,7 +437,7 @@ app.get('/api/tngis/villages', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Villages WFS failed, returning fallback:", err.message);
-        const fallbackData = FALLBACK_VILLAGES[req.query.taluk] || [];
+        const fallbackData = (FALLBACK_VILLAGES[req.query.taluk] || []).sort((a, b) => a.localeCompare(b));
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
