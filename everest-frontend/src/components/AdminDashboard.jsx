@@ -500,6 +500,25 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
               else if (geom.type === 'MultiPolygon') coordinates = geom.coordinates[0][0]; // Outer ring of first polygon
               
               if (coordinates && coordinates.length > 0) {
+                  let bMercX = mapConfig.baseMercX;
+                  let bMercY = mapConfig.baseMercY;
+                  
+                  if (bMercX === 0 && bMercY === 0) {
+                      let minM = Infinity, minMy = Infinity, maxM = -Infinity, maxMy = -Infinity;
+                      coordinates.forEach(c => {
+                          if (c[0] < minM) minM = c[0];
+                          if (c[0] > maxM) maxM = c[0];
+                          if (c[1] < minMy) minMy = c[1];
+                          if (c[1] > maxMy) maxMy = c[1];
+                      });
+                      bMercX = minM + (maxM - minM)/2;
+                      bMercY = minMy + (maxMy - minMy)/2;
+                      setMapConfig(prev => ({ ...prev, active: true, baseMercX: bMercX, baseMercY: bMercY }));
+                      
+                      // Also enable map layers if they are off
+                      setIsCadastralEnabled(true);
+                  }
+                  
                   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                   
                   const points = coordinates.map(coord => {
@@ -507,8 +526,8 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       const mercX = coord[0];
                       const mercY = coord[1];
                       // Convert to SVG coordinates relative to baseMercX/Y
-                      const svgX = mercX - mapConfig.baseMercX;
-                      const svgY = mapConfig.baseMercY - mercY; // Invert Y
+                      const svgX = mercX - bMercX;
+                      const svgY = bMercY - mercY; // Invert Y
                       
                       if (svgX < minX) minX = svgX;
                       if (svgX > maxX) maxX = svgX;
@@ -529,10 +548,10 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                   const tW = targetWidth + marginX * 2;
                   const tH = targetHeight + marginY * 2;
                   
-                  const startX = cadViewport.x;
-                  const startY = cadViewport.y;
-                  const startW = cadViewport.width;
-                  const startH = cadViewport.height;
+                  const startX = (mapConfig.baseMercX === 0) ? tX : cadViewport.x;
+                  const startY = (mapConfig.baseMercX === 0) ? tY : cadViewport.y;
+                  const startW = (mapConfig.baseMercX === 0) ? tW : cadViewport.width;
+                  const startH = (mapConfig.baseMercX === 0) ? tH : cadViewport.height;
                   
                   let startTime = null;
                   const animate = (time) => {
@@ -6416,7 +6435,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               disabled={lsLoading === 'districts'}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
-              <option value="">Select District</option>
+              <option value="">{lsLoading === 'districts' ? 'Loading Districts...' : 'Select District'}</option>
               {lsDistricts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
             
@@ -6425,7 +6444,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               disabled={!selDistrict || lsLoading === 'taluks'}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
-              <option value="">Select Taluk</option>
+              <option value="">{lsLoading === 'taluks' ? 'Loading Taluks...' : 'Select Taluk'}</option>
               {lsTaluks.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             
@@ -6434,7 +6453,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               disabled={!selTaluk || lsLoading === 'villages'}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
-              <option value="">Select Village</option>
+              <option value="">{lsLoading === 'villages' ? 'Loading Villages...' : 'Select Village'}</option>
               {lsVillages.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
             
@@ -6443,7 +6462,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               disabled={!selVillage || lsLoading === 'surveys'}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
-              <option value="">Select Survey Number</option>
+              <option value="">{lsLoading === 'surveys' ? 'Loading Survey Numbers...' : 'Select Survey Number'}</option>
               {lsSurveys.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             
@@ -6452,7 +6471,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               disabled={!selSurvey || lsLoading === 'subdivs'}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
-              <option value="">Select Subdivision Number (Optional)</option>
+              <option value="">{lsLoading === 'subdivs' ? 'Loading Subdivisions...' : 'Select Subdivision Number (Optional)'}</option>
               {lsSubdivs.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             

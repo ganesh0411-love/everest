@@ -358,12 +358,26 @@ const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
 };
 
 let tnMasterDataset = {};
+let villageLgdMap = new Map();
+
 try {
     const fsSync = require('fs');
     const path = require('path');
     const rawData = fsSync.readFileSync(path.join(__dirname, 'data', 'tn_master.json'), 'utf8');
     tnMasterDataset = JSON.parse(rawData);
-    console.log("Loaded TN Master Dataset");
+    
+    for (let d in tnMasterDataset) {
+        for (let t in tnMasterDataset[d]) {
+            if (Array.isArray(tnMasterDataset[d][t])) {
+                tnMasterDataset[d][t].forEach(v => {
+                    if (typeof v === 'object' && v.name && v.lgd_village_code) {
+                        villageLgdMap.set(`${t}|${v.name}`, v.lgd_village_code);
+                    }
+                });
+            }
+        }
+    }
+    console.log("Loaded TN Master Dataset and O(1) LGD Index");
 } catch (e) {
     console.warn("Could not load tn_master.json", e.message);
 }
@@ -431,21 +445,21 @@ app.get('/api/tngis/villages', async (req, res) => {
     }
 });
 
+let surveyCache = {};
+
 app.get('/api/tngis/survey', async (req, res) => {
     try {
         const { taluk, village } = req.query;
         if (!village) return res.status(400).json({ error: 'Village is required' });
         
         let lgdVillageCode = village;
-        for (let d in tnMasterDataset) {
-            for (let t in tnMasterDataset[d]) {
-                if (!taluk || t === taluk) {
-                    if (tnMasterDataset[d][t] && Array.isArray(tnMasterDataset[d][t])) {
-                        const v = tnMasterDataset[d][t].find(x => typeof x === 'object' && x.name === village);
-                        if (v && v.lgd_village_code) lgdVillageCode = v.lgd_village_code;
-                    }
-                }
-            }
+        if (taluk) {
+            const mappedCode = villageLgdMap.get(`${taluk}|${village}`);
+            if (mappedCode) lgdVillageCode = mappedCode;
+        }
+        
+        if (surveyCache[lgdVillageCode]) {
+            return res.json({ success: true, data: surveyCache[lgdVillageCode] });
         }
         
         let cql = `lgd_village_code='${lgdVillageCode}'`;
@@ -459,6 +473,7 @@ app.get('/api/tngis/survey', async (req, res) => {
                 if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
                 return String(a).localeCompare(String(b));
             });
+            surveyCache[lgdVillageCode] = surveys;
             return res.json({ success: true, data: surveys });
         }
         res.json({ success: true, data: [] });
@@ -468,18 +483,31 @@ app.get('/api/tngis/survey', async (req, res) => {
     }
 });
 
+let subdivCache = {};
+
 app.get('/api/tngis/subdivisions', async (req, res) => {
     try {
         const { taluk, village, survey } = req.query;
         if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
         
-        let cql = `vname='${village}' AND survey_number='${survey}'`;
-        if (taluk) cql = `tname='${taluk}' AND ${cql}`;
+        let lgdVillageCode = village;
+        if (taluk) {
+            const mappedCode = villageLgdMap.get(`${taluk}|${village}`);
+            if (mappedCode) lgdVillageCode = mappedCode;
+        }
+
+        const cacheKey = `${lgdVillageCode}_${survey}`;
+        if (subdivCache[cacheKey]) {
+            return res.json({ success: true, data: subdivCache[cacheKey] });
+        }
+        
+        let cql = `lgd_village_code='${lgdVillageCode}' AND survey_number='${survey}'`;
         
         // Fetch subdivisions
-        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'sub_division_no', cql);
+        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'sub_division', cql);
         if (data && data.features) {
-            const subdivs = [...new Set(data.features.map(f => f.properties.sub_division_no).filter(Boolean))].sort();
+            const subdivs = [...new Set(data.features.map(f => f.properties.sub_division).filter(Boolean))].sort();
+            subdivCache[cacheKey] = subdivs;
             return res.json({ success: true, data: subdivs });
         }
         res.json({ success: true, data: [] });
@@ -497,22 +525,16 @@ app.get('/api/tngis/feature', async (req, res) => {
         
         let typeName = 'cadastral_data_wms:view_cadastral';
         let lgdVillageCode = village;
-        for (let d in tnMasterDataset) {
-            for (let t in tnMasterDataset[d]) {
-                if (!taluk || t === taluk) {
-                    if (tnMasterDataset[d][t] && Array.isArray(tnMasterDataset[d][t])) {
-                        const v = tnMasterDataset[d][t].find(x => typeof x === 'object' && x.name === village);
-                        if (v && v.lgd_village_code) lgdVillageCode = v.lgd_village_code;
-                    }
-                }
-            }
+        if (taluk) {
+            const mappedCode = villageLgdMap.get(`${taluk}|${village}`);
+            if (mappedCode) lgdVillageCode = mappedCode;
         }
         
         let cql = `lgd_village_code='${lgdVillageCode}' AND survey_number='${survey}'`;
         
         if (subdiv) {
             typeName = 'cadastral_data_wms:view_fmb';
-            cql += ` AND sub_division_no='${subdiv}'`;
+            cql += ` AND sub_division='${subdiv}'`;
         }
         
         // We omit propertyName to get the full feature including geometry
