@@ -359,7 +359,9 @@ const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
 
 let tnMasterDataset = {};
 try {
-    const rawData = fs.readFileSync(path.join(__dirname, 'data', 'tn_master.json'), 'utf8');
+    const fsSync = require('fs');
+    const path = require('path');
+    const rawData = fsSync.readFileSync(path.join(__dirname, 'data', 'tn_master.json'), 'utf8');
     tnMasterDataset = JSON.parse(rawData);
     console.log("Loaded TN Master Dataset");
 } catch (e) {
