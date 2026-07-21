@@ -445,7 +445,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   React.useEffect(() => {
       if (selTaluk) {
           setLsLoading('villages');
-          fetch(`${API_BASE}/api/tngis/villages?taluk=${encodeURIComponent(selTaluk)}`)
+          fetch(`${API_BASE}/api/tngis/villages?taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`)
             .then(res => res.json())
             .then(res => setLsVillages(res.data || []))
             .catch(err => console.error(err))
@@ -462,7 +462,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   React.useEffect(() => {
       if (selVillage) {
           setLsLoading('surveys');
-          fetch(`${API_BASE}/api/tngis/survey?village=${encodeURIComponent(selVillage)}`)
+          fetch(`${API_BASE}/api/tngis/survey?village=${encodeURIComponent(selVillage)}&taluk=${encodeURIComponent(selTaluk)}`)
             .then(res => res.json())
             .then(res => setLsSurveys(res.data || []))
             .catch(err => console.error(err))
@@ -477,7 +477,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   React.useEffect(() => {
       if (selSurvey) {
           setLsLoading('subdivs');
-          fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}`)
+          fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}`)
             .then(res => res.json())
             .then(res => setLsSubdivs(res.data || []))
             .catch(err => console.error(err))
@@ -491,7 +491,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
       if (!selVillage || !selSurvey) return;
       setLsLoading('flyTo');
       try {
-          const res = await fetch(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}` + (selSubdiv ? `&subdiv=${encodeURIComponent(selSubdiv)}` : ''));
+          const res = await fetch(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}` + (selSubdiv ? `&subdiv=${encodeURIComponent(selSubdiv)}` : ''));
           const data = await res.json();
           if (data.success && data.feature && data.feature.geometry) {
               const geom = data.feature.geometry;

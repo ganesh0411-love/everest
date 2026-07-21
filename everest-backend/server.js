@@ -406,17 +406,20 @@ app.get('/api/tngis/taluks', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Taluks WFS failed, returning fallback:", err.message);
-        const fallbackData = FALLBACK_TALUKS[req.query.district] || ["Mock Taluk 1", "Mock Taluk 2"];
+        const fallbackData = FALLBACK_TALUKS[req.query.district] || [];
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
 
 app.get('/api/tngis/villages', async (req, res) => {
     try {
-        const { taluk } = req.query;
+        const { district, taluk } = req.query;
         if (!taluk) return res.status(400).json({ error: 'Taluk is required' });
         
-        const data = await fetchTNGIS('tngis:revenue_village', 'vname', `tname='${taluk}'`);
+        let cql = `tname='${taluk}'`;
+        if (district) cql = `dname='${district}' AND ${cql}`;
+        
+        const data = await fetchTNGIS('tngis:revenue_village', 'vname', cql);
         if (data && data.features) {
             const villages = [...new Set(data.features.map(f => f.properties.vname).filter(Boolean))].sort();
             return res.json({ success: true, data: villages });
@@ -424,18 +427,21 @@ app.get('/api/tngis/villages', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Villages WFS failed, returning fallback:", err.message);
-        const fallbackData = FALLBACK_VILLAGES[req.query.taluk] || ["Mock Village 1", "Mock Village 2"];
+        const fallbackData = FALLBACK_VILLAGES[req.query.taluk] || [];
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
 
 app.get('/api/tngis/survey', async (req, res) => {
     try {
-        const { village } = req.query;
+        const { taluk, village } = req.query;
         if (!village) return res.status(400).json({ error: 'Village is required' });
         
+        let cql = `vname='${village}'`;
+        if (taluk) cql = `tname='${taluk}' AND ${cql}`;
+        
         // Use cadastral layer to fetch survey numbers
-        const data = await fetchTNGIS('cadastral_data_wms:view_cadastral', 'survey_number', `vname='${village}'`);
+        const data = await fetchTNGIS('cadastral_data_wms:view_cadastral', 'survey_number', cql);
         if (data && data.features) {
             const surveys = [...new Set(data.features.map(f => f.properties.survey_number).filter(Boolean))].sort((a,b) => {
                 const numA = parseInt(a, 10);
@@ -448,17 +454,20 @@ app.get('/api/tngis/survey', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Survey WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: ["1", "2", "3", "4", "5"], fallback: true });
+        res.json({ success: true, data: [], fallback: true });
     }
 });
 
 app.get('/api/tngis/subdivisions', async (req, res) => {
     try {
-        const { village, survey } = req.query;
+        const { taluk, village, survey } = req.query;
         if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
         
+        let cql = `vname='${village}' AND survey_number='${survey}'`;
+        if (taluk) cql = `tname='${taluk}' AND ${cql}`;
+        
         // Fetch subdivisions
-        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'sub_division_no', `vname='${village}' AND survey_number='${survey}'`);
+        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'sub_division_no', cql);
         if (data && data.features) {
             const subdivs = [...new Set(data.features.map(f => f.properties.sub_division_no).filter(Boolean))].sort();
             return res.json({ success: true, data: subdivs });
@@ -466,18 +475,19 @@ app.get('/api/tngis/subdivisions', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Subdivisions WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: ["1A", "1B", "2A", "2B"], fallback: true });
+        res.json({ success: true, data: [], fallback: true });
     }
 });
 
 // Used for fly-to animation. Returns the full GeoJSON feature for bounding box calculation.
 app.get('/api/tngis/feature', async (req, res) => {
     try {
-        const { village, survey, subdiv } = req.query;
+        const { taluk, village, survey, subdiv } = req.query;
         if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
         
         let typeName = 'cadastral_data_wms:view_cadastral';
         let cql = `vname='${village}' AND survey_number='${survey}'`;
+        if (taluk) cql = `tname='${taluk}' AND ${cql}`;
         
         if (subdiv) {
             typeName = 'cadastral_data_wms:view_fmb';
