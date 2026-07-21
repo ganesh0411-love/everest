@@ -377,12 +377,14 @@ const FALLBACK_VILLAGES = {
     "Palani": ["Ayakudi", "Neikarapatti", "Sivagiripatti", "Kothaimangalam", "Pappampatti"],
     "Nilakkottai": [
         "Ammayanaickanur", "Arai Sevu Patti", "Bangalapatti", "Batlagundu", "Bodikamanpatti", 
-        "Chinnanaickenpatti", "Jambuduraikottai", "Kadaiyasalpatti", "Kanavapatti", "Kodairoad", 
+        "Chekkapatti", "Chengattampatti", "Chinnanaickenpatti", "Chittarangannatham", 
+        "Jambuduraikottai", "Kadaiyasalpatti", "Kanavapatti", "Kodairoad", 
         "Koondoor", "Kulathupatti", "Kulichampatti", "Kullichettipatti", "Kunnuvayankottai", 
         "Malayangondanpatti", "Mattaparai", "Mattarappatti", "Musuvanuthu", "Nakkaluthu", 
         "Nilakkottai", "Noothulapuram", "Oruthattu", "Pallapatti", "Pattiveeranpatti", 
-        "Ramanathapuram", "Ramarajapuram", "Rangaiyampatti", "Sengurichi", "Settilodu", 
-        "Silukuvarpatti", "Sithargal Natham", "Sivagnanapuram", "Vilampatti", "Viralveedu"
+        "Ramanathapuram", "Ramarajapuram", "Rangaiyampatti", "Sandaiyur", "Sengurichi", "Settilodu", 
+        "Sevagampatti", "Silukuvarpatti", "Silvarpatti", "Sithargal Natham", "Sivaganesapuram", "Sivagnanapuram", 
+        "Vilampatti", "Viralveedu"
     ],
     "Athoor": ["Athoor", "Akkaraipatti", "Ambathurai", "Bodikamanpatti", "Gandhigram", "Sriramapuram"],
     "Egmore": ["Egmore Part 1", "Egmore Part 2"]
