@@ -376,6 +376,7 @@ const FALLBACK_VILLAGES = {
     "Dindigul West": ["Adiyanuthu", "Chettinaickenpatti", "Kurumbapatti", "Pallapatti", "Balakrishnapuram"],
     "Palani": ["Ayakudi", "Neikarapatti", "Sivagiripatti", "Kothaimangalam", "Pappampatti"],
     "Nilakkottai": ["Nilakkottai", "Pattiveeranpatti", "Silukuvarpatti", "Ammayanaickanur", "Pallapatti"],
+    "Athoor": ["Athoor", "Akkaraipatti", "Ambathurai", "Bodikamanpatti", "Gandhigram", "Sriramapuram"],
     "Egmore": ["Egmore Part 1", "Egmore Part 2"]
 };
 
@@ -428,11 +429,7 @@ app.get('/api/tngis/villages', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Villages WFS failed, returning fallback:", err.message);
-        const fallbackData = FALLBACK_VILLAGES[req.query.taluk] || [
-            `${req.query.taluk} Village 1`,
-            `${req.query.taluk} Village 2`,
-            `${req.query.taluk} Village 3`
-        ];
+        const fallbackData = FALLBACK_VILLAGES[req.query.taluk] || [];
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
