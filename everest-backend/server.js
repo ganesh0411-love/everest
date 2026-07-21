@@ -357,6 +357,15 @@ const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
     }
 };
 
+let tnMasterDataset = {};
+try {
+    const rawData = fs.readFileSync(path.join(__dirname, 'data', 'tn_master.json'), 'utf8');
+    tnMasterDataset = JSON.parse(rawData);
+    console.log("Loaded TN Master Dataset");
+} catch (e) {
+    console.warn("Could not load tn_master.json", e.message);
+}
+
 app.get('/api/tngis/districts', async (req, res) => {
     try {
         // We ask for only dname, and return unique values
