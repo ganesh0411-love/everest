@@ -340,9 +340,9 @@ const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
         }
         
         console.log(`TNGIS Proxy Request: ${url}`);
-        // Increase timeout to 15s to allow large WFS queries to complete
+        // Increase timeout to 60s to allow massive WFS queries to complete
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
         
         const response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -375,7 +375,7 @@ const FALLBACK_TALUKS = {
 const FALLBACK_VILLAGES = {
     "Dindigul West": ["Adiyanuthu", "Chettinaickenpatti", "Kurumbapatti", "Pallapatti", "Balakrishnapuram"],
     "Palani": ["Ayakudi", "Neikarapatti", "Sivagiripatti", "Kothaimangalam", "Pappampatti"],
-    "Nilakkottai": ["Nilakkottai", "Pattiveeranpatti", "Silukuvarpatti", "Ammayanaickanur", "Pallapatti"],
+    "Nilakkottai": ["Nilakkottai", "Pattiveeranpatti", "Silukuvarpatti", "Ammayanaickanur", "Pallapatti", "Batlagundu", "Kanavapatti", "Viralveedu", "Arai Sevu Patti", "Reserved Forest", "Oruthattu", "Nakkaluthu", "Ramarajapuram", "Sithargal Natham", "Kullichettipatti", "Mattaparai", "Sengurichi", "Kodairoad", "Vilampatti", "Sivagnanapuram", "Bodinayakanpatti", "Musuvanuthu"],
     "Athoor": ["Athoor", "Akkaraipatti", "Ambathurai", "Bodikamanpatti", "Gandhigram", "Sriramapuram"],
     "Egmore": ["Egmore Part 1", "Egmore Part 2"]
 };
