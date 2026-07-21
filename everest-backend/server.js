@@ -357,39 +357,6 @@ const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
     }
 };
 
-const FALLBACK_DISTRICTS = [
-    "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri",
-    "Dindigul", "Erode", "Kallakurichi", "Kanchipuram", "Kanyakumari", "Karur",
-    "Krishnagiri", "Madurai", "Mayiladuthurai", "Nagapattinam", "Namakkal",
-    "Nilgiris", "Perambalur", "Pudukkottai", "Ramanathapuram", "Ranipet",
-    "Salem", "Sivaganga", "Tenkasi", "Thanjavur", "Theni", "Thoothukudi",
-    "Tiruchirappalli", "Tirunelveli", "Tirupathur", "Tiruppur", "Tiruvallur",
-    "Tiruvannamalai", "Tiruvarur", "Vellore", "Viluppuram", "Virudhunagar"
-];
-
-const FALLBACK_TALUKS = {
-    "Dindigul": ["Dindigul West", "Dindigul East", "Palani", "Oddanchatram", "Vedasandur", "Natham", "Nilakkottai", "Kodaikanal", "Athoor"],
-    "Chennai": ["Alandur", "Ambattur", "Aminjikarai", "Ayanavaram", "Egmore", "Guindy", "Madhavaram", "Madhuravoyal", "Mambalam", "Mylapore", "Perambur", "Purasawalkam", "Sholinganallur", "Tiruvottiyur", "Tondiarpet", "Velachery"]
-};
-
-const FALLBACK_VILLAGES = {
-    "Dindigul West": ["Adiyanuthu", "Chettinaickenpatti", "Kurumbapatti", "Pallapatti", "Balakrishnapuram"],
-    "Palani": ["Ayakudi", "Neikarapatti", "Sivagiripatti", "Kothaimangalam", "Pappampatti"],
-    "Nilakkottai": [
-        "Ammayanaickanur", "Arai Sevu Patti", "Bangalapatti", "Batlagundu", "Bodikamanpatti", 
-        "Chekkapatti", "Chengattampatti", "Chinnanaickenpatti", "Chittarangannatham", 
-        "Jambuduraikottai", "Kadaiyasalpatti", "Kanavapatti", "Kodairoad", 
-        "Koondoor", "Kulathupatti", "Kulichampatti", "Kullichettipatti", "Kunnuvayankottai", 
-        "Malayangondanpatti", "Mattaparai", "Mattarappatti", "Musuvanuthu", "Nakkaluthu", 
-        "Nilakkottai", "Noothulapuram", "Oruthattu", "Pallapatti", "Pattiveeranpatti", 
-        "Ramanathapuram", "Ramarajapuram", "Rangaiyampatti", "Sandaiyur", "Sengurichi", "Settilodu", 
-        "Sevagampatti", "Silukuvarpatti", "Silvarpatti", "Sithargal Natham", "Sivaganesapuram", "Sivagnanapuram", 
-        "Vilampatti", "Viralveedu"
-    ],
-    "Athoor": ["Athoor", "Akkaraipatti", "Ambathurai", "Bodikamanpatti", "Gandhigram", "Sriramapuram"],
-    "Egmore": ["Egmore Part 1", "Egmore Part 2"]
-};
-
 app.get('/api/tngis/districts', async (req, res) => {
     try {
         // We ask for only dname, and return unique values
@@ -398,10 +365,11 @@ app.get('/api/tngis/districts', async (req, res) => {
             const districts = [...new Set(data.features.map(f => f.properties.dname).filter(Boolean))].sort();
             return res.json({ success: true, data: districts });
         }
-        res.json({ success: true, data: FALLBACK_DISTRICTS });
+        res.json({ success: true, data: Object.keys(tnMasterDataset).sort() });
     } catch (err) {
         console.error("Districts WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: FALLBACK_DISTRICTS, fallback: true });
+        const fallbackData = Object.keys(tnMasterDataset).sort((a, b) => a.localeCompare(b));
+        res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
 
@@ -418,7 +386,11 @@ app.get('/api/tngis/taluks', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Taluks WFS failed, returning fallback:", err.message);
-        const fallbackData = (FALLBACK_TALUKS[req.query.district] || []).sort((a, b) => a.localeCompare(b));
+        let taluks = [];
+        if (tnMasterDataset[req.query.district]) {
+            taluks = Object.keys(tnMasterDataset[req.query.district]);
+        }
+        const fallbackData = taluks.sort((a, b) => a.localeCompare(b));
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
@@ -439,7 +411,11 @@ app.get('/api/tngis/villages', async (req, res) => {
         res.json({ success: true, data: [] });
     } catch (err) {
         console.error("Villages WFS failed, returning fallback:", err.message);
-        const fallbackData = (FALLBACK_VILLAGES[req.query.taluk] || []).sort((a, b) => a.localeCompare(b));
+        let villages = [];
+        if (tnMasterDataset[req.query.district] && tnMasterDataset[req.query.district][req.query.taluk]) {
+            villages = tnMasterDataset[req.query.district][req.query.taluk];
+        }
+        const fallbackData = villages.sort((a, b) => a.localeCompare(b));
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
