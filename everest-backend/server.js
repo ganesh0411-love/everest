@@ -340,9 +340,9 @@ const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
         }
         
         console.log(`TNGIS Proxy Request: ${url}`);
-        // Use a short timeout of 2s for TNGIS requests as per requirements
+        // Increase timeout to 15s to allow large WFS queries to complete
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
         
         const response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -506,7 +506,8 @@ app.get('/api/tngis/feature', async (req, res) => {
         }
         res.status(404).json({ success: false, error: 'Feature not found' });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Failed to fetch feature' });
+        console.error("Feature WFS failed:", err.message);
+        res.status(404).json({ success: false, error: 'Feature not found or WFS timed out', fallback: true });
     }
 });
 
