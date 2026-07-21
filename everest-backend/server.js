@@ -426,7 +426,7 @@ app.get('/api/tngis/villages', async (req, res) => {
         if (tnMasterDataset[req.query.district] && tnMasterDataset[req.query.district][req.query.taluk]) {
             villages = tnMasterDataset[req.query.district][req.query.taluk];
         }
-        const fallbackData = villages.sort((a, b) => a.localeCompare(b));
+        const fallbackData = villages.map(v => typeof v === "string" ? v : v.name).sort((a, b) => a.localeCompare(b));
         res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
@@ -436,8 +436,19 @@ app.get('/api/tngis/survey', async (req, res) => {
         const { taluk, village } = req.query;
         if (!village) return res.status(400).json({ error: 'Village is required' });
         
-        let cql = `vname='${village}'`;
-        if (taluk) cql = `tname='${taluk}' AND ${cql}`;
+        let lgdVillageCode = village;
+        for (let d in tnMasterDataset) {
+            for (let t in tnMasterDataset[d]) {
+                if (!taluk || t === taluk) {
+                    if (tnMasterDataset[d][t] && Array.isArray(tnMasterDataset[d][t])) {
+                        const v = tnMasterDataset[d][t].find(x => typeof x === 'object' && x.name === village);
+                        if (v && v.lgd_village_code) lgdVillageCode = v.lgd_village_code;
+                    }
+                }
+            }
+        }
+        
+        let cql = `lgd_village_code='${lgdVillageCode}'`;
         
         // Use cadastral layer to fetch survey numbers
         const data = await fetchTNGIS('cadastral_data_wms:view_cadastral', 'survey_number', cql);
@@ -485,8 +496,19 @@ app.get('/api/tngis/feature', async (req, res) => {
         if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
         
         let typeName = 'cadastral_data_wms:view_cadastral';
-        let cql = `vname='${village}' AND survey_number='${survey}'`;
-        if (taluk) cql = `tname='${taluk}' AND ${cql}`;
+        let lgdVillageCode = village;
+        for (let d in tnMasterDataset) {
+            for (let t in tnMasterDataset[d]) {
+                if (!taluk || t === taluk) {
+                    if (tnMasterDataset[d][t] && Array.isArray(tnMasterDataset[d][t])) {
+                        const v = tnMasterDataset[d][t].find(x => typeof x === 'object' && x.name === village);
+                        if (v && v.lgd_village_code) lgdVillageCode = v.lgd_village_code;
+                    }
+                }
+            }
+        }
+        
+        let cql = `lgd_village_code='${lgdVillageCode}' AND survey_number='${survey}'`;
         
         if (subdiv) {
             typeName = 'cadastral_data_wms:view_fmb';
