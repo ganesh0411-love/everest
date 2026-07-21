@@ -340,9 +340,9 @@ const fetchTNGIS = async (typeName, propertyName, cqlFilter = null) => {
         }
         
         console.log(`TNGIS Proxy Request: ${url}`);
-        // Use a short timeout of 10s for TNGIS requests
+        // Use a short timeout of 2s for TNGIS requests as per requirements
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
         
         const response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -366,6 +366,17 @@ const FALLBACK_DISTRICTS = [
     "Tiruchirappalli", "Tirunelveli", "Tirupathur", "Tiruppur", "Tiruvallur",
     "Tiruvannamalai", "Tiruvarur", "Vellore", "Viluppuram", "Virudhunagar"
 ];
+
+const FALLBACK_TALUKS = {
+    "Dindigul": ["Dindigul West", "Dindigul East", "Palani", "Oddanchatram", "Vedasandur", "Natham", "Nilakkottai", "Kodaikanal", "Athoor"],
+    "Chennai": ["Alandur", "Ambattur", "Aminjikarai", "Ayanavaram", "Egmore", "Guindy", "Madhavaram", "Madhuravoyal", "Mambalam", "Mylapore", "Perambur", "Purasawalkam", "Sholinganallur", "Tiruvottiyur", "Tondiarpet", "Velachery"]
+};
+
+const FALLBACK_VILLAGES = {
+    "Dindigul West": ["Adiyanuthu", "Chettinaickenpatti", "Kurumbapatti", "Pallapatti", "Balakrishnapuram"],
+    "Palani": ["Ayakudi", "Neikarapatti", "Sivagiripatti", "Kothaimangalam", "Pappampatti"],
+    "Egmore": ["Egmore Part 1", "Egmore Part 2"]
+};
 
 app.get('/api/tngis/districts', async (req, res) => {
     try {
@@ -394,7 +405,9 @@ app.get('/api/tngis/taluks', async (req, res) => {
         }
         res.json({ success: true, data: [] });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Failed to fetch taluks' });
+        console.error("Taluks WFS failed, returning fallback:", err.message);
+        const fallbackData = FALLBACK_TALUKS[req.query.district] || ["Mock Taluk 1", "Mock Taluk 2"];
+        res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
 
@@ -410,7 +423,9 @@ app.get('/api/tngis/villages', async (req, res) => {
         }
         res.json({ success: true, data: [] });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Failed to fetch villages' });
+        console.error("Villages WFS failed, returning fallback:", err.message);
+        const fallbackData = FALLBACK_VILLAGES[req.query.taluk] || ["Mock Village 1", "Mock Village 2"];
+        res.json({ success: true, data: fallbackData, fallback: true });
     }
 });
 
@@ -432,7 +447,8 @@ app.get('/api/tngis/survey', async (req, res) => {
         }
         res.json({ success: true, data: [] });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Failed to fetch survey numbers' });
+        console.error("Survey WFS failed, returning fallback:", err.message);
+        res.json({ success: true, data: ["1", "2", "3", "4", "5"], fallback: true });
     }
 });
 
@@ -449,7 +465,8 @@ app.get('/api/tngis/subdivisions', async (req, res) => {
         }
         res.json({ success: true, data: [] });
     } catch (err) {
-        res.status(500).json({ success: false, error: 'Failed to fetch subdivisions' });
+        console.error("Subdivisions WFS failed, returning fallback:", err.message);
+        res.json({ success: true, data: ["1A", "1B", "2A", "2B"], fallback: true });
     }
 });
 
