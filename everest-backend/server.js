@@ -8,6 +8,28 @@ const fs = require('fs/promises');
 const path = require('path');
 const { execFile } = require('child_process');
 const { insertMap, getAllMaps, getMapById, renameMap, deleteMap, updateMap, cleanStaleDrafts, saveMapMetadata } = require('./db');
+const sqlite3 = require('sqlite3').verbose();
+
+// Initialize Spatial Cache DB
+const spatialDbPath = path.join(__dirname, 'data', 'spatial_cache.db');
+const spatialDb = new sqlite3.Database(spatialDbPath, (err) => {
+    if (err) console.error("Failed to connect to spatial_cache.db:", err);
+    else console.log("Connected to spatial_cache.db");
+});
+
+const dbAll = (query, params) => new Promise((resolve, reject) => {
+    spatialDb.all(query, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+    });
+});
+const dbGet = (query, params) => new Promise((resolve, reject) => {
+    spatialDb.get(query, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+    });
+});
+
 
 const os = require('os');
 let pdfPoppler = null;
@@ -549,7 +571,62 @@ app.get('/api/tngis/feature', async (req, res) => {
     }
 });
 
+app.get('/api/tngis/boundary', async (req, res) => {
+    try {
+        const { level, district, taluk, village, survey, subdiv } = req.query;
+        if (!level) return res.status(400).json({ error: 'Level is required' });
+
+        let lgdVillageCode = village;
+        if (level === 'parcel' || level === 'village') {
+            if (taluk && village) {
+                const mappedCode = villageLgdMap.get(`${taluk}|${village}`);
+                if (mappedCode) lgdVillageCode = mappedCode;
+            }
+        }
+
+        try {
+            let row;
+            if (level === 'village' && lgdVillageCode) {
+                row = await dbGet(`SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM administrative_boundaries WHERE level='village' AND lgd_code = ? LIMIT 1`, [lgdVillageCode]);
+            } else if (level === 'district' && district) {
+                row = await dbGet(`SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM administrative_boundaries WHERE level='district' AND name = ? LIMIT 1`, [district]);
+            } else if (level === 'taluk' && taluk) {
+                row = await dbGet(`SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM administrative_boundaries WHERE level='taluk' AND name = ? LIMIT 1`, [taluk]);
+            } else if (level === 'parcel' && survey) {
+                if (subdiv) {
+                    row = await dbGet(`SELECT geometry_geojson, bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ? AND sub_div_no = ? LIMIT 1`, [lgdVillageCode, survey, subdiv]);
+                } else {
+                    row = await dbGet(`SELECT geometry_geojson, bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ? LIMIT 1`, [lgdVillageCode, survey]);
+                }
+            }
+            
+            if (row) {
+                if (level === 'parcel' && row.geometry_geojson) {
+                    // Send actual parcel polygon + bbox
+                    return res.json({ success: true, feature: { type: 'Feature', geometry: JSON.parse(row.geometry_geojson), bbox: [row.bbox_min_x, row.bbox_min_y, row.bbox_max_x, row.bbox_max_y], properties: { name: survey } }, source: 'sqlite' });
+                } else if (row.bbox_min_x) {
+                    // Just send bbox for Admin levels so frontend doesn't draw an ugly square, but still zooms
+                    return res.json({ success: true, feature: { type: 'Feature', geometry: null, bbox: [row.bbox_min_x, row.bbox_min_y, row.bbox_max_x, row.bbox_max_y] }, source: 'sqlite' });
+                }
+            }
+        } catch (dbErr) {
+            console.error('Local SQLite boundary lookup failed:', dbErr.message);
+        }
+
+        // If not found in DB, do not fallback to WFS for admin levels since they return errors.
+        // Return a mock bbox if district/taluk so frontend won't crash
+        if (level === 'district') {
+             return res.json({ success: true, feature: { type: 'Feature', geometry: null, bbox: [8485240, 930870, 8953110, 1500000] }, source: 'mock' });
+        }
+
+        res.status(404).json({ success: false, error: 'Boundary not found' });
+    } catch (err) {
+        console.error('Boundary API failed:', err.message);
+        res.status(500).json({ success: false, error: 'Server error' });
+    }
+});
+
 // ─── Start Server ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Everest Backend running on port ${PORT}`);
 });
