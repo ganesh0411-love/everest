@@ -1,11 +1,14 @@
-# Use official Node 18 slim image
-FROM node:18-slim
+# Use official Node 20 slim image
+FROM node:20-slim
 
 # Install poppler-utils (provides pdftoppm binary required by pdf-poppler)
 # Also install required libs for sharp (native image processing)
+# AND build-essential + python3 to natively compile sqlite3 for this specific Linux container
 RUN apt-get update && apt-get install -y \
     poppler-utils \
     libvips-dev \
+    python3 \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -13,7 +16,8 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
-RUN npm install --production
+# Install and forcefully rebuild sqlite3 from source against this container's GLIBC
+RUN npm install --production && npm rebuild sqlite3 --build-from-source
 
 # Copy all backend source files
 COPY . .
