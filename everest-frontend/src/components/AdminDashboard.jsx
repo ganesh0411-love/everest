@@ -587,7 +587,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       if (t < 1) {
                           requestAnimationFrame(animate);
                       } else {
-                          if (geom) setLsHighlightPoly(typeof pointsList !== 'undefined' ? pointsList.flat() : points);
+                          if (geom) setLsHighlightPoly(pointsList || points);
                           else setLsHighlightPoly(null);
                       }
                   };
