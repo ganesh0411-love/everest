@@ -393,6 +393,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [selTaluk, setSelTaluk] = React.useState('');
   const [selVillage, setSelVillage] = React.useState('');
   const [selSurvey, setSelSurvey] = React.useState('');
+  const [mapActionTrigger, setMapActionTrigger] = React.useState(0);
   const [selSubdiv, setSelSubdiv] = React.useState('');
   const [lsLoading, setLsLoading] = React.useState('');
   const [lsHighlightPoly, setLsHighlightPoly] = React.useState(null);
@@ -489,7 +490,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
           setSelSubdiv('');
           setLsSubdivs([]);
       }
-  }, [selSurvey]);
+  }, [selSurvey, mapActionTrigger]);
 
   const fetchAndHighlight = async (level, state) => {
       try {
@@ -505,8 +506,13 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
           if (data.success && data.feature && data.feature.geometry) {
               const geom = data.feature.geometry;
               let coordinates = [];
-              if (geom.type === 'Polygon') coordinates = geom.coordinates[0];
-              else if (geom.type === 'MultiPolygon') coordinates = geom.coordinates[0][0]; 
+              let allRings = [];
+              if (geom.type === 'Polygon') allRings.push(geom.coordinates[0]);
+              else if (geom.type === 'MultiPolygon') {
+                  geom.coordinates.forEach(poly => allRings.push(poly[0]));
+              }
+              // Flatten for bounds calculation
+              coordinates = allRings.flat(); 
               
               if (coordinates && coordinates.length > 0) {
                   let bMercX = mapConfig.baseMercX;
@@ -527,15 +533,18 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                   }
                   
                   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                  const points = coordinates.map(coord => {
-                      const svgX = coord[0] - bMercX;
-                      const svgY = bMercY - coord[1];
-                      if (svgX < minX) minX = svgX;
-                      if (svgX > maxX) maxX = svgX;
-                      if (svgY < minY) minY = svgY;
-                      if (svgY > maxY) maxY = svgY;
-                      return { x: svgX, y: svgY };
+                  const pointsList = allRings.map(ring => {
+                      return ring.map(coord => {
+                          const svgX = coord[0] - bMercX;
+                          const svgY = bMercY - coord[1];
+                          if (svgX < minX) minX = svgX;
+                          if (svgX > maxX) maxX = svgX;
+                          if (svgY < minY) minY = svgY;
+                          if (svgY > maxY) maxY = svgY;
+                          return { x: svgX, y: svgY };
+                      });
                   });
+                  const points = pointsList.flat();
                   
                   const targetWidth = Math.max(maxX - minX, 100);
                   const targetHeight = Math.max(maxY - minY, 100);
@@ -559,16 +568,29 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       const t = Math.min(elapsed / 800, 1);
                       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
                       
-                      setCadViewport({
-                          x: startX + (tX - startX) * ease,
-                          y: startY + (tY - startY) * ease,
-                          width: startW + (tW - startW) * ease,
-                          height: startH + (tH - startH) * ease
+                      setCadViewport(prev => {
+                          // Capture initial start pos correctly on first frame
+                          const sX = (mapConfig.baseMercX === 0 || !startTime) ? startX : prev.startX || startX;
+                          const sY = (mapConfig.baseMercX === 0 || !startTime) ? startY : prev.startY || startY;
+                          const sW = (mapConfig.baseMercX === 0 || !startTime) ? startW : prev.startW || startW;
+                          const sH = (mapConfig.baseMercX === 0 || !startTime) ? startH : prev.startH || startH;
+                          
+                          return {
+                              x: sX + (tX - sX) * ease,
+                              y: sY + (tY - sY) * ease,
+                              width: sW + (tW - sW) * ease,
+                              height: sH + (tH - sH) * ease,
+                              startX: sX, startY: sY, startW: sW, startH: sH
+                          };
                       });
                       
                       if (t < 1) {
                           requestAnimationFrame(animate);
                       } else {
+                          setLsLoading(false);
+                      }
+                  };
+                  requestAnimationFrame(animate); else {
                           if (geom) setLsHighlightPoly(points);
                           else setLsHighlightPoly(null);
                       }
@@ -590,12 +612,15 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
           if (data.success && data.feature) {
               const geom = data.feature.geometry;
               let coordinates = [];
-              if (geom && geom.type === 'Polygon') coordinates = geom.coordinates[0];
-              else if (geom && geom.type === 'MultiPolygon') coordinates = geom.coordinates[0][0];
-              else if (!geom && data.feature.bbox) {
+              let allRings = [];
+              if (geom && geom.type === 'Polygon') allRings.push(geom.coordinates[0]);
+              else if (geom && geom.type === 'MultiPolygon') {
+                  geom.coordinates.forEach(poly => allRings.push(poly[0]));
+              } else if (!geom && data.feature.bbox) {
                   const b = data.feature.bbox;
-                  coordinates = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [b[0], b[1]]];
+                  allRings.push([[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [b[0], b[1]]]);
               }
+              coordinates = allRings.flat();
               
               if (coordinates && coordinates.length > 0) {
                   let bMercX = mapConfig.baseMercX;
@@ -619,21 +644,18 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                   
                   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                   
-                  const points = coordinates.map(coord => {
-                      // EPSG:3857 coordinates from WFS
-                      const mercX = coord[0];
-                      const mercY = coord[1];
-                      // Convert to SVG coordinates relative to baseMercX/Y
-                      const svgX = mercX - bMercX;
-                      const svgY = bMercY - mercY; // Invert Y
-                      
-                      if (svgX < minX) minX = svgX;
-                      if (svgX > maxX) maxX = svgX;
-                      if (svgY < minY) minY = svgY;
-                      if (svgY > maxY) maxY = svgY;
-                      
-                      return { x: svgX, y: svgY };
+                  const pointsList = allRings.map(ring => {
+                      return ring.map(coord => {
+                          const svgX = coord[0] - bMercX;
+                          const svgY = bMercY - coord[1];
+                          if (svgX < minX) minX = svgX;
+                          if (svgX > maxX) maxX = svgX;
+                          if (svgY < minY) minY = svgY;
+                          if (svgY > maxY) maxY = svgY;
+                          return { x: svgX, y: svgY };
+                      });
                   });
+                  const points = pointsList.flat();
                   
                   // Animate Pan and Zoom
                   const targetWidth = Math.max(maxX - minX, 100); // Minimum 100px width
@@ -3656,15 +3678,27 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           <svg viewBox={`0 0 ${vWidth} ${vHeight}`} className="w-full h-full max-h-full drop-shadow-md">
                             {/* Progressive Yellow Highlight Polygon */}
                             {lsHighlightPoly && (
-                              <polygon 
-                                points={lsHighlightPoly.map(pt => `${pt.x},${pt.y}`).join(' ')} 
-                                fill="rgba(255, 255, 0, 0.2)" 
-                                stroke="#FFFF00" 
-                                strokeWidth="3" 
-                                vectorEffect="non-scaling-stroke"
-                                strokeLinejoin="round"
-                              />
-                            )}
+                 Array.isArray(lsHighlightPoly[0]) ? (
+                     lsHighlightPoly.map((ring, idx) => (
+                         <polygon
+                             key={`hp_${idx}`}
+                             points={ring.map(p => `${p.x},${p.y}`).join(' ')}
+                             fill="rgba(255, 255, 0, 0.3)"
+                             stroke="#FFD700"
+                             strokeWidth={cadViewport.width / 400}
+                             style={{ pointerEvents: 'none' }}
+                         />
+                     ))
+                 ) : (
+                     <polygon 
+                         points={lsHighlightPoly.map(p => `${p.x},${p.y}`).join(' ')}
+                         fill="rgba(255, 255, 0, 0.3)"
+                         stroke="#FFD700"
+                         strokeWidth={cadViewport.width / 400}
+                         style={{ pointerEvents: 'none' }}
+                     />
+                 )
+             )}
                             {/* Closed Path Geometry */}
                             <polygon 
                               points={`${p1} ${p2} ${p3} ${p4}`} 
@@ -6569,7 +6603,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </select>
             
             <select 
-              value={selVillage} onChange={e => setSelVillage(e.target.value)}
+              value={selVillage} onChange={e => (() => { setSelVillage(e.target.value); setSelSurvey(''); setSelSubdiv(''); setMapActionTrigger(Date.now()); })()}
               
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
@@ -6578,7 +6612,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </select>
             
             <select 
-              value={selSurvey} onChange={e => setSelSurvey(e.target.value)}
+              value={selSurvey} onChange={e => (() => { setSelSurvey(e.target.value); setMapActionTrigger(Date.now()); })()}
               
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
@@ -6587,7 +6621,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </select>
             
             <select 
-              value={selSubdiv} onChange={e => setSelSubdiv(e.target.value)}
+              value={selSubdiv} onChange={e => (() => { setSelSubdiv(e.target.value); setMapActionTrigger(Date.now()); })()}
               
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
