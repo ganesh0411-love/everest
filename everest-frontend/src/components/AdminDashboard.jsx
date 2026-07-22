@@ -6,7 +6,7 @@ import { db } from '../firebase';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+const API_BASE = 'https://everest-backend.onrender.com';
 
 const DB_NAME = 'EverestTileCache';
 const STORE_NAME = 'tiles';
