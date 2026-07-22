@@ -56,7 +56,7 @@ const ingest = async () => {
     const vcode = '932466'; // Sevugampatti from tn_master.json
     
     try {
-        const parcels = await fetchWFS('cadastral_data_wms:view_cadastral', `lgd_village_code='${vcode}' OR village_code='${vcode}' OR village_code='275685' OR lgd_village_code='275685'`);
+        const parcels = await fetchWFS('cadastral_data_wms:view_fmb', `lgd_village_code='${vcode}' OR village_code='${vcode}' OR village_code='275685' OR lgd_village_code='275685'`);
         console.log(`Fetched ${parcels.length} parcels for Sevugampatti.`);
         
         let inserted = 0;

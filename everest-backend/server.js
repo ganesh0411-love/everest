@@ -479,15 +479,24 @@ app.get('/api/tngis/survey', async (req, res) => {
             const mappedCode = villageLgdMap.get(`${taluk}|${village}`);
             if (mappedCode) lgdVillageCode = mappedCode;
         }
-        
-        if (surveyCache[lgdVillageCode]) {
-            return res.json({ success: true, data: surveyCache[lgdVillageCode] });
+
+        try {
+            const rows = await dbAll('SELECT DISTINCT survey_no FROM cadastral_parcels WHERE lgd_village_code = ? ORDER BY survey_no ASC', [lgdVillageCode]);
+            if (rows && rows.length > 0) {
+                let surveys = rows.map(r => r.survey_no).filter(Boolean).sort((a,b) => {
+                    const numA = parseInt(a, 10);
+                    const numB = parseInt(b, 10);
+                    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                    return String(a).localeCompare(String(b));
+                });
+                return res.json({ success: true, data: surveys, source: 'sqlite' });
+            }
+        } catch (dbErr) {
+            console.error('SQLite survey error:', dbErr.message);
         }
         
         let cql = `lgd_village_code='${lgdVillageCode}'`;
-        
-        // Use cadastral layer to fetch survey numbers
-        const data = await fetchTNGIS('cadastral_data_wms:view_cadastral', 'survey_number', cql);
+        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'survey_number', cql);
         if (data && data.features) {
             const surveys = [...new Set(data.features.map(f => f.properties.survey_number).filter(Boolean))].sort((a,b) => {
                 const numA = parseInt(a, 10);
@@ -495,8 +504,7 @@ app.get('/api/tngis/survey', async (req, res) => {
                 if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
                 return String(a).localeCompare(String(b));
             });
-            surveyCache[lgdVillageCode] = surveys;
-            return res.json({ success: true, data: surveys });
+            return res.json({ success: true, data: surveys, source: 'wfs' });
         }
         res.json({ success: true, data: [] });
     } catch (err) {
@@ -518,19 +526,22 @@ app.get('/api/tngis/subdivisions', async (req, res) => {
             if (mappedCode) lgdVillageCode = mappedCode;
         }
 
-        const cacheKey = `${lgdVillageCode}_${survey}`;
-        if (subdivCache[cacheKey]) {
-            return res.json({ success: true, data: subdivCache[cacheKey] });
+        try {
+            const rows = await dbAll('SELECT DISTINCT sub_div_no FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ? ORDER BY sub_div_no ASC', [lgdVillageCode, survey]);
+            if (rows && rows.length > 0) {
+                const subdivs = rows.map(r => r.sub_div_no).filter(Boolean).sort();
+                return res.json({ success: true, data: subdivs, source: 'sqlite' });
+            }
+        } catch (dbErr) {
+            console.error('SQLite subdiv error:', dbErr.message);
         }
         
         let cql = `lgd_village_code='${lgdVillageCode}' AND survey_number='${survey}'`;
         
-        // Fetch subdivisions
         const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'sub_division', cql);
         if (data && data.features) {
             const subdivs = [...new Set(data.features.map(f => f.properties.sub_division).filter(Boolean))].sort();
-            subdivCache[cacheKey] = subdivs;
-            return res.json({ success: true, data: subdivs });
+            return res.json({ success: true, data: subdivs, source: 'wfs' });
         }
         res.json({ success: true, data: [] });
     } catch (err) {
