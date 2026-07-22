@@ -426,7 +426,6 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   React.useEffect(() => {
       if (selDistrict) {
-          fetchAndHighlight('district', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
           setLsLoading('taluks');
           fetch(`${API_BASE}/api/tngis/taluks?district=${encodeURIComponent(selDistrict)}`)
             .then(res => res.json())
@@ -446,7 +445,6 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   React.useEffect(() => {
       if (selTaluk) {
-          fetchAndHighlight('taluk', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
           setLsLoading('villages');
           fetch(`${API_BASE}/api/tngis/villages?taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`)
             .then(res => res.json())
@@ -464,33 +462,47 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   React.useEffect(() => {
       if (selVillage) {
-          fetchAndHighlight('village', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
           setLsLoading('surveys');
+          setSelSurvey('');
+          setLsSurveys([]);
+          setSelSubdiv('');
+          setLsSubdivs([]);
           fetch(`${API_BASE}/api/tngis/survey?village=${encodeURIComponent(selVillage)}&taluk=${encodeURIComponent(selTaluk)}`)
             .then(res => res.json())
             .then(res => setLsSurveys(res.data || []))
             .catch(err => console.error(err))
             .finally(() => setLsLoading(''));
-          setSelSurvey('');
-          setLsSurveys([]);
-          setSelSubdiv('');
-          setLsSubdivs([]);
       }
   }, [selVillage]);
 
+  // Fetch subdivs only when selSurvey changes
   React.useEffect(() => {
       if (selSurvey) {
-          fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
           setLsLoading('subdivs');
+          setSelSubdiv('');
+          setLsSubdivs([]);
           fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}`)
             .then(res => res.json())
             .then(res => setLsSubdivs(res.data || []))
             .catch(err => console.error(err))
             .finally(() => setLsLoading(''));
-          setSelSubdiv('');
-          setLsSubdivs([]);
       }
-  }, [selSurvey, mapActionTrigger]);
+  }, [selSurvey]);
+
+  // Run highlight on mapActionTrigger
+  React.useEffect(() => {
+      if (mapActionTrigger > 0) {
+          if (selSurvey) {
+              fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
+          } else if (selVillage) {
+              fetchAndHighlight('village', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
+          } else if (selTaluk) {
+              fetchAndHighlight('taluk', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
+          } else if (selDistrict) {
+              fetchAndHighlight('district', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
+          }
+      }
+  }, [mapActionTrigger]);
 
   const fetchAndHighlight = async (level, state) => {
       try {
@@ -676,18 +688,26 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       const t = Math.min(elapsed / 1000, 1);
                       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
                       
-                      setCadViewport({
-                          x: startX + (tX - startX) * ease,
-                          y: startY + (tY - startY) * ease,
-                          width: startW + (tW - startW) * ease,
-                          height: startH + (tH - startH) * ease
+                      setCadViewport(prev => {
+                          const sX = (mapConfig.baseMercX === 0 || !startTime) ? startX : prev.startX || startX;
+                          const sY = (mapConfig.baseMercX === 0 || !startTime) ? startY : prev.startY || startY;
+                          const sW = (mapConfig.baseMercX === 0 || !startTime) ? startW : prev.startW || startW;
+                          const sH = (mapConfig.baseMercX === 0 || !startTime) ? startH : prev.startH || startH;
+                          
+                          return {
+                              x: sX + (tX - sX) * ease,
+                              y: sY + (tY - sY) * ease,
+                              width: sW + (tW - sW) * ease,
+                              height: sH + (tH - sH) * ease,
+                              startX: sX, startY: sY, startW: sW, startH: sH
+                          };
                       });
                       
                       if (t < 1) {
                           requestAnimationFrame(animate);
                       } else {
                           // Flash highlight polygon
-                          setLsHighlightPoly(points);
+                          setLsHighlightPoly(pointsList || points);
                       }
                   };
                   requestAnimationFrame(animate);
