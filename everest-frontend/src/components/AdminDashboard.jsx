@@ -425,6 +425,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   React.useEffect(() => {
       if (selDistrict) {
+          fetchAndHighlight('district', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
           setLsLoading('taluks');
           fetch(`${API_BASE}/api/tngis/taluks?district=${encodeURIComponent(selDistrict)}`)
             .then(res => res.json())
@@ -444,6 +445,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   React.useEffect(() => {
       if (selTaluk) {
+          fetchAndHighlight('taluk', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
           setLsLoading('villages');
           fetch(`${API_BASE}/api/tngis/villages?taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`)
             .then(res => res.json())
@@ -461,6 +463,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   React.useEffect(() => {
       if (selVillage) {
+          fetchAndHighlight('village', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
           setLsLoading('surveys');
           fetch(`${API_BASE}/api/tngis/survey?village=${encodeURIComponent(selVillage)}&taluk=${encodeURIComponent(selTaluk)}`)
             .then(res => res.json())
@@ -476,6 +479,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   React.useEffect(() => {
       if (selSurvey) {
+          fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
           setLsLoading('subdivs');
           fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}`)
             .then(res => res.json())
@@ -487,17 +491,111 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
       }
   }, [selSurvey]);
 
+  const fetchAndHighlight = async (level, state) => {
+      try {
+          let url = `${API_BASE}/api/tngis/boundary?level=${level}`;
+          if (state.selDistrict) url += `&district=${encodeURIComponent(state.selDistrict)}`;
+          if (state.selTaluk) url += `&taluk=${encodeURIComponent(state.selTaluk)}`;
+          if (state.selVillage) url += `&village=${encodeURIComponent(state.selVillage)}`;
+          if (state.selSurvey) url += `&survey=${encodeURIComponent(state.selSurvey)}`;
+          if (state.selSubdiv) url += `&subdiv=${encodeURIComponent(state.selSubdiv)}`;
+          
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.success && data.feature && data.feature.geometry) {
+              const geom = data.feature.geometry;
+              let coordinates = [];
+              if (geom.type === 'Polygon') coordinates = geom.coordinates[0];
+              else if (geom.type === 'MultiPolygon') coordinates = geom.coordinates[0][0]; 
+              
+              if (coordinates && coordinates.length > 0) {
+                  let bMercX = mapConfig.baseMercX;
+                  let bMercY = mapConfig.baseMercY;
+                  
+                  if (bMercX === 0 && bMercY === 0) {
+                      let minM = Infinity, minMy = Infinity, maxM = -Infinity, maxMy = -Infinity;
+                      coordinates.forEach(c => {
+                          if (c[0] < minM) minM = c[0];
+                          if (c[0] > maxM) maxM = c[0];
+                          if (c[1] < minMy) minMy = c[1];
+                          if (c[1] > maxMy) maxMy = c[1];
+                      });
+                      bMercX = minM + (maxM - minM)/2;
+                      bMercY = minMy + (maxMy - minMy)/2;
+                      setMapConfig(prev => ({ ...prev, active: true, baseMercX: bMercX, baseMercY: bMercY }));
+                      setIsCadastralEnabled(true);
+                  }
+                  
+                  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                  const points = coordinates.map(coord => {
+                      const svgX = coord[0] - bMercX;
+                      const svgY = bMercY - coord[1];
+                      if (svgX < minX) minX = svgX;
+                      if (svgX > maxX) maxX = svgX;
+                      if (svgY < minY) minY = svgY;
+                      if (svgY > maxY) maxY = svgY;
+                      return { x: svgX, y: svgY };
+                  });
+                  
+                  const targetWidth = Math.max(maxX - minX, 100);
+                  const targetHeight = Math.max(maxY - minY, 100);
+                  const marginX = targetWidth * 0.2;
+                  const marginY = targetHeight * 0.2;
+                  
+                  const tX = minX - marginX;
+                  const tY = minY - marginY;
+                  const tW = targetWidth + marginX * 2;
+                  const tH = targetHeight + marginY * 2;
+                  
+                  const startX = (mapConfig.baseMercX === 0) ? tX : cadViewport.x;
+                  const startY = (mapConfig.baseMercX === 0) ? tY : cadViewport.y;
+                  const startW = (mapConfig.baseMercX === 0) ? tW : cadViewport.width;
+                  const startH = (mapConfig.baseMercX === 0) ? tH : cadViewport.height;
+                  
+                  let startTime = null;
+                  const animate = (time) => {
+                      if (!startTime) startTime = time;
+                      const elapsed = time - startTime;
+                      const t = Math.min(elapsed / 800, 1);
+                      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                      
+                      setCadViewport({
+                          x: startX + (tX - startX) * ease,
+                          y: startY + (tY - startY) * ease,
+                          width: startW + (tW - startW) * ease,
+                          height: startH + (tH - startH) * ease
+                      });
+                      
+                      if (t < 1) {
+                          requestAnimationFrame(animate);
+                      } else {
+                          if (geom) setLsHighlightPoly(points);
+                          else setLsHighlightPoly(null);
+                      }
+                  };
+                  requestAnimationFrame(animate);
+              }
+          }
+      } catch (err) {
+          console.error("fetchAndHighlight failed:", err);
+      }
+  };
+
   const executeFlyTo = async () => {
       if (!selVillage || !selSurvey) return;
       setLsLoading('flyTo');
       try {
           const res = await fetch(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}` + (selSubdiv ? `&subdiv=${encodeURIComponent(selSubdiv)}` : ''));
           const data = await res.json();
-          if (data.success && data.feature && data.feature.geometry) {
+          if (data.success && data.feature) {
               const geom = data.feature.geometry;
               let coordinates = [];
-              if (geom.type === 'Polygon') coordinates = geom.coordinates[0];
-              else if (geom.type === 'MultiPolygon') coordinates = geom.coordinates[0][0]; // Outer ring of first polygon
+              if (geom && geom.type === 'Polygon') coordinates = geom.coordinates[0];
+              else if (geom && geom.type === 'MultiPolygon') coordinates = geom.coordinates[0][0];
+              else if (!geom && data.feature.bbox) {
+                  const b = data.feature.bbox;
+                  coordinates = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [b[0], b[1]]];
+              }
               
               if (coordinates && coordinates.length > 0) {
                   let bMercX = mapConfig.baseMercX;
@@ -572,7 +670,6 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       } else {
                           // Flash highlight polygon
                           setLsHighlightPoly(points);
-                          setTimeout(() => setLsHighlightPoly(null), 3000); // Hide after 3 seconds
                       }
                   };
                   requestAnimationFrame(animate);
@@ -3557,6 +3654,17 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       return (
                         <div style={{ transform: `translate(${fmbPanX}px, ${fmbPanY}px) scale(${fmbScale})`, transformOrigin: 'center', transition: fmbPanX === 0 && fmbPanY === 0 && fmbScale === 1 ? 'transform 0.2s ease-out' : 'none', width: '100%', height: '100%' }}>
                           <svg viewBox={`0 0 ${vWidth} ${vHeight}`} className="w-full h-full max-h-full drop-shadow-md">
+                            {/* Progressive Yellow Highlight Polygon */}
+                            {lsHighlightPoly && (
+                              <polygon 
+                                points={lsHighlightPoly.map(pt => `${pt.x},${pt.y}`).join(' ')} 
+                                fill="rgba(255, 255, 0, 0.2)" 
+                                stroke="#FFFF00" 
+                                strokeWidth="3" 
+                                vectorEffect="non-scaling-stroke"
+                                strokeLinejoin="round"
+                              />
+                            )}
                             {/* Closed Path Geometry */}
                             <polygon 
                               points={`${p1} ${p2} ${p3} ${p4}`} 
@@ -4797,6 +4905,19 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                        </>
                     )}
                     <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
+                   
+                    {/* Progressive Yellow Highlight Polygon */}
+                    {lsHighlightPoly && (
+                      <polygon 
+                        points={lsHighlightPoly.map(pt => `${pt.x},${pt.y}`).join(' ')} 
+                        fill="rgba(255, 255, 0, 0.2)" 
+                        stroke="#FFFF00" 
+                        strokeWidth={Math.max(cadViewport.width * 0.005, 3)} 
+                        vectorEffect="non-scaling-stroke"
+                        strokeLinejoin="round"
+                        pointerEvents="none"
+                      />
+                    )}
                    
                      <g id="cad-drawing-layer">
                       {(cadBackgroundImage && isBackgroundImageVisible) && (
@@ -6432,7 +6553,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             {/* Dropdowns */}
             <select 
               value={selDistrict} onChange={e => setSelDistrict(e.target.value)}
-              disabled={lsLoading === 'districts'}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'districts' ? 'Loading Districts...' : 'Select District'}</option>
@@ -6441,7 +6561,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <select 
               value={selTaluk} onChange={e => setSelTaluk(e.target.value)}
-              disabled={!selDistrict || lsLoading === 'taluks'}
+              
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'taluks' ? 'Loading Taluks...' : 'Select Taluk'}</option>
@@ -6450,7 +6570,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <select 
               value={selVillage} onChange={e => setSelVillage(e.target.value)}
-              disabled={!selTaluk || lsLoading === 'villages'}
+              
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'villages' ? 'Loading Villages...' : 'Select Village'}</option>
@@ -6459,7 +6579,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <select 
               value={selSurvey} onChange={e => setSelSurvey(e.target.value)}
-              disabled={!selVillage || lsLoading === 'surveys'}
+              
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'surveys' ? 'Loading Survey Numbers...' : 'Select Survey Number'}</option>
@@ -6468,7 +6588,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <select 
               value={selSubdiv} onChange={e => setSelSubdiv(e.target.value)}
-              disabled={!selSurvey || lsLoading === 'subdivs'}
+              
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'subdivs' ? 'Loading Subdivisions...' : 'Select Subdivision Number (Optional)'}</option>
