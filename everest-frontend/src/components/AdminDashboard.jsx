@@ -506,6 +506,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   const fetchAndHighlight = async (level, state) => {
         setLsHighlightPoly(null);
+        setCadSelectedPolygon(null);
         try {
           let url = `${API_BASE}/api/tngis/boundary?level=${level}`;
           if (state.selDistrict) url += `&district=${encodeURIComponent(state.selDistrict)}`;
@@ -605,6 +606,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       } else {
                           if (geom) setLsHighlightPoly(pointsList || points);
                           else setLsHighlightPoly(null);
+        setCadSelectedPolygon(null);
                       }
                   };
                   requestAnimationFrame(animate);
@@ -619,6 +621,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
         if (!selVillage || !selSurvey) return;
         setLsLoading('flyTo');
         setLsHighlightPoly(null);
+        setCadSelectedPolygon(null);
         try {
           const res = await fetch(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}` + (selSubdiv ? `&subdiv=${encodeURIComponent(selSubdiv)}` : ''));
           const data = await res.json();

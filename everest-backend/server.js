@@ -633,7 +633,7 @@ app.get('/api/tngis/boundary', async (req, res) => {
                 row = await dbGet(`SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM administrative_boundaries WHERE level='district' AND name = ? LIMIT 1`, [district]);
             } else if (level === 'taluk' && taluk) {
                 row = await dbGet(`SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM administrative_boundaries WHERE level='taluk' AND name = ? LIMIT 1`, [taluk]);
-            } else if (level === 'parcel' && survey) {
+            } else if ((level === 'parcel' || level === 'survey') && survey) {
                 let query = 'SELECT geometry_geojson, bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ?';
                 let params = [lgdVillageCode, survey];
                 if (subdiv) {
