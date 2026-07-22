@@ -166,7 +166,7 @@ const SatelliteLayer = ({ viewport, baseMercX, baseMercY }) => {
     const R = 6378137;
     const maxMerc = Math.PI * R;
     const zFloat = Math.log2(40075016 / viewport.width) + 1.5;
-    const z = Math.max(0, Math.min(22, Math.round(zFloat)));
+    const z = Math.max(0, Math.min(20, Math.round(zFloat)));
     const n = Math.pow(2, z);
     const tileSizeMeters = 40075016 / n;
     
@@ -505,7 +505,8 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   }, [mapActionTrigger]);
 
   const fetchAndHighlight = async (level, state) => {
-      try {
+        setLsHighlightPoly(null);
+        try {
           let url = `${API_BASE}/api/tngis/boundary?level=${level}`;
           if (state.selDistrict) url += `&district=${encodeURIComponent(state.selDistrict)}`;
           if (state.selTaluk) url += `&taluk=${encodeURIComponent(state.selTaluk)}`;
@@ -515,13 +516,16 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
           
           const res = await fetch(url);
           const data = await res.json();
-          if (data.success && data.feature && data.feature.geometry) {
+          if (data.success && data.feature) {
               const geom = data.feature.geometry;
               let coordinates = [];
               let allRings = [];
-              if (geom.type === 'Polygon') allRings.push(geom.coordinates[0]);
-              else if (geom.type === 'MultiPolygon') {
+              if (geom && geom.type === 'Polygon') allRings.push(geom.coordinates[0]);
+              else if (geom && geom.type === 'MultiPolygon') {
                   geom.coordinates.forEach(poly => allRings.push(poly[0]));
+              } else if (!geom && data.feature.bbox) {
+                  const b = data.feature.bbox;
+                  allRings.push([[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [b[0], b[1]]]);
               }
               // Flatten for bounds calculation
               coordinates = allRings.flat(); 
@@ -612,9 +616,10 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   };
 
   const executeFlyTo = async () => {
-      if (!selVillage || !selSurvey) return;
-      setLsLoading('flyTo');
-      try {
+        if (!selVillage || !selSurvey) return;
+        setLsLoading('flyTo');
+        setLsHighlightPoly(null);
+        try {
           const res = await fetch(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}` + (selSubdiv ? `&subdiv=${encodeURIComponent(selSubdiv)}` : ''));
           const data = await res.json();
           if (data.success && data.feature) {

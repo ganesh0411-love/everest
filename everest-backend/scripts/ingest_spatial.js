@@ -40,7 +40,7 @@ db.serialize(() => {
 });
 
 const fetchWFS = async (typeName, cqlFilter) => {
-    let url = `${TNGIS_URL}?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json&srsName=EPSG:3857`;
+    let url = `${TNGIS_URL}?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json&srsName=EPSG:3857&count=100000`;
     if (cqlFilter) url += `&CQL_FILTER=${encodeURIComponent(cqlFilter)}`;
     
     console.log(`Fetching ${typeName} - ${cqlFilter || 'ALL'}`);
