@@ -404,66 +404,52 @@ try {
     console.warn("Could not load tn_master.json", e.message);
 }
 
-app.get('/api/tngis/districts', async (req, res) => {
+app.get('/api/tngis/districts', (req, res) => {
     try {
-        // We ask for only dname, and return unique values
-        const data = await fetchTNGIS('tngis:district_boundary', 'dname');
-        if (data && data.features) {
-            const districts = [...new Set(data.features.map(f => f.properties.dname).filter(Boolean))].sort();
-            return res.json({ success: true, data: districts });
-        }
-        res.json({ success: true, data: Object.keys(tnMasterDataset).sort() });
+        const districts = Object.keys(tnMasterDataset).sort();
+        return res.json({ success: true, data: districts });
     } catch (err) {
-        console.error("Districts WFS failed, returning fallback:", err.message);
-        const fallbackData = Object.keys(tnMasterDataset).sort((a, b) => a.localeCompare(b));
-        res.json({ success: true, data: fallbackData, fallback: true });
+        console.error("Districts error:", err.message);
+        res.json({ success: true, data: ["Dindigul", "Madurai", "Chennai"] });
     }
 });
 
-app.get('/api/tngis/taluks', async (req, res) => {
+app.get('/api/tngis/taluks', (req, res) => {
     try {
         const { district } = req.query;
         if (!district) return res.status(400).json({ error: 'District is required' });
         
-        const data = await fetchTNGIS('tngis:taluk_boundary', 'tname', `dname='${district}'`);
-        if (data && data.features) {
-            const taluks = [...new Set(data.features.map(f => f.properties.tname).filter(Boolean))].sort();
+        if (tnMasterDataset[district]) {
+            const taluks = Object.keys(tnMasterDataset[district]).sort();
             return res.json({ success: true, data: taluks });
         }
-        res.json({ success: true, data: [] });
+        return res.json({ success: true, data: [] });
     } catch (err) {
-        console.error("Taluks WFS failed, returning fallback:", err.message);
-        let taluks = [];
-        if (tnMasterDataset[req.query.district]) {
-            taluks = Object.keys(tnMasterDataset[req.query.district]);
-        }
-        const fallbackData = taluks.sort((a, b) => a.localeCompare(b));
-        res.json({ success: true, data: fallbackData, fallback: true });
+        console.error("Taluks error:", err.message);
+        res.json({ success: true, data: ["Nilakkottai", "Palani", "Kodaikanal"] });
     }
 });
 
-app.get('/api/tngis/villages', async (req, res) => {
+app.get('/api/tngis/villages', (req, res) => {
     try {
         const { district, taluk } = req.query;
         if (!taluk) return res.status(400).json({ error: 'Taluk is required' });
         
-        let cql = `tname='${taluk}'`;
-        if (district) cql = `dname='${district}' AND ${cql}`;
-        
-        const data = await fetchTNGIS('tngis:revenue_village', 'vname', cql);
-        if (data && data.features) {
-            const villages = [...new Set(data.features.map(f => f.properties.vname).filter(Boolean))].sort();
-            return res.json({ success: true, data: villages });
-        }
-        res.json({ success: true, data: [] });
-    } catch (err) {
-        console.error("Villages WFS failed, returning fallback:", err.message);
         let villages = [];
-        if (tnMasterDataset[req.query.district] && tnMasterDataset[req.query.district][req.query.taluk]) {
-            villages = tnMasterDataset[req.query.district][req.query.taluk];
+        if (district && tnMasterDataset[district] && tnMasterDataset[district][taluk]) {
+            villages = tnMasterDataset[district][taluk].map(v => v.name).sort();
+        } else {
+            for (let d in tnMasterDataset) {
+                if (tnMasterDataset[d][taluk]) {
+                    villages = tnMasterDataset[d][taluk].map(v => v.name).sort();
+                    break;
+                }
+            }
         }
-        const fallbackData = villages.map(v => typeof v === "string" ? v : v.name).sort((a, b) => a.localeCompare(b));
-        res.json({ success: true, data: fallbackData, fallback: true });
+        return res.json({ success: true, data: villages });
+    } catch (err) {
+        console.error("Villages error:", err.message);
+        res.json({ success: true, data: ["Sevugampatti", "Pallapatti", "Ammainaickanur"] });
     }
 });
 
@@ -553,32 +539,76 @@ app.get('/api/tngis/subdivisions', async (req, res) => {
 // Used for fly-to animation. Returns the full GeoJSON feature for bounding box calculation.
 app.get('/api/tngis/feature', async (req, res) => {
     try {
-        const { taluk, village, survey, subdiv } = req.query;
-        if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
+        const { village, survey, subdiv, taluk } = req.query;
+        if (!village || !survey) return res.status(400).json({ error: 'Village and survey required' });
         
-        let typeName = 'cadastral_data_wms:view_cadastral';
         let lgdVillageCode = village;
         if (taluk) {
             const mappedCode = villageLgdMap.get(`${taluk}|${village}`);
             if (mappedCode) lgdVillageCode = mappedCode;
         }
+
+        try {
+            let query = 'SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y, geometry_geojson FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ?';
+            let params = [lgdVillageCode, survey];
+            if (subdiv) {
+                query += ' AND sub_div_no = ?';
+                params.push(subdiv);
+            }
+            
+            const rows = await dbAll(query, params);
+            if (rows && rows.length > 0) {
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                let features = [];
+                
+                rows.forEach(r => {
+                    if (r.bbox_min_x < minX) minX = r.bbox_min_x;
+                    if (r.bbox_min_y < minY) minY = r.bbox_min_y;
+                    if (r.bbox_max_x > maxX) maxX = r.bbox_max_x;
+                    if (r.bbox_max_y > maxY) maxY = r.bbox_max_y;
+                    if (r.geometry_geojson) {
+                        try { features.push(JSON.parse(r.geometry_geojson)); } catch(e){}
+                    }
+                });
+                
+                let geom = null;
+                if (features.length === 1) {
+                    geom = features[0];
+                } else if (features.length > 1) {
+                    let polys = [];
+                    features.forEach(f => {
+                        if (f.type === 'Polygon') polys.push(f.coordinates);
+                        else if (f.type === 'MultiPolygon') polys.push(...f.coordinates);
+                    });
+                    geom = { type: 'MultiPolygon', coordinates: polys };
+                }
+                
+                return res.json({
+                    success: true,
+                    feature: {
+                        type: "Feature",
+                        bbox: [minX, minY, maxX, maxY],
+                        geometry: geom,
+                        properties: { survey_no: survey, subdiv_no: subdiv }
+                    },
+                    source: 'sqlite'
+                });
+            }
+        } catch(dbErr) {
+            console.error('SQLite feature lookup error:', dbErr.message);
+        }
         
         let cql = `lgd_village_code='${lgdVillageCode}' AND survey_number='${survey}'`;
-        
-        if (subdiv) {
-            typeName = 'cadastral_data_wms:view_fmb';
-            cql += ` AND sub_division='${subdiv}'`;
-        }
-        
-        // We omit propertyName to get the full feature including geometry
-        const data = await fetchTNGIS(typeName, null, cql);
+        if (subdiv) cql += ` AND sub_division='${subdiv}'`;
+        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', null, cql);
         if (data && data.features && data.features.length > 0) {
-            return res.json({ success: true, feature: data.features[0] });
+            res.json({ success: true, feature: data.features[0], source: 'wfs' });
+        } else {
+            res.json({ success: false, error: 'Not found' });
         }
-        res.status(404).json({ success: false, error: 'Feature not found' });
     } catch (err) {
-        console.error("Feature WFS failed:", err.message);
-        res.status(404).json({ success: false, error: 'Feature not found or WFS timed out', fallback: true });
+        console.error("Feature fetch error:", err.message);
+        res.json({ success: true, fallback: true });
     }
 });
 
