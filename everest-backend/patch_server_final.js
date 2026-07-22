@@ -2,232 +2,153 @@ const fs = require('fs');
 
 let serverCode = fs.readFileSync('server.js', 'utf8');
 
-// 1. Fix Survey Route
-const surveyRouteOld = `app.get('/api/tngis/survey', async (req, res) => {
+// 1. Replace districts
+const distRegex = /app\.get\('\/api\/tngis\/districts', async \(req, res\) => \{[\s\S]*?res\.json\(\{ success: true, data: \["Dindigul", "Madurai", "Chennai"\] \}\);\s*\}\s*\}\);/;
+const newDistBlock = `app.get('/api/tngis/districts', (req, res) => {
     try {
-        const { taluk, village } = req.query;
-        if (!village) return res.status(400).json({ error: 'Village is required' });
-        
-        let lgdVillageCode = village;
-        if (taluk) {
-            const mappedCode = villageLgdMap.get(\`\${taluk}|\${village}\`);
-            if (mappedCode) lgdVillageCode = mappedCode;
-        }
-        
-        if (surveyCache[lgdVillageCode]) {
-            return res.json({ success: true, data: surveyCache[lgdVillageCode] });
-        }
-        
-        let cql = \`lgd_village_code='\${lgdVillageCode}'\`;
-        
-        // Use cadastral layer to fetch survey numbers
-        const data = await fetchTNGIS('cadastral_data_wms:view_cadastral', 'survey_number', cql);
-        if (data && data.features) {
-            const surveys = [...new Set(data.features.map(f => f.properties.survey_number).filter(Boolean))].sort((a,b) => {
-                const numA = parseInt(a, 10);
-                const numB = parseInt(b, 10);
-                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                return String(a).localeCompare(String(b));
-            });
-            surveyCache[lgdVillageCode] = surveys;
-            return res.json({ success: true, data: surveys });
-        }
-        res.json({ success: true, data: [] });
+        const districts = Object.keys(tnMasterDataset).sort();
+        return res.json({ success: true, data: districts });
     } catch (err) {
-        console.error("Survey WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: ["1A", "2B", "3C", "4D", "1", "2", "3", "4", "5"], fallback: true });
+        console.error("Districts error:", err.message);
+        res.json({ success: true, data: ["Dindigul", "Madurai", "Chennai"] });
     }
 });`;
+serverCode = serverCode.replace(distRegex, newDistBlock);
 
-const surveyRouteNew = `app.get('/api/tngis/survey', async (req, res) => {
+// 2. Replace taluks
+const talukRegex = /app\.get\('\/api\/tngis\/taluks', async \(req, res\) => \{[\s\S]*?res\.json\(\{ success: true, data: \["Nilakkottai", "Palani", "Kodaikanal"\] \}\);\s*\}\s*\}\);/;
+const newTalukBlock = `app.get('/api/tngis/taluks', (req, res) => {
     try {
-        const { taluk, village } = req.query;
-        if (!village) return res.status(400).json({ error: 'Village is required' });
+        const { district } = req.query;
+        if (!district) return res.status(400).json({ error: 'District is required' });
         
-        let lgdVillageCode = village;
-        if (taluk) {
-            const mappedCode = villageLgdMap.get(\`\${taluk}|\${village}\`);
-            if (mappedCode) lgdVillageCode = mappedCode;
+        if (tnMasterDataset[district]) {
+            const taluks = Object.keys(tnMasterDataset[district]).sort();
+            return res.json({ success: true, data: taluks });
         }
-        
-        if (surveyCache[lgdVillageCode]) {
-            return res.json({ success: true, data: surveyCache[lgdVillageCode] });
-        }
-        
-        // SQLite Fast Lookup
-        try {
-            const rows = await dbAll(\`SELECT DISTINCT survey_no FROM cadastral_parcels WHERE lgd_village_code = ?\`, [lgdVillageCode]);
-            if (rows && rows.length > 0) {
-                const surveys = rows.map(r => r.survey_no).sort((a,b) => {
-                    const numA = parseInt(a, 10);
-                    const numB = parseInt(b, 10);
-                    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                    return String(a).localeCompare(String(b));
-                });
-                surveyCache[lgdVillageCode] = surveys;
-                return res.json({ success: true, data: surveys, source: 'sqlite' });
-            }
-        } catch (dbErr) {
-            console.error("Survey SQLite failed:", dbErr.message);
-        }
-        
-        let cql = \`lgd_village_code='\${lgdVillageCode}'\`;
-        const data = await fetchTNGIS('cadastral_data_wms:view_cadastral', 'survey_number', cql);
-        if (data && data.features) {
-            const surveys = [...new Set(data.features.map(f => f.properties.survey_number).filter(Boolean))].sort((a,b) => {
-                const numA = parseInt(a, 10);
-                const numB = parseInt(b, 10);
-                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                return String(a).localeCompare(String(b));
-            });
-            surveyCache[lgdVillageCode] = surveys;
-            return res.json({ success: true, data: surveys });
-        }
-        res.json({ success: true, data: [] });
+        return res.json({ success: true, data: [] });
     } catch (err) {
-        console.error("Survey WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: ["1A", "2B", "3C", "4D", "1", "2", "3", "4", "5"], fallback: true });
+        console.error("Taluks error:", err.message);
+        res.json({ success: true, data: ["Nilakkottai", "Palani", "Kodaikanal"] });
     }
 });`;
+serverCode = serverCode.replace(talukRegex, newTalukBlock);
 
-serverCode = serverCode.replace(surveyRouteOld, surveyRouteNew);
-
-// 2. Fix Subdivision Route
-const subdivRouteOld = `app.get('/api/tngis/subdivisions', async (req, res) => {
+// 3. Replace villages
+const villRegex = /app\.get\('\/api\/tngis\/villages', async \(req, res\) => \{[\s\S]*?res\.json\(\{ success: true, data: \["Sevugampatti", "Pallapatti", "Ammainaickanur"\] \}\);\s*\}\s*\}\);/;
+const newVillBlock = `app.get('/api/tngis/villages', (req, res) => {
     try {
-        const { taluk, village, survey } = req.query;
-        if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
+        const { district, taluk } = req.query;
+        if (!taluk) return res.status(400).json({ error: 'Taluk is required' });
         
-        let lgdVillageCode = village;
-        if (taluk) {
-            const mappedCode = villageLgdMap.get(\`\${taluk}|\${village}\`);
-            if (mappedCode) lgdVillageCode = mappedCode;
-        }
-
-        const cacheKey = \`\${lgdVillageCode}_\${survey}\`;
-        if (subdivCache[cacheKey]) {
-            return res.json({ success: true, data: subdivCache[cacheKey] });
-        }
-
-        let cql = \`lgd_village_code='\${lgdVillageCode}' AND survey_number='\${survey}'\`;
-        
-        // Use cadastral view_fmb layer
-        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'sub_division', cql);
-        if (data && data.features) {
-            const subdivs = [...new Set(data.features.map(f => f.properties.sub_division).filter(Boolean))].sort();
-            subdivCache[cacheKey] = subdivs;
-            return res.json({ success: true, data: subdivs });
-        }
-        res.json({ success: true, data: [] });
-    } catch (err) {
-        console.error("Subdivisions WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: ["1A", "1B", "2A", "2B"], fallback: true });
-    }
-});`;
-
-const subdivRouteNew = `app.get('/api/tngis/subdivisions', async (req, res) => {
-    try {
-        const { taluk, village, survey } = req.query;
-        if (!village || !survey) return res.status(400).json({ error: 'Village and Survey are required' });
-        
-        let lgdVillageCode = village;
-        if (taluk) {
-            const mappedCode = villageLgdMap.get(\`\${taluk}|\${village}\`);
-            if (mappedCode) lgdVillageCode = mappedCode;
-        }
-
-        const cacheKey = \`\${lgdVillageCode}_\${survey}\`;
-        if (subdivCache[cacheKey]) {
-            return res.json({ success: true, data: subdivCache[cacheKey] });
-        }
-
-        // SQLite Fast Lookup
-        try {
-            const rows = await dbAll(\`SELECT DISTINCT sub_div_no FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ?\`, [lgdVillageCode, survey]);
-            if (rows && rows.length > 0) {
-                const subdivs = rows.map(r => r.sub_div_no).filter(Boolean).sort();
-                subdivCache[cacheKey] = subdivs;
-                return res.json({ success: true, data: subdivs, source: 'sqlite' });
-            }
-        } catch (dbErr) {
-            console.error("Subdivisions SQLite failed:", dbErr.message);
-        }
-
-        let cql = \`lgd_village_code='\${lgdVillageCode}' AND survey_number='\${survey}'\`;
-        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', 'sub_division', cql);
-        if (data && data.features) {
-            const subdivs = [...new Set(data.features.map(f => f.properties.sub_division).filter(Boolean))].sort();
-            subdivCache[cacheKey] = subdivs;
-            return res.json({ success: true, data: subdivs });
-        }
-        res.json({ success: true, data: [] });
-    } catch (err) {
-        console.error("Subdivisions WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: ["1A", "1B", "2A", "2B"], fallback: true });
-    }
-});`;
-
-serverCode = serverCode.replace(subdivRouteOld, subdivRouteNew);
-
-// 3. Fix Boundary Route
-const boundaryRouteOldRegex = /app\.get\('\/api\/tngis\/boundary', async \(req, res\) => \{[\s\S]*?res\.status\(404\)\.json\(\{ success: false, error: 'Boundary not found or WFS timed out', fallback: true \}\);\n    \}\n\}\);/;
-
-const boundaryRouteNew = `app.get('/api/tngis/boundary', async (req, res) => {
-    try {
-        const { level, district, taluk, village, survey, subdiv } = req.query;
-        if (!level) return res.status(400).json({ error: 'Level is required' });
-
-        let lgdVillageCode = village;
-        if (level === 'parcel' || level === 'village') {
-            if (taluk && village) {
-                const mappedCode = villageLgdMap.get(\`\${taluk}|\${village}\`);
-                if (mappedCode) lgdVillageCode = mappedCode;
-            }
-        }
-
-        try {
-            let row;
-            if (level === 'village' && lgdVillageCode) {
-                row = await dbGet(\`SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM administrative_boundaries WHERE level='village' AND lgd_code = ? LIMIT 1\`, [lgdVillageCode]);
-            } else if (level === 'district' && district) {
-                row = await dbGet(\`SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM administrative_boundaries WHERE level='district' AND name = ? LIMIT 1\`, [district]);
-            } else if (level === 'taluk' && taluk) {
-                row = await dbGet(\`SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM administrative_boundaries WHERE level='taluk' AND name = ? LIMIT 1\`, [taluk]);
-            } else if (level === 'parcel' && survey) {
-                if (subdiv) {
-                    row = await dbGet(\`SELECT geometry_geojson, bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ? AND sub_div_no = ? LIMIT 1\`, [lgdVillageCode, survey, subdiv]);
-                } else {
-                    row = await dbGet(\`SELECT geometry_geojson, bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ? LIMIT 1\`, [lgdVillageCode, survey]);
+        // district is optional if we search all, but let's assume valid structure
+        let villages = [];
+        if (district && tnMasterDataset[district] && tnMasterDataset[district][taluk]) {
+            villages = tnMasterDataset[district][taluk].map(v => v.name).sort();
+        } else {
+            // Find across all districts if district not explicitly matched (fallback)
+            for (let d in tnMasterDataset) {
+                if (tnMasterDataset[d][taluk]) {
+                    villages = tnMasterDataset[d][taluk].map(v => v.name).sort();
+                    break;
                 }
+            }
+        }
+        return res.json({ success: true, data: villages });
+    } catch (err) {
+        console.error("Villages error:", err.message);
+        res.json({ success: true, data: ["Sevugampatti", "Pallapatti", "Ammainaickanur"] });
+    }
+});`;
+serverCode = serverCode.replace(villRegex, newVillBlock);
+
+// 4. Replace feature boundary endpoint (to get bounding box and multipolygon)
+const featureRegex = /app\.get\('\/api\/tngis\/feature', async \(req, res\) => \{[\s\S]*?res\.json\(\{ success: true, fallback: true \}\);\s*\}\s*\}\);/;
+const newFeatureBlock = `app.get('/api/tngis/feature', async (req, res) => {
+    try {
+        const { village, survey, subdiv, taluk } = req.query;
+        if (!village || !survey) return res.status(400).json({ error: 'Village and survey required' });
+        
+        let lgdVillageCode = village;
+        if (taluk) {
+            const mappedCode = villageLgdMap.get(\`\${taluk}|\${village}\`);
+            if (mappedCode) lgdVillageCode = mappedCode;
+        }
+
+        // Fast SQLite lookup
+        try {
+            let query = 'SELECT bbox_min_x, bbox_min_y, bbox_max_x, bbox_max_y, geometry_geojson FROM cadastral_parcels WHERE lgd_village_code = ? AND survey_no = ?';
+            let params = [lgdVillageCode, survey];
+            if (subdiv) {
+                query += ' AND sub_div_no = ?';
+                params.push(subdiv);
             }
             
-            if (row) {
-                if (level === 'parcel' && row.geometry_geojson) {
-                    // Send actual parcel polygon + bbox
-                    return res.json({ success: true, feature: { type: 'Feature', geometry: JSON.parse(row.geometry_geojson), bbox: [row.bbox_min_x, row.bbox_min_y, row.bbox_max_x, row.bbox_max_y], properties: { name: survey } }, source: 'sqlite' });
-                } else if (row.bbox_min_x) {
-                    // Just send bbox for Admin levels so frontend doesn't draw an ugly square, but still zooms
-                    return res.json({ success: true, feature: { type: 'Feature', geometry: null, bbox: [row.bbox_min_x, row.bbox_min_y, row.bbox_max_x, row.bbox_max_y] }, source: 'sqlite' });
+            const rows = await dbAll(query, params);
+            if (rows && rows.length > 0) {
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                let features = [];
+                
+                rows.forEach(r => {
+                    if (r.bbox_min_x < minX) minX = r.bbox_min_x;
+                    if (r.bbox_min_y < minY) minY = r.bbox_min_y;
+                    if (r.bbox_max_x > maxX) maxX = r.bbox_max_x;
+                    if (r.bbox_max_y > maxY) maxY = r.bbox_max_y;
+                    if (r.geometry_geojson) {
+                        try {
+                            features.push(JSON.parse(r.geometry_geojson));
+                        } catch(e){}
+                    }
+                });
+                
+                // Construct a unified feature
+                let geom = null;
+                if (features.length === 1) {
+                    geom = features[0];
+                } else if (features.length > 1) {
+                    // Collect all polygon rings into a MultiPolygon
+                    let polys = [];
+                    features.forEach(f => {
+                        if (f.type === 'Polygon') polys.push(f.coordinates);
+                        else if (f.type === 'MultiPolygon') polys.push(...f.coordinates);
+                    });
+                    geom = { type: 'MultiPolygon', coordinates: polys };
                 }
+                
+                return res.json({
+                    success: true,
+                    feature: {
+                        type: "Feature",
+                        bbox: [minX, minY, maxX, maxY],
+                        geometry: geom,
+                        properties: { survey_no: survey, subdiv_no: subdiv }
+                    },
+                    source: 'sqlite'
+                });
             }
-        } catch (dbErr) {
-            console.error('Local SQLite boundary lookup failed:', dbErr.message);
+        } catch(dbErr) {
+            console.error('SQLite feature lookup error:', dbErr.message);
         }
-
-        // If not found in DB, do not fallback to WFS for admin levels since they return errors.
-        // Return a mock bbox if district/taluk so frontend won't crash
-        if (level === 'district') {
-             return res.json({ success: true, feature: { type: 'Feature', geometry: null, bbox: [8485240, 930870, 8953110, 1500000] }, source: 'mock' });
+        
+        // Fallback to WFS
+        let cql = \`lgd_village_code='\${lgdVillageCode}' AND survey_number='\${survey}'\`;
+        if (subdiv) cql += \` AND sub_division='\${subdiv}'\`;
+        
+        const data = await fetchTNGIS('cadastral_data_wms:view_fmb', null, cql);
+        if (data && data.features && data.features.length > 0) {
+            // WFS could return multiple features if subdiv is not specified. We'll just return the first one as fallback, or merge them.
+            // For simplicity, just return the exact first feature (fallback path).
+            res.json({ success: true, feature: data.features[0], source: 'wfs' });
+        } else {
+            res.json({ success: false, error: 'Not found' });
         }
-
-        res.status(404).json({ success: false, error: 'Boundary not found' });
     } catch (err) {
-        console.error('Boundary API failed:', err.message);
-        res.status(500).json({ success: false, error: 'Server error' });
+        console.error("Feature fetch error:", err.message);
+        res.json({ success: true, fallback: true });
     }
 });`;
 
-serverCode = serverCode.replace(boundaryRouteOldRegex, boundaryRouteNew);
+serverCode = serverCode.replace(featureRegex, newFeatureBlock);
 
 fs.writeFileSync('server.js', serverCode);
-console.log('server.js successfully patched!');
+console.log('Successfully patched server.js endpoints');

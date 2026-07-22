@@ -4958,16 +4958,31 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                    
                     {/* Progressive Yellow Highlight Polygon */}
                     {lsHighlightPoly && (
-                      <polygon 
-                        points={lsHighlightPoly.map(pt => `${pt.x},${pt.y}`).join(' ')} 
-                        fill="rgba(255, 255, 0, 0.2)" 
-                        stroke="#FFFF00" 
-                        strokeWidth={Math.max(cadViewport.width * 0.005, 3)} 
-                        vectorEffect="non-scaling-stroke"
-                        strokeLinejoin="round"
-                        pointerEvents="none"
-                      />
-                    )}
+                 Array.isArray(lsHighlightPoly[0]) ? (
+                     lsHighlightPoly.map((ring, idx) => (
+                         <polygon
+                             key={`map_hp_${idx}`}
+                             points={ring.map(p => `${p.x},${p.y}`).join(' ')}
+                             fill="rgba(255, 255, 0, 0.2)"
+                             stroke="#FFFF00"
+                             strokeWidth={Math.max(cadViewport.width * 0.005, 3)}
+                             vectorEffect="non-scaling-stroke"
+                             strokeLinejoin="round"
+                             pointerEvents="none"
+                         />
+                     ))
+                 ) : (
+                     <polygon 
+                         points={lsHighlightPoly.map(p => `${p.x},${p.y}`).join(' ')}
+                         fill="rgba(255, 255, 0, 0.2)"
+                         stroke="#FFFF00"
+                         strokeWidth={Math.max(cadViewport.width * 0.005, 3)}
+                         vectorEffect="non-scaling-stroke"
+                         strokeLinejoin="round"
+                         pointerEvents="none"
+                     />
+                 )
+             )}
                    
                      <g id="cad-drawing-layer">
                       {(cadBackgroundImage && isBackgroundImageVisible) && (
@@ -6602,7 +6617,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             {/* Dropdowns */}
             <select 
-              value={selDistrict} onChange={e => setSelDistrict(e.target.value)}
+              value={selDistrict} onChange={e => { setSelDistrict(e.target.value); setSelTaluk(''); setSelVillage(''); setSelSurvey(''); setSelSubdiv(''); setMapActionTrigger(Date.now()); }}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'districts' ? 'Loading Districts...' : 'Select District'}</option>
@@ -6610,7 +6625,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </select>
             
             <select 
-              value={selTaluk} onChange={e => setSelTaluk(e.target.value)}
+              value={selTaluk} onChange={e => { setSelTaluk(e.target.value); setSelVillage(''); setSelSurvey(''); setSelSubdiv(''); setMapActionTrigger(Date.now()); }}
               
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
