@@ -2,6 +2,7 @@ import React from 'react';
 import { flushSync } from 'react-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Geolocation } from '@capacitor/geolocation';
+import { area as turfArea } from '@turf/area';
 import { db } from '../firebase';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
@@ -537,6 +538,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [selSubdiv, setSelSubdiv] = React.useState('');
   const [lsLoading, setLsLoading] = React.useState('');
   const [lsHighlightPoly, setLsHighlightPoly] = React.useState(null);
+  const [mapSelectionArea, setMapSelectionArea] = React.useState(null);
   const [lsHighlightType, setLsHighlightType] = React.useState(null);
   
 const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
@@ -649,6 +651,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
         setLsHighlightPoly(null);
         setLsHighlightType(null);
         setCadSelectedPolygon(null);
+        setMapSelectionArea(null);
         try {
           let url = `${API_BASE}/api/tngis/boundary?level=${level}`;
           if (state.selDistrict) url += `&district=${encodeURIComponent(state.selDistrict)}`;
@@ -661,6 +664,24 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
           const data = await res.json();
           if (data.success && data.feature) {
               const geom = data.feature.geometry;
+              if (geom) {
+                  try {
+                      const computedSqM = turfArea(data.feature);
+                      const totalHectares = computedSqM / 10000;
+                      setMapSelectionArea({
+                          sqMeters: computedSqM,
+                          sqFt: computedSqM * 10.7639,
+                          hectare: totalHectares,
+                          are: totalHectares * 100,
+                          acre: computedSqM / 4046.86,
+                          cent: computedSqM / 40.4686
+                      });
+                  } catch (e) {
+                      console.error("Area calculation error:", e);
+                      setMapSelectionArea(null);
+                  }
+              }
+
               let coordinates = [];
               let allRings = [];
               if (geom && geom.type === 'Polygon') allRings.push(geom.coordinates[0]);
@@ -782,11 +803,30 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
         setLsHighlightPoly(null);
         setLsHighlightType(null);
         setCadSelectedPolygon(null);
+        setMapSelectionArea(null);
         try {
           const res = await fetch(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}` + (selSubdiv ? `&subdiv=${encodeURIComponent(selSubdiv)}` : ''));
           const data = await res.json();
           if (data.success && data.feature) {
               const geom = data.feature.geometry;
+              if (geom) {
+                  try {
+                      const computedSqM = turfArea(data.feature);
+                      const totalHectares = computedSqM / 10000;
+                      setMapSelectionArea({
+                          sqMeters: computedSqM,
+                          sqFt: computedSqM * 10.7639,
+                          hectare: totalHectares,
+                          are: totalHectares * 100,
+                          acre: computedSqM / 4046.86,
+                          cent: computedSqM / 40.4686
+                      });
+                  } catch (e) {
+                      console.error("Area calculation error:", e);
+                      setMapSelectionArea(null);
+                  }
+              }
+
               let coordinates = [];
               let allRings = [];
               if (geom && geom.type === 'Polygon') allRings.push(geom.coordinates[0]);
@@ -1622,6 +1662,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
        sqFt: sqMeters * 10.7639
     };
   }, [cadLines, cadScale, visibleCadPolygons, cadSelectedPolygon, cadMultiSelectMode, cadMultiSelectedPolygons, cadNodes, mapConfig]);
+
+  const activeArea = mapSelectionArea || cadComputedArea;
 
   const cadOpenNodes = React.useMemo(() => {
       if (visibleCadLines.length < 3) return [];
@@ -2832,8 +2874,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   const getHVal = () => cadComputedArea ? Math.floor(cadComputedArea.hectare) : (workspaceArea ? (parseInt(workspaceArea.h, 10) || 0) : 0);
   const getAVal = () => cadComputedArea ? cadComputedArea.are : (workspaceArea ? (parseFloat(workspaceArea.a) || 0) : 0);
-  const getSqm = () => cadComputedArea ? cadComputedArea.sqMeters.toFixed(2) : ( (getHVal() + (getAVal() / 100)) * 10000 ).toFixed(2);
-  const getSqft = () => cadComputedArea ? cadComputedArea.sqFt.toFixed(2) : ( (getHVal() + (getAVal() / 100)) * 107639.1 ).toFixed(2);
+  const getSqm = () => cadComputedArea ? activeArea.sqMeters.toFixed(2) : ( (getHVal() + (getAVal() / 100)) * 10000 ).toFixed(2);
+  const getSqft = () => cadComputedArea ? activeArea.sqFt.toFixed(2) : ( (getHVal() + (getAVal() / 100)) * 107639.1 ).toFixed(2);
 
   const handleSaveCalculations = async () => {
     if (!currentProjectId) return;
@@ -4261,11 +4303,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              <div className="flex justify-between items-center">
                                 <div className="flex-1 flex flex-col items-center border-r border-slate-200">
                                   <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Acre</span>
-                                  <span className="text-lg font-black text-slate-800">{cadComputedArea ? cadComputedArea.acre.toFixed(4) : calculatedLandArea.acre}</span>
+                                  <span className="text-lg font-black text-slate-800">{activeArea ? activeArea.acre.toFixed(4) : calculatedLandArea.acre}</span>
                                 </div>
                                 <div className="flex-1 flex flex-col items-center">
                                   <span className="text-emerald-600/80 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Cent</span>
-                                  <span className="text-xl font-black text-emerald-700">{cadComputedArea ? cadComputedArea.cent.toFixed(2) : calculatedLandArea.cent}</span>
+                                  <span className="text-xl font-black text-emerald-700">{activeArea ? activeArea.cent.toFixed(2) : calculatedLandArea.cent}</span>
                                 </div>
                               </div>
                            </div>
@@ -4562,13 +4604,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                <div className="bg-slate-800/90 backdrop-blur border-b border-r border-slate-700 w-[calc(100%-60px)] flex items-center shrink-0 shadow-sm z-[150] relative rounded-br-2xl">
                  <div className="flex-1 flex flex-col justify-center px-3 py-1.5 border-r border-slate-700/50 min-w-0">
                     <button onClick={() => { setIsAreaDropdownOpen(!isAreaDropdownOpen); setIsPerimeterDropdownOpen(false); }} className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-emerald-400 transition-colors outline-none leading-tight">
-                      <span>{cadComputedArea ? (
-                          selectedAreaUnit === 'Hectare' ? cadComputedArea.hectare.toFixed(4) :
-                          selectedAreaUnit === 'Ares' ? cadComputedArea.are.toFixed(4) :
-                          selectedAreaUnit === 'Acre' ? cadComputedArea.acre.toFixed(4) :
-                          selectedAreaUnit === 'Cent' ? cadComputedArea.cent.toFixed(2) :
-                          selectedAreaUnit === 'Sq. Ft' ? cadComputedArea.sqFt.toFixed(2) :
-                          selectedAreaUnit === 'Sq. M' ? cadComputedArea.sqMeters.toFixed(2) : '--'
+                      <span>{activeArea ? (
+                          selectedAreaUnit === 'Hectare' ? activeArea.hectare.toFixed(4) :
+                          selectedAreaUnit === 'Ares' ? activeArea.are.toFixed(4) :
+                          selectedAreaUnit === 'Acre' ? activeArea.acre.toFixed(4) :
+                          selectedAreaUnit === 'Cent' ? activeArea.cent.toFixed(2) :
+                          selectedAreaUnit === 'Sq. Ft' ? activeArea.sqFt.toFixed(2) :
+                          selectedAreaUnit === 'Sq. M' ? activeArea.sqMeters.toFixed(2) : '--'
                       ) : "--"}</span> <span className="text-[10px] text-slate-400 whitespace-nowrap">{selectedAreaUnit} ▼</span>
                     </button>
                     <button onClick={() => { setSelectedPerimeterUnit(selectedPerimeterUnit === 'Ft' ? 'M' : 'Ft'); setIsAreaDropdownOpen(false); }} className="flex items-center justify-between w-full text-slate-400 font-bold text-[10px] hover:text-fuchsia-400 transition-colors outline-none leading-tight mt-0.5">
@@ -5926,7 +5968,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                      );
                   })()}
                   {/* RED PULSING WARNING RINGS FOR UNCLOSED POLYGON GAPS */}
-                  {cadLines.length >= 3 && !cadComputedArea && cadOpenNodes.map((n, i) => (
+                  {cadLines.length >= 3 && !activeArea && cadOpenNodes.map((n, i) => (
                     <circle 
                       key={`open-${i}`} cx={n.x} cy={n.y} r={cadViewport.width * 0.015} 
                       fill="none" stroke="#ff0033" strokeWidth={cadViewport.width * 0.003} 
@@ -6508,7 +6550,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                  })()}
 
 
-            {cadComputedArea ? (
+            {activeArea ? (
                isPolygonAreaCardVisible ? (
                 <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="absolute bottom-[4.5rem] left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto animate-in slide-in-from-bottom-4">
                   <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1 gap-4">
@@ -6518,11 +6560,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                      </button>
                   </div>
                   <div className="font-mono text-xs text-white grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 whitespace-nowrap pointer-events-none">
-                    <span className="text-slate-400 text-left">Hectare:</span><span className="font-bold text-right">{cadComputedArea.hectare.toFixed(4)}</span>
-                    <span className="text-slate-400 text-left">Are:</span><span className="font-bold text-right">{cadComputedArea.are.toFixed(4)}</span>
-                    <span className="text-slate-400 text-left">Acre:</span><span className="font-bold text-right">{cadComputedArea.acre.toFixed(4)}</span>
-                    <span className="text-slate-400 text-left">Cent:</span><span className="font-bold text-right">{cadComputedArea.cent.toFixed(2)}</span>
-                    <span className="text-slate-400 text-left">Sq. Ft:</span><span className="font-bold text-right">{cadComputedArea.sqFt.toFixed(2)}</span>
+                    <span className="text-slate-400 text-left">Hectare:</span><span className="font-bold text-right">{activeArea.hectare.toFixed(4)}</span>
+                    <span className="text-slate-400 text-left">Are:</span><span className="font-bold text-right">{activeArea.are.toFixed(4)}</span>
+                    <span className="text-slate-400 text-left">Acre:</span><span className="font-bold text-right">{activeArea.acre.toFixed(4)}</span>
+                    <span className="text-slate-400 text-left">Cent:</span><span className="font-bold text-right">{activeArea.cent.toFixed(2)}</span>
+                    <span className="text-slate-400 text-left">Sq. Ft:</span><span className="font-bold text-right">{activeArea.sqFt.toFixed(2)}</span>
                   </div>
                 </div>
                ) : (

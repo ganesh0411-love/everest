@@ -22,6 +22,8 @@
     "@imgly/background-removal": "^1.7.0",
     "@ionic/pwa-elements": "^3.4.0",
     "@supabase/supabase-js": "^2.106.2",
+    "@turf/area": "^7.3.5",
+    "@turf/helpers": "^7.3.5",
     "firebase": "^12.14.0",
     "html2canvas": "^1.4.1",
     "jimp": "^1.6.1",
