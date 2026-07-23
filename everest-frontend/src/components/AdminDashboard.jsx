@@ -6829,32 +6829,32 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               {lsTaluks.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             
-            <select 
-              value={selVillage} onChange={e => (() => { setSelVillage(e.target.value); setSelSurvey(''); setSelSubdiv(''); setMapActionTrigger(Date.now()); })()}
-              
-              className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
-            >
-              <option value="">{lsLoading === 'villages' ? 'Loading Villages...' : 'Select Village'}</option>
-              {lsVillages.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
+            <SearchableDropdown
+              value={selVillage}
+              onChange={val => { setSelVillage(val); setSelSurvey(''); setSelSubdiv(''); if(val || val==='') setMapActionTrigger(Date.now()); }}
+              options={lsVillages}
+              placeholder="Select Village"
+              loadingText="Loading Villages..."
+              isLoading={lsLoading === 'villages'}
+            />
             
-            <select 
-              value={selSurvey} onChange={e => (() => { setSelSurvey(e.target.value); setMapActionTrigger(Date.now()); })()}
-              
-              className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
-            >
-              <option value="">{lsLoading === 'surveys' ? 'Loading Survey Numbers...' : 'Select Survey Number'}</option>
-              {lsSurveys.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <SearchableDropdown
+              value={selSurvey}
+              onChange={val => { setSelSurvey(val); if(val || val==='') setMapActionTrigger(Date.now()); }}
+              options={lsSurveys}
+              placeholder="Select Survey Number"
+              loadingText="Loading Survey Numbers..."
+              isLoading={lsLoading === 'surveys'}
+            />
             
-            <select 
-              value={selSubdiv} onChange={e => (() => { setSelSubdiv(e.target.value); setMapActionTrigger(Date.now()); })()}
-              
-              className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
-            >
-              <option value="">{lsLoading === 'subdivs' ? 'Loading Subdivisions...' : 'Select Subdivision Number (Optional)'}</option>
-              {lsSubdivs.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <SearchableDropdown
+              value={selSubdiv}
+              onChange={val => { setSelSubdiv(val); if(val || val==='') setMapActionTrigger(Date.now()); }}
+              options={lsSubdivs}
+              placeholder="Select Subdivision Number (Optional)"
+              loadingText="Loading Subdivisions..."
+              isLoading={lsLoading === 'subdivs'}
+            />
             
             <button
                onClick={executeFlyTo}
