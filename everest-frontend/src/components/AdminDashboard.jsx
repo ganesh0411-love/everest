@@ -3741,7 +3741,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                         <div style={{ transform: `translate(${fmbPanX}px, ${fmbPanY}px) scale(${fmbScale})`, transformOrigin: 'center', transition: fmbPanX === 0 && fmbPanY === 0 && fmbScale === 1 ? 'transform 0.2s ease-out' : 'none', width: '100%', height: '100%' }}>
                           <svg viewBox={`0 0 ${vWidth} ${vHeight}`} className="w-full h-full max-h-full drop-shadow-md">
                             {/* Progressive Yellow Highlight Polygon */}
-                            {lsHighlightPoly && (
+                    {(lsHighlightPoly && cadViewport.width <= 15000) && (
                  Array.isArray(lsHighlightPoly[0]) ? (
                      lsHighlightPoly.map((ring, idx) => (
                          <polygon
@@ -5005,7 +5005,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
                    
                     {/* Progressive Yellow Highlight Polygon */}
-                    {lsHighlightPoly && (
+                    {(lsHighlightPoly && cadViewport.width <= 15000) && (
                  Array.isArray(lsHighlightPoly[0]) ? (
                      lsHighlightPoly.map((ring, idx) => (
                          <polygon
