@@ -534,9 +534,9 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [selDistrict, setSelDistrict] = React.useState('');
   const [selTaluk, setSelTaluk] = React.useState('');
   const [selVillage, setSelVillage] = React.useState('');
-  const [selSurvey, setSelSurvey] = React.useState('');
+  const [selSurvey, setSelSurvey] = React.useState([]);
   const [mapActionTrigger, setMapActionTrigger] = React.useState(0);
-  const [selSubdiv, setSelSubdiv] = React.useState('');
+  const [selSubdiv, setSelSubdiv] = React.useState([]);
   const [lsLoading, setLsLoading] = React.useState('');
   const [lsHighlightPoly, setLsHighlightPoly] = React.useState(null);
   const [mapSelectionArea, setMapSelectionArea] = React.useState(null);
@@ -580,9 +580,9 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
           setLsTaluks([]);
           setSelVillage('');
           setLsVillages([]);
-          setSelSurvey('');
+          setSelSurvey([]);
           setLsSurveys([]);
-          setSelSubdiv('');
+          setSelSubdiv([]);
           setLsSubdivs([]);
       }
   }, [selDistrict]);
@@ -597,9 +597,9 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
             .finally(() => setLsLoading(''));
           setSelVillage('');
           setLsVillages([]);
-          setSelSurvey('');
+          setSelSurvey([]);
           setLsSurveys([]);
-          setSelSubdiv('');
+          setSelSubdiv([]);
           setLsSubdivs([]);
       }
   }, [selTaluk]);
@@ -607,9 +607,9 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   React.useEffect(() => {
       if (selVillage) {
           setLsLoading('surveys');
-          setSelSurvey('');
+          setSelSurvey([]);
           setLsSurveys([]);
-          setSelSubdiv('');
+          setSelSubdiv([]);
           setLsSubdivs([]);
           fetch(`${API_BASE}/api/tngis/survey?village=${encodeURIComponent(selVillage)}&taluk=${encodeURIComponent(selTaluk)}`)
             .then(res => res.json())
@@ -623,7 +623,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   React.useEffect(() => {
       if (selSurvey) {
           setLsLoading('subdivs');
-          setSelSubdiv('');
+          setSelSubdiv([]);
           setLsSubdivs([]);
           fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}`)
             .then(res => res.json())
@@ -5215,7 +5215,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                        <>
                            <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                            {isFMBEnabled && cadViewport.width <= 1000 && (
-                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={selSurvey} activeSubdiv={selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || !!selSurvey} />
+                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={Array.isArray(selSurvey) ? selSurvey.join(',') : selSurvey} activeSubdiv={Array.isArray(selSubdiv) ? selSubdiv.join(',') : selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || (selSurvey && selSurvey.length > 0)} />
                            )}
                            {isCadastralEnabled && cadViewport.width <= 5000 && (
                                <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
@@ -6238,7 +6238,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                               <>
                                   <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                                   {isFMBEnabled && cadViewport.width <= 1000 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={selSurvey} activeSubdiv={selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || !!selSurvey} />
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={Array.isArray(selSurvey) ? selSurvey.join(',') : selSurvey} activeSubdiv={Array.isArray(selSubdiv) ? selSubdiv.join(',') : selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || (selSurvey && selSurvey.length > 0)} />
                                   )}
                                   {isCadastralEnabled && cadViewport.width <= 5000 && (
                                       <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
@@ -6898,7 +6898,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             {/* Dropdowns */}
             <select 
-              value={selDistrict} onChange={e => { setSelDistrict(e.target.value); setSelTaluk(''); setSelVillage(''); setSelSurvey(''); setSelSubdiv(''); setMapActionTrigger(Date.now()); }}
+              value={selDistrict} onChange={e => { setSelDistrict(e.target.value); setSelTaluk(''); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); setMapActionTrigger(Date.now()); }}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'districts' ? 'Loading Districts...' : 'Select District'}</option>
@@ -6906,7 +6906,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </select>
             
             <select 
-              value={selTaluk} onChange={e => { setSelTaluk(e.target.value); setSelVillage(''); setSelSurvey(''); setSelSubdiv(''); setMapActionTrigger(Date.now()); }}
+              value={selTaluk} onChange={e => { setSelTaluk(e.target.value); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); setMapActionTrigger(Date.now()); }}
               
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
@@ -6916,7 +6916,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <SearchableDropdown
               value={selVillage}
-              onChange={val => { setSelVillage(val); setSelSurvey(''); setSelSubdiv(''); if(val || val==='') setMapActionTrigger(Date.now()); }}
+              onChange={val => { setSelVillage(val); setSelSurvey([]); setSelSubdiv([]); setMapActionTrigger(Date.now()); }}
               options={lsVillages}
               placeholder="Select Village"
               loadingText="Loading Villages..."
@@ -6943,7 +6943,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <button
                onClick={executeFlyTo}
-               disabled={!selVillage || !selSurvey || lsLoading === 'flyTo'}
+               disabled={!selVillage || !selSurvey || selSurvey.length === 0 || lsLoading === 'flyTo'}
                className="w-full mt-2 bg-green-500 hover:bg-green-400 disabled:bg-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md shadow-md transition-colors flex items-center justify-center gap-2"
             >
                {lsLoading === 'flyTo' ? (
