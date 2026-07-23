@@ -666,7 +666,26 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
               const geom = data.feature.geometry;
               if (geom) {
                   try {
-                      const computedSqM = turfArea(data.feature);
+                      const toWGS84Coords = (coords) => {
+                          if (!Array.isArray(coords)) return coords;
+                          if (typeof coords[0] === 'number') {
+                              const lon = coords[0] * 180 / 20037508.34;
+                              const lat = Math.atan(Math.exp(coords[1] * Math.PI / 20037508.34)) * 360 / Math.PI - 90;
+                              return [lon, lat];
+                          }
+                          return coords.map(toWGS84Coords);
+                      };
+                      
+                      const wgs84Feature = {
+                          type: 'Feature',
+                          geometry: {
+                              type: geom.type,
+                              coordinates: toWGS84Coords(geom.coordinates)
+                          },
+                          properties: {}
+                      };
+                      
+                      const computedSqM = turfArea(wgs84Feature);
                       const totalHectares = computedSqM / 10000;
                       setMapSelectionArea({
                           sqMeters: computedSqM,
@@ -811,7 +830,26 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
               const geom = data.feature.geometry;
               if (geom) {
                   try {
-                      const computedSqM = turfArea(data.feature);
+                      const toWGS84Coords = (coords) => {
+                          if (!Array.isArray(coords)) return coords;
+                          if (typeof coords[0] === 'number') {
+                              const lon = coords[0] * 180 / 20037508.34;
+                              const lat = Math.atan(Math.exp(coords[1] * Math.PI / 20037508.34)) * 360 / Math.PI - 90;
+                              return [lon, lat];
+                          }
+                          return coords.map(toWGS84Coords);
+                      };
+                      
+                      const wgs84Feature = {
+                          type: 'Feature',
+                          geometry: {
+                              type: geom.type,
+                              coordinates: toWGS84Coords(geom.coordinates)
+                          },
+                          properties: {}
+                      };
+                      
+                      const computedSqM = turfArea(wgs84Feature);
                       const totalHectares = computedSqM / 10000;
                       setMapSelectionArea({
                           sqMeters: computedSqM,
@@ -2874,8 +2912,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   const getHVal = () => cadComputedArea ? Math.floor(cadComputedArea.hectare) : (workspaceArea ? (parseInt(workspaceArea.h, 10) || 0) : 0);
   const getAVal = () => cadComputedArea ? cadComputedArea.are : (workspaceArea ? (parseFloat(workspaceArea.a) || 0) : 0);
-  const getSqm = () => cadComputedArea ? activeArea.sqMeters.toFixed(2) : ( (getHVal() + (getAVal() / 100)) * 10000 ).toFixed(2);
-  const getSqft = () => cadComputedArea ? activeArea.sqFt.toFixed(2) : ( (getHVal() + (getAVal() / 100)) * 107639.1 ).toFixed(2);
+  const getSqm = () => cadComputedArea ? activeArea.sqMeters.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ( (getHVal() + (getAVal() / 100)) * 10000 ).toFixed(2);
+  const getSqft = () => cadComputedArea ? activeArea.sqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ( (getHVal() + (getAVal() / 100)) * 107639.1 ).toFixed(2);
 
   const handleSaveCalculations = async () => {
     if (!currentProjectId) return;
@@ -4303,11 +4341,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              <div className="flex justify-between items-center">
                                 <div className="flex-1 flex flex-col items-center border-r border-slate-200">
                                   <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Acre</span>
-                                  <span className="text-lg font-black text-slate-800">{activeArea ? activeArea.acre.toFixed(4) : calculatedLandArea.acre}</span>
+                                  <span className="text-lg font-black text-slate-800">{activeArea ? activeArea.acre.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : calculatedLandArea.acre}</span>
                                 </div>
                                 <div className="flex-1 flex flex-col items-center">
                                   <span className="text-emerald-600/80 text-[9px] font-black uppercase tracking-wider mb-0.5">Total Cent</span>
-                                  <span className="text-xl font-black text-emerald-700">{activeArea ? activeArea.cent.toFixed(2) : calculatedLandArea.cent}</span>
+                                  <span className="text-xl font-black text-emerald-700">{activeArea ? activeArea.cent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : calculatedLandArea.cent}</span>
                                 </div>
                               </div>
                            </div>
@@ -4605,12 +4643,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                  <div className="flex-1 flex flex-col justify-center px-3 py-1.5 border-r border-slate-700/50 min-w-0">
                     <button onClick={() => { setIsAreaDropdownOpen(!isAreaDropdownOpen); setIsPerimeterDropdownOpen(false); }} className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-emerald-400 transition-colors outline-none leading-tight">
                       <span>{activeArea ? (
-                          selectedAreaUnit === 'Hectare' ? activeArea.hectare.toFixed(4) :
-                          selectedAreaUnit === 'Ares' ? activeArea.are.toFixed(4) :
-                          selectedAreaUnit === 'Acre' ? activeArea.acre.toFixed(4) :
-                          selectedAreaUnit === 'Cent' ? activeArea.cent.toFixed(2) :
-                          selectedAreaUnit === 'Sq. Ft' ? activeArea.sqFt.toFixed(2) :
-                          selectedAreaUnit === 'Sq. M' ? activeArea.sqMeters.toFixed(2) : '--'
+                          selectedAreaUnit === 'Hectare' ? activeArea.hectare.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) :
+                          selectedAreaUnit === 'Ares' ? activeArea.are.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) :
+                          selectedAreaUnit === 'Acre' ? activeArea.acre.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) :
+                          selectedAreaUnit === 'Cent' ? activeArea.cent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) :
+                          selectedAreaUnit === 'Sq. Ft' ? activeArea.sqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) :
+                          selectedAreaUnit === 'Sq. M' ? activeArea.sqMeters.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'
                       ) : "--"}</span> <span className="text-[10px] text-slate-400 whitespace-nowrap">{selectedAreaUnit} ▼</span>
                     </button>
                     <button onClick={() => { setSelectedPerimeterUnit(selectedPerimeterUnit === 'Ft' ? 'M' : 'Ft'); setIsAreaDropdownOpen(false); }} className="flex items-center justify-between w-full text-slate-400 font-bold text-[10px] hover:text-fuchsia-400 transition-colors outline-none leading-tight mt-0.5">
@@ -6560,11 +6598,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                      </button>
                   </div>
                   <div className="font-mono text-xs text-white grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 whitespace-nowrap pointer-events-none">
-                    <span className="text-slate-400 text-left">Hectare:</span><span className="font-bold text-right">{activeArea.hectare.toFixed(4)}</span>
-                    <span className="text-slate-400 text-left">Are:</span><span className="font-bold text-right">{activeArea.are.toFixed(4)}</span>
-                    <span className="text-slate-400 text-left">Acre:</span><span className="font-bold text-right">{activeArea.acre.toFixed(4)}</span>
-                    <span className="text-slate-400 text-left">Cent:</span><span className="font-bold text-right">{activeArea.cent.toFixed(2)}</span>
-                    <span className="text-slate-400 text-left">Sq. Ft:</span><span className="font-bold text-right">{activeArea.sqFt.toFixed(2)}</span>
+                    <span className="text-slate-400 text-left">Hectare:</span><span className="font-bold text-right">{activeArea.hectare.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-slate-400 text-left">Are:</span><span className="font-bold text-right">{activeArea.are.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-slate-400 text-left">Acre:</span><span className="font-bold text-right">{activeArea.acre.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-slate-400 text-left">Cent:</span><span className="font-bold text-right">{activeArea.cent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-slate-400 text-left">Sq. Ft:</span><span className="font-bold text-right">{activeArea.sqFt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
                ) : (
