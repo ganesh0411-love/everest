@@ -270,8 +270,15 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
             const mercMinY = baseMercY - (vY + vH);
             
             const bbox = `${mercMinX},${mercMinY},${mercMaxX},${mercMaxY}`;
-            const pxW = Math.min(2048, Math.round(window.innerWidth * 1.5));
-            const pxH = Math.min(2048, Math.round(window.innerHeight * 1.5));
+            const maxPx = Math.min(2048, Math.round(window.innerWidth * 1.5));
+            let pxW, pxH;
+            if (vW >= vH) {
+                pxW = maxPx;
+                pxH = Math.max(1, Math.round(maxPx * (vH / vW)));
+            } else {
+                pxH = maxPx;
+                pxW = Math.max(1, Math.round(maxPx * (vW / vH)));
+            }
             
             const textSymbolizer = labelProperty ? `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>${labelProperty}</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">11</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">${labelColor || strokeColor}</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>` : '';
             const sld = `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>${layerName}</Name><UserStyle><FeatureTypeStyle><Rule><LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer>${textSymbolizer}</Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
@@ -327,8 +334,15 @@ const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
             const mercMinY = baseMercY - (vY + vH);
             
             const bbox = `${mercMinX},${mercMinY},${mercMaxX},${mercMaxY}`;
-            const pxW = Math.min(2048, Math.round(window.innerWidth * 1.5));
-            const pxH = Math.min(2048, Math.round(window.innerHeight * 1.5));
+            const maxPx = Math.min(2048, Math.round(window.innerWidth * 1.5));
+            let pxW, pxH;
+            if (vW >= vH) {
+                pxW = maxPx;
+                pxH = Math.max(1, Math.round(maxPx * (vH / vW)));
+            } else {
+                pxH = maxPx;
+                pxW = Math.max(1, Math.round(maxPx * (vW / vH)));
+            }
             
             // Single bounding box request guarantees label deduplication at polygon centroid
             const textSymbolizer = `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>survey_number</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">11</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#FF0000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">#FFFF00</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>`;
