@@ -3545,13 +3545,17 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     setSelVillage('');
     setSelSurvey([]);
     setSelSubdiv([]);
+    setSurveySearchText('');
+    setSubDivSearchText('');
     setLsHighlightPoly(null);
     setLsHighlightType(null);
     setLandArea(0);
     setLandPerimeter(0);
     setCadSelectedPolygon(null);
     setCadMultiSelectedPolygons([]);
+    setMapSelectionArea(null);
     setIsPolygonAreaCardVisible(false);
+    setIsLandSearchModalOpen(false);
     setMapActionTrigger(Date.now());
 
     setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
@@ -3584,11 +3588,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             setCadScale(null);
         });
     
-    // Stop spinning after 1.2s (2-3 rotations)
+    // Stop spinning after 1.5s (2-3 rotations)
     setTimeout(() => {
         setIsRefreshing(false);
         setPullDistance(0);
-    }, 1200);
+    }, 1500);
   };
 
   const handleTouchStart = (e) => {
