@@ -577,15 +577,28 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                   });
                   const points = pointsList.flat();
                   
-                  const targetWidth = Math.max(maxX - minX, 100);
-                  const targetHeight = Math.max(maxY - minY, 100);
-                  const marginX = targetWidth * 0.2;
-                  const marginY = targetHeight * 0.2;
+                  const parcelWidth = maxX - minX;
+                  const parcelHeight = maxY - minY;
                   
-                  const tX = minX - marginX;
-                  const tY = minY - marginY;
-                  const tW = targetWidth + marginX * 2;
-                  const tH = targetHeight + marginY * 2;
+                  let viewW = Math.max(parcelWidth * 2.5, 400);
+                  let viewH = Math.max(parcelHeight * 2.5, 400);
+                  
+                  const screenRatio = window.innerWidth / window.innerHeight;
+                  const viewRatio = viewW / viewH;
+                  
+                  if (screenRatio > viewRatio) {
+                      viewW = viewH * screenRatio;
+                  } else {
+                      viewH = viewW / screenRatio;
+                  }
+                  
+                  const centerX = minX + parcelWidth / 2;
+                  const centerY = minY + parcelHeight / 2;
+                  
+                  const tX = centerX - viewW / 2;
+                  const tY = centerY - viewH / 2;
+                  const tW = viewW;
+                  const tH = viewH;
                   
                   const startX = (mapConfig.baseMercX === 0) ? tX : cadViewport.x;
                   const startY = (mapConfig.baseMercX === 0) ? tY : cadViewport.y;
@@ -688,15 +701,28 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                   const points = pointsList.flat();
                   
                   // Animate Pan and Zoom
-                  const targetWidth = Math.max(maxX - minX, 100); // Minimum 100px width
-                  const targetHeight = Math.max(maxY - minY, 100);
-                  const marginX = targetWidth * 0.2;
-                  const marginY = targetHeight * 0.2;
+                  const parcelWidth = maxX - minX;
+                  const parcelHeight = maxY - minY;
                   
-                  const tX = minX - marginX;
-                  const tY = minY - marginY;
-                  const tW = targetWidth + marginX * 2;
-                  const tH = targetHeight + marginY * 2;
+                  let viewW = Math.max(parcelWidth * 2.5, 400);
+                  let viewH = Math.max(parcelHeight * 2.5, 400);
+                  
+                  const screenRatio = window.innerWidth / window.innerHeight;
+                  const viewRatio = viewW / viewH;
+                  
+                  if (screenRatio > viewRatio) {
+                      viewW = viewH * screenRatio;
+                  } else {
+                      viewH = viewW / screenRatio;
+                  }
+                  
+                  const centerX = minX + parcelWidth / 2;
+                  const centerY = minY + parcelHeight / 2;
+                  
+                  const tX = centerX - viewW / 2;
+                  const tY = centerY - viewH / 2;
+                  const tW = viewW;
+                  const tH = viewH;
                   
                   const startX = (mapConfig.baseMercX === 0) ? tX : cadViewport.x;
                   const startY = (mapConfig.baseMercX === 0) ? tY : cadViewport.y;
