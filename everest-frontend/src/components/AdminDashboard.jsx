@@ -501,7 +501,7 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
       </div>
       
       {isOpen && (
-        <div className="absolute z-[600] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div className="relative z-[600] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((opt, idx) => {
               const isSelected = isMulti && Array.isArray(value) && value.includes(opt);
@@ -650,29 +650,40 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   // Fetch subdivs only when selSurvey changes
   React.useEffect(() => {
+      let active = true;
       if (selSurvey && selSurvey.length > 0) {
           setLsLoading('subdivs');
-          setSelSubdiv([]);
-          setLsSubdivs([]);
-          Promise.all(selSurvey.map(survey => 
+          
+          const fetchPromises = selSurvey.map(survey => 
             fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(survey)}&taluk=${encodeURIComponent(selTaluk)}`)
               .then(res => res.json())
-              .then(res => (res.data || []).map(subdiv => selSurvey.length > 1 ? `${subdiv} (${survey})` : subdiv))
+              .then(res => {
+                  const dataArr = res.data || [];
+                  return dataArr.map(subdiv => selSurvey.length > 1 ? `${subdiv} (${survey})` : subdiv);
+              })
               .catch(err => [])
-          ))
+          );
+
+          Promise.all(fetchPromises)
           .then(results => {
-              const combined = results.flat();
+              if (!active) return;
+              // flatMap aggregation to combine all survey subdivs
+              const combined = results.flatMap(x => x);
               setLsSubdivs([...new Set(combined)]);
           })
           .catch(err => {
+              if (!active) return;
               console.error("Error fetching subdivs:", err);
               setLsSubdivs([]);
           })
-          .finally(() => setLsLoading(''));
+          .finally(() => {
+              if (active) setLsLoading('');
+          });
       } else {
           setLsSubdivs([]);
       }
-  }, [selSurvey]);
+      return () => { active = false; };
+  }, [selSurvey, selVillage, selTaluk]);
 
   // Run highlight on mapActionTrigger
   React.useEffect(() => {
