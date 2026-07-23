@@ -345,8 +345,8 @@ const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
             }
             
             // Single bounding box request guarantees label deduplication at polygon centroid
-            const textSymbolizer = `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>survey_number</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">11</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#FF0000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">#FFFF00</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>`;
-            const sld = `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>cadastral_data_wms:view_cadastral</Name><UserStyle><FeatureTypeStyle><Rule><LineSymbolizer><Stroke><CssParameter name="stroke">#FF1493</CssParameter><CssParameter name="stroke-width">1</CssParameter></Stroke></LineSymbolizer>${textSymbolizer}</Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
+            const textSymbolizer = `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>survey_number</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">24</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#FF0000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">#FFFF00</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>`;
+            const sld = `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>cadastral_data_wms:view_cadastral</Name><UserStyle><FeatureTypeStyle><Rule><LineSymbolizer><Stroke><CssParameter name="stroke">#FF1493</CssParameter><CssParameter name="stroke-width">4</CssParameter></Stroke></LineSymbolizer>${textSymbolizer}</Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
             const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetMap&layers=cadastral_data_wms:view_cadastral&styles=&bbox=${bbox}&width=${pxW}&height=${pxH}&srs=EPSG:3857&format=image/png&transparent=true&format_options=text_antialias:on&sld_body=${encodeURIComponent(sld)}`;
             
             const id = Date.now();
@@ -4960,7 +4960,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                        <>
                            <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                            {isFMBEnabled && cadViewport.width <= 1000 && (
-                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1" labelProperty="sub_division" labelColor="#00FF00" />
+                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" />
                            )}
                            {isCadastralEnabled && cadViewport.width <= 5000 && (
                                <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
@@ -5979,7 +5979,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                               <>
                                   <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                                   {isFMBEnabled && cadViewport.width <= 1000 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1" labelProperty="sub_division" labelColor="#00FF00" />
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" />
                                   )}
                                   {isCadastralEnabled && cadViewport.width <= 5000 && (
                                       <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
