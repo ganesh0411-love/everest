@@ -1142,8 +1142,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   
   const [isFloatingStackExpanded, setIsFloatingStackExpanded] = React.useState(false);
   const [isPolygonAreaCardVisible, setIsPolygonAreaCardVisible] = React.useState(true);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const [pullDistance, setPullDistance] = React.useState(0);
 
   const [selectedAreaUnit, setSelectedAreaUnit] = React.useState('Ares');
   const [isAreaDropdownOpen, setIsAreaDropdownOpen] = React.useState(false);
@@ -3538,8 +3536,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   const pullStartRef = React.useRef(null);
 
   const resetAppState = () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
     setSelDistrict('');
     setSelTaluk('');
     setSelVillage('');
@@ -3587,18 +3583,9 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });
             setCadScale(null);
         });
-    
-    // Stop spinning after 1.5s (2-3 rotations)
-    setTimeout(() => {
-        setIsRefreshing(false);
-        setPullDistance(0);
-    }, 1500);
   };
 
   const handleTouchStart = (e) => {
-    if (e.currentTarget && e.currentTarget.scrollTop === 0) {
-      pullStartRef.current = e.touches[0].clientY;
-    }
     const touch = e.touches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
     const card = element?.closest('.interactive-card');
@@ -3610,17 +3597,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   const handleTouchMove = (e) => {
     const touch = e.touches[0];
-    if (pullStartRef.current !== null) {
-      const dist = touch.clientY - pullStartRef.current;
-      if (dist > 0) {
-        setPullDistance(dist);
-      }
-      if (dist > 120 && !isRefreshing) {
-        resetAppState();
-        pullStartRef.current = null;
-      }
-    }
-
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
     const card = element?.closest('.interactive-card');
     
@@ -3635,7 +3611,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   };
 
   const handleTouchEnd = () => {
-    pullStartRef.current = null;
     if (currentTouchCardRef.current) {
       currentTouchCardRef.current.classList.remove('touch-boom');
       currentTouchCardRef.current = null;
@@ -3644,28 +3619,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   return (
     <div 
-      className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto relative"
+      className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
     >
-      {/* Pull to refresh loader */}
-      {pullDistance > 0 && (
-        <div 
-          className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center bg-white rounded-full shadow-lg text-slate-800 transition-all duration-200"
-          style={{ 
-            top: `${Math.min(pullDistance - 40, 40)}px`, 
-            width: '40px', height: '40px',
-            opacity: Math.min(pullDistance / 100, 1),
-            transform: `translateX(-50%) rotate(${pullDistance * 2}deg)`
-          }}
-        >
-          <svg className={`w-6 h-6 ${isRefreshing ? 'animate-spin text-fuchsia-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </div>
-      )}
       {/* Total Collections Progress */}
       <div className={`bg-white rounded-xl p-3 mb-3 ${cardShadowClass}`}>
         <div className="flex justify-between items-center text-[11px] font-bold mb-1">
@@ -4751,12 +4710,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                        e.stopPropagation();
                        resetAppState();
                      }}
-                     className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors"
+                     className="px-3 py-1.5 bg-slate-800 text-xs font-bold text-slate-300 rounded-lg hover:bg-slate-700 hover:text-white uppercase tracking-wider transition-colors border border-slate-700"
                      title="Refresh/Reset"
                    >
-                     <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isRefreshing ? 'animate-spin text-fuchsia-500' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                     </svg>
+                     Refresh
                    </button>
                    <button 
                      onClick={() => setShowDarkDrawSettings(!showDarkDrawSettings)}
