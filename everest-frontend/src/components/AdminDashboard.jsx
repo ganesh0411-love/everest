@@ -3755,19 +3755,21 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                          <polygon
                              key={`hp_${idx}`}
                              points={ring.map(p => `${p.x},${p.y}`).join(' ')}
-                             fill="rgba(255, 255, 0, 0.3)"
+                             fill="transparent"
                              stroke="#FFD700"
-                             strokeWidth={cadViewport.width / 400}
+                             strokeWidth="4"
+                             vectorEffect="non-scaling-stroke"
                              style={{ pointerEvents: 'none' }}
                          />
                      ))
                  ) : (
                      <polygon 
                          points={lsHighlightPoly.map(p => `${p.x},${p.y}`).join(' ')}
-                         fill="rgba(255, 255, 0, 0.3)"
-                         stroke="#FFD700"
-                         strokeWidth={cadViewport.width / 400}
-                         style={{ pointerEvents: 'none' }}
+                         fill="transparent"
+                             stroke="#FFD700"
+                             strokeWidth="4"
+                             vectorEffect="non-scaling-stroke"
+                             style={{ pointerEvents: 'none' }}
                      />
                  )
              )}
@@ -5023,9 +5025,9 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                          <polygon
                              key={`map_hp_${idx}`}
                              points={ring.map(p => `${p.x},${p.y}`).join(' ')}
-                             fill="rgba(255, 255, 0, 0.2)"
-                             stroke="#FFFF00"
-                             strokeWidth={Math.max(cadViewport.width * 0.005, 3)}
+                             fill="transparent"
+                             stroke="#FFD700"
+                             strokeWidth="4"
                              vectorEffect="non-scaling-stroke"
                              strokeLinejoin="round"
                              pointerEvents="none"
@@ -5034,9 +5036,9 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                  ) : (
                      <polygon 
                          points={lsHighlightPoly.map(p => `${p.x},${p.y}`).join(' ')}
-                         fill="rgba(255, 255, 0, 0.2)"
-                         stroke="#FFFF00"
-                         strokeWidth={Math.max(cadViewport.width * 0.005, 3)}
+                         fill="transparent"
+                             stroke="#FFD700"
+                             strokeWidth="4"
                          vectorEffect="non-scaling-stroke"
                          strokeLinejoin="round"
                          pointerEvents="none"
