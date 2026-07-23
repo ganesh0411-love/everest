@@ -435,7 +435,7 @@ const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
 };
 
 
-const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText, isLoading, isMulti }) => {
+const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText, isLoading, isMulti, flyUp }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const wrapperRef = React.useRef(null);
@@ -501,7 +501,7 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
       </div>
       
       {isOpen && (
-        <div className="relative z-[600] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div className={`absolute z-[600] w-full bg-white border border-slate-200 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.1)] overflow-y-auto ${flyUp ? 'bottom-[105%] mb-1' : 'top-[105%] mt-1'}`} style={{ maxHeight: '220px' }}>
           {filteredOptions.length > 0 ? (
             <>
               {isMulti && (
@@ -5245,12 +5245,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               >
               {/* TOP-LEFT CONTROLS */}
               <div className="absolute top-6 left-6 z-[150] flex flex-col gap-4 pointer-events-none">
-                  <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(true); }} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto">
+                  <button className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                   </button>
-                  <button className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto">
+                  <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(!isLandSearchModalOpen); }} className={`w-10 h-10 rounded-full text-white shadow-lg border flex items-center justify-center transition-colors pointer-events-auto ${isLandSearchModalOpen ? 'bg-blue-600 border-blue-400' : 'bg-slate-800/80 border-slate-600 hover:bg-slate-700'}`}>
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                       </svg>
@@ -7092,11 +7092,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       {/* LAND SEARCH MODAL (TAMIL NILAM MATCH) */}
       {isLandSearchModalOpen && (
         <div 
-          className="fixed inset-0 z-[500] flex items-start justify-center pt-32 px-4 pointer-events-auto bg-slate-900/60 backdrop-blur-sm"
-          onClick={() => setIsLandSearchModalOpen(false)}
+          className="fixed left-20 top-24 z-[500] pointer-events-none"
         >
           <div 
-            className="bg-[#1e3a8a] rounded-xl shadow-2xl p-4 w-full max-w-sm flex flex-col gap-3 relative animate-in fade-in zoom-in-95 duration-200 border border-blue-800"
+            className="bg-[#1e3a8a] rounded-xl shadow-2xl p-4 w-[340px] flex flex-col gap-3 relative animate-in slide-in-from-left-4 duration-300 border border-blue-800 pointer-events-auto"
             onClick={e => e.stopPropagation()}
           >
             {/* Red Close Button */}
@@ -7146,6 +7145,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               loadingText="Loading Survey Numbers..."
               isLoading={lsLoading === 'surveys'}
               isMulti={true}
+              flyUp={true}
             />
             
             <SearchableDropdown
@@ -7156,6 +7156,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               loadingText="Loading Subdivisions..."
               isLoading={lsLoading === 'subdivs'}
               isMulti={true}
+              flyUp={true}
             />
             
             <button
