@@ -411,6 +411,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [selSubdiv, setSelSubdiv] = React.useState('');
   const [lsLoading, setLsLoading] = React.useState('');
   const [lsHighlightPoly, setLsHighlightPoly] = React.useState(null);
+  const [lsHighlightType, setLsHighlightType] = React.useState(null);
   
 const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
@@ -520,6 +521,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
 
   const fetchAndHighlight = async (level, state) => {
         setLsHighlightPoly(null);
+        setLsHighlightType(null);
         setCadSelectedPolygon(null);
         try {
           let url = `${API_BASE}/api/tngis/boundary?level=${level}`;
@@ -631,8 +633,8 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       if (t < 1) {
                           requestAnimationFrame(animate);
                       } else {
-                          if (geom) setLsHighlightPoly(pointsList || points);
-                          else setLsHighlightPoly(null);
+                          if (geom) { setLsHighlightPoly(pointsList || points);
+                          setLsHighlightType(selSubdiv ? 'subdiv' : 'survey'); setLsHighlightType(level); } else { setLsHighlightPoly(null); setLsHighlightType(null); }
         setCadSelectedPolygon(null);
                       }
                   };
@@ -648,6 +650,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
         if (!selVillage || !selSurvey) return;
         setLsLoading('flyTo');
         setLsHighlightPoly(null);
+        setLsHighlightType(null);
         setCadSelectedPolygon(null);
         try {
           const res = await fetch(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(selSurvey)}&taluk=${encodeURIComponent(selTaluk)}` + (selSubdiv ? `&subdiv=${encodeURIComponent(selSubdiv)}` : ''));
@@ -756,6 +759,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       } else {
                           // Flash highlight polygon
                           setLsHighlightPoly(pointsList || points);
+                          setLsHighlightType(selSubdiv ? 'subdiv' : 'survey');
                       }
                   };
                   requestAnimationFrame(animate);
@@ -3741,7 +3745,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                         <div style={{ transform: `translate(${fmbPanX}px, ${fmbPanY}px) scale(${fmbScale})`, transformOrigin: 'center', transition: fmbPanX === 0 && fmbPanY === 0 && fmbScale === 1 ? 'transform 0.2s ease-out' : 'none', width: '100%', height: '100%' }}>
                           <svg viewBox={`0 0 ${vWidth} ${vHeight}`} className="w-full h-full max-h-full drop-shadow-md">
                             {/* Progressive Yellow Highlight Polygon */}
-                    {(lsHighlightPoly && cadViewport.width <= 15000) && (
+                    {(lsHighlightPoly && (
+        (lsHighlightType === 'subdiv' && cadViewport.width <= 1000) ||
+        ((lsHighlightType === 'survey' || lsHighlightType === 'parcel') && cadViewport.width <= 5000) ||
+        (lsHighlightType !== 'subdiv' && lsHighlightType !== 'survey' && lsHighlightType !== 'parcel' && cadViewport.width <= 15000)
+    )) && (
                  Array.isArray(lsHighlightPoly[0]) ? (
                      lsHighlightPoly.map((ring, idx) => (
                          <polygon
@@ -5005,7 +5013,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
                    
                     {/* Progressive Yellow Highlight Polygon */}
-                    {(lsHighlightPoly && cadViewport.width <= 15000) && (
+                    {(lsHighlightPoly && (
+        (lsHighlightType === 'subdiv' && cadViewport.width <= 1000) ||
+        ((lsHighlightType === 'survey' || lsHighlightType === 'parcel') && cadViewport.width <= 5000) ||
+        (lsHighlightType !== 'subdiv' && lsHighlightType !== 'survey' && lsHighlightType !== 'parcel' && cadViewport.width <= 15000)
+    )) && (
                  Array.isArray(lsHighlightPoly[0]) ? (
                      lsHighlightPoly.map((ring, idx) => (
                          <polygon
