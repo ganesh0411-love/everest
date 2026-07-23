@@ -3553,7 +3553,25 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     setIsPolygonAreaCardVisible(false);
     setIsLandSearchModalOpen(false);
     setMapActionTrigger(Date.now());
+    
+    // Purge ALL CAD layers to ensure no polygons or metrics persist
+    setCadPolygons([]);
+    setCadLines([]);
+    setCadCircles([]);
+    setCadSurveys([]);
+    setCadTexts([]);
+    setCadActiveSurveyId(null);
+    setCadHistory({ past: [], future: [] });
+    setCadLoadedProjectId(null);
+    setCadHoveredNode(null);
+    setCadSelectedNode(null);
+    setCadSelectedLine(null);
+    setCadSelectedCircle(null);
+    setCadSelectedText(null);
+    setCadSelectedMetric(null);
+    setCadMultiSelectMode(false);
 
+    // Force Fly-to Current Location
     setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
     Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
         .then(position => {
@@ -3563,19 +3581,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             const baseMercX = R * (lon * Math.PI / 180);
             const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
             
-            setMapConfig(prev => {
-                if (prev.baseMercX !== 0) {
-                    const targetX = baseMercX - prev.baseMercX;
-                    const targetY = prev.baseMercY - baseMercY;
-                    setUserLocationMarker({ x: targetX, y: targetY });
-                    setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
-                    return { ...prev, active: true, isLoading: false, baseLat: lat };
-                } else {
-                    setUserLocationMarker({ x: 0, y: 0 });
-                    setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
-                    return { active: true, isLoading: false, baseMercX, baseMercY, baseLat: lat };
-                }
-            });
+            // Instantly pan map to user's live physical location
+            setUserLocationMarker({ x: 0, y: 0 });
+            setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
+            setMapConfig(prev => ({ ...prev, active: true, isLoading: false, baseMercX, baseMercY, baseLat: lat }));
         })
         .catch(e => {
             console.error("GPS Failed during refresh: ", e);
