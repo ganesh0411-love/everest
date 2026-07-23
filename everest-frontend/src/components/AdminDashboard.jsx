@@ -455,7 +455,7 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [value]);
 
-  const filteredOptions = options.filter(opt => opt && String(opt).toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredOptions = (options || []).filter(opt => opt && String(opt).toLowerCase().includes(String(searchTerm || '').toLowerCase()));
 
   return (
     <div className="relative w-full" ref={wrapperRef}>
