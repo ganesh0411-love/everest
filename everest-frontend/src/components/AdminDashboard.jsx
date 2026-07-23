@@ -1142,6 +1142,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   
   const [isFloatingStackExpanded, setIsFloatingStackExpanded] = React.useState(false);
   const [isPolygonAreaCardVisible, setIsPolygonAreaCardVisible] = React.useState(true);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [pullDistance, setPullDistance] = React.useState(0);
 
   const [selectedAreaUnit, setSelectedAreaUnit] = React.useState('Ares');
   const [isAreaDropdownOpen, setIsAreaDropdownOpen] = React.useState(false);
@@ -3533,9 +3535,67 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   // Ref to track currently hovered element during touch drag
   const currentTouchCardRef = React.useRef(null);
+  const pullStartRef = React.useRef(null);
+
+  const resetAppState = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setSelDistrict('');
+    setSelTaluk('');
+    setSelVillage('');
+    setSelSurvey([]);
+    setSelSubdiv([]);
+    setLsHighlightPoly(null);
+    setLsHighlightType(null);
+    setLandArea(0);
+    setLandPerimeter(0);
+    setCadSelectedPolygon(null);
+    setCadMultiSelectedPolygons([]);
+    setIsPolygonAreaCardVisible(false);
+    setMapActionTrigger(Date.now());
+
+    setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
+    try {
+        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const R = 6378137;
+        const baseMercX = R * (lon * Math.PI / 180);
+        const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+        
+        setMapConfig(prev => {
+            if (prev.baseMercX !== 0) {
+                const targetX = baseMercX - prev.baseMercX;
+                const targetY = prev.baseMercY - baseMercY;
+                setUserLocationMarker({ x: targetX, y: targetY });
+                setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
+                return { ...prev, active: true, isLoading: false, baseLat: lat };
+            } else {
+                setUserLocationMarker({ x: 0, y: 0 });
+                setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
+                return { active: true, isLoading: false, baseMercX, baseMercY, baseLat: lat };
+            }
+        });
+    } catch (e) {
+        console.error("GPS Failed during refresh: ", e);
+        setMapConfig(prev => ({ ...prev, active: false, isLoading: false }));
+        setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });
+        setCadScale(null);
+    }
+    
+    setTimeout(() => {
+        setIsRefreshing(false);
+        setPullDistance(0);
+    }, 800);
+  };
 
   const handleTouchStart = (e) => {
-    const card = e.target.closest('.interactive-card');
+    if (e.currentTarget && e.currentTarget.scrollTop === 0) {
+      pullStartRef.current = e.touches[0].clientY;
+    }
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const card = element?.closest('.interactive-card');
     if (card) {
       card.classList.add('touch-boom');
       currentTouchCardRef.current = card;
@@ -3544,6 +3604,17 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   const handleTouchMove = (e) => {
     const touch = e.touches[0];
+    if (pullStartRef.current !== null) {
+      const dist = touch.clientY - pullStartRef.current;
+      if (dist > 0) {
+        setPullDistance(dist);
+      }
+      if (dist > 120 && !isRefreshing) {
+        resetAppState();
+        pullStartRef.current = null;
+      }
+    }
+
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
     const card = element?.closest('.interactive-card');
     
@@ -3558,6 +3629,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   };
 
   const handleTouchEnd = () => {
+    pullStartRef.current = null;
     if (currentTouchCardRef.current) {
       currentTouchCardRef.current.classList.remove('touch-boom');
       currentTouchCardRef.current = null;
@@ -3566,12 +3638,28 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   return (
     <div 
-      className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto"
+      className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto relative"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
     >
+      {/* Pull to refresh loader */}
+      {pullDistance > 0 && (
+        <div 
+          className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center bg-white rounded-full shadow-lg text-slate-800 transition-all duration-200"
+          style={{ 
+            top: `${Math.min(pullDistance - 40, 40)}px`, 
+            width: '40px', height: '40px',
+            opacity: Math.min(pullDistance / 100, 1),
+            transform: `translateX(-50%) rotate(${pullDistance * 2}deg)`
+          }}
+        >
+          <svg className={`w-6 h-6 ${isRefreshing ? 'animate-spin text-fuchsia-600' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </div>
+      )}
       {/* Total Collections Progress */}
       <div className={`bg-white rounded-xl p-3 mb-3 ${cardShadowClass}`}>
         <div className="flex justify-between items-center text-[11px] font-bold mb-1">
@@ -4651,7 +4739,19 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     </div>
                  </div>
                  
-                 <div className="relative">
+                 <div className="relative flex items-center gap-2">
+                   <button 
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       resetAppState();
+                     }}
+                     className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors"
+                     title="Refresh/Reset"
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isRefreshing ? 'animate-spin text-fuchsia-500' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                     </svg>
+                   </button>
                    <button 
                      onClick={() => setShowDarkDrawSettings(!showDarkDrawSettings)}
                      className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors"
