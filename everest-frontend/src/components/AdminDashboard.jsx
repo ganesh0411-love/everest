@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Geolocation } from '@capacitor/geolocation';
 import { area as turfArea } from '@turf/area';
+import { length as turfLength } from '@turf/length';
 import { db } from '../firebase';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
@@ -686,6 +687,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       };
                       
                       const computedSqM = turfArea(wgs84Feature);
+                      const computedPerimeter = turfLength(wgs84Feature, { units: 'meters' });
                       const totalHectares = computedSqM / 10000;
                       setMapSelectionArea({
                           sqMeters: computedSqM,
@@ -693,7 +695,8 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                           hectare: totalHectares,
                           are: totalHectares * 100,
                           acre: computedSqM / 4046.86,
-                          cent: computedSqM / 40.4686
+                          cent: computedSqM / 40.4686,
+                          perimeterMeters: computedPerimeter
                       });
                   } catch (e) {
                       console.error("Area calculation error:", e);
@@ -850,6 +853,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       };
                       
                       const computedSqM = turfArea(wgs84Feature);
+                      const computedPerimeter = turfLength(wgs84Feature, { units: 'meters' });
                       const totalHectares = computedSqM / 10000;
                       setMapSelectionArea({
                           sqMeters: computedSqM,
@@ -857,7 +861,8 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                           hectare: totalHectares,
                           are: totalHectares * 100,
                           acre: computedSqM / 4046.86,
-                          cent: computedSqM / 40.4686
+                          cent: computedSqM / 40.4686,
+                          perimeterMeters: computedPerimeter
                       });
                   } catch (e) {
                       console.error("Area calculation error:", e);
