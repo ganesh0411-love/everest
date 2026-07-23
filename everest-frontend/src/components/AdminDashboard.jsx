@@ -508,9 +508,10 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
               return (
                 <div 
                   key={idx} 
-                  className={`px-4 py-2 text-sm cursor-pointer hover:bg-blue-100 ${isSelected || value === opt ? 'bg-blue-50 font-bold text-blue-700' : 'text-slate-700'} flex items-center gap-2`}
+                  className={`px-4 py-2 text-sm cursor-pointer hover:bg-blue-100 ${isSelected || value === opt ? 'bg-blue-50 font-bold text-blue-700' : 'text-slate-700'} flex items-center justify-between gap-2`}
                   onClick={() => handleSelect(opt)}
                 >
+                  <span className="truncate">{opt}</span>
                   {isMulti && (
                     <input 
                       type="checkbox" 
@@ -519,7 +520,6 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
                       className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                     />
                   )}
-                  <span className="truncate">{opt}</span>
                 </div>
               );
             })
@@ -7042,6 +7042,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               placeholder="Select Survey Number"
               loadingText="Loading Survey Numbers..."
               isLoading={lsLoading === 'surveys'}
+              isMulti={true}
             />
             
             <SearchableDropdown
@@ -7051,6 +7052,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               placeholder="Select Subdivision Number (Optional)"
               loadingText="Loading Subdivisions..."
               isLoading={lsLoading === 'subdivs'}
+              isMulti={true}
             />
             
             <button
