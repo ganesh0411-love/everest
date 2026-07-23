@@ -251,7 +251,7 @@ const WMSDynamicImage = React.memo(({ x, y, w, h, url, loaded, onLoad }) => {
     );
 });
 
-const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, opacity = 1, labelProperty = null, labelColor = null, activeVillage = null, activeSurvey = null, isHighlightSubdiv = false }) => {
+const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, opacity = 1, labelProperty = null, labelColor = null, activeVillage = null, activeSurvey = null, activeSubdiv = null, isHighlightSubdiv = false }) => {
     if (!baseMercX) return null;
     const [wmsViewports, setWmsViewports] = React.useState([]);
 
@@ -287,20 +287,45 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
             let ruleContent = `<Rule><LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer>${textSymbolizer}</Rule>`;
 
             if (isHighlightSubdiv && activeSurvey) {
-                ruleContent = `<Rule>
-                    <ogc:Filter>
-                        <ogc:PropertyIsEqualTo><ogc:PropertyName>survey_number</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsEqualTo>
-                    </ogc:Filter>
-                    <LineSymbolizer><Stroke><CssParameter name="stroke">#FFFF00</CssParameter><CssParameter name="stroke-width">3</CssParameter></Stroke></LineSymbolizer>
-                    ${highlightTextSymbolizer}
-                </Rule>
-                <Rule>
-                    <ogc:Filter>
-                        <ogc:PropertyIsNotEqualTo><ogc:PropertyName>survey_number</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsNotEqualTo>
-                    </ogc:Filter>
-                    <LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer>
-                    ${textSymbolizer}
-                </Rule>`;
+                if (activeSubdiv && activeSubdiv !== 'All') {
+                    ruleContent = `<Rule>
+                        <ogc:Filter>
+                            <ogc:And>
+                                <ogc:PropertyIsEqualTo><ogc:PropertyName>survey_number</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsEqualTo>
+                                <ogc:PropertyIsEqualTo><ogc:PropertyName>sub_division</ogc:PropertyName><ogc:Literal>${activeSubdiv}</ogc:Literal></ogc:PropertyIsEqualTo>
+                            </ogc:And>
+                        </ogc:Filter>
+                        <LineSymbolizer><Stroke><CssParameter name="stroke">#FFFF00</CssParameter><CssParameter name="stroke-width">3</CssParameter></Stroke></LineSymbolizer>
+                        ${highlightTextSymbolizer}
+                    </Rule>
+                    <Rule>
+                        <ogc:Filter>
+                            <ogc:Not>
+                                <ogc:And>
+                                    <ogc:PropertyIsEqualTo><ogc:PropertyName>survey_number</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsEqualTo>
+                                    <ogc:PropertyIsEqualTo><ogc:PropertyName>sub_division</ogc:PropertyName><ogc:Literal>${activeSubdiv}</ogc:Literal></ogc:PropertyIsEqualTo>
+                                </ogc:And>
+                            </ogc:Not>
+                        </ogc:Filter>
+                        <LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer>
+                        ${textSymbolizer}
+                    </Rule>`;
+                } else {
+                    ruleContent = `<Rule>
+                        <ogc:Filter>
+                            <ogc:PropertyIsEqualTo><ogc:PropertyName>survey_number</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsEqualTo>
+                        </ogc:Filter>
+                        <LineSymbolizer><Stroke><CssParameter name="stroke">#FFFF00</CssParameter><CssParameter name="stroke-width">3</CssParameter></Stroke></LineSymbolizer>
+                        ${highlightTextSymbolizer}
+                    </Rule>
+                    <Rule>
+                        <ogc:Filter>
+                            <ogc:PropertyIsNotEqualTo><ogc:PropertyName>survey_number</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsNotEqualTo>
+                        </ogc:Filter>
+                        <LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer>
+                        ${textSymbolizer}
+                    </Rule>`;
+                }
             }
 
             const sld = `<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc"><NamedLayer><Name>${layerName}</Name><UserStyle><FeatureTypeStyle>${ruleContent}</FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
@@ -314,7 +339,7 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
         }, 400);
         
         return () => clearTimeout(timer);
-    }, [viewport.x, viewport.y, viewport.width, viewport.height, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, activeVillage, activeSurvey, isHighlightSubdiv]);
+    }, [viewport.x, viewport.y, viewport.width, viewport.height, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, activeVillage, activeSurvey, activeSubdiv, isHighlightSubdiv]);
 
     return (
         <g opacity={opacity} pointerEvents="none">
@@ -5018,7 +5043,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                        <>
                            <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                            {isFMBEnabled && cadViewport.width <= 1000 && (
-                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={selSurvey} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || !!selSurvey} />
+                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={selSurvey} activeSubdiv={selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || !!selSurvey} />
                            )}
                            {isCadastralEnabled && cadViewport.width <= 5000 && (
                                <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
@@ -6041,7 +6066,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                               <>
                                   <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                                   {isFMBEnabled && cadViewport.width <= 1000 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={selSurvey} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || !!selSurvey} />
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={selSurvey} activeSubdiv={selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || !!selSurvey} />
                                   )}
                                   {isCadastralEnabled && cadViewport.width <= 5000 && (
                                       <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
