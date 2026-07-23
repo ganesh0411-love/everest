@@ -286,25 +286,17 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
 
             let ruleContent = `<Rule><LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer>${textSymbolizer}</Rule>`;
 
-            if (isHighlightSubdiv && activeVillage && activeSurvey) {
+            if (isHighlightSubdiv && activeSurvey) {
                 ruleContent = `<Rule>
                     <ogc:Filter>
-                        <ogc:And>
-                            <ogc:PropertyIsEqualTo><ogc:PropertyName>vname</ogc:PropertyName><ogc:Literal>${activeVillage}</ogc:Literal></ogc:PropertyIsEqualTo>
-                            <ogc:PropertyIsEqualTo><ogc:PropertyName>survey_no</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsEqualTo>
-                        </ogc:And>
+                        <ogc:PropertyIsEqualTo><ogc:PropertyName>survey_number</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsEqualTo>
                     </ogc:Filter>
                     <LineSymbolizer><Stroke><CssParameter name="stroke">#FFFF00</CssParameter><CssParameter name="stroke-width">3</CssParameter></Stroke></LineSymbolizer>
                     ${highlightTextSymbolizer}
                 </Rule>
                 <Rule>
                     <ogc:Filter>
-                        <ogc:Not>
-                            <ogc:And>
-                                <ogc:PropertyIsEqualTo><ogc:PropertyName>vname</ogc:PropertyName><ogc:Literal>${activeVillage}</ogc:Literal></ogc:PropertyIsEqualTo>
-                                <ogc:PropertyIsEqualTo><ogc:PropertyName>survey_no</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsEqualTo>
-                            </ogc:And>
-                        </ogc:Not>
+                        <ogc:PropertyIsNotEqualTo><ogc:PropertyName>survey_number</ogc:PropertyName><ogc:Literal>${activeSurvey}</ogc:Literal></ogc:PropertyIsNotEqualTo>
                     </ogc:Filter>
                     <LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${strokeWidth}</CssParameter></Stroke></LineSymbolizer>
                     ${textSymbolizer}
