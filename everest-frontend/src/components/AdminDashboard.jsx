@@ -432,6 +432,77 @@ const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
     );
 };
 
+
+const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText, isLoading }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const wrapperRef = React.useRef(null);
+
+  React.useEffect(() => {
+    setSearchTerm(value || '');
+  }, [value]);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearchTerm(value || '');
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [value]);
+
+  const filteredOptions = options.filter(opt => opt && String(opt).toLowerCase().includes(searchTerm.toLowerCase()));
+
+  return (
+    <div className="relative w-full" ref={wrapperRef}>
+      <div className="relative w-full">
+        <input
+          type="text"
+          className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 pr-10 rounded-md border-0 outline-none shadow-sm cursor-text text-sm"
+          placeholder={isLoading ? loadingText : placeholder}
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setIsOpen(true);
+            if (e.target.value === '') onChange('');
+          }}
+          onFocus={() => setIsOpen(true)}
+        />
+        <div 
+          className="absolute right-0 top-0 h-full px-3 flex items-center cursor-pointer"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+        </div>
+      </div>
+      
+      {isOpen && (
+        <div className="absolute z-[600] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((opt, idx) => (
+              <div 
+                key={idx} 
+                className={`px-4 py-2 text-sm cursor-pointer hover:bg-blue-100 ${value === opt ? 'bg-blue-50 font-bold text-blue-700' : 'text-slate-700'}`}
+                onClick={() => {
+                  onChange(opt);
+                  setSearchTerm(opt);
+                  setIsOpen(false);
+                }}
+              >
+                {opt}
+              </div>
+            ))
+          ) : (
+            <div className="px-4 py-3 text-sm text-slate-500 text-center">No matches found</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminDashboard = ({ setCurrentView }) => {
   const cardShadowClass = "interactive-card";
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
