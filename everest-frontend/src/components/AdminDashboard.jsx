@@ -3537,7 +3537,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   const currentTouchCardRef = React.useRef(null);
   const pullStartRef = React.useRef(null);
 
-  const resetAppState = async () => {
+  const resetAppState = () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
     setSelDistrict('');
@@ -3555,38 +3555,40 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     setMapActionTrigger(Date.now());
 
     setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
-    try {
-        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const R = 6378137;
-        const baseMercX = R * (lon * Math.PI / 180);
-        const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
-        
-        setMapConfig(prev => {
-            if (prev.baseMercX !== 0) {
-                const targetX = baseMercX - prev.baseMercX;
-                const targetY = prev.baseMercY - baseMercY;
-                setUserLocationMarker({ x: targetX, y: targetY });
-                setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
-                return { ...prev, active: true, isLoading: false, baseLat: lat };
-            } else {
-                setUserLocationMarker({ x: 0, y: 0 });
-                setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
-                return { active: true, isLoading: false, baseMercX, baseMercY, baseLat: lat };
-            }
+    Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+        .then(position => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const R = 6378137;
+            const baseMercX = R * (lon * Math.PI / 180);
+            const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+            
+            setMapConfig(prev => {
+                if (prev.baseMercX !== 0) {
+                    const targetX = baseMercX - prev.baseMercX;
+                    const targetY = prev.baseMercY - baseMercY;
+                    setUserLocationMarker({ x: targetX, y: targetY });
+                    setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
+                    return { ...prev, active: true, isLoading: false, baseLat: lat };
+                } else {
+                    setUserLocationMarker({ x: 0, y: 0 });
+                    setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
+                    return { active: true, isLoading: false, baseMercX, baseMercY, baseLat: lat };
+                }
+            });
+        })
+        .catch(e => {
+            console.error("GPS Failed during refresh: ", e);
+            setMapConfig(prev => ({ ...prev, active: false, isLoading: false }));
+            setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });
+            setCadScale(null);
         });
-    } catch (e) {
-        console.error("GPS Failed during refresh: ", e);
-        setMapConfig(prev => ({ ...prev, active: false, isLoading: false }));
-        setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });
-        setCadScale(null);
-    }
     
+    // Stop spinning after 1.2s (2-3 rotations)
     setTimeout(() => {
         setIsRefreshing(false);
         setPullDistance(0);
-    }, 800);
+    }, 1200);
   };
 
   const handleTouchStart = (e) => {
