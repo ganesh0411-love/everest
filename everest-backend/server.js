@@ -1,3 +1,4 @@
+const turf = require('@turf/turf');
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -575,12 +576,18 @@ app.get('/api/tngis/feature', async (req, res) => {
                 if (features.length === 1) {
                     geom = features[0];
                 } else if (features.length > 1) {
-                    let polys = [];
-                    features.forEach(f => {
-                        if (f.type === 'Polygon') polys.push(f.coordinates);
-                        else if (f.type === 'MultiPolygon') polys.push(...f.coordinates);
-                    });
-                    geom = { type: 'MultiPolygon', coordinates: polys };
+                    try {
+                        const fc = turf.featureCollection(features.map(f => turf.feature(f)));
+                        const un = turf.union(fc);
+                        geom = un.geometry;
+                    } catch(e) {
+                        let polys = [];
+                        features.forEach(f => {
+                            if (f.type === 'Polygon') polys.push(f.coordinates);
+                            else if (f.type === 'MultiPolygon') polys.push(...f.coordinates);
+                        });
+                        geom = { type: 'MultiPolygon', coordinates: polys };
+                    }
                 }
                 
                 return res.json({
@@ -659,12 +666,18 @@ app.get('/api/tngis/boundary', async (req, res) => {
                     if (features.length === 1) {
                         geom = features[0];
                     } else if (features.length > 1) {
-                        let polys = [];
-                        features.forEach(f => {
-                            if (f.type === 'Polygon') polys.push(f.coordinates);
-                            else if (f.type === 'MultiPolygon') polys.push(...f.coordinates);
-                        });
-                        geom = { type: 'MultiPolygon', coordinates: polys };
+                        try {
+                            const fc = turf.featureCollection(features.map(f => turf.feature(f)));
+                            const un = turf.union(fc);
+                            geom = un.geometry;
+                        } catch(e) {
+                            let polys = [];
+                            features.forEach(f => {
+                                if (f.type === 'Polygon') polys.push(f.coordinates);
+                                else if (f.type === 'MultiPolygon') polys.push(...f.coordinates);
+                            });
+                            geom = { type: 'MultiPolygon', coordinates: polys };
+                        }
                     }
                     
                     return res.json({ success: true, feature: { type: 'Feature', geometry: geom, bbox: [minX, minY, maxX, maxY], properties: { name: survey } }, source: 'sqlite' });
