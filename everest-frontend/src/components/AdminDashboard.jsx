@@ -8,7 +8,8 @@ import { db } from '../firebase';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
-const API_BASE = 'https://everest-backend-f9nt.onrender.com';
+const USE_LOCAL_GIS = true;
+const API_BASE = USE_LOCAL_GIS ? '' : 'https://everest-backend-f9nt.onrender.com';
 
 const DB_NAME = 'EverestTileCache';
 const STORE_NAME = 'tiles';
@@ -660,7 +661,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
           setLsSurveys([]);
           setSelSubdiv([]);
           setLsSubdivs([]);
-          fetch(`${API_BASE}/api/tngis/survey?village=${encodeURIComponent(selVillage)}&taluk=${encodeURIComponent(selTaluk)}`)
+          fetch(`${API_BASE}/api/tngis/survey?village=${encodeURIComponent(selVillage)}&taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`)
             .then(res => res.json())
             .then(res => setLsSurveys(res.data || []))
             .catch(err => console.error(err))
@@ -675,7 +676,7 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
           setLsLoading('subdivs');
           
           const fetchPromises = selSurvey.map(survey => 
-            fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(survey)}&taluk=${encodeURIComponent(selTaluk)}`)
+            fetch(`${API_BASE}/api/tngis/subdivisions?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(survey)}&taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`)
               .then(res => res.json())
               .then(res => {
                   const dataArr = res.data || [];
@@ -945,11 +946,11 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       sub = match[1];
                       sur = match[2];
                   }
-                  fetches.push(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&subdiv=${encodeURIComponent(sub)}`);
+                  fetches.push(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&subdiv=${encodeURIComponent(sub)}&district=${encodeURIComponent(selDistrict)}`);
               });
           } else if (selSurvey && selSurvey.length > 0) {
               selSurvey.forEach(sur => {
-                  fetches.push(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}`);
+                  fetches.push(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`);
               });
           }
 
