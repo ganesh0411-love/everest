@@ -35,14 +35,24 @@ async function fetchSurveys(lgdCode) {
     return [];
 }
 
-async function fetchSurveyFeatures(lgdCode, survey) {
+async function fetchSurveyFeatures(lgdCode, survey, retries = 3) {
     const url = `https://tngis.tn.gov.in/app/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=cadastral_data_wms:view_fmb&outputFormat=application/json&srsName=EPSG:3857&cql_filter=lgd_village_code=\x27${lgdCode}\x27%20AND%20survey_number=\x27${survey}\x27`;
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    return await r.json();
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const r = await fetch(url, { timeout: 120000 });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return await r.json();
+        } catch (e) {
+            if (attempt === retries) return null;
+            await new Promise(res => setTimeout(res, 2000 * attempt));
+        }
+    }
+    return null;
 }
 
 async function main() {
+    let globalStartTime = Date.now();
     for (const v of villages) {
         const vName = v.name;
         const vLgd = v.lgd_village_code;
@@ -71,56 +81,105 @@ async function main() {
         fs.mkdirSync(outDir, { recursive: true });
 
         let successCount = 0;
+        let skippedCount = 0;
+        let failedCount = 0;
+        let processedCount = 0;
         const CONCURRENCY = 15;
+        let lastSuccessTime = Date.now();
         
-        // Print Initial Tracker
-        console.log(`\n?? CURRENT VILLAGE IN PROGRESS:`);
-        console.log(`* Village Name: ${vName}`);
-        console.log(`* Total Survey Count: ${totalSurveys} Surveys`);
-        console.log(`* Downloaded Progress: 0/${totalSurveys} (0%)`);
-        console.log(`* Start Time & Duration Elapsed: Started ${startTimeStr} | Elapsed: 0 mins 0 secs`);
-        console.log(`* Estimated Time Remaining (ETA): Calculating...`);
-        console.log(`* Status: IN PROGRESS\n`);
+        // Check existing
+        for (const survey of surveys) {
+            const filePath = path.join(outDir, `${survey}.geojson`);
+            if (fs.existsSync(filePath)) {
+                successCount++;
+                skippedCount++;
+                processedCount++;
+            }
+        }
         
+        if (skippedCount > 0) {
+            console.log(`[INFO] Auto-Resume triggered: Found ${skippedCount} existing survey files. Resuming...`);
+        }
+
         let lastReportTime = Date.now();
 
         for (let i = 0; i < totalSurveys; i += CONCURRENCY) {
             const batch = surveys.slice(i, i + CONCURRENCY);
             
             await Promise.all(batch.map(async (survey) => {
+                const filePath = path.join(outDir, `${survey}.geojson`);
+                if (fs.existsSync(filePath)) {
+                    return;
+                }
+                
                 try {
                     const data = await fetchSurveyFeatures(vLgd, survey);
                     if (data && data.features && data.features.length > 0) {
-                        const filePath = path.join(outDir, `${survey}.geojson`);
                         fs.writeFileSync(filePath, JSON.stringify(data));
                         successCount++;
+                        lastSuccessTime = Date.now();
+                    } else {
+                        failedCount++;
+                        console.log(`[WARN] Survey ${survey} failed or empty after retries. Skipping.`);
                     }
                 } catch(e) {
+                    failedCount++;
+                    console.log(`[ERROR] Survey ${survey} fetch error: ${e.message}. Skipping.`);
                 }
+                processedCount++;
             }));
             
             const now = Date.now();
-            // Report every 2.5 minutes (150000 ms) or every 20 batches to simulate the 2-3 minute request.
-            if (now - lastReportTime > 150000 || i === Math.floor(totalSurveys / 2)) {
+            if (now - lastReportTime > 60000 || processedCount === totalSurveys) {
                 lastReportTime = now;
                 const elapsedMs = now - startTime;
-                const percent = Math.floor((successCount / totalSurveys) * 100);
-                const msPerSurvey = elapsedMs / (successCount || 1);
-                const remainingSurveys = totalSurveys - successCount;
-                const etaMs = msPerSurvey * remainingSurveys;
+                const percent = Math.floor((processedCount / totalSurveys) * 100);
+                
+                const processedThisSession = processedCount - skippedCount;
+                let etaMs = -1;
+                if (processedThisSession > 0) {
+                    const msPerSurvey = elapsedMs / processedThisSession;
+                    const remainingSurveys = totalSurveys - processedCount;
+                    etaMs = msPerSurvey * remainingSurveys;
+                }
                 
                 console.log(`\n?? CURRENT VILLAGE IN PROGRESS:`);
                 console.log(`* Village Name: ${vName}`);
                 console.log(`* Total Survey Count: ${totalSurveys} Surveys`);
-                console.log(`* Downloaded Progress: ${successCount}/${totalSurveys} (${percent}%)`);
+                console.log(`* Processed Progress: ${processedCount}/${totalSurveys} (${percent}%) [Success: ${successCount}, Failed: ${failedCount}]`);
                 console.log(`* Start Time & Duration Elapsed: Started ${startTimeStr} | Elapsed: ${formatTime(elapsedMs)}`);
                 console.log(`* Estimated Time Remaining (ETA): ${formatETA(etaMs)}`);
                 console.log(`* Status: IN PROGRESS\n`);
+                
+                fs.writeFileSync(path.join(__dirname, "sync_status.json"), JSON.stringify({
+                    village: vName,
+                    processedCount,
+                    successCount,
+                    failedCount,
+                    totalSurveys,
+                    percent,
+                    elapsed: formatTime(elapsedMs),
+                    eta: formatETA(etaMs),
+                    startTimeStr,
+                    lastSuccessTime
+                }));
             }
         }
         
         const totalElapsed = Date.now() - startTime;
-        console.log(`[DONE] ${vName}: ${successCount}/${totalSurveys} (100%) - Completed in ${formatTime(totalElapsed)}.`);
+        console.log(`[DONE] ${vName}: Processed ${processedCount}/${totalSurveys} (Success: ${successCount}, Failed: ${failedCount}) - Completed in ${formatTime(totalElapsed)}.`);
+        fs.writeFileSync(path.join(__dirname, "sync_status.json"), JSON.stringify({
+            village: vName,
+            processedCount,
+            successCount,
+            failedCount,
+            totalSurveys,
+            percent: 100,
+            elapsed: formatTime(totalElapsed),
+            eta: "0 secs",
+            status: "DONE",
+            lastSuccessTime
+        }));
     }
 }
 
