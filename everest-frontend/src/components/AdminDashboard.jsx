@@ -9,9 +9,9 @@ import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'fireb
 
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
 const USE_LOCAL_GIS = true;
-const REMOTE_API_BASE = 'http://localhost:5000';
+const REMOTE_API_BASE = 'https://everest-backend-f9nt.onrender.com';
 const LOCAL_API_BASE = 'http://localhost:5000';
-const API_BASE = 'http://localhost:5000';
+const API_BASE = LOCAL_API_BASE;
 
 const DB_NAME = 'EverestTileCache';
 const STORE_NAME = 'tiles';

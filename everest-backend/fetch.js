@@ -39,9 +39,9 @@ async function main() {
         console.log(`  -> Fetching Feature for Survey ${survey}...`);
         const featureData = await fetchFeature(survey);
         
-        if (featureData && featureData.features && featureData.features.length > 0) {
+        if (featureData && featureData.feature) {
             const filePath = path.join(outDir, `${survey}.geojson`);
-            fs.writeFileSync(filePath, JSON.stringify(featureData));
+            fs.writeFileSync(filePath, JSON.stringify({ type: 'FeatureCollection', features: [featureData.feature] }));
             successCount++;
         } else {
             console.log(`     [!] Failed to get feature for ${survey}`);
