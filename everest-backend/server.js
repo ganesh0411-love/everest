@@ -511,8 +511,8 @@ app.get('/api/tngis/survey', async (req, res) => {
         }
         res.json({ success: true, data: [] });
     } catch (err) {
-        console.error("Survey WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: ["1A", "2B", "3C", "4D", "1", "2", "3", "4", "5"], fallback: true });
+        console.error("Survey WFS failed:", err.message);
+        res.json({ success: true, data: [], error: err.message });
     }
 });
 
@@ -565,8 +565,8 @@ app.get('/api/tngis/subdivisions', async (req, res) => {
         }
         res.json({ success: true, data: [] });
     } catch (err) {
-        console.error("Subdivisions WFS failed, returning fallback:", err.message);
-        res.json({ success: true, data: ["1A", "2B", "3C", "4D", "1", "2", "3", "4", "5"], fallback: true });
+        console.error("Subdivisions WFS failed:", err.message);
+        res.json({ success: true, data: [], error: err.message });
     }
 });
 
