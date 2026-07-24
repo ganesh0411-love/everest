@@ -8,7 +8,7 @@ import argparse
 import urllib.parse
 from pathlib import Path
 
-API_BASE = 'https://everest-backend-f9nt.onrender.com'
+API_BASE = 'http://localhost:5000'
 MAX_RETRIES = 3
 
 def setup_db(db_path):
@@ -42,7 +42,7 @@ def fetch_json(url, retries=MAX_RETRIES):
         try:
             # Polite rate limiting
             time.sleep(random.uniform(1.0, 2.5))
-            response = requests.get(url, timeout=30)
+            response = requests.get(url, timeout=120)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -88,6 +88,8 @@ def fetch_survey_feature(district, taluk, village, survey):
 def main():
     parser = argparse.ArgumentParser(description="GIS Data Batch Fetcher")
     parser.add_argument('--dry-run-district', type=str, help="Specify a single district to fetch (Dry Run Mode)")
+    parser.add_argument('--taluk', type=str, help="Specify a single taluk")
+    parser.add_argument('--village', type=str, help="Specify a single village")
     parser.add_argument('--full-state-run', action='store_true', help="Fetch all districts across Tamil Nadu")
     args = parser.parse_args()
 
@@ -96,8 +98,8 @@ def main():
         return
 
     # Setup directories and DB
-    Path("data").mkdir(exist_ok=True)
-    db_path = "data/completed_villages.db"
+    Path("../everest-backend/data").mkdir(exist_ok=True)
+    db_path = "../everest-backend/data/completed_villages.db"
     conn = setup_db(db_path)
     c = conn.cursor()
 
@@ -107,8 +109,12 @@ def main():
     # Populate hierarchy into DB first
     for district in districts:
         taluks = sync_taluks(district)
+        if args.taluk:
+            taluks = [t for t in taluks if t.lower() == args.taluk.lower()]
         for taluk in taluks:
             villages = sync_villages(district, taluk)
+            if args.village:
+                villages = [v for v in villages if v.lower() == args.village.lower()]
             for village in villages:
                 c.execute('''
                     INSERT OR IGNORE INTO villages (district, taluk, village, status)
@@ -150,7 +156,7 @@ def main():
                 ''', (v_id, survey, json.dumps(feature_data)))
                 
                 # Optionally write to GeoJSON file structure
-                dir_path = Path(f"data/geojson/{district}/{taluk}/{village}")
+                dir_path = Path(f"../everest-backend/data/geojson/{district}/{taluk}/{village}")
                 dir_path.mkdir(parents=True, exist_ok=True)
                 with open(dir_path / f"{survey}.geojson", "w") as f:
                     json.dump(feature_data, f)
