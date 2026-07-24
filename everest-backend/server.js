@@ -531,7 +531,7 @@ app.get('/api/tngis/subdivisions', async (req, res) => {
                     const fileContent = require('fs').readFileSync(filePath, 'utf8');
                     const data = JSON.parse(fileContent);
                     if (data.features) {
-                        let subdivs = data.features.map(f => f.properties && f.properties.SUBDIV_NO).filter(Boolean);
+                        let subdivs = data.features.map(f => f.properties && (f.properties.sub_division || f.properties.SUBDIV_NO)).filter(Boolean);
                         subdivs = [...new Set(subdivs)].sort();
                         return res.json({ success: true, data: subdivs, source: 'local_json' });
                     }
@@ -586,12 +586,44 @@ app.get('/api/tngis/feature', async (req, res) => {
                     if (data.features) {
                         let feature;
                         if (subdiv) {
-                            feature = data.features.find(f => f.properties && f.properties.SUBDIV_NO === subdiv);
+                            feature = data.features.find(f => f.properties && (f.properties.sub_division === subdiv || f.properties.SUBDIV_NO === subdiv));
+                            if (feature) return res.json({ success: true, feature: feature, source: 'local_json' });
                         } else {
-                            feature = data.features[0];
-                        }
-                        if (feature) {
-                            return res.json({ success: true, feature: feature, source: 'local_json' });
+                            if (data.features.length === 1) {
+                                feature = data.features[0];
+                            } else if (data.features.length > 1) {
+                                let geom = null;
+                                try {
+                                    const fc = turf.featureCollection(data.features.map(f => f.type === 'Feature' ? f : turf.feature(f.geometry || f, f.properties)));
+                                    const un = turf.union(fc);
+                                    geom = un.geometry;
+                                } catch (e) {
+                                    let polys = [];
+                                    data.features.forEach(f => {
+                                        let g = f.geometry || f;
+                                        if (g.type === 'Polygon') polys.push(g.coordinates);
+                                        else if (g.type === 'MultiPolygon') polys.push(...g.coordinates);
+                                    });
+                                    geom = { type: 'MultiPolygon', coordinates: polys };
+                                }
+                                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                                data.features.forEach(f => {
+                                    try {
+                                        const b = turf.bbox(f.type === 'Feature' ? f : turf.feature(f.geometry || f));
+                                        if (b[0] < minX) minX = b[0];
+                                        if (b[1] < minY) minY = b[1];
+                                        if (b[2] > maxX) maxX = b[2];
+                                        if (b[3] > maxY) maxY = b[3];
+                                    } catch(e) {}
+                                });
+                                feature = {
+                                    type: 'Feature',
+                                    geometry: geom,
+                                    bbox: [minX, minY, maxX, maxY],
+                                    properties: { survey_no: survey }
+                                };
+                            }
+                            if (feature) return res.json({ success: true, feature: feature, source: 'local_json' });
                         }
                     }
                 } catch(e) { console.error('Local JSON feature error:', e); }
@@ -690,12 +722,44 @@ app.get('/api/tngis/boundary', async (req, res) => {
                     if (data.features) {
                         let feature;
                         if (subdiv) {
-                            feature = data.features.find(f => f.properties && f.properties.SUBDIV_NO === subdiv);
+                            feature = data.features.find(f => f.properties && (f.properties.sub_division === subdiv || f.properties.SUBDIV_NO === subdiv));
+                            if (feature) return res.json({ success: true, feature: feature, source: 'local_json' });
                         } else {
-                            feature = data.features[0];
-                        }
-                        if (feature) {
-                            return res.json({ success: true, feature: feature, source: 'local_json' });
+                            if (data.features.length === 1) {
+                                feature = data.features[0];
+                            } else if (data.features.length > 1) {
+                                let geom = null;
+                                try {
+                                    const fc = turf.featureCollection(data.features.map(f => f.type === 'Feature' ? f : turf.feature(f.geometry || f, f.properties)));
+                                    const un = turf.union(fc);
+                                    geom = un.geometry;
+                                } catch (e) {
+                                    let polys = [];
+                                    data.features.forEach(f => {
+                                        let g = f.geometry || f;
+                                        if (g.type === 'Polygon') polys.push(g.coordinates);
+                                        else if (g.type === 'MultiPolygon') polys.push(...g.coordinates);
+                                    });
+                                    geom = { type: 'MultiPolygon', coordinates: polys };
+                                }
+                                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                                data.features.forEach(f => {
+                                    try {
+                                        const b = turf.bbox(f.type === 'Feature' ? f : turf.feature(f.geometry || f));
+                                        if (b[0] < minX) minX = b[0];
+                                        if (b[1] < minY) minY = b[1];
+                                        if (b[2] > maxX) maxX = b[2];
+                                        if (b[3] > maxY) maxY = b[3];
+                                    } catch(e) {}
+                                });
+                                feature = {
+                                    type: 'Feature',
+                                    geometry: geom,
+                                    bbox: [minX, minY, maxX, maxY],
+                                    properties: { survey_no: survey }
+                                };
+                            }
+                            if (feature) return res.json({ success: true, feature: feature, source: 'local_json' });
                         }
                     }
                 } catch(e) { console.error('Local JSON boundary error:', e); }
