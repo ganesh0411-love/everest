@@ -9,7 +9,9 @@ import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'fireb
 
 // Cloud API base — reads from .env at build time, falls back to localhost for dev
 const USE_LOCAL_GIS = true;
-const API_BASE = USE_LOCAL_GIS ? '' : 'https://everest-backend-f9nt.onrender.com';
+const REMOTE_API_BASE = 'https://everest-backend-f9nt.onrender.com';
+const LOCAL_API_BASE = USE_LOCAL_GIS ? '' : REMOTE_API_BASE;
+const API_BASE = REMOTE_API_BASE;
 
 const DB_NAME = 'EverestTileCache';
 const STORE_NAME = 'tiles';
@@ -738,15 +740,15 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                           sub = match[1];
                           sur = match[2];
                       }
-                      fetches.push(`${API_BASE}/api/tngis/boundary?level=parcel&district=${encodeURIComponent(state.selDistrict)}&taluk=${encodeURIComponent(state.selTaluk)}&village=${encodeURIComponent(state.selVillage)}&survey=${encodeURIComponent(sur)}&subdiv=${encodeURIComponent(sub)}`);
+                      fetches.push(`${LOCAL_API_BASE}/api/tngis/boundary?level=parcel&district=${encodeURIComponent(state.selDistrict)}&taluk=${encodeURIComponent(state.selTaluk)}&village=${encodeURIComponent(state.selVillage)}&survey=${encodeURIComponent(sur)}&subdiv=${encodeURIComponent(sub)}`);
                   });
               } else if (state.selSurvey && state.selSurvey.length > 0) {
                   state.selSurvey.forEach(sur => {
-                      fetches.push(`${API_BASE}/api/tngis/boundary?level=parcel&district=${encodeURIComponent(state.selDistrict)}&taluk=${encodeURIComponent(state.selTaluk)}&village=${encodeURIComponent(state.selVillage)}&survey=${encodeURIComponent(sur)}`);
+                      fetches.push(`${LOCAL_API_BASE}/api/tngis/boundary?level=parcel&district=${encodeURIComponent(state.selDistrict)}&taluk=${encodeURIComponent(state.selTaluk)}&village=${encodeURIComponent(state.selVillage)}&survey=${encodeURIComponent(sur)}`);
                   });
               }
           } else {
-              let url = `${API_BASE}/api/tngis/boundary?level=${level}`;
+              let url = `${LOCAL_API_BASE}/api/tngis/boundary?level=${level}`;
               if (state.selDistrict) url += `&district=${encodeURIComponent(state.selDistrict)}`;
               if (state.selTaluk) url += `&taluk=${encodeURIComponent(state.selTaluk)}`;
               if (state.selVillage) url += `&village=${encodeURIComponent(state.selVillage)}`;
@@ -946,11 +948,11 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       sub = match[1];
                       sur = match[2];
                   }
-                  fetches.push(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&subdiv=${encodeURIComponent(sub)}&district=${encodeURIComponent(selDistrict)}`);
+                  fetches.push(`${LOCAL_API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&subdiv=${encodeURIComponent(sub)}&district=${encodeURIComponent(selDistrict)}`);
               });
           } else if (selSurvey && selSurvey.length > 0) {
               selSurvey.forEach(sur => {
-                  fetches.push(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`);
+                  fetches.push(`${LOCAL_API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`);
               });
           }
 
@@ -3546,8 +3548,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     setSubDivSearchText('');
     setLsHighlightPoly(null);
     setLsHighlightType(null);
-    setLandArea(0);
-    setLandPerimeter(0);
     setCadSelectedPolygon(null);
     setCadMultiSelectedPolygons([]);
     setMapSelectionArea(null);
