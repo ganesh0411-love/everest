@@ -256,7 +256,7 @@ const WMSDynamicImage = React.memo(({ x, y, w, h, url, loaded, onLoad }) => {
     );
 });
 
-const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, opacity = 1, labelProperty = null, labelColor = null, activeVillage = null, activeSurvey = null, activeSubdiv = null, isHighlightSubdiv = false }) => {
+const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, opacity = 1, labelProperty = null, labelColor = null, activeVillage = null, activeSurvey = null, activeSubdiv = null, isHighlightSubdiv = false, selectedName = null, selectedPropertyName = null }) => {
     if (!baseMercX) return null;
     const [wmsViewports, setWmsViewports] = React.useState([]);
 
@@ -287,7 +287,7 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
             
             const isMobile = window.innerWidth < 768;
             const mobileFontSize = isMobile ? '8' : '11';
-            const mobileStrokeWidth = isMobile ? '1' : strokeWidth;
+            const mobileStrokeWidth = isMobile ? '1.5' : strokeWidth;
             const mobileHighlightStrokeWidth = isMobile ? '2' : '3';
 
             const createTextSymbolizer = (color) => labelProperty ? `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>${labelProperty}</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">${mobileFontSize}</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">${color}</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>` : '';
@@ -296,7 +296,27 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
 
             let ruleContent = `<Rule><LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${mobileStrokeWidth}</CssParameter></Stroke></LineSymbolizer>${textSymbolizer}</Rule>`;
 
-            if (isHighlightSubdiv && activeSurvey) {
+            // --- District / Taluk selection highlight (blue fill + bright border) ---
+            if (selectedName && selectedPropertyName) {
+                const hlStroke = isMobile ? '2.5' : '4';
+                ruleContent = `<Rule>
+                    <ogc:Filter>
+                        <ogc:PropertyIsEqualTo><ogc:PropertyName>${selectedPropertyName}</ogc:PropertyName><ogc:Literal>${selectedName}</ogc:Literal></ogc:PropertyIsEqualTo>
+                    </ogc:Filter>
+                    <PolygonSymbolizer>
+                        <Fill><CssParameter name="fill">#1d4ed8</CssParameter><CssParameter name="fill-opacity">0.25</CssParameter></Fill>
+                        <Stroke><CssParameter name="stroke">#1d4ed8</CssParameter><CssParameter name="stroke-width">${hlStroke}</CssParameter></Stroke>
+                    </PolygonSymbolizer>
+                    <LineSymbolizer><Stroke><CssParameter name="stroke">#1d4ed8</CssParameter><CssParameter name="stroke-width">${hlStroke}</CssParameter></Stroke></LineSymbolizer>
+                </Rule>
+                <Rule>
+                    <ogc:Filter>
+                        <ogc:PropertyIsNotEqualTo><ogc:PropertyName>${selectedPropertyName}</ogc:PropertyName><ogc:Literal>${selectedName}</ogc:Literal></ogc:PropertyIsNotEqualTo>
+                    </ogc:Filter>
+                    <LineSymbolizer><Stroke><CssParameter name="stroke">${strokeColor}</CssParameter><CssParameter name="stroke-width">${mobileStrokeWidth}</CssParameter></Stroke></LineSymbolizer>
+                    ${textSymbolizer}
+                </Rule>`;
+            } else if (isHighlightSubdiv && activeSurvey) {
                 if (activeSubdiv && activeSubdiv !== 'All') {
                     ruleContent = `<Rule>
                         <ogc:Filter>
@@ -349,7 +369,7 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
         }, 400);
         
         return () => clearTimeout(timer);
-    }, [viewport.x, viewport.y, viewport.width, viewport.height, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, activeVillage, activeSurvey, activeSubdiv, isHighlightSubdiv]);
+    }, [viewport.x, viewport.y, viewport.width, viewport.height, baseMercX, baseMercY, layerName, strokeColor, strokeWidth, activeVillage, activeSurvey, activeSubdiv, isHighlightSubdiv, selectedName, selectedPropertyName]);
 
     return (
         <g opacity={opacity} pointerEvents="none">
@@ -1063,10 +1083,8 @@ const AdminDashboard = ({ setCurrentView }) => {
                       } else if (geom.type === 'MultiPolygon') {
                           geom.coordinates.forEach(poly => combinedRings.push(poly[0]));
                       }
-                  } else if (resData.feature.bbox) {
-                      const b = resData.feature.bbox;
-                      combinedRings.push([[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [b[0], b[1]]]);
                   }
+                  // Skip bbox-only fallback: never draw a rectangular box as a highlight polygon
               }
           }
 
@@ -5506,13 +5524,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                            )}
                            {isVillageEnabled && cadViewport.width > 1000 && cadViewport.width <= 30000 && (
-                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#FFFFFF" strokeWidth="2" opacity={0.6} />
+                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#1e293b" strokeWidth="2.5" opacity={0.85} selectedName={selVillage || null} selectedPropertyName={selVillage ? 'village_name' : null} />
                            )}
                            {isTalukEnabled && cadViewport.width > 5000 && cadViewport.width <= 150000 && (
-                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#FFA500" strokeWidth="2" opacity={0.7} />
+                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#f59e0b" strokeWidth="2.5" opacity={0.9} selectedName={selTaluk || null} selectedPropertyName={selTaluk ? 'taluk_name' : null} />
                            )}
                            {isDistrictEnabled && cadViewport.width > 20000 && (
-                               <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#FF0000" strokeWidth="3" opacity={0.8} />
+                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#ef4444" strokeWidth="3.5" opacity={0.9} selectedName={selDistrict || null} selectedPropertyName={selDistrict ? 'district_name' : null} />
                            )}
                        </>
                     )}
@@ -6529,13 +6547,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                       <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                                   )}
                                   {isVillageEnabled && cadViewport.width > 1000 && cadViewport.width <= 30000 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#FFFFFF" strokeWidth="2" opacity={0.6} />
+                                    <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#1e293b" strokeWidth="2.5" opacity={0.85} selectedName={selVillage || null} selectedPropertyName={selVillage ? 'village_name' : null} />
                                   )}
                                   {isTalukEnabled && cadViewport.width > 5000 && cadViewport.width <= 150000 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#FFA500" strokeWidth="2" opacity={0.7} />
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#f59e0b" strokeWidth="2.5" opacity={0.9} selectedName={selTaluk || null} selectedPropertyName={selTaluk ? 'taluk_name' : null} />
                                   )}
                                   {isDistrictEnabled && cadViewport.width > 20000 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#FF0000" strokeWidth="3" opacity={0.8} />
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#ef4444" strokeWidth="3.5" opacity={0.9} selectedName={selDistrict || null} selectedPropertyName={selDistrict ? 'district_name' : null} />
                                   )}
                               </>
                           )}
