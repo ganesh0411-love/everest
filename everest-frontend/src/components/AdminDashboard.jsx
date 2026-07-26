@@ -639,11 +639,11 @@ const AdminDashboard = ({ setCurrentView }) => {
   // --- MANUAL CAD ENGINE STATE -----
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
   const [isLayerMenuOpen, setIsLayerMenuOpen] = React.useState(false);
-  const [isCadastralEnabled, setIsCadastralEnabled] = React.useState(false);
-  const [isFMBEnabled, setIsFMBEnabled] = React.useState(false);
-  const [isVillageEnabled, setIsVillageEnabled] = React.useState(false);
-  const [isTalukEnabled, setIsTalukEnabled] = React.useState(false);
-  const [isDistrictEnabled, setIsDistrictEnabled] = React.useState(false);
+  const [isCadastralEnabled, setIsCadastralEnabled] = React.useState(true);
+  const [isFMBEnabled, setIsFMBEnabled] = React.useState(true);
+  const [isVillageEnabled, setIsVillageEnabled] = React.useState(true);
+  const [isTalukEnabled, setIsTalukEnabled] = React.useState(true);
+  const [isDistrictEnabled, setIsDistrictEnabled] = React.useState(true);
   const [cadPromptSurveyNo, setCadPromptSurveyNo] = React.useState('');
   const [cadPromptSubDiv, setCadPromptSubDiv] = React.useState('');
   const [cadPromptColor, setCadPromptColor] = React.useState('#3b82f6'); // Default to blue-500
@@ -885,9 +885,6 @@ const AdminDashboard = ({ setCurrentView }) => {
                       } else if (geom.type === 'MultiPolygon') {
                           geom.coordinates.forEach(poly => combinedRings.push(poly[0]));
                       }
-                  } else if (resData.feature.bbox) {
-                      const b = resData.feature.bbox;
-                      combinedRings.push([[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [b[0], b[1]]]);
                   }
               }
           }
@@ -915,43 +912,61 @@ const AdminDashboard = ({ setCurrentView }) => {
               }
               const geom = data.feature.geometry;
               
-              if (coordinates && coordinates.length > 0) {
+              if ((coordinates && coordinates.length > 0) || data.feature.bbox) {
                   let bMercX = mapConfig.baseMercX;
                   let bMercY = mapConfig.baseMercY;
                   
                   if (bMercX === 0 && bMercY === 0) {
-                      let minM = Infinity, minMy = Infinity, maxM = -Infinity, maxMy = -Infinity;
-                      coordinates.forEach(c => {
-                          if (c[0] < minM) minM = c[0];
-                          if (c[0] > maxM) maxM = c[0];
-                          if (c[1] < minMy) minMy = c[1];
-                          if (c[1] > maxMy) maxMy = c[1];
-                      });
-                      bMercX = minM + (maxM - minM)/2;
-                      bMercY = minMy + (maxMy - minMy)/2;
+                      if (coordinates.length > 0) {
+                          let minM = Infinity, minMy = Infinity, maxM = -Infinity, maxMy = -Infinity;
+                          coordinates.forEach(c => {
+                              if (c[0] < minM) minM = c[0];
+                              if (c[0] > maxM) maxM = c[0];
+                              if (c[1] < minMy) minMy = c[1];
+                              if (c[1] > maxMy) maxMy = c[1];
+                          });
+                          bMercX = minM + (maxM - minM)/2;
+                          bMercY = minMy + (maxMy - minMy)/2;
+                      } else if (data.feature.bbox) {
+                          const b = data.feature.bbox;
+                          bMercX = b[0] + (b[2] - b[0])/2;
+                          bMercY = b[1] + (b[3] - b[1])/2;
+                      }
                       setMapConfig(prev => ({ ...prev, active: true, baseMercX: bMercX, baseMercY: bMercY }));
                       setIsCadastralEnabled(true);
                   }
                   
                   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                  const pointsList = allRings.map(ring => {
-                      return ring.map(coord => {
-                          const svgX = coord[0] - bMercX;
-                          const svgY = bMercY - coord[1];
-                          if (svgX < minX) minX = svgX;
-                          if (svgX > maxX) maxX = svgX;
-                          if (svgY < minY) minY = svgY;
-                          if (svgY > maxY) maxY = svgY;
-                          return { x: svgX, y: svgY };
+                  let pointsList = null;
+                  let points = null;
+                  
+                  if (coordinates.length > 0) {
+                      pointsList = allRings.map(ring => {
+                          return ring.map(coord => {
+                              const svgX = coord[0] - bMercX;
+                              const svgY = bMercY - coord[1];
+                              if (svgX < minX) minX = svgX;
+                              if (svgX > maxX) maxX = svgX;
+                              if (svgY < minY) minY = svgY;
+                              if (svgY > maxY) maxY = svgY;
+                              return { x: svgX, y: svgY };
+                          });
                       });
-                  });
-                  const points = pointsList.flat();
+                      points = pointsList.flat();
+                  } else if (data.feature.bbox) {
+                      const b = data.feature.bbox;
+                      minX = b[0] - bMercX;
+                      maxX = b[2] - bMercX;
+                      minY = bMercY - b[3];
+                      maxY = bMercY - b[1];
+                  }
                   
                   const parcelWidth = maxX - minX;
                   const parcelHeight = maxY - minY;
                   
                   const isMobile = window.innerWidth < 768;
-                  const padFactor = isMobile ? 1.5 : 2.5;
+                  const isAdminLevel = coordinates.length === 0 && data.feature.bbox;
+                  const padFactor = isAdminLevel ? 1.15 : (isMobile ? 1.5 : 2.5);
                   const minViewPx = isMobile ? 150 : 400;
                   
                   let viewW = Math.max(parcelWidth * padFactor, minViewPx);
@@ -987,7 +1002,6 @@ const AdminDashboard = ({ setCurrentView }) => {
                       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
                       
                       setCadViewport(prev => {
-                          // Capture initial start pos correctly on first frame
                           const sX = (mapConfig.baseMercX === 0 || !startTime) ? startX : prev.startX || startX;
                           const sY = (mapConfig.baseMercX === 0 || !startTime) ? startY : prev.startY || startY;
                           const sW = (mapConfig.baseMercX === 0 || !startTime) ? startW : prev.startW || startW;
@@ -1005,9 +1019,14 @@ const AdminDashboard = ({ setCurrentView }) => {
                       if (t < 1) {
                           requestAnimationFrame(animate);
                       } else {
-                          if (geom) { setLsHighlightPoly(pointsList || points);
-                          setLsHighlightType(selSubdiv ? 'subdiv' : 'survey'); setLsHighlightType(level); } else { setLsHighlightPoly(null); setLsHighlightType(null); }
-        setCadSelectedPolygon(null);
+                          if (coordinates.length > 0 && (pointsList || points)) {
+                              setLsHighlightPoly(pointsList || points);
+                              setLsHighlightType(selSubdiv ? 'subdiv' : (level || 'survey'));
+                          } else {
+                              setLsHighlightPoly(null);
+                              setLsHighlightType(level || null);
+                          }
+                          setCadSelectedPolygon(null);
                       }
                   };
                   requestAnimationFrame(animate);
@@ -1018,207 +1037,24 @@ const AdminDashboard = ({ setCurrentView }) => {
       }
   };
   const executeFlyTo = async () => {
-        if (!selVillage || !selSurvey || selSurvey.length === 0) return;
+        if (!selDistrict && !selTaluk && !selVillage && (!selSurvey || selSurvey.length === 0)) return;
         setLsLoading('flyTo');
-        setLsHighlightPoly(null);
-        setLsHighlightType(null);
-        setCadSelectedPolygon(null);
-        setMapSelectionArea(null);
         try {
-          let fetches = [];
-          if (selSubdiv && selSubdiv.length > 0) {
-              selSubdiv.forEach(subItem => {
-                  let sub = subItem;
-                  let sur = (selSurvey && selSurvey.length === 1) ? selSurvey[0] : '';
-                  const match = subItem.match(/(.+?)\s+\((.+?)\)$/);
-                  if (match) {
-                      sub = match[1];
-                      sur = match[2];
-                  }
-                  fetches.push(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&subdiv=${encodeURIComponent(sub)}&district=${encodeURIComponent(selDistrict)}`);
-              });
-          } else if (selSurvey && selSurvey.length > 0) {
-              selSurvey.forEach(sur => {
-                  fetches.push(`${API_BASE}/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`);
-              });
-          }
-
-          const responses = await Promise.all(fetches.map(url => fetch(url).then(r => r.json())));
-          
-          let combinedRings = [];
-          let combinedAreaSqM = 0;
-          let combinedPerimeterMeters = 0;
-          let validDataFound = false;
-          let data = { feature: { geometry: null, bbox: null } }; // mocked top-level data for the rest of function
-
-          const toWGS84Coords = (coords) => {
-              if (!Array.isArray(coords)) return coords;
-              if (typeof coords[0] === 'number') {
-                  const lon = coords[0] * 180 / 20037508.34;
-                  const lat = Math.atan(Math.exp(coords[1] * Math.PI / 20037508.34)) * 360 / Math.PI - 90;
-                  return [lon, lat];
-              }
-              return coords.map(toWGS84Coords);
-          };
-
-          for (const resData of responses) {
-              if (resData.success && resData.feature) {
-                  validDataFound = true;
-                  const geom = resData.feature.geometry;
-                  if (!data.feature.bbox && resData.feature.bbox) data.feature.bbox = resData.feature.bbox;
-
-                  if (geom) {
-                      try {
-                          const wgs84Feature = {
-                              type: 'Feature',
-                              geometry: { type: geom.type, coordinates: toWGS84Coords(geom.coordinates) },
-                              properties: {}
-                          };
-                          combinedAreaSqM += turfArea(wgs84Feature);
-                          combinedPerimeterMeters += turfLength(wgs84Feature, { units: 'meters' });
-                      } catch (e) {}
-
-                      if (geom.type === 'Polygon') {
-                          combinedRings.push(geom.coordinates[0]);
-                      } else if (geom.type === 'MultiPolygon') {
-                          geom.coordinates.forEach(poly => combinedRings.push(poly[0]));
-                      }
-                  }
-                  // Skip bbox-only fallback: never draw a rectangular box as a highlight polygon
-              }
-          }
-
-          if (validDataFound) {
-              if (combinedAreaSqM > 0) {
-                  const totalHectares = combinedAreaSqM / 10000;
-                  setMapSelectionArea({
-                      sqMeters: combinedAreaSqM,
-                      sqFt: combinedAreaSqM * 10.7639,
-                      hectare: totalHectares,
-                      are: totalHectares * 100,
-                      acre: combinedAreaSqM / 4046.86,
-                      cent: combinedAreaSqM / 40.4686,
-                      perimeterMeters: combinedPerimeterMeters
-                  });
-              }
-              let coordinates = [];
-              let allRings = combinedRings;
-              coordinates = allRings.flat();
-              
-              if (combinedRings.length > 0) {
-                  data.feature.geometry = { type: 'MultiPolygon', coordinates: combinedRings.map(r => [r]) };
-              }
-              const geom = data.feature.geometry;
-              
-              if (coordinates && coordinates.length > 0) {
-                  let bMercX = mapConfig.baseMercX;
-                  let bMercY = mapConfig.baseMercY;
-                  
-                  if (bMercX === 0 && bMercY === 0) {
-                      let minM = Infinity, minMy = Infinity, maxM = -Infinity, maxMy = -Infinity;
-                      coordinates.forEach(c => {
-                          if (c[0] < minM) minM = c[0];
-                          if (c[0] > maxM) maxM = c[0];
-                          if (c[1] < minMy) minMy = c[1];
-                          if (c[1] > maxMy) maxMy = c[1];
-                      });
-                      bMercX = minM + (maxM - minM)/2;
-                      bMercY = minMy + (maxMy - minMy)/2;
-                      setMapConfig(prev => ({ ...prev, active: true, baseMercX: bMercX, baseMercY: bMercY }));
-                      
-                      // Also enable map layers if they are off
-                      setIsCadastralEnabled(true);
-                  }
-                  
-                  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                  
-                  const pointsList = allRings.map(ring => {
-                      return ring.map(coord => {
-                          const svgX = coord[0] - bMercX;
-                          const svgY = bMercY - coord[1];
-                          if (svgX < minX) minX = svgX;
-                          if (svgX > maxX) maxX = svgX;
-                          if (svgY < minY) minY = svgY;
-                          if (svgY > maxY) maxY = svgY;
-                          return { x: svgX, y: svgY };
-                      });
-                  });
-                  const points = pointsList.flat();
-                  
-                  // Animate Pan and Zoom
-                  const parcelWidth = maxX - minX;
-                  const parcelHeight = maxY - minY;
-                  
-                  const isMobile = window.innerWidth < 768;
-                  const padFactor = isMobile ? 1.5 : 2.5;
-                  const minViewPx = isMobile ? 150 : 400;
-                  
-                  let viewW = Math.max(parcelWidth * padFactor, minViewPx);
-                  let viewH = Math.max(parcelHeight * padFactor, minViewPx);
-                  
-                  const screenRatio = window.innerWidth / window.innerHeight;
-                  const viewRatio = viewW / viewH;
-                  
-                  if (screenRatio > viewRatio) {
-                      viewW = viewH * screenRatio;
-                  } else {
-                      viewH = viewW / screenRatio;
-                  }
-                  
-                  const centerX = minX + parcelWidth / 2;
-                  const centerY = minY + parcelHeight / 2;
-                  
-                  const tX = centerX - viewW / 2;
-                  const tY = centerY - viewH / 2;
-                  const tW = viewW;
-                  const tH = viewH;
-                  
-                  const startX = (mapConfig.baseMercX === 0) ? tX : cadViewport.x;
-                  const startY = (mapConfig.baseMercX === 0) ? tY : cadViewport.y;
-                  const startW = (mapConfig.baseMercX === 0) ? tW : cadViewport.width;
-                  const startH = (mapConfig.baseMercX === 0) ? tH : cadViewport.height;
-                  
-                  let startTime = null;
-                  const animate = (time) => {
-                      if (!startTime) startTime = time;
-                      const elapsed = time - startTime;
-                      const t = Math.min(elapsed / 1000, 1);
-                      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-                      
-                      setCadViewport(prev => {
-                          const sX = (mapConfig.baseMercX === 0 || !startTime) ? startX : prev.startX || startX;
-                          const sY = (mapConfig.baseMercX === 0 || !startTime) ? startY : prev.startY || startY;
-                          const sW = (mapConfig.baseMercX === 0 || !startTime) ? startW : prev.startW || startW;
-                          const sH = (mapConfig.baseMercX === 0 || !startTime) ? startH : prev.startH || startH;
-                          
-                          return {
-                              x: sX + (tX - sX) * ease,
-                              y: sY + (tY - sY) * ease,
-                              width: sW + (tW - sW) * ease,
-                              height: sH + (tH - sH) * ease,
-                              startX: sX, startY: sY, startW: sW, startH: sH
-                          };
-                      });
-                      
-                      if (t < 1) {
-                          requestAnimationFrame(animate);
-                      } else {
-                          // Flash highlight polygon
-                          setLsHighlightPoly(pointsList || points);
-                          setLsHighlightType(selSubdiv ? 'subdiv' : 'survey');
-                      }
-                  };
-                  requestAnimationFrame(animate);
-                  setIsLandSearchModalOpen(false); // Close modal
-              }
-          } else {
-              alert('Feature not found or no geometry returned.');
-          }
-      } catch (err) {
-          alert('Failed to execute search: ' + err.message);
-      } finally {
-          setLsLoading('');
-      }
+            if (selSurvey && selSurvey.length > 0) {
+                await fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv });
+            } else if (selVillage) {
+                await fetchAndHighlight('village', { selDistrict, selTaluk, selVillage, selSurvey: [], selSubdiv: [] });
+            } else if (selTaluk) {
+                await fetchAndHighlight('taluk', { selDistrict, selTaluk, selVillage, selSurvey: [], selSubdiv: [] });
+            } else if (selDistrict) {
+                await fetchAndHighlight('district', { selDistrict, selTaluk, selVillage, selSurvey: [], selSubdiv: [] });
+            }
+            setIsLandSearchModalOpen(false);
+        } catch (err) {
+            alert('Failed to execute search: ' + err.message);
+        } finally {
+            setLsLoading('');
+        }
   };
 
 React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
@@ -4856,24 +4692,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                          </div>
                        </div>
 
-                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsVillageEnabled(!isVillageEnabled); }}>
-                         <span>Show Village Boundary</span>
-                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isVillageEnabled ? 'bg-white' : 'bg-slate-600'}`}>
-                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isVillageEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                         </div>
-                       </div>
-                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsTalukEnabled(!isTalukEnabled); }}>
-                         <span>Show Taluk Boundary</span>
-                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isTalukEnabled ? 'bg-orange-500' : 'bg-slate-600'}`}>
-                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isTalukEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                         </div>
-                       </div>
-                       <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsDistrictEnabled(!isDistrictEnabled); }}>
-                         <span>Show District Boundary</span>
-                         <div className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 ${isDistrictEnabled ? 'bg-red-500' : 'bg-slate-600'}`}>
-                           <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${isDistrictEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                         </div>
-                       </div>
+
                        
                        <div className="flex items-center justify-between w-full px-5 py-3 border-b border-slate-700 gap-4">
                           <label className="flex items-center gap-2 cursor-pointer text-[13px] font-bold text-slate-300 hover:text-white transition-colors" onClick={e => e.stopPropagation()}>
@@ -6540,20 +6359,20 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           {mapConfig.active && (
                               <>
                                   <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
-                                  {isFMBEnabled && cadViewport.width <= 1000 && (
+                                  {cadViewport.width <= 1500 && (
                                       <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={Array.isArray(selSurvey) ? selSurvey.join(',') : selSurvey} activeSubdiv={Array.isArray(selSubdiv) ? selSubdiv.join(',') : selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || (selSurvey && selSurvey.length > 0)} />
                                   )}
-                                  {isCadastralEnabled && cadViewport.width <= 5000 && (
+                                  {cadViewport.width <= 6000 && (
                                       <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                                   )}
-                                  {isVillageEnabled && cadViewport.width > 1000 && cadViewport.width <= 30000 && (
-                                    <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#1e293b" strokeWidth="2.5" opacity={0.85} selectedName={selVillage || null} selectedPropertyName={selVillage ? 'village_name' : null} />
+                                  {cadViewport.width > 800 && cadViewport.width <= 40000 && (
+                                    <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#800000" strokeWidth="2.5" opacity={0.85} selectedName={selVillage || null} selectedPropertyName={selVillage ? 'village_name' : null} />
                                   )}
-                                  {isTalukEnabled && cadViewport.width > 5000 && cadViewport.width <= 150000 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#f59e0b" strokeWidth="2.5" opacity={0.9} selectedName={selTaluk || null} selectedPropertyName={selTaluk ? 'taluk_name' : null} />
+                                  {cadViewport.width > 3000 && cadViewport.width <= 150000 && (
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#ea580c" strokeWidth="2.5" opacity={0.9} selectedName={selTaluk || null} selectedPropertyName={selTaluk ? 'taluk_name' : null} />
                                   )}
-                                  {isDistrictEnabled && cadViewport.width > 20000 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#ef4444" strokeWidth="3.5" opacity={0.9} selectedName={selDistrict || null} selectedPropertyName={selDistrict ? 'district_name' : null} />
+                                  {cadViewport.width > 10000 && (
+                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#78350f" strokeWidth="3.5" opacity={0.95} selectedName={selDistrict || null} selectedPropertyName={selDistrict ? 'district_name' : null} />
                                   )}
                               </>
                           )}
