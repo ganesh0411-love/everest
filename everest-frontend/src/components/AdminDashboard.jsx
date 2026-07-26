@@ -481,11 +481,12 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
   };
 
   return (
-    <div className="relative w-full" ref={wrapperRef}>
-      <div className="relative w-full">
+    <div className="relative w-full box-border" ref={wrapperRef} style={{ boxSizing: 'border-box' }}>
+      <div className="relative w-full box-border" style={{ boxSizing: 'border-box' }}>
         <input
           type="text"
-          className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 pr-10 rounded-md border-0 outline-none shadow-sm cursor-text text-sm"
+          className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 pr-10 rounded-md border-0 outline-none shadow-sm cursor-text text-sm box-border"
+          style={{ boxSizing: 'border-box' }}
           placeholder={isLoading ? loadingText : (isMulti && Array.isArray(value) && value.length > 0 ? value.join(', ') : placeholder)}
           value={isMulti ? searchTerm : searchTerm}
           onChange={(e) => {
@@ -504,7 +505,7 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
       </div>
       
       {isOpen && (
-        <div className={`absolute z-[600] w-full bg-white border border-slate-200 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.1)] overflow-y-auto ${flyUp ? 'bottom-[105%] mb-1' : 'top-[105%] mt-1'}`} style={{ maxHeight: '220px' }}>
+        <div className={`absolute z-[600] w-full bg-white border border-slate-200 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.1)] overflow-y-auto box-border ${flyUp ? 'bottom-[105%] mb-1' : 'top-[105%] mt-1'}`} style={{ maxHeight: '220px', boxSizing: 'border-box', left: 0, right: 0 }}>
           {filteredOptions.length > 0 ? (
             <>
               {isMulti && (
@@ -594,7 +595,22 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [mapSelectionArea, setMapSelectionArea] = React.useState(null);
   const [lsHighlightType, setLsHighlightType] = React.useState(null);
   
-const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
+  const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!showLandSurveyDashboard) {
+      setIsLandSearchModalOpen(false);
+    }
+  }, [showLandSurveyDashboard]);
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      setIsLandSearchModalOpen(false);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
     const [isSubDivisionDropdownOpen, setIsSubDivisionDropdownOpen] = React.useState(false);
     const [checkedSurveyNos, setCheckedSurveyNos] = React.useState([]);
@@ -7095,10 +7111,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       {/* LAND SEARCH MODAL (TAMIL NILAM MATCH) */}
       {isLandSearchModalOpen && (
         <div 
-          className="fixed inset-0 z-[500] pointer-events-none flex items-center justify-center p-4 box-border"
+          className="fixed inset-0 z-[500] pointer-events-none flex items-center justify-center p-2 sm:p-4 box-border overflow-x-hidden"
+          style={{ boxSizing: 'border-box' }}
         >
           <div 
-            className="bg-[#1e3a8a] rounded-xl shadow-2xl p-4 w-[340px] max-w-[90vw] m-auto flex flex-col gap-3 relative animate-in zoom-in-95 duration-300 border border-blue-800 pointer-events-auto box-border"
+            className="bg-[#1e3a8a] rounded-xl shadow-2xl p-3 sm:p-4 w-full max-w-[310px] sm:max-w-[340px] mx-auto my-auto flex flex-col gap-3 relative animate-in zoom-in-95 duration-300 border border-blue-800 pointer-events-auto box-border"
             onClick={e => e.stopPropagation()}
             style={{ boxSizing: 'border-box' }}
           >
