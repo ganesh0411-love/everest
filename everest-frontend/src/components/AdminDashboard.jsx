@@ -472,37 +472,26 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Auto-scroll selected item into view when dropdown opens
+  // Auto-scroll to first selected item (centered) when dropdown opens
   React.useEffect(() => {
     if (isOpen && optionsContainerRef.current) {
       setTimeout(() => {
         if (optionsContainerRef.current) {
           const selectedEl = optionsContainerRef.current.querySelector('[data-selected="true"]');
           if (selectedEl) {
-            const containerTop = optionsContainerRef.current.getBoundingClientRect().top;
-            const elementTop = selectedEl.getBoundingClientRect().top;
-            optionsContainerRef.current.scrollTop += (elementTop - containerTop);
+            selectedEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
           } else {
             optionsContainerRef.current.scrollTop = 0;
           }
         }
-      }, 10);
+      }, 30);
     }
   }, [isOpen]);
 
+  // Preserve natural order — never reorder selected items to the top
   const filteredOptions = React.useMemo(() => {
-    const list = (options || []).filter(opt => opt !== null && opt !== undefined && String(opt).toLowerCase().includes(String(searchTerm || '').toLowerCase()));
-    if (isMulti && Array.isArray(value) && value.length > 0) {
-      const selected = [];
-      const unselected = [];
-      list.forEach(opt => {
-        if (value.includes(opt)) selected.push(opt);
-        else unselected.push(opt);
-      });
-      return [...selected, ...unselected];
-    }
-    return list;
-  }, [options, searchTerm, isMulti, value]);
+    return (options || []).filter(opt => opt !== null && opt !== undefined && String(opt).toLowerCase().includes(String(searchTerm || '').toLowerCase()));
+  }, [options, searchTerm]);
 
   const displayValue = React.useMemo(() => {
     if (isOpen) return searchTerm;
