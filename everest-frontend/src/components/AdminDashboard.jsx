@@ -314,8 +314,8 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
 
     React.useEffect(() => {
         const timer = setTimeout(() => {
-            const padX = viewport.width * 0.2;
-            const padY = viewport.height * 0.2;
+            const padX = viewport.width * 0.6;
+            const padY = viewport.height * 0.6;
             const vX = viewport.x - padX;
             const vY = viewport.y - padY;
             const vW = viewport.width + padX * 2;
@@ -449,9 +449,9 @@ const CadastralWMSLayer = ({ viewport, baseMercX, baseMercY }) => {
 
     React.useEffect(() => {
         const timer = setTimeout(() => {
-            // Expand bbox by 20% on all sides so small pans are smooth
-            const padX = viewport.width * 0.2;
-            const padY = viewport.height * 0.2;
+            // Expand bbox by 60% on all sides so small pans and map rotations are smooth
+            const padX = viewport.width * 0.6;
+            const padY = viewport.height * 0.6;
             const vX = viewport.x - padX;
             const vY = viewport.y - padY;
             const vW = viewport.width + padX * 2;
@@ -1116,6 +1116,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   const [cadPromptValue, setCadPromptValue] = React.useState('');
   const [cadPromptUnit, setCadPromptUnit] = React.useState('meters');
   const cadSvgRef = React.useRef(null);
+  const cadLayerGroupRef = React.useRef(null);
   
   const [isFloatingStackExpanded, setIsFloatingStackExpanded] = React.useState(false);
   const [isPolygonAreaCardVisible, setIsPolygonAreaCardVisible] = React.useState(true);
@@ -1926,9 +1927,20 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   }, [cadNodes, cadSelectedLine, cadEditInputs.isMovingLine, cadLines]);
 
   const getCadSvgCoords = (clientX, clientY) => {
-    if (!cadSvgRef.current) return { x: 0, y: 0 };
-    const CTM = cadSvgRef.current.getScreenCTM();
+    const targetEl = cadLayerGroupRef.current || cadSvgRef.current;
+    if (!targetEl) return { x: 0, y: 0 };
+    const CTM = targetEl.getScreenCTM();
     if (!CTM) return { x: 0, y: 0 };
+    if (typeof CTM.inverse === 'function' && cadSvgRef.current) {
+      try {
+        const inv = CTM.inverse();
+        let pt = cadSvgRef.current.createSVGPoint();
+        pt.x = clientX;
+        pt.y = clientY;
+        pt = pt.matrixTransform(inv);
+        return { x: pt.x, y: pt.y };
+      } catch (err) {}
+    }
     return { x: (clientX - CTM.e) / CTM.a, y: (clientY - CTM.f) / CTM.d };
   };
 
@@ -1987,6 +1999,17 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   const getSvgPtToContainer = (svgX, svgY) => {
     if (!cadSvgRef.current) return { left: 0, top: 0 };
+    const targetEl = cadLayerGroupRef.current || cadSvgRef.current;
+    const CTM = targetEl.getScreenCTM();
+    if (!CTM) return { left: 0, top: 0 };
+    try {
+      const rect = cadSvgRef.current.getBoundingClientRect();
+      let pt = cadSvgRef.current.createSVGPoint();
+      pt.x = svgX;
+      pt.y = svgY;
+      pt = pt.matrixTransform(CTM);
+      return { left: pt.x - rect.left, top: pt.y - rect.top };
+    } catch (err) {}
     const rect = cadSvgRef.current.getBoundingClientRect();
     const scaleX = rect.width / cadViewport.width;
     const scaleY = rect.height / cadViewport.height;
@@ -2281,8 +2304,15 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
       const svgRect = cadSvgRef.current.getBoundingClientRect();
       const uniformScale = Math.max(cadPinchInitial.view.width / svgRect.width, cadPinchInitial.view.height / svgRect.height);
-      const dx = (cadPinchInitial.cx - cx) * uniformScale;
-      const dy = (cadPinchInitial.cy - cy) * uniformScale; 
+      let dx = (cadPinchInitial.cx - cx) * uniformScale;
+      let dy = (cadPinchInitial.cy - cy) * uniformScale; 
+      if (mapRotation !== 0) {
+        const rad = -mapRotation * (Math.PI / 180);
+        const rdx = dx * Math.cos(rad) - dy * Math.sin(rad);
+        const rdy = dx * Math.sin(rad) + dy * Math.cos(rad);
+        dx = rdx;
+        dy = rdy;
+      }
 
       const centroidSvgX = cadPinchInitial.view.x + (cadPinchInitial.cx - svgRect.left) * uniformScale;
       const centroidSvgY = cadPinchInitial.view.y + (cadPinchInitial.cy - svgRect.top) * uniformScale;
@@ -2425,8 +2455,15 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       }
 
       if (cadPointerGesture?.isDraggingPan) {
-         const dx = (cadPointerGesture.lastClientX - e.clientX) * uniformScale;
-         const dy = (cadPointerGesture.lastClientY - e.clientY) * uniformScale;
+         let dx = (cadPointerGesture.lastClientX - e.clientX) * uniformScale;
+         let dy = (cadPointerGesture.lastClientY - e.clientY) * uniformScale;
+         if (mapRotation !== 0) {
+           const rad = -mapRotation * (Math.PI / 180);
+           const rdx = dx * Math.cos(rad) - dy * Math.sin(rad);
+           const rdy = dx * Math.sin(rad) + dy * Math.cos(rad);
+           dx = rdx;
+           dy = rdy;
+         }
          
          const newX = cadViewportRef.current.x + dx;
          const newY = cadViewportRef.current.y + dy;
@@ -2467,8 +2504,15 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       }
 
       if (cadPointerGesture?.isDraggingText) {
-         const dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
-         const dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
+         let dxSvg = (e.clientX - cadPointerGesture.startX) * uniformScale;
+         let dySvg = (e.clientY - cadPointerGesture.startY) * uniformScale;
+         if (mapRotation !== 0) {
+           const rad = -mapRotation * (Math.PI / 180);
+           const rdx = dxSvg * Math.cos(rad) - dySvg * Math.sin(rad);
+           const rdy = dxSvg * Math.sin(rad) + dySvg * Math.cos(rad);
+           dxSvg = rdx;
+           dySvg = rdy;
+         }
          const textId = cadPointerGesture.targetText.id;
          const basePos = cadPointerGesture.basePos || { x: cadPointerGesture.targetText.x, y: cadPointerGesture.targetText.y };
          if (!cadPointerGesture.basePos) setCadPointerGesture(p => ({ ...p, basePos }));
@@ -5496,8 +5540,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               )}
                  <svg 
                    ref={cadSvgRef}
-                   className="absolute inset-0 w-full h-full cursor-crosshair touch-none transition-transform duration-200 ease-linear"
-                   style={{ transform: `rotate(${mapRotation}deg)` }}
+                   className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
                    viewBox={`${cadViewport.x} ${cadViewport.y} ${cadViewport.width} ${cadViewport.height}`}
                    preserveAspectRatio="xMidYMid slice"
                  >
@@ -5506,6 +5549,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                        <path d={`M ${cadViewport.width * 0.05} 0 L 0 0 0 ${cadViewport.width * 0.05}`} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={cadViewport.width * 0.001}/>
                      </pattern>
                    </defs>
+                   <g ref={cadLayerGroupRef} transform={`rotate(${mapRotation}, ${cadViewport.x + cadViewport.width / 2}, ${cadViewport.y + cadViewport.height / 2})`}>
                     {mapConfig.active && (
                        <>
                            <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
@@ -6485,6 +6529,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       />
                     );
                   })}
+                   </g>
                    </g>
                 </svg>
 
