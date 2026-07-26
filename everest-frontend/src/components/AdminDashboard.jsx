@@ -719,6 +719,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [lsHighlightType, setLsHighlightType] = React.useState(null);
   
   const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
+  const [mapRotation, setMapRotation] = React.useState(0);
 
   React.useEffect(() => {
     if (!showLandSurveyDashboard) {
@@ -2008,6 +2009,96 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp);
   };
+
+  const toggleSatelliteMap = React.useCallback(() => {
+    if (mapConfig.active) {
+      setMapConfig(prev => ({ ...prev, active: false }));
+      if (!cadScale) {
+        setCadScale(Math.cos(mapConfig.baseLat * Math.PI / 180));
+      }
+      return;
+    }
+    setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
+    Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+      .then(position => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const R = 6378137;
+        const baseMercX = R * (lon * Math.PI / 180);
+        const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+        
+        setMapConfig(prev => {
+          if (prev.baseMercX !== 0) {
+            const targetX = baseMercX - prev.baseMercX;
+            const targetY = prev.baseMercY - baseMercY;
+            setUserLocationMarker({ x: targetX, y: targetY });
+            setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
+            return { ...prev, active: true, isLoading: false, baseLat: lat };
+          } else {
+            setUserLocationMarker({ x: 0, y: 0 });
+            setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
+            return { active: true, isLoading: false, baseMercX, baseMercY, baseLat: lat };
+          }
+        });
+      })
+      .catch(e => {
+        alert("Geolocation failed: " + e.message);
+        setMapConfig(prev => ({ ...prev, active: false, isLoading: false }));
+      });
+  }, [mapConfig.active, mapConfig.baseLat, cadScale]);
+
+  const handleGpsCenter = React.useCallback(async () => {
+    if (cadNodes && cadNodes.length > 0 && mapConfig.baseLat !== 0 && !mapConfig.active) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      cadNodes.forEach(n => {
+        if (n.x < minX) minX = n.x;
+        if (n.x > maxX) maxX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.y > maxY) maxY = n.y;
+      });
+      const margin = Math.max(maxX - minX, maxY - minY) * 0.1 || 10;
+      setCadViewport({ x: minX - margin, y: minY - margin, width: (maxX - minX) + margin * 2, height: (maxY - minY) + margin * 2 });
+      return;
+    }
+    try {
+      const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      const R = 6378137;
+      const mercX = R * (lon * Math.PI / 180);
+      const mercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+      const targetX = mercX - mapConfig.baseMercX;
+      const targetY = mapConfig.baseMercY - mercY;
+      
+      setUserLocationMarker({ x: targetX, y: targetY });
+
+      const tWidth = 500;
+      const tHeight = 500;
+      const tX = targetX - tWidth/2;
+      const tY = targetY - tHeight/2;
+      
+      const startX = cadViewport.x;
+      const startY = cadViewport.y;
+      
+      let startTime = null;
+      const animate = (time) => {
+        if (!startTime) startTime = time;
+        const elapsed = time - startTime;
+        const t = Math.min(elapsed / 600, 1);
+        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        setCadViewport({
+          x: startX + (tX - startX) * ease,
+          y: startY + (tY - startY) * ease,
+          width: 500,
+          height: 500
+        });
+        if (t < 1) requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+    } catch (e) {
+      alert("GPS Re-center failed: " + e.message);
+    }
+  }, [cadNodes, mapConfig, cadViewport]);
 
   const handleCadPointerDown = (e) => {
     cadStateBeforeActionRef.current = captureCadState();
@@ -5202,17 +5293,44 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     }
                 }}
               >
-              {/* TOP-LEFT CONTROLS */}
-              <div className="absolute top-6 left-6 z-[150] flex flex-col gap-4 pointer-events-none">
-                  <button className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto">
+              {/* TOP-LEFT CONTROLS: VERTICAL ICON STACK */}
+              <div className="absolute top-6 left-6 z-[150] flex flex-col items-center gap-3 pointer-events-none">
+                  {/* Icon 1: Search Icon */}
+                  <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(true); }} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="Search">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(!isLandSearchModalOpen); }} className={`w-10 h-10 rounded-full text-white shadow-lg border flex items-center justify-center transition-colors pointer-events-auto ${isLandSearchModalOpen ? 'bg-blue-600 border-blue-400' : 'bg-slate-800/80 border-slate-600 hover:bg-slate-700'}`}>
+                  {/* Icon 2: Land Search Icon */}
+                  <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(!isLandSearchModalOpen); }} className={`w-10 h-10 rounded-full text-white shadow-lg border flex items-center justify-center transition-colors pointer-events-auto ${isLandSearchModalOpen ? 'bg-blue-600 border-blue-400' : 'bg-slate-800/80 border-slate-600 hover:bg-slate-700'}`} title="Land Search">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                       </svg>
+                  </button>
+                  {/* Icon 3: 360° Map Rotation Control Icon */}
+                  <div className="flex items-center bg-slate-800/90 text-white rounded-full shadow-lg border border-slate-600 pointer-events-auto overflow-hidden">
+                      <button onClick={(e) => { e.stopPropagation(); setMapRotation(r => (r - 15 + 360) % 360); }} className="px-2 py-2 hover:bg-slate-700 active:bg-slate-600 transition-colors" title="Rotate Left 15°">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setMapRotation(0); }} className="px-1.5 py-2 hover:bg-slate-700 active:bg-slate-600 transition-colors flex items-center justify-center text-[10px] font-bold font-mono min-w-[28px]" title="Reset North (0°)">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transition-transform duration-300 shrink-0" style={{ transform: `rotate(${mapRotation}deg)` }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polygon points="12 2 15 12 12 10 9 12 12 2" fill="currentColor"/><circle cx="12" cy="12" r="9"/></svg>
+                          {mapRotation !== 0 && <span className="ml-1 text-fuchsia-400">{mapRotation}°</span>}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setMapRotation(r => (r + 15) % 360); }} className="px-2 py-2 hover:bg-slate-700 active:bg-slate-600 transition-colors" title="Rotate Right 15°">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                      </button>
+                  </div>
+                  {/* Icon 4: Current Location / GPS Center Icon */}
+                  <button onClick={handleGpsCenter} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="GPS Center / Current Location">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
+                  </button>
+                  {/* Icon 5: Map Layer Toggle Icon */}
+                  <button onClick={toggleSatelliteMap} className={`w-10 h-10 rounded-full flex justify-center items-center font-bold transition-colors pointer-events-auto shadow-lg border border-slate-600 ${mapConfig.active ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-slate-800/80 hover:bg-slate-700 text-white'}`} title={mapConfig.active ? "Toggle Satellite Map OFF" : "Toggle Satellite Map ON"}>
+                      {mapConfig.isLoading ? (
+                          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                      ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                      )}
                   </button>
               </div>
 
@@ -5277,7 +5395,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   </div>
               </div>
 
-              {/* BOTTOM-LEFT LEGEND */}
+              {/* BOTTOM-LEFT LEGEND: Hidden in Live Map Mode */}
+              {!mapConfig.active && (
               <div className="absolute bottom-6 left-6 z-[150] pointer-events-none">
                   <button className="bg-slate-800/80 px-4 py-2 rounded-full text-white text-xs font-bold shadow-lg border border-slate-600 hover:bg-slate-700 transition-colors flex items-center gap-2 pointer-events-auto">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -5286,6 +5405,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       Legend
                   </button>
               </div>
+              )}
 
               {cadContextMenu && (
                 <div 
@@ -5376,7 +5496,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               )}
                  <svg 
                    ref={cadSvgRef}
-                   className="absolute inset-0 w-full h-full cursor-crosshair touch-none transition-transform duration-75 ease-linear"
+                   className="absolute inset-0 w-full h-full cursor-crosshair touch-none transition-transform duration-200 ease-linear"
+                   style={{ transform: `rotate(${mapRotation}deg)` }}
                    viewBox={`${cadViewport.x} ${cadViewport.y} ${cadViewport.width} ${cadViewport.height}`}
                    preserveAspectRatio="xMidYMid slice"
                  >
@@ -6766,10 +6887,9 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                    );
                  })()}
 
-
             {activeArea ? (
                isPolygonAreaCardVisible ? (
-                <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className="absolute bottom-[4.5rem] left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto animate-in slide-in-from-bottom-4">
+                <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className={`absolute ${mapConfig.active ? 'bottom-6' : 'bottom-16'} left-6 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto animate-in slide-in-from-bottom-4 transition-all duration-300`}>
                   <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1 gap-4">
                      <span className="text-[10px] text-fuchsia-400 font-black uppercase tracking-widest">Polygon Area</span>
                      <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(false); }} className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-slate-800" title="Minimize">
@@ -6785,12 +6905,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   </div>
                 </div>
                ) : (
-                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(true); }} className="absolute bottom-[4.5rem] left-8 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 text-fuchsia-400 hover:text-fuchsia-300 pointer-events-auto flex items-center justify-center animate-in zoom-in-75 hover:bg-slate-800 transition-colors" title="Restore Polygon Area">
+                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(true); }} className={`absolute ${mapConfig.active ? 'bottom-6' : 'bottom-16'} left-6 z-[120] bg-slate-900/90 p-3 rounded-xl shadow-2xl border border-slate-700 text-fuchsia-400 hover:text-fuchsia-300 pointer-events-auto flex items-center justify-center animate-in zoom-in-75 hover:bg-slate-800 transition-all duration-300`} title="Restore Polygon Area">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                 </button>
                )
-             ) : (
-                cadLines.length >= 3 && cadOpenNodes && cadOpenNodes.length > 0 && (
+             ) : null}
+
+             {cadLines.length >= 3 && cadOpenNodes && cadOpenNodes.length > 0 && (
                   <div className="absolute bottom-8 left-8 z-[120] animate-in slide-in-from-bottom-4">
                    <button 
                      onPointerDown={(e) => { e.stopPropagation(); }}
@@ -6807,179 +6928,69 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                    </button>
                   </div>
                 )
+             }
+
+             {/* VIRTUAL JOYSTICK D-PAD: Hidden in Live Map Mode */}
+             {!mapConfig.active && (
+             <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none scale-75 origin-bottom-right"
+                  onPointerDown={e => e.stopPropagation()}
+             >
+                <div className="flex flex-col items-center gap-1">
+                   {/* Top Button: ADD LINE TRIGGER */}
+                   <button 
+                      className={`w-10 h-10 rounded-full flex justify-center items-center font-bold text-xl transition-colors ${cadTool === 'ADD_LINE' ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white active:bg-fuchsia-600'}`}
+                      onClick={() => { 
+                         if (cadTool === 'ADD_LINE') {
+                            setCadTool('IDLE');
+                            setCadAnchorNode(null);
+                         } else {
+                            setCadTool('ADD_LINE');
+                            setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2, isInitialCenter: true });
+                         }
+                         setCadSelectedNode(null); 
+                      }}
+                      title="Add Line"
+                   >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                         <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                      </svg>
+                   </button>
+                   
+                   <div className="flex gap-1">
+                      {/* Left Button: GPS */}
+                      <button 
+                         className="w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex justify-center items-center font-bold transition-colors"
+                         title="GPS"
+                         onClick={handleGpsCenter}
+                      >
+                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <text x="12" y="16" fontSize="10" fontWeight="900" textAnchor="middle" fill="currentColor" stroke="none">GPS</text>
+                         </svg>
+                      </button>
+                      
+                      {/* Center Axis Button: Reset Origin / GPS Re-Center */}
+                      <button 
+                         className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-fuchsia-400 border border-slate-600 flex justify-center items-center font-bold text-xl transition-colors"
+                         onClick={handleGpsCenter}
+                         title="Reset View / Re-center"
+                      >
+                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2"/></svg>
+                      </button>
+
+                      {/* Right Button: METRIC INSTANT TOGGLE */}
+                      <button 
+                         className={`w-10 h-10 rounded-full flex justify-center items-center transition-colors bg-slate-700 hover:bg-slate-600 text-white active:bg-fuchsia-600`}
+                         onClick={() => setIsGlobalMetricFeet(p => !p)}
+                         title="Toggle Metric Units (m/ft)"
+                      >
+                         <span className="font-bold text-lg font-mono leading-none tracking-tight">
+                            {isGlobalMetricFeet ? 'ft' : 'm'}
+                         </span>
+                      </button>
+                   </div>
+                </div>
+             </div>
              )}
-
-            {/* VIRTUAL JOYSTICK D-PAD */}
-            <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none scale-75 origin-bottom-right"
-                 onPointerDown={e => e.stopPropagation()}
-            >
-               <div className="flex flex-col items-center gap-1">
-                  {/* Top Button: ADD LINE TRIGGER */}
-                  <button 
-                     className={`w-10 h-10 rounded-full flex justify-center items-center font-bold text-xl transition-colors ${cadTool === 'ADD_LINE' ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white active:bg-fuchsia-600'}`}
-                     onClick={() => { 
-                        if (cadTool === 'ADD_LINE') {
-                           setCadTool('IDLE');
-                           setCadAnchorNode(null);
-                        } else {
-                           setCadTool('ADD_LINE');
-                           setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2, isInitialCenter: true });
-                        }
-                        setCadSelectedNode(null); 
-                     }}
-                     title="Add Line"
-                  >
-                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-                     </svg>
-                  </button>
-                  
-                  <div className="flex gap-1">
-                     {/* Left Button: GPS */}
-                     <button 
-                        className="w-10 h-10 rounded-full bg-slate-700 hover:bg-slate-600 text-white flex justify-center items-center font-bold transition-colors"
-                        title="GPS"
-                     >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                           <text x="12" y="16" fontSize="10" fontWeight="900" textAnchor="middle" fill="currentColor" stroke="none">GPS</text>
-                        </svg>
-                     </button>
-                     
-                     {/* Center Axis Button: Reset Origin / GPS Re-Center */}
-                     <button 
-                        className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-fuchsia-400 border border-slate-600 flex justify-center items-center font-bold text-xl transition-colors"
-                        onClick={async () => {
-                            if (cadNodes && cadNodes.length > 0 && mapConfig.baseLat !== 0) {
-                                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                                cadNodes.forEach(n => {
-                                    if (n.x < minX) minX = n.x;
-                                    if (n.x > maxX) maxX = n.x;
-                                    if (n.y < minY) minY = n.y;
-                                    if (n.y > maxY) maxY = n.y;
-                                });
-                                const margin = Math.max(maxX - minX, maxY - minY) * 0.1 || 10;
-                                setCadViewport({ x: minX - margin, y: minY - margin, width: (maxX - minX) + margin * 2, height: (maxY - minY) + margin * 2 });
-                                return;
-                            }
-                            if (mapConfig.active) {
-                                try {
-                                    const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-                                    const lat = position.coords.latitude;
-                                    const lon = position.coords.longitude;
-                                    const R = 6378137;
-                                    const mercX = R * (lon * Math.PI / 180);
-                                    const mercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
-                                    const targetX = mercX - mapConfig.baseMercX;
-                                    const targetY = mapConfig.baseMercY - mercY;
-                                    
-                                    setUserLocationMarker({ x: targetX, y: targetY });
-
-                                    const tWidth = 500;
-                                    const tHeight = 500;
-                                    const tX = targetX - tWidth/2;
-                                    const tY = targetY - tHeight/2;
-                                    
-                                    const startX = cadViewport.x;
-                                    const startY = cadViewport.y;
-                                    const startW = cadViewport.width;
-                                    const startH = cadViewport.height;
-                                    
-                                    let startTime = null;
-                                    const animate = (time) => {
-                                        if (!startTime) startTime = time;
-                                        const elapsed = time - startTime;
-                                        const t = Math.min(elapsed / 600, 1);
-                                        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-                                        setCadViewport({
-                                            x: startX + (tX - startX) * ease,
-                                            y: startY + (tY - startY) * ease,
-                                            width: startW + (tWidth - startW) * ease,
-                                            height: startH + (tHeight - startH) * ease
-                                        });
-                                        if (t < 1) requestAnimationFrame(animate);
-                                    };
-                                    requestAnimationFrame(animate);
-                                } catch(e) {
-                                    alert("GPS Error: " + e.message);
-                                }
-                            } else {
-                                setCadViewport({ x: 0, y: 0, width: 2000, height: 2000 });
-                            }
-                        }}
-                        title="My Location / Reset Origin"
-                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2"/></svg>
-                     </button>
-
-                     
-                     {/* Right Button: METRIC INSTANT TOGGLE */}
-                     <button 
-                        className={`w-10 h-10 rounded-full flex justify-center items-center transition-colors bg-slate-700 hover:bg-slate-600 text-white active:bg-fuchsia-600`}
-                        onClick={() => setIsGlobalMetricFeet(p => !p)}
-                        title="Toggle Metric Units (m/ft)"
-                     >
-                        <span className="font-bold text-lg font-mono leading-none tracking-tight">
-                           {isGlobalMetricFeet ? 'ft' : 'm'}
-                        </span>
-                     </button>
-                  </div>
-                  
-                  {/* Bottom Button: Map Layers */}
-                  <button 
-                     className={`w-10 h-10 rounded-full flex justify-center items-center font-bold transition-colors ${mapConfig.active ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
-                     onClick={() => {
-                        if (mapConfig.active) {
-                            setMapConfig(prev => ({ ...prev, active: false }));
-                            if (!cadScale) {
-                                setCadScale(Math.cos(mapConfig.baseLat * Math.PI / 180));
-                            }
-                            return;
-                        }
-                        setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
-                        Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
-                            .then(position => {
-                                const lat = position.coords.latitude;
-                                const lon = position.coords.longitude;
-                                const R = 6378137;
-                                const baseMercX = R * (lon * Math.PI / 180);
-                                const baseMercY = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
-                                
-                                setMapConfig(prev => {
-                                    if (prev.baseMercX !== 0) {
-                                        const targetX = baseMercX - prev.baseMercX;
-                                        const targetY = prev.baseMercY - baseMercY;
-                                        setUserLocationMarker({ x: targetX, y: targetY });
-                                        setCadViewport({ x: targetX - 250, y: targetY - 250, width: 500, height: 500 });
-                                        return { ...prev, active: true, isLoading: false, baseLat: lat };
-                                    } else {
-                                        setUserLocationMarker({ x: 0, y: 0 });
-                                        setCadViewport({ x: -250, y: -250, width: 500, height: 500 });
-                                        return { active: true, isLoading: false, baseMercX, baseMercY, baseLat: lat };
-                                    }
-                                });
-                            })
-                            .catch(e => {
-                                alert("Geolocation failed: " + e.message);
-                                setMapConfig(prev => ({ ...prev, active: false, isLoading: false }));
-                            });
-                     }}
-                     title="Live Satellite Map"
-                  >
-                     {mapConfig.isLoading ? (
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                        </svg>
-                     ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                           <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-                           <polyline points="2 12 12 17 22 12"/>
-                           <polyline points="2 17 12 22 22 17"/>
-                        </svg>
-                     )}
-                  </button>
-               </div>
-            </div>
 {cadPrompt && (() => {
                   let l = cadPrompt.x;
                   let t = cadPrompt.y;
