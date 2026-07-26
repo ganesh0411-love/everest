@@ -442,26 +442,86 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
   const [isOpen, setIsOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const wrapperRef = React.useRef(null);
+  const optionsContainerRef = React.useRef(null);
 
-  React.useEffect(() => {
-    if (!isMulti) {
-      setSearchTerm(value || '');
+  const handleOpenToggle = () => {
+    if (!isOpen) {
+      setSearchTerm('');
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+      setSearchTerm('');
     }
-  }, [value, isMulti]);
+  };
+
+  const handleInputFocus = () => {
+    if (!isOpen) {
+      setSearchTerm('');
+      setIsOpen(true);
+    }
+  };
 
   React.useEffect(() => {
     const handleClickOutside = (event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setIsOpen(false);
-        if (!isMulti) setSearchTerm(value || '');
-        else setSearchTerm('');
+        setSearchTerm('');
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [value, isMulti]);
+  }, []);
 
-  const filteredOptions = (options || []).filter(opt => opt && String(opt).toLowerCase().includes(String(searchTerm || '').toLowerCase()));
+  // Auto-scroll selected item into view when dropdown opens
+  React.useEffect(() => {
+    if (isOpen && optionsContainerRef.current) {
+      setTimeout(() => {
+        if (optionsContainerRef.current) {
+          const selectedEl = optionsContainerRef.current.querySelector('[data-selected="true"]');
+          if (selectedEl) {
+            const containerTop = optionsContainerRef.current.getBoundingClientRect().top;
+            const elementTop = selectedEl.getBoundingClientRect().top;
+            optionsContainerRef.current.scrollTop += (elementTop - containerTop);
+          } else {
+            optionsContainerRef.current.scrollTop = 0;
+          }
+        }
+      }, 10);
+    }
+  }, [isOpen]);
+
+  const filteredOptions = React.useMemo(() => {
+    const list = (options || []).filter(opt => opt !== null && opt !== undefined && String(opt).toLowerCase().includes(String(searchTerm || '').toLowerCase()));
+    if (isMulti && Array.isArray(value) && value.length > 0) {
+      const selected = [];
+      const unselected = [];
+      list.forEach(opt => {
+        if (value.includes(opt)) selected.push(opt);
+        else unselected.push(opt);
+      });
+      return [...selected, ...unselected];
+    }
+    return list;
+  }, [options, searchTerm, isMulti, value]);
+
+  const displayValue = React.useMemo(() => {
+    if (isOpen) return searchTerm;
+    if (isMulti) {
+      return Array.isArray(value) && value.length > 0 ? value.join(', ') : '';
+    }
+    return value || '';
+  }, [isOpen, searchTerm, isMulti, value]);
+
+  const computedPlaceholder = React.useMemo(() => {
+    if (isLoading) return loadingText;
+    if (isOpen) {
+      if (!isMulti && value) return `Current: ${value}`;
+      if (isMulti && Array.isArray(value) && value.length > 0) return `${value.length} selected (type to filter...)`;
+      return "Type to search...";
+    }
+    if (isMulti && Array.isArray(value) && value.length > 0) return value.join(', ');
+    return placeholder;
+  }, [isLoading, isOpen, isMulti, value, loadingText, placeholder]);
 
   const handleSelect = (opt) => {
     if (isMulti) {
@@ -475,8 +535,8 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
       onChange(newVal);
     } else {
       onChange(opt);
-      setSearchTerm(opt);
       setIsOpen(false);
+      setSearchTerm('');
     }
   };
 
@@ -487,25 +547,25 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
           type="text"
           className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 pr-10 rounded-md border-0 outline-none shadow-sm cursor-text text-sm box-border"
           style={{ boxSizing: 'border-box' }}
-          placeholder={isLoading ? loadingText : (isMulti && Array.isArray(value) && value.length > 0 ? value.join(', ') : placeholder)}
-          value={isMulti ? searchTerm : searchTerm}
+          placeholder={computedPlaceholder}
+          value={displayValue}
           onChange={(e) => {
             setSearchTerm(e.target.value);
-            setIsOpen(true);
-            if (!isMulti && e.target.value === '') onChange('');
+            if (!isOpen) setIsOpen(true);
+            if (!isMulti && e.target.value === '' && !isOpen) onChange('');
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={handleInputFocus}
         />
         <div 
           className="absolute right-0 top-0 h-full px-3 flex items-center cursor-pointer"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={handleOpenToggle}
         >
           <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
         </div>
       </div>
       
       {isOpen && (
-        <div className={`absolute z-[600] w-full bg-white border border-slate-200 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.1)] overflow-y-auto box-border ${flyUp ? 'bottom-[105%] mb-1' : 'top-[105%] mt-1'}`} style={{ maxHeight: '220px', boxSizing: 'border-box', left: 0, right: 0 }}>
+        <div ref={optionsContainerRef} className={`absolute z-[600] w-full bg-white border border-slate-200 rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.1)] overflow-y-auto box-border ${flyUp ? 'bottom-[105%] mb-1' : 'top-[105%] mt-1'}`} style={{ maxHeight: '220px', boxSizing: 'border-box', left: 0, right: 0 }}>
           {filteredOptions.length > 0 ? (
             <>
               {isMulti && (
@@ -528,10 +588,12 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
               )}
               {filteredOptions.map((opt, idx) => {
                 const isSelected = isMulti && Array.isArray(value) && value.includes(opt);
+                const isSingleSelected = !isMulti && value === opt;
                 return (
                   <div 
                     key={idx} 
-                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-blue-100 ${isSelected || value === opt ? 'bg-blue-50 font-bold text-blue-700' : 'text-slate-700'} flex items-center justify-between gap-2`}
+                    data-selected={isSelected || isSingleSelected ? "true" : "false"}
+                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-blue-100 ${isSelected || isSingleSelected ? 'bg-blue-50 font-bold text-blue-700 border-l-4 border-blue-600' : 'text-slate-700'} flex items-center justify-between gap-2`}
                     onClick={() => handleSelect(opt)}
                   >
                     <span className="truncate">{opt}</span>
