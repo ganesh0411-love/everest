@@ -11,7 +11,7 @@ import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'fireb
 const USE_LOCAL_GIS = true;
 const REMOTE_API_BASE = 'https://everest-backend-f9nt.onrender.com';
 const LOCAL_API_BASE = 'http://localhost:5000';
-const API_BASE = REMOTE_API_BASE;
+const API_BASE = LOCAL_API_BASE;
 
 const DB_NAME = 'EverestTileCache';
 const STORE_NAME = 'tiles';
@@ -740,15 +740,15 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                           sub = match[1];
                           sur = match[2];
                       }
-                      fetches.push(`https://everest-backend-f9nt.onrender.com/api/tngis/boundary?level=parcel&district=${encodeURIComponent(state.selDistrict)}&taluk=${encodeURIComponent(state.selTaluk)}&village=${encodeURIComponent(state.selVillage)}&survey=${encodeURIComponent(sur)}&subdiv=${encodeURIComponent(sub)}`);
+                      fetches.push(`http://localhost:5000/api/tngis/boundary?level=parcel&district=${encodeURIComponent(state.selDistrict)}&taluk=${encodeURIComponent(state.selTaluk)}&village=${encodeURIComponent(state.selVillage)}&survey=${encodeURIComponent(sur)}&subdiv=${encodeURIComponent(sub)}`);
                   });
               } else if (state.selSurvey && state.selSurvey.length > 0) {
                   state.selSurvey.forEach(sur => {
-                      fetches.push(`https://everest-backend-f9nt.onrender.com/api/tngis/boundary?level=parcel&district=${encodeURIComponent(state.selDistrict)}&taluk=${encodeURIComponent(state.selTaluk)}&village=${encodeURIComponent(state.selVillage)}&survey=${encodeURIComponent(sur)}`);
+                      fetches.push(`http://localhost:5000/api/tngis/boundary?level=parcel&district=${encodeURIComponent(state.selDistrict)}&taluk=${encodeURIComponent(state.selTaluk)}&village=${encodeURIComponent(state.selVillage)}&survey=${encodeURIComponent(sur)}`);
                   });
               }
           } else {
-              let url = `https://everest-backend-f9nt.onrender.com/api/tngis/boundary?level=${level}`;
+              let url = `http://localhost:5000/api/tngis/boundary?level=${level}`;
               if (state.selDistrict) url += `&district=${encodeURIComponent(state.selDistrict)}`;
               if (state.selTaluk) url += `&taluk=${encodeURIComponent(state.selTaluk)}`;
               if (state.selVillage) url += `&village=${encodeURIComponent(state.selVillage)}`;
@@ -948,11 +948,11 @@ const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
                       sub = match[1];
                       sur = match[2];
                   }
-                  fetches.push(`https://everest-backend-f9nt.onrender.com/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&subdiv=${encodeURIComponent(sub)}&district=${encodeURIComponent(selDistrict)}`);
+                  fetches.push(`http://localhost:5000/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&subdiv=${encodeURIComponent(sub)}&district=${encodeURIComponent(selDistrict)}`);
               });
           } else if (selSurvey && selSurvey.length > 0) {
               selSurvey.forEach(sur => {
-                  fetches.push(`https://everest-backend-f9nt.onrender.com/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`);
+                  fetches.push(`http://localhost:5000/api/tngis/feature?village=${encodeURIComponent(selVillage)}&survey=${encodeURIComponent(sur)}&taluk=${encodeURIComponent(selTaluk)}&district=${encodeURIComponent(selDistrict)}`);
               });
           }
 
@@ -4714,20 +4714,22 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     </div>
                  </div>
                  
-                 <div className="relative flex items-center gap-2">
-                   <button 
-                     onClick={(e) => {
-                       e.stopPropagation();
-                       resetAppState();
-                     }}
-                     className="px-3 py-1.5 bg-slate-800 text-xs font-bold text-slate-300 rounded-lg hover:bg-slate-700 hover:text-white uppercase tracking-wider transition-colors border border-slate-700"
-                     title="Refresh/Reset"
-                   >
-                     Refresh
-                   </button>
-                   <button 
-                     onClick={() => setShowDarkDrawSettings(!showDarkDrawSettings)}
-                     className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors"
+                 <div className="relative flex items-center gap-1.5 shrink-0">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        resetAppState();
+                      }}
+                      className="w-9 h-9 mr-1 rounded-full bg-slate-800/80 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors border border-slate-700 shadow-sm shrink-0"
+                      title="Refresh / Sync"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => setShowDarkDrawSettings(!showDarkDrawSettings)}
+                      className="w-10 h-10 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-300 transition-colors shrink-0"
                    >
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -7093,11 +7095,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       {/* LAND SEARCH MODAL (TAMIL NILAM MATCH) */}
       {isLandSearchModalOpen && (
         <div 
-          className="fixed left-20 top-24 z-[500] pointer-events-none"
+          className="fixed inset-0 z-[500] pointer-events-none flex items-center justify-center p-4 box-border"
         >
           <div 
-            className="bg-[#1e3a8a] rounded-xl shadow-2xl p-4 w-[340px] flex flex-col gap-3 relative animate-in slide-in-from-left-4 duration-300 border border-blue-800 pointer-events-auto"
+            className="bg-[#1e3a8a] rounded-xl shadow-2xl p-4 w-[340px] max-w-[90vw] m-auto flex flex-col gap-3 relative animate-in zoom-in-95 duration-300 border border-blue-800 pointer-events-auto box-border"
             onClick={e => e.stopPropagation()}
+            style={{ boxSizing: 'border-box' }}
           >
             {/* Red Close Button */}
             <button 
