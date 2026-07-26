@@ -7,11 +7,63 @@ import { length as turfLength } from '@turf/length';
 import { db } from '../firebase';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
-// Cloud API base — reads from .env at build time, falls back to localhost for dev
+// ============================================================================
+// DUAL-ENVIRONMENT API CONFIGURATION & AUTOMATIC FALLBACK MECHANISM (WITH FLOW)
+// 1. PC / Localhost Dev: Strictly use local Node.js server (http://localhost:5000)
+// 2. Mobile APK / Production Build: Use Render Cloud Backend URL with smooth fallback
+// ============================================================================
 const USE_LOCAL_GIS = true;
 const REMOTE_API_BASE = 'https://everest-backend-f9nt.onrender.com';
 const LOCAL_API_BASE = 'http://localhost:5000';
-const API_BASE = REMOTE_API_BASE;
+
+const isLocalPC = Boolean(
+  import.meta.env?.DEV ||
+  import.meta.env?.MODE === 'development' ||
+  (typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.startsWith('192.168.') ||
+    window.location.hostname.startsWith('10.') ||
+    window.location.hostname.startsWith('172.')
+  ))
+);
+
+const API_BASE = isLocalPC
+  ? (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE || LOCAL_API_BASE)
+  : (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE || REMOTE_API_BASE);
+
+// Intercept network requests to provide smooth automatic fallback from Render -> Localhost
+if (typeof window !== 'undefined' && !window._everestApiFallbackInitialized) {
+  window._everestApiFallbackInitialized = true;
+  const originalFetch = window.fetch;
+  window.fetch = async function(resource, init) {
+    const urlStr = typeof resource === 'string' ? resource : (resource instanceof Request ? resource.url : String(resource));
+    try {
+      const response = await originalFetch(resource, init);
+      // If production call to Render returns server error (5xx) or 404/empty, fall back smoothly to local cached endpoints
+      if (!isLocalPC && urlStr.startsWith(REMOTE_API_BASE) && (response.status >= 500 || response.status === 404 || response.status === 502 || response.status === 503)) {
+        console.warn(`[API Fallback] Render Cloud API (${urlStr}) returned status ${response.status}. Falling back smoothly to local cached endpoint.`);
+        const fallbackUrl = urlStr.replace(REMOTE_API_BASE, LOCAL_API_BASE);
+        return await originalFetch(fallbackUrl, init);
+      }
+      return response;
+    } catch (err) {
+      // If network fails (offline or Render unreachable), fall back smoothly to localhost / local cache
+      if (!isLocalPC && urlStr.startsWith(REMOTE_API_BASE)) {
+        console.warn(`[API Fallback] Render Cloud API unreachable (${err.message}). Falling back smoothly to local cached endpoint.`);
+        const fallbackUrl = urlStr.replace(REMOTE_API_BASE, LOCAL_API_BASE);
+        try {
+          return await originalFetch(fallbackUrl, init);
+        } catch (fallbackErr) {
+          console.error(`[API Fallback] Both Render and local fallback failed for ${urlStr}:`, fallbackErr);
+          throw err;
+        }
+      }
+      throw err;
+    }
+  };
+}
+
 
 const DB_NAME = 'EverestTileCache';
 const STORE_NAME = 'tiles';
@@ -287,8 +339,8 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
             
             const isMobile = window.innerWidth < 768;
             const mobileFontSize = isMobile ? '8' : '11';
-            const mobileStrokeWidth = isMobile ? '1.5' : strokeWidth;
-            const mobileHighlightStrokeWidth = isMobile ? '2' : '3';
+            const mobileStrokeWidth = strokeWidth;
+            const mobileHighlightStrokeWidth = isMobile ? '2.5' : '3';
 
             const createTextSymbolizer = (color) => labelProperty ? `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>${labelProperty}</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">${mobileFontSize}</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">${color}</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>` : '';
             const textSymbolizer = createTextSymbolizer(labelColor || strokeColor);
@@ -5336,20 +5388,20 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     {mapConfig.active && (
                        <>
                            <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
-                           {isFMBEnabled && cadViewport.width <= 1000 && (
+                           {cadViewport.width <= 1500 && (
                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={Array.isArray(selSurvey) ? selSurvey.join(',') : selSurvey} activeSubdiv={Array.isArray(selSubdiv) ? selSubdiv.join(',') : selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || (selSurvey && selSurvey.length > 0)} />
                            )}
-                           {isCadastralEnabled && cadViewport.width <= 5000 && (
+                           {cadViewport.width <= 6000 && (
                                <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
                            )}
-                           {isVillageEnabled && cadViewport.width > 1000 && cadViewport.width <= 30000 && (
-                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#1e293b" strokeWidth="2.5" opacity={0.85} selectedName={selVillage || null} selectedPropertyName={selVillage ? 'village_name' : null} />
+                           {cadViewport.width > 800 && cadViewport.width <= 40000 && (
+                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#800000" strokeWidth="2.5" opacity={0.85} selectedName={selVillage || null} selectedPropertyName={selVillage ? 'village_name' : null} />
                            )}
-                           {isTalukEnabled && cadViewport.width > 5000 && cadViewport.width <= 150000 && (
-                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#f59e0b" strokeWidth="2.5" opacity={0.9} selectedName={selTaluk || null} selectedPropertyName={selTaluk ? 'taluk_name' : null} />
+                           {cadViewport.width > 3000 && cadViewport.width <= 150000 && (
+                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="taluk_boundary" strokeColor="#ea580c" strokeWidth="2.5" opacity={0.9} selectedName={selTaluk || null} selectedPropertyName={selTaluk ? 'taluk_name' : null} />
                            )}
-                           {isDistrictEnabled && cadViewport.width > 20000 && (
-                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#ef4444" strokeWidth="3.5" opacity={0.9} selectedName={selDistrict || null} selectedPropertyName={selDistrict ? 'district_name' : null} />
+                           {cadViewport.width > 10000 && (
+                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="district_boundary" strokeColor="#78350f" strokeWidth="3.5" opacity={0.95} selectedName={selDistrict || null} selectedPropertyName={selDistrict ? 'district_name' : null} />
                            )}
                        </>
                     )}
@@ -7021,7 +7073,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             {/* Dropdowns */}
             <select 
-              value={selDistrict} onChange={e => { setSelDistrict(e.target.value); setSelTaluk(''); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); setMapActionTrigger(Date.now()); }}
+              value={selDistrict} onChange={e => { const val = e.target.value; setSelDistrict(val); setSelTaluk(''); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); if(val) fetchAndHighlight('district', { selDistrict: val, selTaluk: '', selVillage: '', selSurvey: [], selSubdiv: [] }); }}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'districts' ? 'Loading Districts...' : 'Select District'}</option>
@@ -7029,7 +7081,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </select>
             
             <select 
-              value={selTaluk} onChange={e => { setSelTaluk(e.target.value); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); setMapActionTrigger(Date.now()); }}
+              value={selTaluk} onChange={e => { const val = e.target.value; setSelTaluk(val); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); if(val) fetchAndHighlight('taluk', { selDistrict, selTaluk: val, selVillage: '', selSurvey: [], selSubdiv: [] }); else if(selDistrict) fetchAndHighlight('district', { selDistrict, selTaluk: '', selVillage: '', selSurvey: [], selSubdiv: [] }); }}
               
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
@@ -7039,7 +7091,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <SearchableDropdown
               value={selVillage}
-              onChange={val => { setSelVillage(val); setSelSurvey([]); setSelSubdiv([]); setMapActionTrigger(Date.now()); }}
+              onChange={val => { setSelVillage(val); setSelSurvey([]); setSelSubdiv([]); if(val) fetchAndHighlight('village', { selDistrict, selTaluk, selVillage: val, selSurvey: [], selSubdiv: [] }); else if(selTaluk) fetchAndHighlight('taluk', { selDistrict, selTaluk, selVillage: '', selSurvey: [], selSubdiv: [] }); }}
               options={lsVillages}
               placeholder="Select Village"
               loadingText="Loading Villages..."
@@ -7048,7 +7100,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <SearchableDropdown
               value={selSurvey}
-              onChange={val => { setSelSurvey(val); if(val || val==='') setMapActionTrigger(Date.now()); }}
+              onChange={val => { setSelSurvey(val); setSelSubdiv([]); if(val && val.length > 0) fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey: val, selSubdiv: [] }); else if(selVillage) fetchAndHighlight('village', { selDistrict, selTaluk, selVillage, selSurvey: [], selSubdiv: [] }); }}
               options={lsSurveys}
               placeholder="Select Survey Number"
               loadingText="Loading Survey Numbers..."
@@ -7059,7 +7111,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <SearchableDropdown
               value={selSubdiv}
-              onChange={val => { setSelSubdiv(val); if(val || val==='') setMapActionTrigger(Date.now()); }}
+              onChange={val => { setSelSubdiv(val); if(val && val.length > 0 && selSurvey && selSurvey.length > 0) fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv: val }); else if(selSurvey && selSurvey.length > 0) fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv: [] }); }}
               options={lsSubdivs}
               placeholder="Select Subdivision Number (Optional)"
               loadingText="Loading Subdivisions..."
@@ -7070,7 +7122,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <button
                onClick={executeFlyTo}
-               disabled={!selVillage || !selSurvey || selSurvey.length === 0 || lsLoading === 'flyTo'}
+               disabled={(!selDistrict && !selTaluk && !selVillage && (!selSurvey || selSurvey.length === 0)) || lsLoading === 'flyTo'}
                className="w-full mt-2 bg-green-500 hover:bg-green-400 disabled:bg-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md shadow-md transition-colors flex items-center justify-center gap-2"
             >
                {lsLoading === 'flyTo' ? (
