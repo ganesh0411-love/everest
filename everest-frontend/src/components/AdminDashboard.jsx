@@ -1048,30 +1048,37 @@ const AdminDashboard = ({ setCurrentView }) => {
                   const startH = (mapConfig.baseMercX === 0) ? tH : cadViewport.height;
                   
                   let startTime = null;
+                  const duration = 500;
+                  const sX = cadViewportRef.current.x;
+                  const sY = cadViewportRef.current.y;
+                  const sW = cadViewportRef.current.width;
+                  const sH = cadViewportRef.current.height;
+
                   const animate = (time) => {
                       if (!startTime) startTime = time;
                       const elapsed = time - startTime;
-                      const t = Math.min(elapsed / 800, 1);
+                      const t = Math.min(elapsed / duration, 1);
                       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
                       
-                      setCadViewport(prev => {
-                          const sX = (mapConfig.baseMercX === 0 || !startTime) ? startX : prev.startX || startX;
-                          const sY = (mapConfig.baseMercX === 0 || !startTime) ? startY : prev.startY || startY;
-                          const sW = (mapConfig.baseMercX === 0 || !startTime) ? startW : prev.startW || startW;
-                          const sH = (mapConfig.baseMercX === 0 || !startTime) ? startH : prev.startH || startH;
-                          
-                          return {
-                              x: sX + (tX - sX) * ease,
-                              y: sY + (tY - sY) * ease,
-                              width: sW + (tW - sW) * ease,
-                              height: sH + (tH - sH) * ease,
-                              startX: sX, startY: sY, startW: sW, startH: sH
-                          };
-                      });
+                      const curX = sX + (tX - sX) * ease;
+                      const curY = sY + (tY - sY) * ease;
+                      const curW = sW + (tW - sW) * ease;
+                      const curH = sH + (tH - sH) * ease;
+
+                      cadViewportRef.current = { x: curX, y: curY, width: curW, height: curH };
+                      if (cadSvgRef.current) {
+                          cadSvgRef.current.setAttribute('viewBox', `${curX} ${curY} ${curW} ${curH}`);
+                      }
+                      if (cadLayerGroupRef.current) {
+                          const cx = curX + curW / 2;
+                          const cy = curY + curH / 2;
+                          cadLayerGroupRef.current.setAttribute('transform', `rotate(${mapRotation}, ${cx}, ${cy})`);
+                      }
                       
                       if (t < 1) {
                           requestAnimationFrame(animate);
                       } else {
+                          setCadViewport(cadViewportRef.current);
                           if (coordinates.length > 0 && (pointsList || points)) {
                               setLsHighlightPoly(pointsList || points);
                               setLsHighlightType(selSubdiv ? 'subdiv' : (level || 'survey'));
@@ -2042,7 +2049,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       return;
     }
     setMapConfig(prev => ({ ...prev, active: true, isLoading: true }));
-    Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+    Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 })
       .then(position => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
@@ -2084,7 +2091,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       return;
     }
     try {
-      const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      let position;
+      try {
+        position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 3000, maximumAge: 30000 });
+      } catch (err) {
+        position = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
+      }
       const lat = position.coords.latitude;
       const lon = position.coords.longitude;
       const R = 6378137;
@@ -2100,22 +2112,39 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       const tX = targetX - tWidth/2;
       const tY = targetY - tHeight/2;
       
-      const startX = cadViewport.x;
-      const startY = cadViewport.y;
+      const startX = cadViewportRef.current.x;
+      const startY = cadViewportRef.current.y;
+      const startW = cadViewportRef.current.width;
+      const startH = cadViewportRef.current.height;
       
       let startTime = null;
+      const duration = 400;
       const animate = (time) => {
         if (!startTime) startTime = time;
         const elapsed = time - startTime;
-        const t = Math.min(elapsed / 600, 1);
+        const t = Math.min(elapsed / duration, 1);
         const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-        setCadViewport({
-          x: startX + (tX - startX) * ease,
-          y: startY + (tY - startY) * ease,
-          width: 500,
-          height: 500
-        });
-        if (t < 1) requestAnimationFrame(animate);
+        
+        const curX = startX + (tX - startX) * ease;
+        const curY = startY + (tY - startY) * ease;
+        const curW = startW + (tWidth - startW) * ease;
+        const curH = startH + (tHeight - startH) * ease;
+        
+        cadViewportRef.current = { x: curX, y: curY, width: curW, height: curH };
+        if (cadSvgRef.current) {
+          cadSvgRef.current.setAttribute('viewBox', `${curX} ${curY} ${curW} ${curH}`);
+        }
+        if (cadLayerGroupRef.current) {
+          const cx = curX + curW / 2;
+          const cy = curY + curH / 2;
+          cadLayerGroupRef.current.setAttribute('transform', `rotate(${mapRotation}, ${cx}, ${cy})`);
+        }
+        
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          setCadViewport(cadViewportRef.current);
+        }
       };
       requestAnimationFrame(animate);
     } catch (e) {
@@ -2327,6 +2356,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       if (cadSvgRef.current) {
           cadSvgRef.current.setAttribute('viewBox', `${newX} ${newY} ${newWidth} ${newHeight}`);
       }
+      if (cadLayerGroupRef.current) {
+          const cx = newX + newWidth / 2;
+          const cy = newY + newHeight / 2;
+          cadLayerGroupRef.current.setAttribute('transform', `rotate(${mapRotation}, ${cx}, ${cy})`);
+      }
       
       if (cadWheelTimeoutRef.current) clearTimeout(cadWheelTimeoutRef.current);
       cadWheelTimeoutRef.current = setTimeout(() => {
@@ -2471,6 +2505,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
          
          if (cadSvgRef.current) {
             cadSvgRef.current.setAttribute('viewBox', `${newX} ${newY} ${cadViewportRef.current.width} ${cadViewportRef.current.height}`);
+         }
+         if (cadLayerGroupRef.current) {
+            const cx = newX + cadViewportRef.current.width / 2;
+            const cy = newY + cadViewportRef.current.height / 2;
+            cadLayerGroupRef.current.setAttribute('transform', `rotate(${mapRotation}, ${cx}, ${cy})`);
          }
          
          // Direct mutation of drag state avoids continuous React re-renders during 60FPS dragging
@@ -2915,6 +2954,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     
     if (cadSvgRef.current) {
         cadSvgRef.current.setAttribute('viewBox', `${next.x} ${next.y} ${next.width} ${next.height}`);
+    }
+    if (cadLayerGroupRef.current) {
+        const cx = next.x + next.width / 2;
+        const cy = next.y + next.height / 2;
+        cadLayerGroupRef.current.setAttribute('transform', `rotate(${mapRotation}, ${cx}, ${cy})`);
     }
     
     if (cadWheelTimeoutRef.current) clearTimeout(cadWheelTimeoutRef.current);
