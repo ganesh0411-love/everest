@@ -3887,6 +3887,35 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       currentTouchCardRef.current = null;
     }
   };
+  // Global interceptor for Android Hardware Back Button
+  React.useEffect(() => {
+    window.handleAndroidBack = () => {
+      // 1. Modals & Popups
+      if (isLandSearchModalOpen) { setIsLandSearchModalOpen(false); return true; }
+      if (showDarkDrawSettings) { setShowDarkDrawSettings(false); return true; }
+      if (isGalleryPopupOpen) { setIsGalleryPopupOpen(false); return true; }
+      if (isScaleModalOpen) { setIsScaleModalOpen(false); return true; }
+      if (isLayerMenuOpen) { setIsLayerMenuOpen(false); return true; }
+
+      // 2. Deep Sub-views (Manual Canvas / My Projects)
+      if (activeLandSurveyView === 'dark_draw_manual' || activeLandSurveyView === 'dark_draw_projects') {
+        setActiveLandSurveyView('dark_draw_submenu');
+        return true;
+      }
+
+      // 3. Parent Tool Views (Field Book, Simple Lands, Dark Draw Hub, Recreate FMB)
+      if (activeLandSurveyView !== 'menu') {
+        setActiveLandSurveyView('menu');
+        return true;
+      }
+
+      // 4. Return false so App.jsx handles it (goes to Home page)
+      return false;
+    };
+    return () => {
+      window.handleAndroidBack = null;
+    };
+  });
 
   return (
     <div 

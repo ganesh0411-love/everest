@@ -216,6 +216,13 @@ function App() {
 
     const setupListener = async () => {
       backListenerHandle = await CapacitorApp.addListener('backButton', () => {
+        // 0. Global Back Button Intercept for internal tool routing
+        if (typeof window.handleAndroidBack === 'function') {
+          if (window.handleAndroidBack()) {
+            return;
+          }
+        }
+
         // 1. Close open modal states first
         if (fullscreenImage) { setFullscreenImage(null); return; }
         if (isAddCustomerOpen) { setIsAddCustomerOpen(false); return; }
