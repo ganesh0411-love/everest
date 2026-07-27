@@ -4213,71 +4213,149 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         )}
 
           {activeLandSurveyView === 'menu' ? (
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              {/* Card 1 */}
-              <div 
-                className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
-                onClick={() => setActiveLandSurveyView('simple')}
-              >
-                <div>
-                  <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Simple Lands View</h3>
-                  <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">View basic land parameters</p>
+            <div className="flex-1 overflow-y-auto flex flex-col" style={{background: 'linear-gradient(160deg, #dbeafe 0%, #e0f2fe 30%, #f0fdf4 60%, #faf5ff 100%)'}}>
+              {/* Hero Header */}
+              <div className="flex items-start justify-between px-5 pt-5 pb-3">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-[28px] font-black text-slate-800 leading-tight">Survey <span className="text-blue-500">Hub</span></h1>
+                    <svg className="w-7 h-7 text-blue-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  </div>
+                  <p className="text-[13px] text-slate-500 font-semibold leading-snug">Smart Tools for<br/>Land Surveyors</p>
                 </div>
-                <div className="w-10 h-10 bg-sky-50 rounded-full flex items-center justify-center text-sky-600 shadow-inner">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                {/* 3D Illustration */}
+                <div className="w-32 h-28 flex items-center justify-center relative">
+                  <div className="absolute inset-0 rounded-2xl bg-white/30 backdrop-blur-sm" />
+                  <svg viewBox="0 0 120 100" className="w-full h-full drop-shadow-lg" xmlns="http://www.w3.org/2000/svg">
+                    {/* Ground / Terrain */}
+                    <ellipse cx="55" cy="72" rx="48" ry="18" fill="#86efac" opacity="0.7"/>
+                    <ellipse cx="55" cy="72" rx="38" ry="12" fill="#4ade80" opacity="0.5"/>
+                    {/* Path */}
+                    <path d="M30 72 Q55 60 80 72" fill="none" stroke="white" strokeWidth="2.5" strokeDasharray="4 3" opacity="0.9"/>
+                    {/* Trees */}
+                    <circle cx="25" cy="62" r="7" fill="#16a34a"/>
+                    <rect x="23" y="68" width="4" height="5" fill="#92400e"/>
+                    <circle cx="85" cy="60" r="9" fill="#15803d"/>
+                    <rect x="83" y="67" width="4" height="6" fill="#92400e"/>
+                    <circle cx="38" cy="58" r="6" fill="#22c55e"/>
+                    {/* Location pin red */}
+                    <path d="M58 20 C58 20 48 32 48 40 C48 46 53 50 58 50 C63 50 68 46 68 40 C68 32 58 20 58 20Z" fill="#ef4444"/>
+                    <circle cx="58" cy="40" r="5" fill="white"/>
+                    {/* Total Station tripod */}
+                    <line x1="90" y1="55" x2="78" y2="72" stroke="#374151" strokeWidth="2"/>
+                    <line x1="90" y1="55" x2="102" y2="72" stroke="#374151" strokeWidth="2"/>
+                    <line x1="90" y1="55" x2="90" y2="72" stroke="#374151" strokeWidth="2"/>
+                    {/* Total Station body */}
+                    <rect x="83" y="42" width="14" height="13" rx="3" fill="#d97706"/>
+                    <rect x="85" y="40" width="10" height="4" rx="2" fill="#fbbf24"/>
+                    <rect x="86" y="44" width="8" height="2" rx="1" fill="#92400e"/>
+                    <circle cx="90" cy="49" r="4" fill="#1e293b"/>
+                    <circle cx="90" cy="49" r="2.5" fill="#0ea5e9"/>
+                  </svg>
                 </div>
               </div>
 
-              {/* Card 2 */}
-              <div 
-                className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
-                onClick={() => setActiveLandSurveyView('fmb')}
-              >
-                <div>
-                  <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Field Measurement Book</h3>
-                  <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">Access master measurements</p>
+              {/* 2x2 Grid Cards */}
+              <div className="grid grid-cols-2 gap-4 px-4 pb-6 pt-2 flex-1">
+                {/* Card 1 - Blue - Simple Lands View */}
+                <div
+                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg"
+                  style={{background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)'}}
+                  onClick={() => setActiveLandSurveyView('simple')}
+                >
+                  <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md mb-3">
+                    <svg className="w-8 h-8 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                      <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-black text-[13px] leading-tight uppercase tracking-wide">SIMPLE LANDS VIEW</h3>
+                    <p className="text-blue-100 text-[10px] font-semibold mt-1 leading-snug">View basic land parameters</p>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <div className="w-8 h-8 bg-white/25 rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </div>
+                  </div>
                 </div>
-                <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 shadow-inner">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-                </div>
-              </div>
 
-              {/* Card 3 */}
-              <div 
-                className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
-                onClick={() => {
-                  setCurrentProjectId(null);
-                  setExtractedVectors(null);
-                  setPdfScale('');
-                  setWorkspaceSurveyNumber('');
-                  setWorkspaceSubDivision('');
-                  setWorkspaceArea(null);
-                  setCurrentProjectId(null);
-                  setShowWorkspaceCalculation(false);
-                  setCalculatedLandArea({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
-                  setFmbWorkflowState('extract');
-                  setActiveLandSurveyView('recreate_fmb');
-                }}
-              >
-                <div>
-                  <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">Recreate FMB</h3>
-                  <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">Draft new measurement layouts</p>
+                {/* Card 2 - Green - Field Measurement Book */}
+                <div
+                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg"
+                  style={{background: 'linear-gradient(135deg, #22c55e 0%, #86efac 100%)'}}
+                  onClick={() => setActiveLandSurveyView('fmb')}
+                >
+                  <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md mb-3">
+                    <svg className="w-8 h-8 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-black text-[13px] leading-tight uppercase tracking-wide">FIELD MEASUREMENT BOOK</h3>
+                    <p className="text-green-50 text-[10px] font-semibold mt-1 leading-snug">Access master measurements</p>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <div className="w-8 h-8 bg-white/25 rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </div>
+                  </div>
                 </div>
-                <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 shadow-inner">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+
+                {/* Card 3 - Orange - Recreate FMB */}
+                <div
+                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg"
+                  style={{background: 'linear-gradient(135deg, #f97316 0%, #fbbf24 100%)'}}
+                  onClick={() => {
+                    setCurrentProjectId(null);
+                    setExtractedVectors(null);
+                    setPdfScale('');
+                    setWorkspaceSurveyNumber('');
+                    setWorkspaceSubDivision('');
+                    setWorkspaceArea(null);
+                    setCurrentProjectId(null);
+                    setShowWorkspaceCalculation(false);
+                    setCalculatedLandArea({ hectareAres: '0 Hect, 0 Ares', acre: '0', cent: '0' });
+                    setFmbWorkflowState('extract');
+                    setActiveLandSurveyView('recreate_fmb');
+                  }}
+                >
+                  <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md mb-3">
+                    <svg className="w-8 h-8 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/><path d="M15 15l2 2-2 2"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-black text-[13px] leading-tight uppercase tracking-wide">RECREATE FMB</h3>
+                    <p className="text-orange-50 text-[10px] font-semibold mt-1 leading-snug">Draft new measurement layouts</p>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <div className="w-8 h-8 bg-white/25 rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              {/* Card 4 */}
-              <div 
-                className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer"
-                onClick={() => setActiveLandSurveyView('dark_draw_submenu')}
-              >
-                <div>
-                  <h3 className="font-black text-[#0369a1] text-[15px] uppercase tracking-wide">DARK DRAW FMB</h3>
-                  <p className="text-[11px] text-slate-500 font-bold mt-1 tracking-wide">Advanced manual drawing mode</p>
-                </div>
-                <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white shadow-inner">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+
+                {/* Card 4 - Purple - Dark Draw FMB */}
+                <div
+                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg"
+                  style={{background: 'linear-gradient(135deg, #8b5cf6 0%, #c4b5fd 100%)'}}
+                  onClick={() => setActiveLandSurveyView('dark_draw_submenu')}
+                >
+                  <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md mb-3">
+                    <svg className="w-8 h-8 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-black text-[13px] leading-tight uppercase tracking-wide">DARK DRAW FMB</h3>
+                    <p className="text-purple-100 text-[10px] font-semibold mt-1 leading-snug">Advanced manual drawing mode</p>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <div className="w-8 h-8 bg-white/25 rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
