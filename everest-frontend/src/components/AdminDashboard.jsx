@@ -728,12 +728,24 @@ const AdminDashboard = ({ setCurrentView }) => {
   }, [showLandSurveyDashboard]);
 
   React.useEffect(() => {
+    if (isLandSearchModalOpen) {
+      window.history.pushState({ modal: 'landSearch' }, '', window.location.href);
+    } else {
+      if (window.history.state && window.history.state.modal === 'landSearch') {
+        window.history.back();
+      }
+    }
+  }, [isLandSearchModalOpen]);
+
+  React.useEffect(() => {
     const handlePopState = () => {
-      setIsLandSearchModalOpen(false);
+      if (isLandSearchModalOpen) {
+        setIsLandSearchModalOpen(false);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [isLandSearchModalOpen]);
 
   const [isSurveyDropdownOpen, setIsSurveyDropdownOpen] = React.useState(false);
     const [isSubDivisionDropdownOpen, setIsSubDivisionDropdownOpen] = React.useState(false);
@@ -916,6 +928,9 @@ const AdminDashboard = ({ setCurrentView }) => {
 
           for (const resData of responses) {
               if (resData.success && resData.feature) {
+                  // Yield to browser event loop to prevent UI freezing during heavy GeoJSON processing
+                  await new Promise(resolve => setTimeout(resolve, 0));
+
                   validDataFound = true;
                   const geom = resData.feature.geometry;
                   if (!firstFeatureGeomType) firstFeatureGeomType = geom ? geom.type : null;
@@ -5412,27 +5427,16 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   <button onClick={handleGpsCenter} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="GPS Center / Current Location">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
                   </button>
-                  {/* Icon 5: Map Layer Toggle Icon */}
-                  <button onClick={toggleSatelliteMap} className={`w-10 h-10 rounded-full flex justify-center items-center font-bold transition-colors pointer-events-auto shadow-lg border border-slate-600 ${mapConfig.active ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-slate-800/80 hover:bg-slate-700 text-white'}`} title={mapConfig.active ? "Toggle Satellite Map OFF" : "Toggle Satellite Map ON"}>
-                      {mapConfig.isLoading ? (
-                          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-                      ) : (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
-                      )}
-                  </button>
-              </div>
-
-              {/* RIGHT-SIDE CONTROLS */}
-              <div className="absolute top-1/2 right-6 -translate-y-1/2 z-[150] flex flex-col gap-4 pointer-events-none items-end">
+                  {/* Icon 5: Cadastral / Sub-division Layer Toggle Icon */}
                   <div className="relative pointer-events-auto">
-                      <button onClick={(e) => { e.stopPropagation(); setIsLayerMenuOpen(!isLayerMenuOpen); }} className={`w-10 h-10 rounded-full text-white shadow-lg border flex items-center justify-center transition-colors ${isLayerMenuOpen ? 'bg-cyan-600 border-cyan-400' : 'bg-slate-800/80 border-slate-600 hover:bg-slate-700'}`}>
+                      <button onClick={(e) => { e.stopPropagation(); setIsLayerMenuOpen(!isLayerMenuOpen); }} className={`w-10 h-10 rounded-full text-white shadow-lg border flex items-center justify-center transition-colors ${isLayerMenuOpen || isCadastralEnabled || isFMBEnabled ? 'bg-cyan-600 border-cyan-400' : 'bg-slate-800/80 border-slate-600 hover:bg-slate-700'}`} title="Map Layers (Cadastral / Sub-division)">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M4 7l8-4 8 4-8 4-8-4zm0 4l8 4 8-4m-16 4l8 4 8-4" />
                           </svg>
                       </button>
                       
                       {isLayerMenuOpen && (
-                          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-4 bg-slate-900/95 backdrop-blur-md border border-slate-600 rounded-xl shadow-2xl p-4 w-56 animate-in fade-in slide-in-from-right-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 bg-slate-900/95 backdrop-blur-md border border-slate-600 rounded-xl shadow-2xl p-4 w-56 animate-in fade-in slide-in-from-left-4 z-[200]" onClick={(e) => e.stopPropagation()}>
                               <h3 className="text-white font-black text-xs uppercase tracking-widest border-b border-slate-700 pb-2 mb-3">Map Layers</h3>
                               
                               <div className="flex flex-col gap-3">
@@ -7019,12 +7023,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 )
              }
 
-             {/* VIRTUAL JOYSTICK D-PAD: Hidden in Live Map Mode */}
-             {!mapConfig.active && (
+             {/* VIRTUAL JOYSTICK D-PAD / SATELLITE MAP TOGGLE */}
              <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none scale-75 origin-bottom-right"
                   onPointerDown={e => e.stopPropagation()}
              >
                 <div className="flex flex-col items-center gap-1">
+                   {!mapConfig.active && (
+                   <>
                    {/* Top Button: ADD LINE TRIGGER */}
                    <button 
                       className={`w-10 h-10 rounded-full flex justify-center items-center font-bold text-xl transition-colors ${cadTool === 'ADD_LINE' ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white active:bg-fuchsia-600'}`}
@@ -7077,9 +7082,23 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                          </span>
                       </button>
                    </div>
+                   </>
+                   )}
+
+                   {/* Bottom Button: Map Layers (Satellite Map View Toggle) */}
+                   <button 
+                      className={`w-10 h-10 rounded-full flex justify-center items-center font-bold transition-colors shadow-lg border border-slate-600 ${mapConfig.active ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                      onClick={toggleSatelliteMap}
+                      title={mapConfig.active ? "Toggle Satellite Map OFF" : "Toggle Satellite Map ON"}
+                   >
+                      {mapConfig.isLoading ? (
+                          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                      ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                      )}
+                   </button>
                 </div>
              </div>
-             )}
 {cadPrompt && (() => {
                   let l = cadPrompt.x;
                   let t = cadPrompt.y;
@@ -7173,7 +7192,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             {/* Dropdowns */}
             <select 
-              value={selDistrict} onChange={e => { const val = e.target.value; setSelDistrict(val); setSelTaluk(''); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); if(val) fetchAndHighlight('district', { selDistrict: val, selTaluk: '', selVillage: '', selSurvey: [], selSubdiv: [] }); }}
+              value={selDistrict} onChange={e => { const val = e.target.value; setSelDistrict(val); setSelTaluk(''); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); }}
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
               <option value="">{lsLoading === 'districts' ? 'Loading Districts...' : 'Select District'}</option>
@@ -7181,7 +7200,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </select>
             
             <select 
-              value={selTaluk} onChange={e => { const val = e.target.value; setSelTaluk(val); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); if(val) fetchAndHighlight('taluk', { selDistrict, selTaluk: val, selVillage: '', selSurvey: [], selSubdiv: [] }); else if(selDistrict) fetchAndHighlight('district', { selDistrict, selTaluk: '', selVillage: '', selSurvey: [], selSubdiv: [] }); }}
+              value={selTaluk} onChange={e => { const val = e.target.value; setSelTaluk(val); setSelVillage(''); setSelSurvey([]); setSelSubdiv([]); }}
               
               className="w-full bg-[#fef08a] text-slate-800 font-medium py-3 px-4 rounded-md border-0 outline-none shadow-sm cursor-pointer text-sm"
             >
@@ -7191,7 +7210,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <SearchableDropdown
               value={selVillage}
-              onChange={val => { setSelVillage(val); setSelSurvey([]); setSelSubdiv([]); if(val) fetchAndHighlight('village', { selDistrict, selTaluk, selVillage: val, selSurvey: [], selSubdiv: [] }); else if(selTaluk) fetchAndHighlight('taluk', { selDistrict, selTaluk, selVillage: '', selSurvey: [], selSubdiv: [] }); }}
+              onChange={val => { setSelVillage(val); setSelSurvey([]); setSelSubdiv([]); }}
               options={lsVillages}
               placeholder="Select Village"
               loadingText="Loading Villages..."
@@ -7200,7 +7219,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <SearchableDropdown
               value={selSurvey}
-              onChange={val => { setSelSurvey(val); setSelSubdiv([]); if(val && val.length > 0) fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey: val, selSubdiv: [] }); else if(selVillage) fetchAndHighlight('village', { selDistrict, selTaluk, selVillage, selSurvey: [], selSubdiv: [] }); }}
+              onChange={val => { setSelSurvey(val); setSelSubdiv([]); }}
               options={lsSurveys}
               placeholder="Select Survey Number"
               loadingText="Loading Survey Numbers..."
@@ -7211,7 +7230,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             <SearchableDropdown
               value={selSubdiv}
-              onChange={val => { setSelSubdiv(val); if(val && val.length > 0 && selSurvey && selSurvey.length > 0) fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv: val }); else if(selSurvey && selSurvey.length > 0) fetchAndHighlight('parcel', { selDistrict, selTaluk, selVillage, selSurvey, selSubdiv: [] }); }}
+              onChange={val => { setSelSubdiv(val); }}
               options={lsSubdivs}
               placeholder="Select Subdivision Number (Optional)"
               loadingText="Loading Subdivisions..."
