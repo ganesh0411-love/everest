@@ -7023,13 +7023,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 )
              }
 
-             {/* VIRTUAL JOYSTICK D-PAD / SATELLITE MAP TOGGLE */}
+             {/* STATE 1: CANVAS MODE - VIRTUAL JOYSTICK D-PAD */}
+             {!mapConfig.active && (
              <div className="absolute bottom-8 right-8 z-[120] opacity-80 hover:opacity-100 transition-opacity bg-slate-800 rounded-full border-4 border-slate-700 shadow-2xl p-2 select-none touch-none scale-75 origin-bottom-right"
                   onPointerDown={e => e.stopPropagation()}
              >
                 <div className="flex flex-col items-center gap-1">
-                   {!mapConfig.active && (
-                   <>
                    {/* Top Button: ADD LINE TRIGGER */}
                    <button 
                       className={`w-10 h-10 rounded-full flex justify-center items-center font-bold text-xl transition-colors ${cadTool === 'ADD_LINE' ? 'bg-fuchsia-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white active:bg-fuchsia-600'}`}
@@ -7082,14 +7081,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                          </span>
                       </button>
                    </div>
-                   </>
-                   )}
 
                    {/* Bottom Button: Map Layers (Satellite Map View Toggle) */}
                    <button 
-                      className={`w-10 h-10 rounded-full flex justify-center items-center font-bold transition-colors shadow-lg border border-slate-600 ${mapConfig.active ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                      className="w-10 h-10 rounded-full flex justify-center items-center font-bold transition-colors shadow-lg border border-slate-600 bg-slate-700 hover:bg-slate-600 text-white"
                       onClick={toggleSatelliteMap}
-                      title={mapConfig.active ? "Toggle Satellite Map OFF" : "Toggle Satellite Map ON"}
+                      title="Toggle Satellite Map ON"
                    >
                       {mapConfig.isLoading ? (
                           <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
@@ -7099,6 +7096,48 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                    </button>
                 </div>
              </div>
+             )}
+
+             {/* STATE 2: LIVE MAP MODE - FLOATING ACTION BUTTONS (ADD LINE & SATELLITE TOGGLE) */}
+             {mapConfig.active && (
+             <div className="absolute bottom-8 right-8 z-[120] flex items-center gap-3 select-none touch-none"
+                  onPointerDown={e => e.stopPropagation()}
+             >
+                 {/* Floating Pencil ("Add Line") Icon */}
+                 <button 
+                    className={`w-12 h-12 rounded-full shadow-2xl border-2 flex justify-center items-center font-bold text-xl transition-all pointer-events-auto ${cadTool === 'ADD_LINE' ? 'bg-fuchsia-600 border-fuchsia-400 text-white shadow-[0_0_15px_rgba(192,38,211,0.6)] scale-105' : 'bg-slate-800/90 border-slate-600 hover:bg-slate-700 text-white'}`}
+                    onClick={(e) => { 
+                       e.stopPropagation();
+                       if (cadTool === 'ADD_LINE') {
+                          setCadTool('IDLE');
+                          setCadAnchorNode(null);
+                       } else {
+                          setCadTool('ADD_LINE');
+                          setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2, isInitialCenter: true });
+                       }
+                       setCadSelectedNode(null); 
+                    }}
+                    title="Add Line / Draw over Satellite Map"
+                 >
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                       <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                    </svg>
+                 </button>
+
+                 {/* Floating Map View Toggle Icon */}
+                 <button 
+                    className="w-12 h-12 rounded-full flex justify-center items-center font-bold transition-all pointer-events-auto shadow-2xl border-2 border-green-400 bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]"
+                    onClick={(e) => { e.stopPropagation(); toggleSatelliteMap(); }}
+                    title="Toggle Satellite Map OFF"
+                 >
+                    {mapConfig.isLoading ? (
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                    ) : (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                    )}
+                 </button>
+             </div>
+             )}
 {cadPrompt && (() => {
                   let l = cadPrompt.x;
                   let t = cadPrompt.y;
