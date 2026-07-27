@@ -4204,7 +4204,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       {/* Land Survey Dashboard Overlay Route */}
       {showLandSurveyDashboard && (
         <div className="fixed inset-0 z-[120] bg-[#f8fafc] flex flex-col animate-in slide-in-from-right-full duration-300" style={{ width: cadWindowSize.width, height: cadWindowSize.height }}>
-          {activeLandSurveyView !== 'dark_draw_manual' && activeLandSurveyView !== 'dark_draw_submenu' && activeLandSurveyView !== 'dark_draw_projects' && (
+          {activeLandSurveyView !== 'menu' && activeLandSurveyView !== 'dark_draw_manual' && activeLandSurveyView !== 'dark_draw_submenu' && activeLandSurveyView !== 'dark_draw_projects' && (
           <div className="bg-white px-5 py-4 border-b border-slate-100 flex items-center gap-4 shadow-sm relative z-10">
             <button 
               onClick={() => {
@@ -4286,10 +4286,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               </div>
 
               {/* 2x2 Grid Cards */}
-              <div className="grid grid-cols-2 gap-4 px-4 pb-6 pt-2 flex-1">
+              <div className="grid grid-cols-2 gap-4 px-4 pb-24 pt-2">
                 {/* Card 1 - Blue - Simple Lands View */}
                 <div
-                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg"
+                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg aspect-square md:aspect-auto"
                   style={{background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)'}}
                   onClick={() => setActiveLandSurveyView('simple')}
                 >
@@ -4312,7 +4312,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
                 {/* Card 2 - Green - Field Measurement Book */}
                 <div
-                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg"
+                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg aspect-square md:aspect-auto"
                   style={{background: 'linear-gradient(135deg, #22c55e 0%, #86efac 100%)'}}
                   onClick={() => setActiveLandSurveyView('fmb')}
                 >
@@ -4334,7 +4334,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
                 {/* Card 3 - Orange - Recreate FMB */}
                 <div
-                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg"
+                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg aspect-square md:aspect-auto"
                   style={{background: 'linear-gradient(135deg, #f97316 0%, #fbbf24 100%)'}}
                   onClick={() => {
                     setCurrentProjectId(null);
@@ -4368,7 +4368,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
                 {/* Card 4 - Purple - Dark Draw FMB */}
                 <div
-                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg"
+                  className="rounded-3xl p-4 flex flex-col justify-between cursor-pointer active:scale-95 transition-all duration-150 shadow-lg aspect-square md:aspect-auto"
                   style={{background: 'linear-gradient(135deg, #8b5cf6 0%, #c4b5fd 100%)'}}
                   onClick={() => setActiveLandSurveyView('dark_draw_submenu')}
                 >
