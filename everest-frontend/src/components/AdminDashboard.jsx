@@ -2093,18 +2093,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   }, [mapConfig.active, mapConfig.baseLat, cadScale]);
 
   const handleGpsCenter = React.useCallback(async () => {
-    if (cadNodes && cadNodes.length > 0 && mapConfig.baseLat !== 0 && !mapConfig.active) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      cadNodes.forEach(n => {
-        if (n.x < minX) minX = n.x;
-        if (n.x > maxX) maxX = n.x;
-        if (n.y < minY) minY = n.y;
-        if (n.y > maxY) maxY = n.y;
-      });
-      const margin = Math.max(maxX - minX, maxY - minY) * 0.1 || 10;
-      setCadViewport({ x: minX - margin, y: minY - margin, width: (maxX - minX) + margin * 2, height: (maxY - minY) + margin * 2 });
-      return;
-    }
     try {
       let position;
       try {
@@ -2165,7 +2153,112 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     } catch (e) {
       alert("GPS Re-center failed: " + e.message);
     }
-  }, [cadNodes, mapConfig, cadViewport]);
+  }, [mapConfig, cadViewport, mapRotation]);
+
+  const panCanvasToCenter = React.useCallback(() => {
+    if (mapConfig.active && (selDistrict || selTaluk || selVillage || (selSurvey && selSurvey.length > 0))) {
+      executeFlyTo();
+      return;
+    }
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    if (cadNodes && cadNodes.length > 0) {
+      cadNodes.forEach(n => {
+        if (n.x < minX) minX = n.x;
+        if (n.x > maxX) maxX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.y > maxY) maxY = n.y;
+      });
+    }
+    if (cadLines && cadLines.length > 0) {
+      cadLines.forEach(l => {
+        if (l.p1.x < minX) minX = l.p1.x;
+        if (l.p1.x > maxX) maxX = l.p1.x;
+        if (l.p1.y < minY) minY = l.p1.y;
+        if (l.p1.y > maxY) maxY = l.p1.y;
+        if (l.p2.x < minX) minX = l.p2.x;
+        if (l.p2.x > maxX) maxX = l.p2.x;
+        if (l.p2.y < minY) minY = l.p2.y;
+        if (l.p2.y > maxY) maxY = l.p2.y;
+      });
+    }
+    if (visibleCadPolygons && visibleCadPolygons.length > 0) {
+      visibleCadPolygons.forEach(poly => {
+        if (poly.points) {
+          poly.points.forEach(p => {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+          });
+        }
+      });
+    }
+    if (cadCircles && cadCircles.length > 0) {
+      cadCircles.forEach(c => {
+        const r = c.radiusPixels || 0;
+        if (c.center.x - r < minX) minX = c.center.x - r;
+        if (c.center.x + r > maxX) maxX = c.center.x + r;
+        if (c.center.y - r < minY) minY = c.center.y - r;
+        if (c.center.y + r > maxY) maxY = c.center.y + r;
+      });
+    }
+
+    if (minX !== Infinity && maxX !== -Infinity && minY !== Infinity && maxY !== -Infinity) {
+      const width = maxX - minX;
+      const height = maxY - minY;
+      const marginX = Math.max(width * 0.15, 50);
+      const marginY = Math.max(height * 0.15, 50);
+      
+      const targetW = width + marginX * 2;
+      const targetH = height + marginY * 2;
+      const targetX = minX - marginX;
+      const targetY = minY - marginY;
+
+      const startX = cadViewportRef.current.x;
+      const startY = cadViewportRef.current.y;
+      const startW = cadViewportRef.current.width;
+      const startH = cadViewportRef.current.height;
+
+      let startTime = null;
+      const duration = 400;
+      const animate = (time) => {
+        if (!startTime) startTime = time;
+        const elapsed = time - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+        const curX = startX + (targetX - startX) * ease;
+        const curY = startY + (targetY - startY) * ease;
+        const curW = startW + (targetW - startW) * ease;
+        const curH = startH + (targetH - startH) * ease;
+
+        cadViewportRef.current = { x: curX, y: curY, width: curW, height: curH };
+        if (cadSvgRef.current) {
+          cadSvgRef.current.setAttribute('viewBox', `${curX} ${curY} ${curW} ${curH}`);
+        }
+        if (cadLayerGroupRef.current) {
+          const cx = curX + curW / 2;
+          const cy = curY + curH / 2;
+          cadLayerGroupRef.current.setAttribute('transform', `rotate(${mapRotation}, ${cx}, ${cy})`);
+        }
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          setCadViewport(cadViewportRef.current);
+        }
+      };
+      requestAnimationFrame(animate);
+      return;
+    }
+
+    const defaultViewport = { x: 0, y: 0, width: 2000, height: 2000 };
+    setCadViewport(defaultViewport);
+    cadViewportRef.current = defaultViewport;
+  }, [mapConfig.active, selDistrict, selTaluk, selVillage, selSurvey, executeFlyTo, cadNodes, cadLines, visibleCadPolygons, cadCircles, mapRotation]);
+
 
   const handleCadPointerDown = (e) => {
     cadStateBeforeActionRef.current = captureCadState();
@@ -7064,8 +7157,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       {/* Center Axis Button: Reset Origin / GPS Re-Center */}
                       <button 
                          className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-fuchsia-400 border border-slate-600 flex justify-center items-center font-bold text-xl transition-colors"
-                         onClick={handleGpsCenter}
-                         title="Reset View / Re-center"
+                         onClick={panCanvasToCenter}
+                         title="Fit to Canvas / Recenter"
                       >
                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2"/></svg>
                       </button>
