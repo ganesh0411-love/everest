@@ -10,16 +10,16 @@ const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
 
 const district = "Dindigul";
 const taluksToProcess = [
-    "Athoor",
+    "Palani",
+    "Vedasandur",
     "Dindiguleast",
-    "Dindigulwest",
-    "Gujiliamparai",
     "Kodaikanal",
     "Natham",
     "Nilakkottai",
     "Oddanchatram",
-    "Palani",
-    "Vedasandur"
+    "Athoor",
+    "Dindigulwest",
+    "Gujiliamparai"
 ];
 
 const tnMaster = require("./data/tn_master.json");
@@ -84,10 +84,34 @@ async function main() {
         console.log(`######################################################\n`);
         
         const villages = tnMaster.Dindigul[taluk] || [];
+        const talukDir = path.join(__dirname, "data", "geojson", district, taluk);
         
-        for (const v of villages) {
-            const vName = v.name;
-            const vLgd = v.lgd_village_code;
+        let talukComplete = false;
+        while (!talukComplete) {
+            let missingVillages = [];
+            
+            // Determine missing or incomplete villages
+            for (const v of villages) {
+                const vp = path.join(talukDir, v.name);
+                if (!fs.existsSync(vp) || !fs.statSync(vp).isDirectory()) {
+                    missingVillages.push(v);
+                } else {
+                    // Check if there are any JSON files or if it's completely empty.
+                    // A proper check would rely on `sync_status.json` but to be fast we can just re-verify
+                    // missing villages. The pipeline already skips completed surveys instantly.
+                    missingVillages.push(v);
+                }
+            }
+            
+            // To be efficient, we will process all villages, but the pipeline already auto-resumes and skips 100% completed villages.
+            // But we can check if all surveys exist. 
+            // Instead of complicating it, let's just let the script run through `villages` but track if any failures occurred.
+            
+            let talukHadFailures = false;
+            
+            for (const v of villages) {
+                const vName = v.name;
+                const vLgd = v.lgd_village_code;
             
             console.log(`\n======================================================`);
             console.log(`[*] Starting village: ${vName} (${vLgd}) in Taluk: ${taluk}`);
@@ -100,12 +124,16 @@ async function main() {
                 surveys = await fetchSurveys(vLgd);
             } catch(e) {
                 console.log(`[!] Failed to get survey list for ${vName}: ${e.message}`);
+                talukHadFailures = true;
                 continue;
             }
             
             const totalSurveys = surveys.length;
             if (totalSurveys === 0) {
-                console.log(`[DONE] ${vName}: 0/0 (100%) - Completed in 0 secs.`);
+                const outDir = path.join(__dirname, "data", "geojson", district, taluk, vName);
+                fs.mkdirSync(outDir, { recursive: true });
+                fs.writeFileSync(path.join(outDir, "0_surveys_RF.json"), "{}");
+                console.log(`[DONE] ${vName}: 0/0 (100%) - Completed in 0 secs (RF Excluded).`);
                 continue;
             }
 
@@ -200,7 +228,8 @@ async function main() {
                             elapsed: formatTime(elapsedMs),
                             eta: formatETA(etaMs),
                             startTimeStr,
-                            lastSuccessTime
+                            lastSuccessTime,
+                            currentSurvey: survey
                         }));
                     }
                 }
@@ -263,9 +292,22 @@ async function main() {
                 elapsed: formatTime(totalElapsed),
                 eta: "0 secs",
                 status: "DONE",
-                lastSuccessTime
+                lastSuccessTime,
+                currentSurvey: "Completed"
             }));
+            
+            if (failedCount > 0) {
+                talukHadFailures = true;
+            }
+        } // End of village loop
+        
+        if (!talukHadFailures) {
+            talukComplete = true;
+            console.log(`\n[***] TALUK ${taluk} IS 100% COMPLETE! Moving to next taluk...`);
+        } else {
+            console.log(`\n[WARN] TALUK ${taluk} had failures or skipped villages. Restarting verification loop for ${taluk} to enforce 100% completion...`);
         }
+    } // End of while(!talukComplete)
     }
     
     console.log(`\n######################################################`);
