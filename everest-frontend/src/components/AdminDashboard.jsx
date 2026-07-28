@@ -907,6 +907,50 @@ const AdminDashboard = ({ setCurrentView }) => {
       }
   }, [mapActionTrigger]);
 
+  // WMS GetFeatureInfo reverse lookup: resolves land data (district/taluk/village/survey/subdiv) from lat/lng
+  const doWmsReverseLookup = React.useCallback(async (lat, lng) => {
+      try {
+          // Convert lat/lng to EPSG:3857 mercator
+          const mercX = lng * 20037508.34 / 180;
+          const mercY = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180;
+
+          // Build a tiny 10m bbox around the tap point
+          const delta = 50; // metres in mercator
+          const bboxStr = `${mercX - delta},${mercY - delta},${mercX + delta},${mercY + delta}`;
+          const pxSize = 101; // odd number so tap point is dead centre
+          const i = Math.floor(pxSize / 2), j = Math.floor(pxSize / 2); // i,j = centre pixel
+
+          // Query the FMB (parcel-level) layer first for survey/subdiv, fall back to cadastral
+          const layers = ['cadastral_data_wms:view_fmb', 'cadastral_data_wms:view_cadastral'];
+          let info = null;
+          for (const layer of layers) {
+              const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetFeatureInfo&layers=${layer}&query_layers=${layer}&bbox=${bboxStr}&width=${pxSize}&height=${pxSize}&srs=EPSG:3857&x=${i}&y=${j}&info_format=application/json&feature_count=1`;
+              try {
+                  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+                  if (!res.ok) continue;
+                  const data = await res.json();
+                  if (data && data.features && data.features.length > 0) {
+                      const props = data.features[0].properties || {};
+                      info = {
+                          district: props.district_name || props.district || props.DISTRICT || null,
+                          taluk: props.taluk_name || props.taluk || props.TALUK || null,
+                          village: props.village_name || props.village || props.VILLAGE || null,
+                          surveyNo: props.survey_number || props.survey_no || props.SURVEY_NO || props.survey || null,
+                          subdivNo: props.sub_division || props.sub_div_no || props.SUBDIV_NO || props.subdiv || null,
+                      };
+                      if (info.village || info.surveyNo) break; // got useful data
+                  }
+              } catch (e) { /* timeout or network error, continue */ }
+          }
+
+          if (info) {
+              setCadPinInfo(info);
+          }
+      } catch (e) {
+          console.warn('WMS reverse lookup failed:', e);
+      }
+  }, [mapConfig]);
+
   const fetchAndHighlight = async (level, state) => {
         setLsHighlightPoly(null);
         setLsHighlightType(null);
@@ -1176,6 +1220,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   const [isPolygonAreaCardVisible, setIsPolygonAreaCardVisible] = React.useState(true);
   const [isLandInfoCardVisible, setIsLandInfoCardVisible] = React.useState(true);
   const [cadPinLocation, setCadPinLocation] = React.useState(null);
+  const [cadPinInfo, setCadPinInfo] = React.useState(null); // resolved land data for tapped point
+  const [cadPinCopied, setCadPinCopied] = React.useState(false); // clipboard toast
 
   const [selectedAreaUnit, setSelectedAreaUnit] = React.useState('Ares');
   const [isAreaDropdownOpen, setIsAreaDropdownOpen] = React.useState(false);
@@ -2782,6 +2828,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                         if (cadSelectedPolygon === hitPoly && hitPoly !== null) {
                             setCadSelectedPolygon(null);
                             setCadPinLocation(null);
+                            setCadPinInfo(null);
                             setLsHighlightPoly(null);
                         } else {
                             setCadSelectedPolygon(hitPoly);
@@ -2798,6 +2845,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                     lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
                                 }
                                 setCadPinLocation({ x: svgRaw.x, y: svgRaw.y, lat, lng });
+                                // WMS GetFeatureInfo reverse lookup for land data
+                                if (mapConfig && mapConfig.baseMercX !== 0 && lat !== 0) {
+                                    doWmsReverseLookup(lat, lng);
+                                }
                             }
                             
                             if (hitPoly !== null) {
@@ -3095,6 +3146,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                      if (cadSelectedPolygon === hitPoly && hitPoly !== null) {
                                          setCadSelectedPolygon(null);
                                          setCadPinLocation(null);
+                                         setCadPinInfo(null);
                                          setLsHighlightPoly(null);
                                      } else {
                                          setCadSelectedPolygon(hitPoly);
@@ -3109,6 +3161,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                                  lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
                                              }
                                              setCadPinLocation({ x: rawPt.x, y: rawPt.y, lat, lng });
+                                             // WMS GetFeatureInfo reverse lookup for land data
+                                             if (mapConfig && mapConfig.baseMercX !== 0 && lat !== 0) {
+                                                 doWmsReverseLookup(lat, lng);
+                                             }
                                          }
                                          
                                          if (hitPoly !== null) {
@@ -6481,12 +6537,32 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       )
                   )}
 
-                  {cadPinLocation && (
-                      <g transform={`translate(${cadPinLocation.x}, ${cadPinLocation.y}) scale(${cadViewport.width * 0.0012})`} style={{ pointerEvents: 'none', zIndex: 9999 }}>
-                          <path d="M0 -30 C-10 -30 -15 -20 -15 -10 C-15 5 0 20 0 20 C0 20 15 5 15 -10 C15 -20 10 -30 0 -30 Z" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
-                          <circle cx="0" cy="-12" r="5" fill="#ffffff" />
-                      </g>
-                  )}
+                  {cadPinLocation && (() => {
+                    // Convert SVG coord to screen pixel for fixed-size pin rendering
+                    const svgEl = cadSvgRef.current;
+                    const vp = cadViewport;
+                    // px per SVG unit
+                    const svgRect = svgEl ? svgEl.getBoundingClientRect() : { width: 1, height: 1 };
+                    const pxPerUnit = svgRect.width / vp.width;
+                    const screenX = (cadPinLocation.x - vp.x) * pxPerUnit;
+                    const screenY = (cadPinLocation.y - vp.y) * pxPerUnit;
+                    // Render pin at fixed 36px using foreignObject
+                    return (
+                      <foreignObject
+                        x={cadPinLocation.x - (18 / pxPerUnit)}
+                        y={cadPinLocation.y - (36 / pxPerUnit)}
+                        width={36 / pxPerUnit}
+                        height={42 / pxPerUnit}
+                        style={{ pointerEvents: 'none', overflow: 'visible' }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 44" width="36" height="44" style={{ display:'block', filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.45))' }}>
+                          <path d="M18 0C10.268 0 4 6.268 4 14c0 9.917 13.065 27.386 13.636 28.127a.75.75 0 0 0 1.228 0C19.435 41.386 32 23.917 32 14 32 6.268 25.732 0 18 0z" fill="#2563eb"/>
+                          <path d="M18 0C10.268 0 4 6.268 4 14c0 9.917 13.065 27.386 13.636 28.127a.75.75 0 0 0 1.228 0C19.435 41.386 32 23.917 32 14 32 6.268 25.732 0 18 0z" fill="none" stroke="white" strokeWidth="1.5"/>
+                          <circle cx="18" cy="14" r="5.5" fill="white"/>
+                        </svg>
+                      </foreignObject>
+                    );
+                  })()}
                   {cadCircles.map(c => {
                     const isSelected = cadSelectedCircle === c.id;
                     const isGlowing = cadGlowingCircles.includes(c.id);
@@ -7531,6 +7607,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 const landPoly = visibleCadPolygons.find(p => p.id === cadSelectedPolygon);
                 const landSurvey = (landPoly && landPoly.surveyId) ? cadSurveys.find(s => s.id === landPoly.surveyId) : null;
                 const showLandInfo = cadPinLocation || (cadSelectedPolygon && landPoly);
+                // Resolve display values: prefer WMS-fetched cadPinInfo, fall back to dropdown selections
+                const dispDistrict = (cadPinInfo && cadPinInfo.district) || (landSurvey && landSurvey.district) || selDistrict || '-';
+                const dispTaluk = (cadPinInfo && cadPinInfo.taluk) || (landSurvey && landSurvey.taluk) || selTaluk || '-';
+                const dispVillage = (cadPinInfo && cadPinInfo.village) || (landSurvey && landSurvey.village) || selVillage || '-';
+                const dispSurveyNo = (cadPinInfo && cadPinInfo.surveyNo) || (landSurvey && landSurvey.surveyNo) || (selSurvey && selSurvey.length > 0 ? selSurvey.join(', ') : null) || '-';
+                const dispSubdivNo = (cadPinInfo && cadPinInfo.subdivNo) || (landSurvey && landSurvey.subDivisionNo) || (selSubdiv && selSubdiv.length > 0 ? selSubdiv.join(', ') : null) || '-';
 
                 return (
                     <div className="absolute left-4 md:left-6 z-[120] flex gap-3 pointer-events-none items-end" style={{ bottom: mapConfig.active ? '1.5rem' : '4.5rem' }}>
@@ -7575,29 +7657,48 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                    </div>
                                    
                                    {cadPinLocation && (
-                                       <div className="flex items-center gap-2 mb-3">
-                                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-blue-500"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
-                                           <a href={`https://maps.google.com/?q=${cadPinLocation.lat.toFixed(6)},${cadPinLocation.lng.toFixed(6)}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold text-xs hover:underline decoration-blue-600/50">
-                                               {cadPinLocation.lat.toFixed(5)}, {cadPinLocation.lng.toFixed(5)}
-                                           </a>
-                                       </div>
-                                   )}
+                                        <div className="flex items-center gap-1.5 mb-3 bg-blue-50 rounded-lg px-2 py-1.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-blue-500 shrink-0"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+                                            <a href={`https://maps.google.com/?q=${cadPinLocation.lat.toFixed(6)},${cadPinLocation.lng.toFixed(6)}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold text-[11px] hover:underline flex-1 leading-tight">
+                                                {cadPinLocation.lat.toFixed(5)}, {cadPinLocation.lng.toFixed(5)}
+                                            </a>
+                                            <button
+                                                onPointerDown={(e) => e.stopPropagation()}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const coordStr = `${cadPinLocation.lat.toFixed(6)},${cadPinLocation.lng.toFixed(6)}`;
+                                                    navigator.clipboard.writeText(coordStr).then(() => {
+                                                        setCadPinCopied(true);
+                                                        setTimeout(() => setCadPinCopied(false), 2000);
+                                                    });
+                                                }}
+                                                className="shrink-0 p-1 rounded hover:bg-blue-100 transition-colors"
+                                                title="Copy coordinates"
+                                            >
+                                                {cadPinCopied ? (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                                ) : (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
 
                                    <div className="grid grid-cols-3 gap-2 mb-3">
                                        <div className="flex flex-col items-center justify-center p-2 bg-slate-50 rounded-lg text-center overflow-hidden">
                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500 mb-1"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="22"/><line x1="15" y1="22" x2="15" y2="22"/><line x1="9" y1="6" x2="9" y2="6"/><line x1="15" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="9" y2="10"/><line x1="15" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="9" y2="14"/><line x1="15" y1="14" x2="15" y2="14"/></svg>
                                            <span className="text-[9px] text-slate-500 font-semibold mb-0.5">District</span>
-                                           <span className="text-[10px] font-bold text-slate-800 truncate w-full px-1" title={selDistrict || '-'}>{selDistrict || '-'}</span>
+                                           <span className="text-[10px] font-bold text-slate-800 truncate w-full px-1" title={dispDistrict}>{dispDistrict}</span>
                                        </div>
                                        <div className="flex flex-col items-center justify-center p-2 bg-slate-50 rounded-lg text-center overflow-hidden">
                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-500 mb-1"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                                            <span className="text-[9px] text-slate-500 font-semibold mb-0.5">Taluk</span>
-                                           <span className="text-[10px] font-bold text-slate-800 truncate w-full px-1" title={selTaluk || '-'}>{selTaluk || '-'}</span>
+                                           <span className="text-[10px] font-bold text-slate-800 truncate w-full px-1" title={dispTaluk}>{dispTaluk}</span>
                                        </div>
                                        <div className="flex flex-col items-center justify-center p-2 bg-slate-50 rounded-lg text-center overflow-hidden">
                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500 mb-1"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                                            <span className="text-[9px] text-slate-500 font-semibold mb-0.5">Village</span>
-                                           <span className="text-[10px] font-bold text-slate-800 truncate w-full px-1" title={selVillage || '-'}>{selVillage || '-'}</span>
+                                           <span className="text-[10px] font-bold text-slate-800 break-words w-full px-1 leading-tight" title={dispVillage}>{dispVillage}</span>
                                        </div>
                                    </div>
 
@@ -7607,14 +7708,14 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-teal-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                                                Survey No.
                                            </div>
-                                           <span className="text-teal-600 font-bold text-[13px]">{(landSurvey && landSurvey.surveyNo) || '-'}</span>
+                                           <span className="text-teal-600 font-bold text-[13px]">{dispSurveyNo}</span>
                                        </div>
                                        <div className="flex-1 flex flex-col px-2 text-center">
                                            <div className="flex items-center justify-center gap-1 text-slate-500 text-[10px] font-semibold mb-1">
                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-indigo-500"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                                                Sub-div No.
                                            </div>
-                                           <span className="text-indigo-600 font-bold text-[13px]">{(landSurvey && landSurvey.subDivisionNo) || '-'}</span>
+                                           <span className="text-indigo-600 font-bold text-[13px]">{dispSubdivNo}</span>
                                        </div>
                                    </div>
                                </div>
