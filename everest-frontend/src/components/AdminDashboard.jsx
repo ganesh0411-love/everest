@@ -2779,7 +2779,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                             }
                         });
                     } else {
-                        if (cadSelectedPolygon === hitPoly) {
+                        if (cadSelectedPolygon === hitPoly && hitPoly !== null) {
                             setCadSelectedPolygon(null);
                             setCadPinLocation(null);
                             setLsHighlightPoly(null);
@@ -2800,9 +2800,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                 setCadPinLocation({ x: svgRaw.x, y: svgRaw.y, lat, lng });
                             }
                             
-                            const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
-                            if (matchingPoly) {
-                                setLsHighlightPoly([matchingPoly.pts]);
+                            if (hitPoly !== null) {
+                                const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
+                                if (matchingPoly) {
+                                    setLsHighlightPoly([matchingPoly.pts]);
+                                }
+                            } else {
+                                setLsHighlightPoly(null);
                             }
                             
                             setIsPolygonAreaCardVisible(false);
@@ -3014,7 +3018,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                setCadSelectedPolygon(null);
                setCadPopupOffset({x:0, y:0});
             } else {
-               if (cadTool === 'IDLE' && !isAddRadiusEnabled && (cadPolygons.length > 0 || visibleCadPolygons.length > 0)) {
+               if (cadTool === 'IDLE' && !isAddRadiusEnabled) {
                      const rawPt = getCadSvgCoords(e.clientX, e.clientY);
                        let hitPoly = null;
                        let hitSurveyId = null;
@@ -3088,7 +3092,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                          });
                                      }
                                  } else {
-                                     if (cadSelectedPolygon === hitPoly) {
+                                     if (cadSelectedPolygon === hitPoly && hitPoly !== null) {
                                          setCadSelectedPolygon(null);
                                          setCadPinLocation(null);
                                          setLsHighlightPoly(null);
@@ -3107,9 +3111,14 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                              setCadPinLocation({ x: rawPt.x, y: rawPt.y, lat, lng });
                                          }
                                          
-                                         const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
-                                         if (matchingPoly) {
-                                             setLsHighlightPoly([matchingPoly.pts]);
+                                         if (hitPoly !== null) {
+                                             const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
+                                             if (matchingPoly) {
+                                                 setLsHighlightPoly([matchingPoly.pts]);
+                                                 setLsHighlightType('parcel');
+                                             }
+                                         } else {
+                                             setLsHighlightPoly(null);
                                          }
                                          
                                          setIsPolygonAreaCardVisible(false);
@@ -3123,7 +3132,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                          setCadSelectedCircle(null);
                      } else {
                          if (!cadMultiSelectModeRef.current) {
-                             setCadSelectedPolygon(null);
+                             // do not reset pin/polygon here as the tap handler will process it above.
                          }
                      }
                }
@@ -6153,37 +6162,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     )}
                     <rect x={cadViewport.x} y={cadViewport.y} width="100%" height="100%" fill="url(#grid)" />
                    
-                    {/* Progressive Yellow Highlight Polygon */}
-                    {(lsHighlightPoly && (
-        (lsHighlightType === 'subdiv' && cadViewport.width <= 1000) ||
-        ((lsHighlightType === 'survey' || lsHighlightType === 'parcel') && cadViewport.width <= 5000) ||
-        (lsHighlightType !== 'subdiv' && lsHighlightType !== 'survey' && lsHighlightType !== 'parcel' && cadViewport.width <= 15000)
-    )) && (
-                 Array.isArray(lsHighlightPoly[0]) ? (
-                     lsHighlightPoly.map((ring, idx) => (
-                         <polygon
-                             key={`map_hp_${idx}`}
-                             points={ring.map(p => `${p.x},${p.y}`).join(' ')}
-                             fill="transparent"
-                             stroke="#FFD700"
-                             strokeWidth="4"
-                             vectorEffect="non-scaling-stroke"
-                             strokeLinejoin="round"
-                             pointerEvents="none"
-                         />
-                     ))
-                 ) : (
-                     <polygon 
-                         points={lsHighlightPoly.map(p => `${p.x},${p.y}`).join(' ')}
-                         fill="transparent"
-                             stroke="#FFD700"
-                             strokeWidth="4"
-                         vectorEffect="non-scaling-stroke"
-                         strokeLinejoin="round"
-                         pointerEvents="none"
-                     />
-                 )
-             )}
                    
                      <g id="cad-drawing-layer">
                       {(cadBackgroundImage && isBackgroundImageVisible) && (
@@ -6475,7 +6453,35 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     );
                   })}
 
-                  {cadPinLocation && cadSelectedPolygon && (
+                  {/* Top-Level Yellow Highlight Polygon for Selected Land */}
+                  {lsHighlightPoly && (
+                      Array.isArray(lsHighlightPoly[0]) ? (
+                          lsHighlightPoly.map((ring, idx) => (
+                              <polygon
+                                  key={`map_hp_${idx}`}
+                                  points={ring.map(p => `${p.x},${p.y}`).join(' ')}
+                                  fill="transparent"
+                                  stroke="#FFD700"
+                                  strokeWidth="6"
+                                  vectorEffect="non-scaling-stroke"
+                                  strokeLinejoin="round"
+                                  style={{ pointerEvents: 'none' }}
+                              />
+                          ))
+                      ) : (
+                          <polygon 
+                              points={lsHighlightPoly.map(p => `${p.x},${p.y}`).join(' ')}
+                              fill="transparent"
+                              stroke="#FFD700"
+                              strokeWidth="6"
+                              vectorEffect="non-scaling-stroke"
+                              strokeLinejoin="round"
+                              style={{ pointerEvents: 'none' }}
+                          />
+                      )
+                  )}
+
+                  {cadPinLocation && (
                       <g transform={`translate(${cadPinLocation.x}, ${cadPinLocation.y}) scale(${cadViewport.width * 0.0012})`} style={{ pointerEvents: 'none', zIndex: 9999 }}>
                           <path d="M0 -30 C-10 -30 -15 -20 -15 -10 C-15 5 0 20 0 20 C0 20 15 5 15 -10 C15 -20 10 -30 0 -30 Z" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
                           <circle cx="0" cy="-12" r="5" fill="#ffffff" />
@@ -7524,7 +7530,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             {(() => {
                 const landPoly = visibleCadPolygons.find(p => p.id === cadSelectedPolygon);
                 const landSurvey = (landPoly && landPoly.surveyId) ? cadSurveys.find(s => s.id === landPoly.surveyId) : null;
-                const showLandInfo = cadSelectedPolygon && landPoly;
+                const showLandInfo = cadPinLocation || (cadSelectedPolygon && landPoly);
 
                 return (
                     <div className="absolute left-4 md:left-6 z-[120] flex gap-3 pointer-events-none items-end" style={{ bottom: mapConfig.active ? '1.5rem' : '4.5rem' }}>
