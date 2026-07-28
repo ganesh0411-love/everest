@@ -5,8 +5,60 @@ import { Geolocation } from '@capacitor/geolocation';
 import { db } from '../firebase';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
-// Cloud API base — reads from .env at build time, falls back to localhost for dev
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+// ============================================================================
+// DUAL-ENVIRONMENT API CONFIGURATION & AUTOMATIC FALLBACK MECHANISM (WITH FLOW)
+// 1. PC / Localhost Dev: Strictly use local Node.js server (http://localhost:5000)
+// 2. Mobile APK / Production Build: Use Render Cloud Backend URL with smooth fallback
+// ============================================================================
+const USE_LOCAL_GIS = true;
+const REMOTE_API_BASE = 'https://everest-backend-f9nt.onrender.com';
+const LOCAL_API_BASE = 'http://localhost:5000';
+
+const isLocalPC = Boolean(
+  import.meta.env?.DEV ||
+  import.meta.env?.MODE === 'development' ||
+  (typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.startsWith('192.168.') ||
+    window.location.hostname.startsWith('10.') ||
+    window.location.hostname.startsWith('172.')
+  ))
+);
+
+const API_BASE = isLocalPC
+  ? (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE || LOCAL_API_BASE)
+  : (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE || REMOTE_API_BASE);
+
+// Intercept network requests to provide smooth automatic fallback from Render -> Localhost
+if (typeof window !== 'undefined' && !window._everestApiFallbackInitialized) {
+  window._everestApiFallbackInitialized = true;
+  const originalFetch = window.fetch;
+  window.fetch = async function(resource, init) {
+    const urlStr = typeof resource === 'string' ? resource : (resource instanceof Request ? resource.url : String(resource));
+    try {
+      const response = await originalFetch(resource, init);
+      if (!isLocalPC && urlStr.startsWith(REMOTE_API_BASE) && (response.status >= 500 || response.status === 404 || response.status === 502 || response.status === 503)) {
+        console.warn(`[API Fallback] Render Cloud API (${urlStr}) returned status ${response.status}. Falling back smoothly to local cached endpoint.`);
+        const fallbackUrl = urlStr.replace(REMOTE_API_BASE, LOCAL_API_BASE);
+        return await originalFetch(fallbackUrl, init);
+      }
+      return response;
+    } catch (err) {
+      if (!isLocalPC && urlStr.startsWith(REMOTE_API_BASE)) {
+        console.warn(`[API Fallback] Render Cloud API unreachable (${err.message}). Falling back smoothly to local cached endpoint.`);
+        const fallbackUrl = urlStr.replace(REMOTE_API_BASE, LOCAL_API_BASE);
+        try {
+          return await originalFetch(fallbackUrl, init);
+        } catch (fallbackErr) {
+          console.error(`[API Fallback] Both Render and local fallback failed for ${urlStr}:`, fallbackErr);
+          throw err;
+        }
+      }
+      throw err;
+    }
+  };
+}
 
 const DB_NAME = 'EverestTileCache';
 const STORE_NAME = 'tiles';
