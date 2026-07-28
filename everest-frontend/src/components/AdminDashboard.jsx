@@ -32,7 +32,7 @@ const API_BASE = isLocalPC
   ? (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE || LOCAL_API_BASE)
   : (import.meta.env?.VITE_API_BASE_URL || import.meta.env?.VITE_API_BASE || REMOTE_API_BASE);
 
-// Intercept network requests to provide smooth automatic fallback from Render -> Localhost
+// Intercept network requests to provide smooth automatic fallback from Render -> Localhost and Localhost -> Render
 if (typeof window !== 'undefined' && !window._everestApiFallbackInitialized) {
   window._everestApiFallbackInitialized = true;
   const originalFetch = window.fetch;
@@ -40,15 +40,22 @@ if (typeof window !== 'undefined' && !window._everestApiFallbackInitialized) {
     const urlStr = typeof resource === 'string' ? resource : (resource instanceof Request ? resource.url : String(resource));
     try {
       const response = await originalFetch(resource, init);
-      // If production call to Render returns server error (5xx) or 404/empty, fall back smoothly to local cached endpoints
+      // Fallback from Render -> Localhost
       if (!isLocalPC && urlStr.startsWith(REMOTE_API_BASE) && (response.status >= 500 || response.status === 404 || response.status === 502 || response.status === 503)) {
         console.warn(`[API Fallback] Render Cloud API (${urlStr}) returned status ${response.status}. Falling back smoothly to local cached endpoint.`);
         const fallbackUrl = urlStr.replace(REMOTE_API_BASE, LOCAL_API_BASE);
         return await originalFetch(fallbackUrl, init);
       }
+      // Fallback from Localhost -> Render
+      if (isLocalPC && urlStr.startsWith(LOCAL_API_BASE) && (response.status >= 500 || response.status === 404 || response.status === 502 || response.status === 503)) {
+        console.warn(`[API Fallback] Local API (${urlStr}) returned status ${response.status}. Falling back smoothly to Render Cloud endpoint.`);
+        const fallbackUrl = urlStr.replace(LOCAL_API_BASE, REMOTE_API_BASE);
+        return await originalFetch(fallbackUrl, init);
+      }
       return response;
     } catch (err) {
-      // If network fails (offline or Render unreachable), fall back smoothly to localhost / local cache
+      // Network fails (offline or Unreachable)
+      // Fallback from Render -> Localhost
       if (!isLocalPC && urlStr.startsWith(REMOTE_API_BASE)) {
         console.warn(`[API Fallback] Render Cloud API unreachable (${err.message}). Falling back smoothly to local cached endpoint.`);
         const fallbackUrl = urlStr.replace(REMOTE_API_BASE, LOCAL_API_BASE);
@@ -56,6 +63,17 @@ if (typeof window !== 'undefined' && !window._everestApiFallbackInitialized) {
           return await originalFetch(fallbackUrl, init);
         } catch (fallbackErr) {
           console.error(`[API Fallback] Both Render and local fallback failed for ${urlStr}:`, fallbackErr);
+          throw err;
+        }
+      }
+      // Fallback from Localhost -> Render (CRITICAL FIX)
+      if (isLocalPC && urlStr.startsWith(LOCAL_API_BASE)) {
+        console.warn(`[API Fallback] Local API unreachable (${err.message}). Falling back smoothly to Render Cloud endpoint.`);
+        const fallbackUrl = urlStr.replace(LOCAL_API_BASE, REMOTE_API_BASE);
+        try {
+          return await originalFetch(fallbackUrl, init);
+        } catch (fallbackErr) {
+          console.error(`[API Fallback] Both Local and Render fallback failed for ${urlStr}:`, fallbackErr);
           throw err;
         }
       }
