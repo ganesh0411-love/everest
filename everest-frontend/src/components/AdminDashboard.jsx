@@ -2762,7 +2762,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     }
 
     if (cadActiveHitPolyRef.current) {
-        const hitPoly = cadActiveHitPolyRef.current;
+        const hitPoly = cadActiveHitPolyRef.current === 'EMPTY' ? null : cadActiveHitPolyRef.current;
         const hitSurveyId = cadActiveHitSurveyRef.current;
         
         if (e.pointerType === 'touch') {
@@ -3041,8 +3041,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              }
                          }
                        }
-                     if (hitPoly) {
-                         cadActiveHitPolyRef.current = hitPoly;
+                     if (true) {
+                         cadActiveHitPolyRef.current = hitPoly || 'EMPTY';
                          cadActiveHitSurveyRef.current = hitSurveyId;
                          cadTouchStartPosRef.current = { x: e.clientX, y: e.clientY };
                          cadLongPressTriggeredRef.current = false;
