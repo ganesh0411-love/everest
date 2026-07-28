@@ -719,7 +719,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [lsSurveys, setLsSurveys] = React.useState([]);
   const [lsSubdivs, setLsSubdivs] = React.useState([]);
   
-  const [selDistrict, setSelDistrict] = React.useState('');
+  const [selDistrict, setSelDistrict] = React.useState('Dindigul');
   const [selTaluk, setSelTaluk] = React.useState('');
   const [selVillage, setSelVillage] = React.useState('');
   const [selSurvey, setSelSurvey] = React.useState([]);
@@ -3825,7 +3825,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   const pullStartRef = React.useRef(null);
 
   const resetAppState = () => {
-    setSelDistrict('');
+    setSelDistrict('Dindigul');
     setSelTaluk('');
     setSelVillage('');
     setSelSurvey([]);
