@@ -3014,7 +3014,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                setCadSelectedPolygon(null);
                setCadPopupOffset({x:0, y:0});
             } else {
-               if (cadTool === 'IDLE' && !isAddRadiusEnabled && cadPolygons.length > 0) {
+               if (cadTool === 'IDLE' && !isAddRadiusEnabled && (cadPolygons.length > 0 || visibleCadPolygons.length > 0)) {
                      const rawPt = getCadSvgCoords(e.clientX, e.clientY);
                        let hitPoly = null;
                        let hitSurveyId = null;
