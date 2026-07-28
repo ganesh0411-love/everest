@@ -721,6 +721,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   
   const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   const [mapRotation, setMapRotation] = React.useState(0);
+  const [isMobile360Active, setIsMobile360Active] = React.useState(false);
 
   React.useEffect(() => {
     if (!showLandSurveyDashboard) {
@@ -2275,7 +2276,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       const dist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
       const cx = (pts[0].clientX + pts[1].clientX) / 2;
       const cy = (pts[0].clientY + pts[1].clientY) / 2;
-      setCadPinchInitial({ dist, cx, cy, view: { ...cadViewport } });
+      const angle = Math.atan2(pts[1].clientY - pts[0].clientY, pts[1].clientX - pts[0].clientX) * (180 / Math.PI);
+      setCadPinchInitial({ dist, cx, cy, view: { ...cadViewport }, angle, initialRotation: mapRotation });
       return;
     }
 
@@ -2437,6 +2439,15 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       const cy = (pts[0].clientY + pts[1].clientY) / 2;
 
       const scaleDelta = dist > 5 ? cadPinchInitial.dist / dist : 1;
+      if (isMobile360Active && cadPinchInitial.angle !== undefined) {
+          const currentAngle = Math.atan2(pts[1].clientY - pts[0].clientY, pts[1].clientX - pts[0].clientX) * (180 / Math.PI);
+          let deltaAngle = currentAngle - cadPinchInitial.angle;
+          if (deltaAngle > 180) deltaAngle -= 360;
+          if (deltaAngle < -180) deltaAngle += 360;
+          let newRot = (cadPinchInitial.initialRotation + deltaAngle) % 360;
+          if (newRot < 0) newRot += 360;
+          setMapRotation(Math.round(newRot));
+      }
       const newWidth = cadPinchInitial.view.width * scaleDelta;
       const newHeight = cadPinchInitial.view.height * scaleDelta;
 
@@ -3909,6 +3920,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         return true;
       }
 
+      if (showLandSurveyDashboard && activeLandSurveyView === 'menu') {
+        setShowLandSurveyDashboard(false);
+        return true;
+      }
+
       // 4. Return false so App.jsx handles it (goes to Home page)
       return false;
     };
@@ -4397,8 +4413,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     }}
                   >
                     <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-full flex items-center justify-center shadow-md mb-4 mt-1 shrink-0 z-10 group-hover:scale-110 transition-transform duration-300">
-                      <svg className="w-8 h-8 md:w-10 md:h-10 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/><path d="M15 15l2 2-2 2"/>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-10 md:h-10">
+                        <path d="M3 9L12 4L21 9V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V9Z" stroke="#f97316" strokeWidth="2"/>
+                        <path d="M9 21V12H15V21" stroke="#f97316" strokeWidth="2"/>
+                        <path d="M12 4V12" stroke="#fdba74" strokeWidth="2" strokeDasharray="3 3"/>
                       </svg>
                     </div>
                     <div className="z-10 flex flex-col items-center">
@@ -4414,17 +4432,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   <div
                     className="group relative rounded-[28px] md:rounded-[32px] p-5 md:p-6 flex flex-col items-center cursor-pointer active:scale-95 transition-transform duration-200 shadow-[0_10px_30px_rgba(147,51,234,0.2)] overflow-hidden aspect-square md:aspect-auto md:min-h-[220px]"
                     style={{background: 'linear-gradient(150deg, #c084fc 0%, #7e22ce 100%)'}}
-                    onClick={() => {
-                      setIsManualCanvasOpen(true);
-                      setIsMyProjectsOpen(false);
-                      setActiveLandSurveyView('dark_draw_manual');
-                      resetCadWorkspace();
-                      setMapConfig({ ...mapConfig, active: false });
-                    }}
+                    onClick={() => { setActiveLandSurveyView('dark_draw_submenu'); }}
                   >
                     <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-full flex items-center justify-center shadow-md mb-4 mt-1 shrink-0 z-10 group-hover:scale-110 transition-transform duration-300">
-                      <svg className="w-8 h-8 md:w-10 md:h-10 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 2l4 10-4-3-4 3 4-10z"/><circle cx="12" cy="19" r="2"/>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-10 md:h-10">
+                        <path d="M16 4L20 8L8 20H4V16L16 4Z" stroke="#9333ea" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 8L16 12" stroke="#9333ea" strokeWidth="2" strokeLinecap="round"/>
+                        <path d="M20 4L22 2" stroke="#9333ea" strokeWidth="2" strokeLinecap="round"/>
                       </svg>
                     </div>
                     <div className="z-10 flex flex-col items-center">
@@ -7453,43 +7467,100 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
              {/* STATE 2: LIVE MAP MODE - FLOATING ACTION BUTTONS (ADD LINE & SATELLITE TOGGLE) */}
              {mapConfig.active && (
-             <div className="absolute bottom-8 right-8 z-[120] flex items-center gap-3 select-none touch-none"
-                  onPointerDown={e => e.stopPropagation()}
-             >
-                 {/* Floating Pencil ("Add Line") Icon */}
-                 <button 
-                    className={`w-12 h-12 rounded-full shadow-2xl border-2 flex justify-center items-center font-bold text-xl transition-all pointer-events-auto ${cadTool === 'ADD_LINE' ? 'bg-fuchsia-600 border-fuchsia-400 text-white shadow-[0_0_15px_rgba(192,38,211,0.6)] scale-105' : 'bg-slate-800/90 border-slate-600 hover:bg-slate-700 text-white'}`}
-                    onClick={(e) => { 
-                       e.stopPropagation();
-                       if (cadTool === 'ADD_LINE') {
-                          setCadTool('IDLE');
-                          setCadAnchorNode(null);
-                       } else {
-                          setCadTool('ADD_LINE');
-                          setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2, isInitialCenter: true });
-                       }
-                       setCadSelectedNode(null); 
-                    }}
-                    title="Add Line / Draw over Satellite Map"
+             <>
+                 {/* DESKTOP LAYOUT (Pencil + Map Toggle only - others are at top-left) */}
+                 <div className="absolute bottom-8 right-8 z-[120] hidden md:flex items-center gap-3 select-none touch-none"
+                      onPointerDown={e => e.stopPropagation()}
                  >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                       <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-                    </svg>
-                 </button>
+                     <button 
+                        className={`w-12 h-12 rounded-full shadow-2xl border-2 flex justify-center items-center font-bold text-xl transition-all pointer-events-auto ${cadTool === 'ADD_LINE' ? 'bg-fuchsia-600 border-fuchsia-400 text-white shadow-[0_0_15px_rgba(192,38,211,0.6)] scale-105' : 'bg-slate-800/90 border-slate-600 hover:bg-slate-700 text-white'}`}
+                        onClick={(e) => { 
+                           e.stopPropagation();
+                           if (cadTool === 'ADD_LINE') {
+                              setCadTool('IDLE');
+                              setCadAnchorNode(null);
+                           } else {
+                              setCadTool('ADD_LINE');
+                              setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2, isInitialCenter: true });
+                           }
+                           setCadSelectedNode(null); 
+                        }}
+                        title="Add Line / Draw over Satellite Map"
+                     >
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                           <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                        </svg>
+                     </button>
+                     <button 
+                        className="w-12 h-12 rounded-full flex justify-center items-center font-bold transition-all pointer-events-auto shadow-2xl border-2 border-green-400 bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]"
+                        onClick={(e) => { e.stopPropagation(); toggleSatelliteMap(); }}
+                        title="Toggle Satellite Map OFF"
+                     >
+                        {mapConfig.isLoading ? (
+                            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                        ) : (
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                        )}
+                     </button>
+                 </div>
 
-                 {/* Floating Map View Toggle Icon */}
-                 <button 
-                    className="w-12 h-12 rounded-full flex justify-center items-center font-bold transition-all pointer-events-auto shadow-2xl border-2 border-green-400 bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]"
-                    onClick={(e) => { e.stopPropagation(); toggleSatelliteMap(); }}
-                    title="Toggle Satellite Map OFF"
-                 >
-                    {mapConfig.isLoading ? (
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-                    ) : (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
-                    )}
-                 </button>
-             </div>
+                 {/* MOBILE LAYOUT (Stacked Controls) */}
+                 <div className="absolute top-6 left-6 z-[150] flex md:hidden items-center gap-2 pointer-events-none">
+                     <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(true); }} className="w-10 h-10 rounded-full bg-slate-800/90 text-white shadow-xl border border-slate-600 flex items-center justify-center pointer-events-auto active:bg-slate-700">
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                     </button>
+                     <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(!isLandSearchModalOpen); }} className={`w-10 h-10 rounded-full text-white shadow-xl border flex items-center justify-center pointer-events-auto transition-colors ${isLandSearchModalOpen ? 'bg-blue-600 border-blue-400' : 'bg-slate-800/90 border-slate-600 active:bg-slate-700'}`}>
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                     </button>
+                 </div>
+
+                 <div className="absolute bottom-8 right-4 z-[120] flex items-end gap-5 md:hidden pointer-events-none select-none touch-none" onPointerDown={e => e.stopPropagation()}>
+                     <button 
+                        className={`w-12 h-12 rounded-full shadow-2xl border-2 flex justify-center items-center font-bold text-xl pointer-events-auto transition-all ${cadTool === 'ADD_LINE' ? 'bg-fuchsia-600 border-fuchsia-400 text-white shadow-[0_0_15px_rgba(192,38,211,0.6)] scale-105' : 'bg-slate-800/90 border-slate-600 text-white'}`}
+                        onClick={(e) => { 
+                           e.stopPropagation();
+                           if (cadTool === 'ADD_LINE') {
+                              setCadTool('IDLE');
+                              setCadAnchorNode(null);
+                           } else {
+                              setCadTool('ADD_LINE');
+                              setCadAnchorNode({ x: cadViewport.x + cadViewport.width / 2, y: cadViewport.y + cadViewport.height / 2, isInitialCenter: true });
+                           }
+                           setCadSelectedNode(null); 
+                        }}
+                     >
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                     </button>
+
+                     <div className="flex flex-col gap-3 pointer-events-auto items-center">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setIsMobile360Active(p => !p); }} 
+                          className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border transition-all ${isMobile360Active ? 'bg-amber-500 border-amber-300 text-white shadow-[0_0_15px_rgba(245,158,11,0.6)]' : 'bg-slate-800/90 border-slate-600 text-white active:bg-slate-700'}`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        </button>
+
+                        <button onClick={handleGpsCenter} className="w-10 h-10 rounded-full bg-slate-800/90 text-white shadow-lg border border-slate-600 flex items-center justify-center active:bg-slate-700" title="GPS Center">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
+                        </button>
+
+                        <button onClick={(e) => { e.stopPropagation(); setIsLayerMenuOpen(!isLayerMenuOpen); }} className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border transition-colors ${isLayerMenuOpen || isCadastralEnabled || isFMBEnabled ? 'bg-cyan-600 border-cyan-400 text-white' : 'bg-slate-800/90 border-slate-600 text-white active:bg-slate-700'}`}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                        </button>
+
+                        <button 
+                          className="w-12 h-12 rounded-full flex justify-center items-center font-bold transition-all shadow-2xl border-2 border-green-400 bg-green-600 active:bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]"
+                          onClick={(e) => { e.stopPropagation(); toggleSatelliteMap(); }}
+                        >
+                          {mapConfig.isLoading ? (
+                              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                          ) : (
+                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                          )}
+                        </button>
+                     </div>
+                 </div>
+             </>
              )}
 {cadPrompt && (() => {
                   let l = cadPrompt.x;
