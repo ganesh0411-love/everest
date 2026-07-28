@@ -5381,7 +5381,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                </div>
 
                {/* WORKSPACE SPLIT SUMMARY CARD */}
-               <div className="bg-slate-800/90 backdrop-blur border-b border-r border-slate-700 w-[calc(100%-60px)] flex items-center shrink-0 shadow-sm z-[150] relative rounded-br-2xl">
+               <div className="bg-slate-800/90 backdrop-blur border-b border-r border-slate-700 w-[calc(100%-60px)] flex items-center shrink-0 shadow-sm z-[9999] relative rounded-br-2xl">
                  <div className="flex-1 flex flex-col justify-center px-3 py-1.5 border-r border-slate-700/50 min-w-0">
                     <button onClick={() => { setIsAreaDropdownOpen(!isAreaDropdownOpen); setIsPerimeterDropdownOpen(false); }} className="flex items-center justify-between w-full text-white font-black text-[13px] hover:text-emerald-400 transition-colors outline-none leading-tight">
                       <span>{activeArea ? (
@@ -5486,8 +5486,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                  {/* DROPDOWNS OUTSIDE OVERFLOW CONTEXTS */}
                  {isAreaDropdownOpen && (
                     <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsAreaDropdownOpen(false)}></div>
-                      <div className="absolute top-full left-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-50 min-w-[120px] flex flex-col">
+                      <div className="fixed inset-0 z-[9998]" onClick={(e) => { e.stopPropagation(); setIsAreaDropdownOpen(false); }}></div>
+                      <div className="absolute top-full left-4 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-[9999] min-w-[120px] flex flex-col" onClick={(e) => e.stopPropagation()}>
                          {['Hectare', 'Ares', 'Acre', 'Cent', 'Sq. Ft', 'Sq. M'].map(unit => (
                              <button key={unit} onClick={() => { setSelectedAreaUnit(unit); setIsAreaDropdownOpen(false); }} className={`px-4 py-2 text-xs font-bold text-left hover:bg-slate-700 transition-colors ${selectedAreaUnit === unit ? 'text-emerald-400' : 'text-slate-300'}`}>
                                 {unit}
@@ -5807,7 +5807,9 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       </button>
                       
                       {isLayerMenuOpen && (
-                          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 bg-slate-900/95 backdrop-blur-md border border-slate-600 rounded-xl shadow-2xl p-4 w-56 animate-in fade-in slide-in-from-left-4 z-[200]" onClick={(e) => e.stopPropagation()}>
+                          <>
+                             <div className="fixed inset-0 z-[190]" onClick={(e) => { e.stopPropagation(); setIsLayerMenuOpen(false); }}></div>
+                             <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 bg-slate-900/95 backdrop-blur-md border border-slate-600 rounded-xl shadow-2xl p-4 w-56 animate-in fade-in slide-in-from-left-4 z-[200]" onClick={(e) => e.stopPropagation()}>
                               <h3 className="text-white font-black text-xs uppercase tracking-widest border-b border-slate-700 pb-2 mb-3">Map Layers</h3>
                               
                               <div className="flex flex-col gap-3">
@@ -5854,6 +5856,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                   </label>
                               </div>
                           </div>
+                          </>
                       )}
                   </div>
               </div>
