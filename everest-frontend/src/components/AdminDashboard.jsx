@@ -7357,7 +7357,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
             {activeArea ? (
                isPolygonAreaCardVisible ? (
-                <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className={`absolute ${mapConfig.active ? 'bottom-12 md:bottom-6' : 'bottom-32 md:bottom-16'} left-4 md:left-6 z-[120] bg-slate-900/95 p-2 md:p-3 rounded-lg md:rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto animate-in slide-in-from-bottom-4 transition-all duration-300`}>
+                <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} className={`absolute ${mapConfig.active ? 'bottom-6' : 'bottom-[4.5rem] md:bottom-[4.5rem]'} left-4 md:left-6 z-[120] bg-slate-900/95 p-2 md:p-3 rounded-lg md:rounded-xl shadow-2xl border border-slate-700 w-max flex flex-col pointer-events-auto animate-in slide-in-from-bottom-4 transition-all duration-300`}>
                   <div className="flex items-center justify-between border-b border-slate-700 pb-1 mb-1 gap-4">
                      <span className="text-[9px] md:text-[10px] text-fuchsia-400 font-black uppercase tracking-widest leading-none mb-1">Polygon Area</span>
                      <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(false); }} className="text-slate-500 hover:text-white transition-colors p-1 rounded hover:bg-slate-800" title="Minimize">
@@ -7373,7 +7373,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   </div>
                 </div>
                ) : (
-                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(true); }} className={`absolute ${mapConfig.active ? 'bottom-12 md:bottom-6' : 'bottom-32 md:bottom-16'} left-4 md:left-6 z-[120] bg-slate-900/90 p-2 md:p-3 rounded-lg md:rounded-xl shadow-2xl border border-slate-700 text-fuchsia-400 hover:text-fuchsia-300 pointer-events-auto flex items-center justify-center animate-in zoom-in-75 hover:bg-slate-800 transition-all duration-300`} title="Restore Polygon Area">
+                <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setIsPolygonAreaCardVisible(true); }} className={`absolute ${mapConfig.active ? 'bottom-6' : 'bottom-[4.5rem] md:bottom-[4.5rem]'} left-4 md:left-6 z-[120] bg-slate-900/90 p-2 md:p-3 rounded-lg md:rounded-xl shadow-2xl border border-slate-700 text-fuchsia-400 hover:text-fuchsia-300 pointer-events-auto flex items-center justify-center animate-in zoom-in-75 hover:bg-slate-800 transition-all duration-300`} title="Restore Polygon Area">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                 </button>
                )
@@ -7466,7 +7466,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       {mapConfig.isLoading ? (
                           <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                       ) : (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                       )}
                    </button>
                 </div>
@@ -7507,14 +7507,14 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                         {mapConfig.isLoading ? (
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                         ) : (
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                         )}
                      </button>
                  </div>
 
 
                  {/* MOBILE LAYOUT (Pencil + Map Toggle) */}
-                 <div className="absolute bottom-28 right-4 z-[120] flex md:hidden flex-col items-center gap-3 select-none touch-none"
+                 <div className="absolute bottom-6 right-3 z-[120] flex md:hidden flex-row items-center gap-3 select-none touch-none"
                       onPointerDown={e => e.stopPropagation()}
                  >
                      <button 
@@ -7544,7 +7544,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                         {mapConfig.isLoading ? (
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                         ) : (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                         )}
                      </button>
                  </div>
