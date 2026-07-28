@@ -338,11 +338,22 @@ const BoundaryWMSLayer = ({ viewport, baseMercX, baseMercY, layerName, strokeCol
             }
             
             const isMobile = window.innerWidth < 768;
-            const mobileFontSize = isMobile ? '8' : '11';
-            const mobileStrokeWidth = strokeWidth;
+            
+            // Dynamic scaling based on viewport width (mercator meters). 
+            // 400m is roughly a comfortable zoom level for subdivision viewing.
+            const zoomScale = Math.max(0.1, Math.min(1, 400 / viewport.width));
+            
+            // Defect 2 Fix: Scale down label font size dynamically.
+            const calcFontSize = isMobile ? Math.max(7, Math.round(11 * zoomScale)) : Math.max(9, Math.round(13 * zoomScale));
+            const mobileFontSize = calcFontSize.toString();
+            
+            // Defect 1 Fix: Crisp, thin vector lines without bulging (max 1.5px, scales down to 0.5px when zoomed out)
+            const calcStroke = Math.max(0.5, parseFloat(strokeWidth) * zoomScale).toFixed(1);
+            const mobileStrokeWidth = calcStroke;
+            
             const mobileHighlightStrokeWidth = isMobile ? '2.5' : '3';
 
-            const createTextSymbolizer = (color) => labelProperty ? `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>${labelProperty}</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">${mobileFontSize}</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">${color}</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption></TextSymbolizer>` : '';
+            const createTextSymbolizer = (color) => labelProperty ? `<TextSymbolizer><Geometry><ogc:Function name="centroid"><ogc:PropertyName>the_geom</ogc:PropertyName></ogc:Function></Geometry><Label><ogc:PropertyName>${labelProperty}</ogc:PropertyName></Label><Font><CssParameter name="font-family">Arial</CssParameter><CssParameter name="font-size">${mobileFontSize}</CssParameter><CssParameter name="font-weight">bold</CssParameter></Font><LabelPlacement><PointPlacement><AnchorPoint><AnchorPointX>0.5</AnchorPointX><AnchorPointY>0.5</AnchorPointY></AnchorPoint></PointPlacement></LabelPlacement><Halo><Radius>1</Radius><Fill><CssParameter name="fill">#000000</CssParameter></Fill></Halo><Fill><CssParameter name="fill">${color}</CssParameter></Fill><VendorOption name="conflictResolution">true</VendorOption><VendorOption name="goodnessOfFit">0.7</VendorOption><VendorOption name="polygonAlign">mbr</VendorOption></TextSymbolizer>` : '';
             const textSymbolizer = createTextSymbolizer(labelColor || strokeColor);
             const highlightTextSymbolizer = createTextSymbolizer('#FFFF00');
 
