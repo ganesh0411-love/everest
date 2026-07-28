@@ -719,6 +719,7 @@ const AdminDashboard = ({ setCurrentView }) => {
   const [mapSelectionArea, setMapSelectionArea] = React.useState(null);
   const [lsHighlightType, setLsHighlightType] = React.useState(null);
   
+  const [landSearchType, setLandSearchType] = React.useState('rural');
   const [isLandSearchModalOpen, setIsLandSearchModalOpen] = React.useState(false);
   const [mapRotation, setMapRotation] = React.useState(0);
   const [isMobile360Active, setIsMobile360Active] = React.useState(false);
