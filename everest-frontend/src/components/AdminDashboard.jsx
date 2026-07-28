@@ -2766,6 +2766,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     if (cadPointersRef.current.size < 2) setCadPinchInitial(null);
 
     if (cadPointersRef.current.size === 0) {
+      // FIX: Sync native SVG viewport back to React state to trigger tile and WMS layer fetches
+      setCadViewport({ ...cadViewportRef.current });
       const wasMultiTouch = cadMultiTouchActiveRef.current;
       cadMultiTouchActiveRef.current = false;
 
