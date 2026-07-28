@@ -2779,26 +2779,35 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                             }
                         });
                     } else {
-                        setCadSelectedPolygon(prev => {
-                            if (prev === hitPoly) {
-                               setCadPinLocation(null);
-                               return null;
-                            }
+                        if (cadSelectedPolygon === hitPoly) {
+                            setCadSelectedPolygon(null);
+                            setCadPinLocation(null);
+                            setLsHighlightPoly(null);
+                        } else {
+                            setCadSelectedPolygon(hitPoly);
                             if (hitSurveyId) setCadActiveSurveyId(hitSurveyId);
                             
-                            if (mapConfig && mapConfig.baseMercX !== 0 && cadTouchStartPosRef.current) {
-                                const svgRaw = getCadSvgCoords(cadTouchStartPosRef.current.x, cadTouchStartPosRef.current.y);
-                                const mercX = mapConfig.baseMercX + svgRaw.x;
-                                const mercY = mapConfig.baseMercY - svgRaw.y;
-                                const lng = (mercX / 6378137) * (180 / Math.PI);
-                                const lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+                            let svgRaw = { x: 0, y: 0 };
+                            let lat = 0, lng = 0;
+                            if (cadTouchStartPosRef.current) {
+                                svgRaw = getCadSvgCoords(cadTouchStartPosRef.current.x, cadTouchStartPosRef.current.y);
+                                if (mapConfig && mapConfig.baseMercX !== 0) {
+                                    const mercX = mapConfig.baseMercX + svgRaw.x;
+                                    const mercY = mapConfig.baseMercY - svgRaw.y;
+                                    lng = (mercX / 6378137) * (180 / Math.PI);
+                                    lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+                                }
                                 setCadPinLocation({ x: svgRaw.x, y: svgRaw.y, lat, lng });
+                            }
+                            
+                            const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
+                            if (matchingPoly) {
+                                setLsHighlightPoly([matchingPoly.pts]);
                             }
                             
                             setIsPolygonAreaCardVisible(false);
                             setIsLandInfoCardVisible(true);
-                            return hitPoly;
-                        });
+                        }
                     }
                 });
             }
@@ -3079,25 +3088,33 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                          });
                                      }
                                  } else {
-                                     setCadSelectedPolygon(prev => {
-                                         if (prev === hitPoly) {
-                                            setCadPinLocation(null);
-                                            return null;
-                                         }
+                                     if (cadSelectedPolygon === hitPoly) {
+                                         setCadSelectedPolygon(null);
+                                         setCadPinLocation(null);
+                                         setLsHighlightPoly(null);
+                                     } else {
+                                         setCadSelectedPolygon(hitPoly);
                                          if (hitSurveyId) setCadActiveSurveyId(hitSurveyId);
                                          
-                                         if (mapConfig && mapConfig.baseMercX !== 0 && typeof rawPt !== 'undefined') {
-                                             const mercX = mapConfig.baseMercX + rawPt.x;
-                                             const mercY = mapConfig.baseMercY - rawPt.y;
-                                             const lng = (mercX / 6378137) * (180 / Math.PI);
-                                             const lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+                                         if (typeof rawPt !== 'undefined') {
+                                             let lat = 0, lng = 0;
+                                             if (mapConfig && mapConfig.baseMercX !== 0) {
+                                                 const mercX = mapConfig.baseMercX + rawPt.x;
+                                                 const mercY = mapConfig.baseMercY - rawPt.y;
+                                                 lng = (mercX / 6378137) * (180 / Math.PI);
+                                                 lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+                                             }
                                              setCadPinLocation({ x: rawPt.x, y: rawPt.y, lat, lng });
+                                         }
+                                         
+                                         const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
+                                         if (matchingPoly) {
+                                             setLsHighlightPoly([matchingPoly.pts]);
                                          }
                                          
                                          setIsPolygonAreaCardVisible(false);
                                          setIsLandInfoCardVisible(true);
-                                         return hitPoly;
-                                     });
+                                     }
                                  }
                              });
                          }
