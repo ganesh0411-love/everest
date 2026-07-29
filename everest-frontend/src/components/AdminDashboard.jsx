@@ -2059,6 +2059,18 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     return cadNodes;
   }, [cadNodes, cadSelectedLine, cadEditInputs.isMovingLine, cadLines]);
 
+  const cadIsPointInPolygon = (pt, vs) => {
+      if (!vs || !vs.length) return false;
+      let inside = false;
+      for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+          const xi = vs[i].x, yi = vs[i].y;
+          const xj = vs[j].x, yj = vs[j].y;
+          const intersect = ((yi > pt.y) !== (yj > pt.y)) && (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+      }
+      return inside;
+  };
+
   const getCadSvgCoords = (clientX, clientY) => {
     const targetEl = cadLayerGroupRef.current || cadSvgRef.current;
     if (!targetEl) return { x: 0, y: 0 };
@@ -2881,9 +2893,14 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                     doWmsReverseLookup(lat, lng);
                                 }
                             }
+                            let actualHitPolyId = hitPoly;
+                            if (actualHitPolyId === null && svgRaw) {
+                                const found = visibleCadPolygons.find(p => p.pts && cadIsPointInPolygon(svgRaw, p.pts));
+                                if (found) actualHitPolyId = found.id;
+                            }
                             
-                            if (hitPoly !== null) {
-                                const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
+                            if (actualHitPolyId !== null) {
+                                const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(actualHitPolyId));
                                 if (matchingPoly) {
                                     setLsHighlightPoly([matchingPoly.pts]);
                                     
@@ -3207,9 +3224,14 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                                  doWmsReverseLookup(lat, lng);
                                              }
                                          }
+                                         let actualHitPolyId = hitPoly;
+                                         if (actualHitPolyId === null && rawPt) {
+                                             const found = visibleCadPolygons.find(p => p.pts && cadIsPointInPolygon(rawPt, p.pts));
+                                             if (found) actualHitPolyId = found.id;
+                                         }
                                          
-                                         if (hitPoly !== null) {
-                                             const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
+                                         if (actualHitPolyId !== null) {
+                                             const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(actualHitPolyId));
                                              if (matchingPoly) {
                                                  setLsHighlightPoly([matchingPoly.pts]);
                                                  setLsHighlightType('parcel');
