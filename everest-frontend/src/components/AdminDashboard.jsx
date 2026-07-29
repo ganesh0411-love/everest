@@ -5542,7 +5542,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                    </button>
                    
                    {showDarkDrawSettings && (
-                     <div className="absolute right-0 top-12 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[150] overflow-hidden py-1">
+                     <div className="absolute right-0 top-12 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1">
                        <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { 
                           e.preventDefault(); 
                           e.stopPropagation(); 
@@ -6035,7 +6035,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 }}
               >
               {/* DESKTOP CONTROLS: ORIGINAL VERTICAL ICON STACK */}
-              <div className="absolute top-6 left-6 z-[150] hidden md:flex flex-col items-center gap-3 pointer-events-none">
+              <div className="absolute top-6 left-6 z-[150] hidden md:flex flex-col items-center gap-3 pointer-events-none" onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()}>
                   {/* Icon 1: Search Icon */}
                   <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(true); }} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="Search">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -6062,7 +6062,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       </button>
                   </div>
                   {/* Icon 4: Current Location / GPS Center Icon */}
-                  <button onClick={handleGpsCenter} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="GPS Center / Current Location">
+                  <button onClick={(e) => { e.stopPropagation(); handleGpsCenter(); }} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="GPS Center / Current Location">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
                   </button>
                   {/* Icon 5: Cadastral / Sub-division Layer Toggle Icon */}
@@ -6129,7 +6129,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               </div>
 
               {/* MOBILE TOP-LEFT CONTROLS: HORIZONTAL ICON PAIR */}
-              <div className="absolute top-6 left-6 z-[150] flex md:hidden flex-row items-center gap-3 pointer-events-none max-w-md">
+              <div className="absolute top-6 left-6 z-[150] flex md:hidden flex-row items-center gap-3 pointer-events-none max-w-md" onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()}>
                   {/* Icon 1: Search Icon */}
                   <button onClick={(e) => { e.stopPropagation(); setIsLandSearchModalOpen(true); }} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="Search">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -6145,7 +6145,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               </div>
 
               {/* MOBILE RIGHT-BOTTOM CONTROLS: COLLAPSIBLE VERTICAL STACK */}
-              <div className="absolute bottom-20 right-3 z-[150] flex md:hidden flex-col items-center pointer-events-none max-w-md">
+              <div className="absolute bottom-20 right-3 z-[150] flex md:hidden flex-col items-center pointer-events-none max-w-md" onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()}>
                   {/* Collapse/Expand Toggle Arrow */}
                   <button 
                       onClick={(e) => { e.stopPropagation(); setIsStackCollapsed(!isStackCollapsed); }}
@@ -6175,7 +6175,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                         <span className="text-[9px] font-black leading-none uppercase">360°</span>
                       </button>
                       {/* Icon 4: Current Location / GPS Center Icon */}
-                      <button onClick={handleGpsCenter} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="GPS Center / Current Location">
+                      <button onClick={(e) => { e.stopPropagation(); handleGpsCenter(); }} className="w-10 h-10 rounded-full bg-slate-800/80 text-white shadow-lg border border-slate-600 flex items-center justify-center hover:bg-slate-700 transition-colors pointer-events-auto" title="GPS Center / Current Location">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
                       </button>
                       {/* Icon 5: Cadastral / Sub-division Layer Toggle Icon */}
