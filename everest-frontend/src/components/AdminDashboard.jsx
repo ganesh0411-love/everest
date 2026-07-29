@@ -2886,6 +2886,16 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                 const matchingPoly = visibleCadPolygons.find(p => String(p.id) === String(hitPoly));
                                 if (matchingPoly) {
                                     setLsHighlightPoly([matchingPoly.pts]);
+                                    
+                                    // Pre-populate data from local survey cache immediately
+                                    const polySurvey = matchingPoly.surveyId ? cadSurveys.find(s => s.id === matchingPoly.surveyId) : null;
+                                    setCadPinInfo({
+                                        district: selDistrict || null,
+                                        taluk: selTaluk || null,
+                                        village: selVillage || null,
+                                        surveyNo: polySurvey ? polySurvey.surveyNo : null,
+                                        subdivNo: polySurvey ? polySurvey.subDivisionNo : null
+                                    });
                                 }
                             } else {
                                 setLsHighlightPoly(null);
@@ -3203,6 +3213,16 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                              if (matchingPoly) {
                                                  setLsHighlightPoly([matchingPoly.pts]);
                                                  setLsHighlightType('parcel');
+                                                 
+                                                 // Pre-populate data from local survey cache immediately
+                                                 const polySurvey = matchingPoly.surveyId ? cadSurveys.find(s => s.id === matchingPoly.surveyId) : null;
+                                                 setCadPinInfo({
+                                                     district: selDistrict || null,
+                                                     taluk: selTaluk || null,
+                                                     village: selVillage || null,
+                                                     surveyNo: polySurvey ? polySurvey.surveyNo : null,
+                                                     subdivNo: polySurvey ? polySurvey.subDivisionNo : null
+                                                 });
                                              }
                                          } else {
                                              setLsHighlightPoly(null);
