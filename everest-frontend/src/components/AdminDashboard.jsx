@@ -921,30 +921,61 @@ const AdminDashboard = ({ setCurrentView }) => {
           const i = Math.floor(pxSize / 2), j = Math.floor(pxSize / 2); // i,j = centre pixel
 
           // Query the FMB (parcel-level) layer first for survey/subdiv, fall back to cadastral
-          const layers = ['cadastral_data_wms:view_fmb', 'cadastral_data_wms:view_cadastral'];
-          let info = null;
-          for (const layer of layers) {
-              const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetFeatureInfo&layers=${layer}&query_layers=${layer}&bbox=${bboxStr}&width=${pxSize}&height=${pxSize}&srs=EPSG:3857&x=${i}&y=${j}&info_format=application/json&feature_count=1`;
+          const queryLayersFmb = 'cadastral_data_wms:view_fmb,revenue_village,taluk_boundary,district_boundary';
+          const queryLayersCad = 'cadastral_data_wms:view_cadastral,revenue_village,taluk_boundary,district_boundary';
+          const layerSets = [queryLayersFmb, queryLayersCad];
+          
+          let info = { district: null, taluk: null, village: null, surveyNo: null, subdivNo: null };
+          let foundCadastral = false;
+          let highlightRings = null;
+          
+          for (const layerSet of layerSets) {
+              const url = `https://tngis.tn.gov.in/app/wms?service=WMS&version=1.1.1&request=GetFeatureInfo&layers=${layerSet}&query_layers=${layerSet}&bbox=${bboxStr}&width=${pxSize}&height=${pxSize}&srs=EPSG:3857&x=${i}&y=${j}&info_format=application/json&feature_count=5`;
               try {
                   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
                   if (!res.ok) continue;
                   const data = await res.json();
                   if (data && data.features && data.features.length > 0) {
-                      const props = data.features[0].properties || {};
-                      info = {
-                          district: props.district_name || props.district || props.DISTRICT || null,
-                          taluk: props.taluk_name || props.taluk || props.TALUK || null,
-                          village: props.village_name || props.village || props.VILLAGE || null,
-                          surveyNo: props.survey_number || props.survey_no || props.SURVEY_NO || props.survey || null,
-                          subdivNo: props.sub_division || props.sub_div_no || props.SUBDIV_NO || props.subdiv || null,
-                      };
-                      if (info.village || info.surveyNo) break; // got useful data
+                      data.features.forEach(f => {
+                          const props = f.properties || {};
+                          // Extract attributes from all intersected layers
+                          if (props.district_name || props.district || props.DISTRICT) info.district = props.district_name || props.district || props.DISTRICT;
+                          if (props.taluk_name || props.taluk || props.TALUK) info.taluk = props.taluk_name || props.taluk || props.TALUK;
+                          if (props.village_name || props.village || props.VILLAGE) info.village = props.village_name || props.village || props.VILLAGE;
+                          
+                          // Check if this feature is from FMB or Cadastral
+                          if (props.survey_number || props.survey_no || props.SURVEY_NO || props.survey) {
+                              info.surveyNo = props.survey_number || props.survey_no || props.SURVEY_NO || props.survey;
+                              if (props.sub_division || props.sub_div_no || props.SUBDIV_NO || props.subdiv) info.subdivNo = props.sub_division || props.sub_div_no || props.SUBDIV_NO || props.subdiv;
+                              foundCadastral = true;
+                              
+                              // Extract geometry for highlight
+                              if (f.geometry && mapConfig) {
+                                  let polys = [];
+                                  if (f.geometry.type === 'Polygon') {
+                                      polys.push(f.geometry.coordinates[0]);
+                                  } else if (f.geometry.type === 'MultiPolygon') {
+                                      f.geometry.coordinates.forEach(p => polys.push(p[0]));
+                                  }
+                                  if (polys.length > 0) {
+                                      highlightRings = polys.map(ring => ring.map(pt => ({
+                                          x: pt[0] - mapConfig.baseMercX,
+                                          y: mapConfig.baseMercY - pt[1]
+                                      })));
+                                  }
+                              }
+                          }
+                      });
+                      if (foundCadastral) break;
                   }
               } catch (e) { /* timeout or network error, continue */ }
           }
 
-          if (info) {
+          if (info.district || info.taluk || info.village || info.surveyNo) {
               setCadPinInfo(info);
+          }
+          if (highlightRings) {
+              setLsHighlightPoly(highlightRings);
           }
       } catch (e) {
           console.warn('WMS reverse lookup failed:', e);
@@ -6543,24 +6574,29 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     const vp = cadViewport;
                     // px per SVG unit
                     const svgRect = svgEl ? svgEl.getBoundingClientRect() : { width: 1, height: 1 };
-                    const pxPerUnit = svgRect.width / vp.width;
-                    const screenX = (cadPinLocation.x - vp.x) * pxPerUnit;
-                    const screenY = (cadPinLocation.y - vp.y) * pxPerUnit;
-                    // Render pin at fixed 36px using foreignObject
+                    const unitsPerPx = vp.width / svgRect.width;
+                    const scaleFactor = 0.5 * unitsPerPx; // Natively 40 units wide -> 20px on screen
+                    
                     return (
-                      <foreignObject
-                        x={cadPinLocation.x - (18 / pxPerUnit)}
-                        y={cadPinLocation.y - (36 / pxPerUnit)}
-                        width={36 / pxPerUnit}
-                        height={42 / pxPerUnit}
-                        style={{ pointerEvents: 'none', overflow: 'visible' }}
+                      <g
+                        transform={`translate(${cadPinLocation.x}, ${cadPinLocation.y}) scale(${scaleFactor})`}
+                        style={{ pointerEvents: 'none', filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.4))' }}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 44" width="36" height="44" style={{ display:'block', filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.45))' }}>
-                          <path d="M18 0C10.268 0 4 6.268 4 14c0 9.917 13.065 27.386 13.636 28.127a.75.75 0 0 0 1.228 0C19.435 41.386 32 23.917 32 14 32 6.268 25.732 0 18 0z" fill="#2563eb"/>
-                          <path d="M18 0C10.268 0 4 6.268 4 14c0 9.917 13.065 27.386 13.636 28.127a.75.75 0 0 0 1.228 0C19.435 41.386 32 23.917 32 14 32 6.268 25.732 0 18 0z" fill="none" stroke="white" strokeWidth="1.5"/>
-                          <circle cx="18" cy="14" r="5.5" fill="white"/>
-                        </svg>
-                      </foreignObject>
+                        <path 
+                          d="M 0 0 C 13.6 -11 20 -19 20 -28 C 20 -39 11 -48 0 -48 C -11 -48 -20 -39 -20 -28 C -20 -19 -6.4 -11 0 0 Z" 
+                          fill="#2563eb" 
+                          stroke="#ffffff" 
+                          strokeWidth="2" 
+                          vectorEffect="non-scaling-stroke" 
+                        />
+                        <circle 
+                          cx="0" 
+                          cy="-28" 
+                          r="7" 
+                          fill="#ffffff" 
+                          vectorEffect="non-scaling-stroke" 
+                        />
+                      </g>
                     );
                   })()}
                   {cadCircles.map(c => {
