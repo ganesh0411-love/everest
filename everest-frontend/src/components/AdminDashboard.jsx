@@ -2888,15 +2888,16 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                     lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
                                 }
                                 setCadPinLocation({ x: svgRaw.x, y: svgRaw.y, lat, lng });
-                                // WMS GetFeatureInfo reverse lookup for land data
-                                if (mapConfig && mapConfig.baseMercX !== 0 && lat !== 0) {
-                                    doWmsReverseLookup(lat, lng);
-                                }
                             }
                             let actualHitPolyId = hitPoly;
                             if (actualHitPolyId === null && svgRaw) {
                                 const found = visibleCadPolygons.find(p => p.pts && cadIsPointInPolygon(svgRaw, p.pts));
                                 if (found) actualHitPolyId = found.id;
+                            }
+                            
+                            let isInsideHighlight = false;
+                            if (actualHitPolyId === null && svgRaw && lsHighlightPoly && lsHighlightPoly.length > 0) {
+                                isInsideHighlight = lsHighlightPoly.some(ring => cadIsPointInPolygon(svgRaw, ring));
                             }
                             
                             if (actualHitPolyId !== null) {
@@ -2914,8 +2915,24 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                         subdivNo: polySurvey ? polySurvey.subDivisionNo : null
                                     });
                                 }
+                            } else if (isInsideHighlight) {
+                                // Tapped inside active search highlight - use search state directly
+                                setCadPinInfo({
+                                    district: selDistrict || null,
+                                    taluk: selTaluk || null,
+                                    village: selVillage || null,
+                                    surveyNo: (selSurvey && selSurvey.length > 0) ? selSurvey.join(', ') : null,
+                                    subdivNo: selSubdiv || null
+                                });
                             } else {
                                 setLsHighlightPoly(null);
+                            }
+                            
+                            // WMS GetFeatureInfo reverse lookup as final fallback
+                            if (actualHitPolyId === null && !isInsideHighlight) {
+                                if (mapConfig && mapConfig.baseMercX !== 0 && lat !== 0) {
+                                    doWmsReverseLookup(lat, lng);
+                                }
                             }
                             
                             setIsPolygonAreaCardVisible(false);
@@ -3219,15 +3236,16 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                                  lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
                                              }
                                              setCadPinLocation({ x: rawPt.x, y: rawPt.y, lat, lng });
-                                             // WMS GetFeatureInfo reverse lookup for land data
-                                             if (mapConfig && mapConfig.baseMercX !== 0 && lat !== 0) {
-                                                 doWmsReverseLookup(lat, lng);
-                                             }
                                          }
                                          let actualHitPolyId = hitPoly;
-                                         if (actualHitPolyId === null && rawPt) {
+                                         if (actualHitPolyId === null && typeof rawPt !== 'undefined') {
                                              const found = visibleCadPolygons.find(p => p.pts && cadIsPointInPolygon(rawPt, p.pts));
                                              if (found) actualHitPolyId = found.id;
+                                         }
+                                         
+                                         let isInsideHighlight = false;
+                                         if (actualHitPolyId === null && typeof rawPt !== 'undefined' && lsHighlightPoly && lsHighlightPoly.length > 0) {
+                                             isInsideHighlight = lsHighlightPoly.some(ring => cadIsPointInPolygon(rawPt, ring));
                                          }
                                          
                                          if (actualHitPolyId !== null) {
@@ -3246,8 +3264,31 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                                      subdivNo: polySurvey ? polySurvey.subDivisionNo : null
                                                  });
                                              }
+                                         } else if (isInsideHighlight) {
+                                             // Tapped inside active search highlight - use search state directly
+                                             setCadPinInfo({
+                                                 district: selDistrict || null,
+                                                 taluk: selTaluk || null,
+                                                 village: selVillage || null,
+                                                 surveyNo: (selSurvey && selSurvey.length > 0) ? selSurvey.join(', ') : null,
+                                                 subdivNo: selSubdiv || null
+                                             });
                                          } else {
                                              setLsHighlightPoly(null);
+                                         }
+                                         
+                                         // WMS GetFeatureInfo reverse lookup as final fallback
+                                         if (actualHitPolyId === null && !isInsideHighlight && typeof rawPt !== 'undefined') {
+                                             let lat = 0, lng = 0;
+                                             if (mapConfig && mapConfig.baseMercX !== 0) {
+                                                 const mercX = mapConfig.baseMercX + rawPt.x;
+                                                 const mercY = mapConfig.baseMercY - rawPt.y;
+                                                 lng = (mercX / 6378137) * (180 / Math.PI);
+                                                 lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+                                             }
+                                             if (mapConfig && mapConfig.baseMercX !== 0 && lat !== 0) {
+                                                 doWmsReverseLookup(lat, lng);
+                                             }
                                          }
                                          
                                          setIsPolygonAreaCardVisible(false);
