@@ -2844,6 +2844,45 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     }
   };
 
+  const handleParcelClick = (e, p) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (cadTool !== 'IDLE') return;
+
+    const polySurvey = p.surveyId ? cadSurveys.find(s => s.id === p.surveyId) : null;
+    
+    // Set selected polygon for CAD highlighting
+    setCadSelectedPolygon(p.id);
+    if (p.surveyId) setCadActiveSurveyId(p.surveyId);
+    
+    // Set yellow highlight ring strictly around the clicked parcel
+    setLsHighlightPoly([p.pts]);
+    setLsHighlightType('subdiv');
+
+    // Populate Land Info popup with guaranteed properties from the SVG element mapping
+    setCadPinInfo({
+        district: selDistrict || null,
+        taluk: selTaluk || null,
+        village: selVillage || null,
+        surveyNo: polySurvey ? polySurvey.surveyNo : (selSurvey || null),
+        subdivNo: polySurvey ? polySurvey.subDivisionNo : (selSubdiv || null)
+    });
+
+    // Drop Pin natively at clicked coordinate
+    const svgRaw = getCadSvgCoords(e.clientX, e.clientY);
+    let lat = 0, lng = 0;
+    if (mapConfig && mapConfig.baseMercX !== 0) {
+        const mercX = mapConfig.baseMercX + svgRaw.x;
+        const mercY = mapConfig.baseMercY - svgRaw.y;
+        lng = (mercX / 6378137) * (180 / Math.PI);
+        lat = (2 * Math.atan(Math.exp(mercY / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+    }
+    setCadPinLocation({ x: svgRaw.x, y: svgRaw.y, lat, lng });
+
+    setIsPolygonAreaCardVisible(false);
+    setIsLandInfoCardVisible(true);
+  };
+
   const handleCadPointerUp = (e) => {
     if (cadLongPressTimerRef.current) {
         clearTimeout(cadLongPressTimerRef.current);
@@ -6609,6 +6648,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                 strokeWidth={cadViewport.width * 0.02}
                                 strokeLinejoin="round"
                                 style={{ pointerEvents: cadTool === 'IDLE' ? 'all' : 'none', cursor: cadTool === 'IDLE' ? 'pointer' : 'crosshair' }} 
+                                onClick={(e) => handleParcelClick(e, p)}
+                                onPointerUp={(e) => {
+                                    // Prevent the background cadPointerUp from firing and resetting the pin if this was a touch event
+                                    e.stopPropagation();
+                                }}
                             />
                             {/* Visual polygon */}
                             <polygon
