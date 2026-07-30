@@ -5542,7 +5542,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                    </button>
                    
                    {showDarkDrawSettings && (
-                     <div className="absolute right-0 top-12 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1">
+                     <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1">
                        <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { 
                           e.preventDefault(); 
                           e.stopPropagation(); 
