@@ -5482,7 +5482,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           ) : activeLandSurveyView === 'dark_draw_manual' ? (
              <div className="flex-1 flex flex-col bg-slate-950 animate-in slide-in-from-right-8 duration-300 relative">
                {/* TOP NAVIGATION BAR OVERHAUL */}
-               <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center shadow-md relative z-[200] shrink-0 w-full justify-between">
+               <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center shadow-md relative z-[99999] shrink-0 w-full justify-between" style={{ zIndex: 99999 }}>
                  <div className="flex items-center gap-4">
                     {/* Native Back Arrow */}
                     <button 
@@ -5542,7 +5542,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                    </button>
                    
                    {showDarkDrawSettings && (
-                     <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1">
+                     <div className="absolute right-0 top-14 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[99999] overflow-hidden py-1" style={{ zIndex: 99999 }}>
                        <div className="flex items-center justify-between w-full px-5 py-3 text-[13px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer border-b border-slate-700" onClick={(e) => { 
                           e.preventDefault(); 
                           e.stopPropagation(); 
