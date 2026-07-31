@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const tnMaster = require('./data/tn_master.json');
 
-const district = "Dindigul";
+const district = "Theni";
 const taluks = tnMaster[district] || {};
 
 let report = "";
@@ -57,7 +57,7 @@ try {
 
 report += `#### 🌍 Global District Breakdown\n`;
 report += `- **Target District:** ${district}\n`;
-report += `- **Total Villages (Dindigul):** ${totalDistrictVillages}\n`;
+report += `- **Total Villages (${district}):** ${totalDistrictVillages}\n`;
 report += `- **Processed Villages:** ${processedDistrictVillages} / ${totalDistrictVillages}\n`;
 report += `- **Total Surveys Extracted:** ~${totalDistrictSurveys}\n\n`;
 

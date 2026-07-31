@@ -1,0 +1,28 @@
+### 📊 IMMEDIATE SYSTEM RECOVERY & STATUS REPORT
+
+#### 🌍 Global District Breakdown
+- **Target District:** Theni
+- **Total Villages (Theni):** 129
+- **Processed Villages:** 128 / 129
+- **Total Surveys Extracted:** ~103511
+
+#### 📍 Current Village Breakdown (Running Task)
+**Current Village:** Kamayakoundanpatti (2571 / 2593) | **Currently Extracting:** Survey No. 1161
+
+- **Taluk:** Uthamapalayam
+- **Progress:** 99%
+- **Success:** 2571 | **Failed:** 0
+- **ETA:** ~29 secs | **Elapsed:** 17 mins 22 secs
+
+#### 📋 Full Progress Table
+| Taluk | Total Villages | Processed Villages | Surveys Extracted | Status | Remarks |
+|-------|----------------|--------------------|-------------------|--------|---------|
+| Andipatti | 26 | 26 | 18558 | ✅ Completed | All villages fetched |
+| Bodinayakanur | 15 | 15 | 11182 | ✅ Completed | All villages fetched |
+| Periyakulam | 25 | 25 | 28850 | ✅ Completed | All villages fetched |
+| Theni | 16 | 16 | 9666 | ✅ Completed | All villages fetched |
+| Uthamapalayam | 47 | 46 | 35255 | 🔄 In Progress | Fetching... |
+
+#### ⏱️ Timing Details
+- **Report Generated:** 31/7/2026, 9:10:12 am (IST)
+- **Next Expected Report:** 31/7/2026, 9:15:12 am (IST)

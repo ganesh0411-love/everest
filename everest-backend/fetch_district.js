@@ -8,18 +8,13 @@ const https = require("https");
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 });
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
 
-const district = "Dindigul";
+const district = "Theni";
 const taluksToProcess = [
-    "Palani",
-    "Vedasandur",
-    "Dindiguleast",
-    "Kodaikanal",
-    "Natham",
-    "Nilakkottai",
-    "Oddanchatram",
-    "Athoor",
-    "Dindigulwest",
-    "Gujiliamparai"
+    "Andipatti",
+    "Bodinayakanur",
+    "Periyakulam",
+    "Theni",
+    "Uthamapalayam"
 ];
 
 const tnMaster = require("./data/tn_master.json");
@@ -83,7 +78,7 @@ async function main() {
         console.log(`[***] STARTING TALUK: ${taluk}`);
         console.log(`######################################################\n`);
         
-        const villages = tnMaster.Dindigul[taluk] || [];
+        const villages = tnMaster[district][taluk] || [];
         const talukDir = path.join(__dirname, "data", "geojson", district, taluk);
         
         let talukComplete = false;
@@ -274,6 +269,8 @@ async function main() {
                     }
                     allFailures.push({ district, taluk, village: vName, failedSurveys });
                     fs.writeFileSync(failuresFile, JSON.stringify(allFailures, null, 2));
+                    console.log(`[INFO] Acknowledged ${failedSurveys.length} persistent failures. Resetting failedCount to 0 to prevent infinite taluk looping.`);
+                    failedCount = 0;
                 } else {
                     console.log(`[SUCCESS] All failed surveys completely recovered in secondary pass!`);
                 }
@@ -311,7 +308,7 @@ async function main() {
     }
     
     console.log(`\n######################################################`);
-    console.log(`[***] ALL TALUKS IN DINDIGUL COMPLETED [***]`);
+    console.log(`[***] ALL TALUKS IN ${district.toUpperCase()} COMPLETED [***]`);
     console.log(`######################################################\n`);
 }
 
