@@ -6355,9 +6355,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                             {isFMBEnabled && cadViewport.width <= 1500 && (
                                <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={Array.isArray(selSurvey) ? selSurvey.join(',') : selSurvey} activeSubdiv={Array.isArray(selSubdiv) ? selSubdiv.join(',') : selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || (selSurvey && selSurvey.length > 0)} />
                            )}
-                            {isCadastralEnabled && cadViewport.width <= 6000 && (
-                               <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
-                           )}
+                            {cadViewport.width <= 6000 && (
+                               <g style={{ display: isCadastralEnabled ? 'block' : 'none' }}>
+                                   <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                               </g>
+
+                            )}
                            {cadViewport.width > 800 && cadViewport.width <= 40000 && (
                                 <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#800000" strokeWidth="2.5" opacity={0.85} selectedName={selVillage || null} selectedPropertyName={selVillage ? 'village_name' : null} />
                            )}
@@ -7409,11 +7412,15 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           {mapConfig.active && (
                               <>
                                   <SatelliteLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
-                                  {isFMBEnabled && cadViewport.width <= 1500 && (
-                                      <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={Array.isArray(selSurvey) ? selSurvey.join(',') : selSurvey} activeSubdiv={Array.isArray(selSubdiv) ? selSubdiv.join(',') : selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || (selSurvey && selSurvey.length > 0)} />
+                                  {cadViewport.width <= 1500 && (
+                                      <g style={{ display: isFMBEnabled ? 'block' : 'none' }}>
+                                          <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="cadastral_data_wms:view_fmb" strokeColor="#00FF00" strokeWidth="1.5" labelProperty="sub_division" labelColor="#00FF00" activeVillage={selVillage} activeSurvey={Array.isArray(selSurvey) ? selSurvey.join(',') : selSurvey} activeSubdiv={Array.isArray(selSubdiv) ? selSubdiv.join(',') : selSubdiv} isHighlightSubdiv={lsHighlightType === 'survey' || lsHighlightType === 'subdiv' || (selSurvey && selSurvey.length > 0)} />
+                                      </g>
                                   )}
-                                  {isCadastralEnabled && cadViewport.width <= 6000 && (
-                                      <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                                  {cadViewport.width <= 6000 && (
+                                      <g style={{ display: isCadastralEnabled ? 'block' : 'none' }}>
+                                          <CadastralWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} />
+                                      </g>
                                   )}
                                   {cadViewport.width > 800 && cadViewport.width <= 40000 && (
                                     <BoundaryWMSLayer viewport={cadViewport} baseMercX={mapConfig.baseMercX} baseMercY={mapConfig.baseMercY} layerName="revenue_village" strokeColor="#800000" strokeWidth="2.5" opacity={0.85} selectedName={selVillage || null} selectedPropertyName={selVillage ? 'village_name' : null} />
