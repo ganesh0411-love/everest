@@ -604,12 +604,39 @@ const CustomerDetail = ({ customer, onBack }) => {
                </span>
             </div>
           </div>
-          {/* Next Due */}
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center w-[240px] flex-none shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-            <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Next Due</p>
-            <h3 className="text-lg xl:text-xl font-bold text-white tracking-wider flex items-center mt-2 drop-shadow-md whitespace-nowrap">
-              {nextFormattedDueDate}
-            </h3>
+          {/* Top-Right Loan Summary */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-4 flex flex-col justify-center w-[240px] flex-none shadow-[0_8px_30px_rgba(0,0,0,0.12)] h-[116px]">
+            <div className="flex flex-col gap-2 w-full">
+              {/* Row 1: Total Re-Pay */}
+              <div className="flex justify-between items-center w-full">
+                <span className="text-[10px] text-emerald-100 font-bold uppercase tracking-wider">Total Re-Pay</span>
+                <span className="text-[12px] font-black text-white">₹{repayAmount.toLocaleString('en-IN')}</span>
+              </div>
+              
+              {/* Row 2: Progress */}
+              <div className="flex justify-between items-center w-full">
+                <span className="text-[10px] text-emerald-100 font-bold uppercase tracking-wider">Progress</span>
+                <span className="text-[12px] font-black text-white">
+                  {effectiveInstallmentCount}/{planCount} {planToken ? planToken.charAt(0).toUpperCase() + planToken.slice(1).toLowerCase() + 's' : 'Weeks'}
+                </span>
+              </div>
+
+              {/* Row 3: Bounced */}
+              <div className="flex justify-between items-center w-full">
+                <span className="text-[10px] text-emerald-100 font-bold uppercase tracking-wider">Bounced</span>
+                <span className="text-[12px] font-black text-red-400">
+                  {installments.filter(i => i.status === 'BOUNCED').length}
+                </span>
+              </div>
+
+              {/* Row 4: Late Payment */}
+              <div className="flex justify-between items-center w-full">
+                <span className="text-[10px] text-emerald-100 font-bold uppercase tracking-wider">Late Payment</span>
+                <span className="text-[12px] font-black text-amber-400">
+                  {installments.filter(i => i.status === 'LATE').length}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
