@@ -573,22 +573,36 @@ const CustomerDetail = ({ customer, onBack }) => {
         </div>
 
         {/* Right: Metric Cards */}
-        <div className="flex gap-6 flex-none justify-end">
-          {/* Loan Amount */}
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center flex-1 min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-            <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Loan Amount</p>
-            <h3 className="text-[28px] font-black text-[#4ade80] tracking-tighter flex items-center drop-shadow-md">
-              <IndianRupee className="w-6 h-6 mr-1 stroke-[3]" />
-              {loanAmount.toLocaleString('en-IN')}
-            </h3>
-          </div>
-          {/* Outstanding */}
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center flex-1 min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-            <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Outstanding</p>
-            <h3 className="text-[28px] font-black text-[#ef4444] tracking-tighter flex items-center drop-shadow-md">
-              <IndianRupee className="w-6 h-6 mr-1 stroke-[3]" />
-              {netBalance.toLocaleString('en-IN')}
-            </h3>
+        <div className="flex gap-6 flex-none justify-end md:items-start">
+          
+          <div className="flex flex-col gap-3 w-full">
+            <div className="flex gap-6">
+              {/* Loan Amount */}
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 md:py-3 md:px-4 md:h-fit flex flex-col items-center justify-center flex-1 min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+                <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2 md:mb-1">Loan Amount</p>
+                <h3 className="text-[28px] font-black text-[#4ade80] tracking-tighter flex items-center drop-shadow-md">
+                  <IndianRupee className="w-6 h-6 mr-1 stroke-[3]" />
+                  {loanAmount.toLocaleString('en-IN')}
+                </h3>
+              </div>
+              {/* Outstanding */}
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 md:py-3 md:px-4 md:h-fit flex flex-col items-center justify-center flex-1 min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+                <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2 md:mb-1">Outstanding</p>
+                <h3 className="text-[28px] font-black text-[#ef4444] tracking-tighter flex items-center drop-shadow-md">
+                  <IndianRupee className="w-6 h-6 mr-1 stroke-[3]" />
+                  {netBalance.toLocaleString('en-IN')}
+                </h3>
+              </div>
+            </div>
+            
+            {/* Sleek Next Due Text Indicator */}
+            <div className="flex justify-center items-center text-[12px] font-black text-emerald-50 uppercase tracking-widest mt-1">
+               <span className="mr-2 text-emerald-200">NEXT DUE:</span>
+               <span className="text-[14px] text-white drop-shadow-md tracking-wider">
+                 {nextFormattedDueDate} 
+                 {nextFormattedWeekday && <span className="ml-1.5 text-[11px] text-emerald-100 opacity-90">({nextFormattedWeekday})</span>}
+               </span>
+            </div>
           </div>
           {/* Next Due */}
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center w-[240px] flex-none shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
@@ -723,32 +737,34 @@ const CustomerDetail = ({ customer, onBack }) => {
         </div>
         </div>
 
-        {/* Right Column: Quick Actions Sidebar (Desktop Only) */}
-        <div className="hidden md:flex w-[240px] flex-col gap-4 relative z-20 flex-none">
-          <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 p-6 flex flex-col gap-4 h-full">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 text-center">Quick Actions</h3>
-            
-            <button onClick={handleOpenCollectionModal} className="flex items-center gap-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl p-3 transition-colors group">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center transition-colors">
-                <IndianRupee className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
-              </div>
-              <span className="text-slate-800 font-bold tracking-wide">Entry</span>
+        {/* Right Column: Radial Arc Action Dock (Desktop Only) */}
+        <div className="hidden md:flex w-[90px] flex-col items-center justify-center h-full relative z-20 flex-none gap-8">
+          
+          {/* Top Arc Action: Schedule */}
+          <div className="relative group translate-x-3 z-0">
+            <button onClick={() => setShowScheduleModal(true)} className="bg-white hover:bg-blue-50 border border-slate-200 w-[52px] h-[52px] rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.12)] hover:scale-110 transition-all duration-300">
+              <Clock className="w-5 h-5 text-blue-600" />
             </button>
-
-            <button onClick={() => setShowScheduleModal(true)} className="flex items-center gap-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl p-3 transition-colors group">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center transition-colors">
-                <Clock className="w-5 h-5 text-blue-600" />
-              </div>
-              <span className="text-slate-800 font-bold tracking-wide">Schedule</span>
-            </button>
-
-            <button onClick={() => setShowStatementModal(true)} className="flex items-center gap-3 bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 rounded-xl p-3 transition-colors group">
-              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center transition-colors">
-                <FileText className="w-5 h-5 text-purple-600" />
-              </div>
-              <span className="text-slate-800 font-bold tracking-wide">Statement</span>
-            </button>
+            <span className="absolute right-full top-1/2 -translate-y-1/2 mr-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0 bg-white text-slate-800 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-md whitespace-nowrap pointer-events-none">Schedule</span>
           </div>
+
+          {/* Center Action: Entry (Primary) */}
+          <div className="relative group -translate-x-3 z-10">
+            <button onClick={handleOpenCollectionModal} className="bg-gradient-to-b from-[#19825b] to-[#125c40] border-[4px] border-[#f4f7f6] w-[72px] h-[72px] rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(18,75,51,0.5)] hover:scale-110 transition-all duration-300 overflow-hidden relative">
+              <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
+              <IndianRupee className="w-7 h-7 text-white stroke-[2.5] drop-shadow-md z-10 relative" />
+            </button>
+            <span className="absolute right-full top-1/2 -translate-y-1/2 mr-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0 bg-white text-slate-800 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-md whitespace-nowrap pointer-events-none">Entry</span>
+          </div>
+
+          {/* Bottom Arc Action: Statement */}
+          <div className="relative group translate-x-3 z-0">
+            <button onClick={() => setShowStatementModal(true)} className="bg-white hover:bg-purple-50 border border-slate-200 w-[52px] h-[52px] rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.12)] hover:scale-110 transition-all duration-300">
+              <FileText className="w-5 h-5 text-purple-600 stroke-[2.5]" />
+            </button>
+            <span className="absolute right-full top-1/2 -translate-y-1/2 mr-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0 bg-white text-slate-800 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-md whitespace-nowrap pointer-events-none">Statement</span>
+          </div>
+
         </div>
       </div>
 
