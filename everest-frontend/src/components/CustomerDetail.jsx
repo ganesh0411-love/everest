@@ -150,6 +150,41 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const effectiveInstallmentCount = fullySettledCount;
   const baseDateObj = parseDate(rawDueDate);
+
+  const calculateLatePayments = (entries = []) => {
+    const dueGroups = {};
+    
+    entries.forEach(entry => {
+      const due = entry.number; // map from our 'number' field
+      if (!due) return;
+      if (!dueGroups[due]) dueGroups[due] = [];
+      dueGroups[due].push(entry);
+    });
+  
+    let lateCount = 0;
+  
+    Object.values(dueGroups).forEach(groupEntries => {
+      const isLate = groupEntries.some(e => {
+        // compute the date string with weekday to match the exact requirement
+        const dObj = parseDate(e.date);
+        const weekday = !isNaN(dObj.getTime()) ? dObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() : '';
+        const dateStrWithDay = `${e.date} (${weekday})`;
+        
+        const isPaidLateDay = e.status === 'PAID' && (dateStrWithDay.includes('(THU)') || dateStrWithDay.includes('(FRI)') || dateStrWithDay.includes('(SAT)') || dateStrWithDay.includes('(SUN)'));
+        const isPending = e.status === 'PENDING';
+        return isPaidLateDay || isPending;
+      });
+  
+      if (isLate) {
+        lateCount += 1;
+      }
+    });
+  
+    return lateCount;
+  };
+
+  const latePaymentCount = calculateLatePayments(installments);
+
   const nextDueDateObj = new Date(baseDateObj);
   nextDueDateObj.setDate(nextDueDateObj.getDate() + (effectiveInstallmentCount * 7));
 
@@ -633,7 +668,7 @@ const CustomerDetail = ({ customer, onBack }) => {
               <div className="flex justify-between items-center w-full">
                 <span className="text-[10px] text-emerald-100 font-bold uppercase tracking-wider">Late Payment</span>
                 <span className="text-[12px] font-black text-amber-400">
-                  {installments.filter(i => i.status === 'LATE').length}
+                  {latePaymentCount}
                 </span>
               </div>
             </div>
