@@ -541,39 +541,41 @@ const CustomerDetail = ({ customer, onBack }) => {
 
       {/* Desktop Top Section */}
       <div className="hidden md:flex flex-row justify-between items-stretch px-8 pt-6 pb-2 relative z-10 gap-6">
-        {/* Left: Profile Card */}
-        <div className="flex items-center bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)] gap-6 flex-1 max-w-[500px]">
-          {/* Back Button */}
-          <button onClick={onBack} className="text-white p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0">
-            <ArrowLeft className="w-8 h-8" />
+        {/* Left: Back Button & Profile Card */}
+        <div className="flex items-center gap-6 flex-1">
+          {/* Back Button Outside */}
+          <button onClick={onBack} className="text-white p-3 rounded-full hover:bg-white/10 transition-colors flex-shrink-0 border border-white/20 bg-white/5 backdrop-blur-md">
+            <ArrowLeft className="w-6 h-6" />
           </button>
           
-          <div className="w-[80px] h-[80px] rounded-full border-[3px] border-white/50 overflow-hidden shadow-lg relative bg-slate-200 flex-shrink-0">
-            <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
-          </div>
-          
-          <div className="flex flex-col flex-1">
-            <h2 className="text-2xl font-bold text-white tracking-tight leading-tight">{formatName(customer.name)}</h2>
-            <p className="text-emerald-100 text-sm font-medium tracking-wide mt-1">{customer.center || customer.area || '\u00A0'}</p>
+          <div className="flex items-center bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)] gap-4 w-max">
+            <div className="w-[80px] h-[80px] rounded-full border-[3px] border-white/50 overflow-hidden shadow-lg relative bg-slate-200 flex-shrink-0">
+              <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
+            </div>
             
-            <div className="flex items-center gap-3 mt-3">
-              <a href={`tel:${customer.phone || customer.mobile || ''}`} className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
-                <Phone className="w-4 h-4 text-white" />
-              </a>
-              <a href={customer.locationUrl || customer.customerLocationUrl || `https://maps.google.com/?q=${customer.city || customer.address || ''}`} target="_blank" rel="noopener noreferrer" className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
-                <MapPin className="w-4 h-4 text-white" />
-              </a>
-              <button onClick={() => setShowVerificationModal(true)} className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
-                <MoreVertical className="w-4 h-4 text-white" />
-              </button>
+            <div className="flex flex-col flex-1 pr-2">
+              <h2 className="text-2xl font-bold text-white tracking-tight leading-tight">{formatName(customer.name)}</h2>
+              <p className="text-emerald-100 text-sm font-medium tracking-wide mt-0.5">{customer.center || customer.area || '\u00A0'}</p>
+              
+              <div className="flex items-center gap-2 mt-2">
+                <a href={`tel:${customer.phone || customer.mobile || ''}`} className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
+                  <Phone className="w-4 h-4 text-white" />
+                </a>
+                <a href={customer.locationUrl || customer.customerLocationUrl || `https://maps.google.com/?q=${customer.city || customer.address || ''}`} target="_blank" rel="noopener noreferrer" className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-white" />
+                </a>
+                <button onClick={() => setShowVerificationModal(true)} className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
+                  <MoreVertical className="w-4 h-4 text-white" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Right: Metric Cards */}
-        <div className="flex gap-4 flex-1 justify-end">
+        <div className="flex gap-6 flex-none justify-end">
           {/* Loan Amount */}
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center flex-1 min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
             <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Loan Amount</p>
             <h3 className="text-[28px] font-black text-[#4ade80] tracking-tighter flex items-center drop-shadow-md">
               <IndianRupee className="w-6 h-6 mr-1 stroke-[3]" />
@@ -581,7 +583,7 @@ const CustomerDetail = ({ customer, onBack }) => {
             </h3>
           </div>
           {/* Outstanding */}
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center flex-1 min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
             <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Outstanding</p>
             <h3 className="text-[28px] font-black text-[#ef4444] tracking-tighter flex items-center drop-shadow-md">
               <IndianRupee className="w-6 h-6 mr-1 stroke-[3]" />
@@ -589,9 +591,9 @@ const CustomerDetail = ({ customer, onBack }) => {
             </h3>
           </div>
           {/* Next Due */}
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center w-[240px] flex-none shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
             <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Next Due</p>
-            <h3 className="text-xl font-bold text-white tracking-wider flex items-center mt-2 drop-shadow-md">
+            <h3 className="text-lg xl:text-xl font-bold text-white tracking-wider flex items-center mt-2 drop-shadow-md whitespace-nowrap">
               {nextFormattedDueDate}
             </h3>
           </div>
@@ -602,7 +604,7 @@ const CustomerDetail = ({ customer, onBack }) => {
       <div className="flex-1 bg-[#f8fafc] md:bg-transparent rounded-t-[2.5rem] md:rounded-none pt-6 md:pt-2 px-4 md:px-8 relative z-20 flex flex-col md:flex-row shadow-[0_-10px_30px_rgba(0,0,0,0.15)] md:shadow-none mt-4 md:mt-0 overflow-hidden gap-6 pb-0 md:pb-8">        
         
         {/* Left Column: Ledger */}
-        <div className="flex-1 flex flex-col relative md:bg-white md:rounded-[2rem] md:shadow-xl md:border md:border-slate-200 overflow-hidden">
+        <div className="flex-1 flex flex-col relative md:bg-white md:rounded-2xl md:shadow-xl md:border md:border-slate-200 overflow-hidden">
         
         {/* Background Avatar Watermark */}
         {centerAvatarSrc && (
@@ -638,7 +640,8 @@ const CustomerDetail = ({ customer, onBack }) => {
             {installments.length > 0 && (
               <thead className="sticky top-0 bg-[#f8fafc] z-20 shadow-sm outline outline-1 outline-slate-200/50">
                 <tr>
-                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider bg-[#f8fafc]">DATE</th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider bg-[#f8fafc] w-12 text-center">S.NO</th>
+                  <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider bg-[#f8fafc] text-center">DATE</th>
                   <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider bg-[#f8fafc]">DUE</th>
                   <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider bg-[#f8fafc]">STATUS</th>
                   <th className="py-3 px-1 text-[11px] sm:text-xs font-extrabold text-slate-700 tracking-wider text-right pr-4 bg-[#f8fafc]">AMOUNT</th>
@@ -670,8 +673,9 @@ const CustomerDetail = ({ customer, onBack }) => {
                   }}
                   className="border-b border-slate-200/60 hover:bg-slate-100 transition-colors whitespace-nowrap text-[11px] sm:text-[13px] cursor-pointer"
                 >
-                  <td className="py-3.5 px-1 font-bold text-slate-800 text-left pl-2">
-                    <div className="flex flex-col">
+                  <td className="py-3.5 px-1 sm:px-2 font-black text-slate-400 text-[10px] sm:text-[12px] text-center">{index + 1}</td>
+                  <td className="py-3.5 px-1 font-bold text-slate-800 text-center">
+                    <div className="flex flex-col items-center">
                       <span>{inst.date}</span>
                       <span className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">({parseDate(inst.date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}){inst.timeStr ? ` ${inst.timeStr}` : ''}</span>
                     </div>
@@ -706,7 +710,7 @@ const CustomerDetail = ({ customer, onBack }) => {
             {installments.length > 0 && (
               <tfoot className="bg-slate-50 border-t border-slate-200/80 shadow-[0_-2px_10px_rgba(0,0,0,0.02)] sticky bottom-0 z-20">
                 <tr>
-                  <td colSpan="3" className="py-3.5 px-2 text-right text-[13px] sm:text-[14px] font-black text-slate-900 uppercase tracking-widest drop-shadow-sm">
+                  <td colSpan="4" className="py-3.5 px-2 text-right text-[13px] sm:text-[14px] font-black text-slate-900 uppercase tracking-widest drop-shadow-sm">
                     Sub-total
                   </td>
                   <td className="py-3.5 px-1 text-[15px] sm:text-[16px] font-black text-[#1b7c58] text-right pr-4 tracking-tight drop-shadow-sm">
@@ -720,47 +724,29 @@ const CustomerDetail = ({ customer, onBack }) => {
         </div>
 
         {/* Right Column: Quick Actions Sidebar (Desktop Only) */}
-        <div className="hidden md:flex w-[320px] flex-col gap-4 relative z-20">
-          <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 p-6 flex flex-col gap-5 h-full">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3">Quick Actions</h3>
+        <div className="hidden md:flex w-[240px] flex-col gap-4 relative z-20 flex-none">
+          <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 p-6 flex flex-col gap-4 h-full">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 text-center">Quick Actions</h3>
             
-            {/* Entry Action (Primary) */}
-            <button 
-              onClick={handleOpenCollectionModal}
-              className="bg-gradient-to-br from-[#1b7c58] to-[#124b33] rounded-2xl p-6 flex flex-col items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all group"
-            >
-              <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                <IndianRupee className="w-8 h-8 text-white stroke-[2.5]" />
+            <button onClick={handleOpenCollectionModal} className="flex items-center gap-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl p-3 transition-colors group">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center transition-colors">
+                <IndianRupee className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
               </div>
-              <span className="text-white font-bold tracking-widest uppercase">Record Entry</span>
+              <span className="text-slate-800 font-bold tracking-wide">Entry</span>
             </button>
 
-            {/* Schedule Action */}
-            <button 
-              onClick={() => setShowScheduleModal(true)}
-              className="bg-slate-50 hover:bg-emerald-50 rounded-2xl p-5 flex items-center gap-4 border border-slate-200 hover:border-emerald-200 transition-colors group"
-            >
-              <div className="w-12 h-12 rounded-full bg-slate-200 group-hover:bg-emerald-100 flex items-center justify-center transition-colors">
-                <Clock className="w-6 h-6 text-slate-600 group-hover:text-emerald-600" />
+            <button onClick={() => setShowScheduleModal(true)} className="flex items-center gap-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl p-3 transition-colors group">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center transition-colors">
+                <Clock className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="flex flex-col text-left">
-                <span className="text-slate-800 font-bold">Schedule</span>
-                <span className="text-xs text-slate-500 font-medium">View repayment plan</span>
-              </div>
+              <span className="text-slate-800 font-bold tracking-wide">Schedule</span>
             </button>
 
-            {/* Statement Action */}
-            <button 
-              onClick={() => setShowStatementModal(true)}
-              className="bg-slate-50 hover:bg-blue-50 rounded-2xl p-5 flex items-center gap-4 border border-slate-200 hover:border-blue-200 transition-colors group"
-            >
-              <div className="w-12 h-12 rounded-full bg-slate-200 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                <FileText className="w-6 h-6 text-slate-600 group-hover:text-blue-600" />
+            <button onClick={() => setShowStatementModal(true)} className="flex items-center gap-3 bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 rounded-xl p-3 transition-colors group">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center transition-colors">
+                <FileText className="w-5 h-5 text-purple-600" />
               </div>
-              <div className="flex flex-col text-left">
-                <span className="text-slate-800 font-bold">Statement</span>
-                <span className="text-xs text-slate-500 font-medium">Generate report</span>
-              </div>
+              <span className="text-slate-800 font-bold tracking-wide">Statement</span>
             </button>
           </div>
         </div>
