@@ -30,6 +30,7 @@ import AdminDashboard from './components/AdminDashboard';
 import EMICalculator from './components/EMICalculator';
 import OfflineImage from './components/OfflineImage';
 import CustomerDetail from './components/CustomerDetail';
+import DesktopSidebar from './components/DesktopSidebar';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
@@ -551,7 +552,7 @@ function App() {
         return (
           <>
             {customers.length === 0 ? (
-              <main className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto bg-white flex flex-col justify-center items-center h-full">
+              <main className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto md:max-w-none md:mx-0 bg-white flex flex-col justify-center items-center h-full">
                 <EmptyState />
               </main>
             ) : (
@@ -567,7 +568,7 @@ function App() {
                 </div>
                 
                 <main 
-                  className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto bg-white flex flex-col"
+                  className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto md:max-w-none md:mx-0 bg-white flex flex-col"
                   onScroll={handleScroll}
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
@@ -714,10 +715,12 @@ function App() {
       {userProfile?.role === 'customer' ? (
         <CustomerDashboard userProfile={userProfile} customers={customers} />
       ) : (
-        <>
+        <div className="w-full h-full flex flex-col relative overflow-hidden">
           {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Staff Management' && <Header currentView={currentView} setCurrentView={switchTab} />}
-      
-      {renderView()}
+          <div className="flex-1 flex flex-col md:flex-row w-full overflow-hidden relative">
+            <DesktopSidebar currentView={currentView} setCurrentView={switchTab} />
+            <div className="flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] max-w-4xl mx-auto md:max-w-none md:mx-0">
+              {renderView()}
 
       {/* Filter Modal Overlay */}
       {isFilterOpen && (
@@ -833,7 +836,9 @@ function App() {
           <Footer currentView={currentView} setCurrentView={switchTab} />
         </div>
       )}
-        </>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

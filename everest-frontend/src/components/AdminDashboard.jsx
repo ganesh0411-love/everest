@@ -4572,7 +4572,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               </div>
 
               {/* Hero Header */}
-              <div className="flex items-start justify-between px-6 pt-8 pb-4 relative z-10 max-w-5xl mx-auto w-full">
+              <div className="flex items-start justify-between px-6 pt-8 pb-4 relative z-10 max-w-5xl md:max-w-none mx-0 w-full">
                 <div className="flex flex-col mt-2">
                   <div className="flex items-center gap-3 mb-1">
                     <button 
@@ -4652,7 +4652,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               </div>
 
               {/* 2x2 Grid Cards Container */}
-              <div className="flex-1 w-full max-w-5xl mx-auto px-6 pb-24 relative z-10 flex flex-col justify-center">
+              <div className="flex-1 w-full max-w-5xl md:max-w-none mx-0 px-6 pb-24 relative z-10 flex flex-col justify-center">
                 <div className="grid grid-cols-2 gap-5 md:gap-6">
                   
                   {/* Card 1 - Blue - Measurement Logic */}

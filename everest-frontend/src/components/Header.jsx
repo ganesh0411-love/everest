@@ -50,7 +50,7 @@ const Header = ({ currentView, setCurrentView }) => {
   ];
 
   return (
-    <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto bg-[#eaf5f4] ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'}`}>
+    <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto md:max-w-none md:mx-0 bg-[#eaf5f4] ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'}`}>
       <div className={`flex justify-between relative ${(currentView === 'Customer') ? 'items-center pb-1' : 'items-start'}`}>
         <div className="flex items-center gap-2">
           {currentView === 'Application Status' ? (
@@ -63,7 +63,7 @@ const Header = ({ currentView, setCurrentView }) => {
               CUSTOMER LIST
             </h1>
           ) : (
-            <>
+            <div className="flex items-center gap-2">
               <img src={logo} alt="Everest Logo" className="w-9 h-9 object-contain magic-crop mix-blend-multiply" />
               <div className="relative">
                 <select className="appearance-none bg-transparent font-bold text-lg text-slate-900 pr-4 outline-none cursor-pointer">
@@ -72,7 +72,7 @@ const Header = ({ currentView, setCurrentView }) => {
                 </select>
                 <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">▼</span>
               </div>
-            </>
+            </div>
           )}
         </div>
         <div className="flex flex-col items-end relative" ref={menuRef}>
