@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { saveImageToIDB, getImageFromIDB } from '../utils/idbHelper';
 
+const API_BASE = import.meta.env?.VITE_API_BASE_URL || 'https://everest-backend-f9nt.onrender.com';
+
+
 const OfflineImage = ({ src, alt, className, style, fallback }) => {
   const [imgSrc, setImgSrc] = useState('');
 
@@ -13,41 +16,50 @@ const OfflineImage = ({ src, alt, className, style, fallback }) => {
         return;
       }
       
+      // Rewrite legacy paths to the live backend API
+      let targetSrc = src;
+      if (targetSrc.startsWith('/')) {
+        targetSrc = `${API_BASE}${targetSrc}`;
+      }
+      if (targetSrc.includes('localhost:5000')) {
+        targetSrc = targetSrc.replace('http://localhost:5000', API_BASE);
+      }
+      
       // If it's already a local data URI or blob URL, just use it
-      if (src.startsWith('data:') || src.startsWith('blob:')) {
-        if (isMounted) setImgSrc(src);
+      if (targetSrc.startsWith('data:') || targetSrc.startsWith('blob:')) {
+        if (isMounted) setImgSrc(targetSrc);
         return;
       }
 
       try {
-        const cachedBase64 = await getImageFromIDB(src);
+        const cachedBase64 = await getImageFromIDB(targetSrc);
         if (cachedBase64) {
           if (isMounted) setImgSrc(cachedBase64);
         } else if (navigator.onLine) {
           try {
-            const response = await fetch(src);
+            const response = await fetch(targetSrc);
             if (response.ok) {
               const blob = await response.blob();
               const reader = new FileReader();
               reader.onloadend = async () => {
                 const base64 = reader.result;
                 if (isMounted) setImgSrc(base64);
-                await saveImageToIDB(src, base64);
+                await saveImageToIDB(targetSrc, base64);
               };
               reader.readAsDataURL(blob);
             } else {
-              if (isMounted) setImgSrc(src);
+              if (isMounted) setImgSrc(targetSrc);
             }
           } catch (err) {
-            if (isMounted) setImgSrc(src);
+            if (isMounted) setImgSrc(targetSrc);
           }
         } else {
           // Offline and not in cache
-          if (isMounted) setImgSrc(src);
+          if (isMounted) setImgSrc(targetSrc);
         }
       } catch (e) {
         console.error("Error caching image", e);
-        if (isMounted) setImgSrc(src);
+        if (isMounted) setImgSrc(targetSrc);
       }
     };
 
@@ -63,7 +75,21 @@ const OfflineImage = ({ src, alt, className, style, fallback }) => {
     return <div className={`bg-slate-200 animate-pulse ${className}`} style={style} />;
   }
 
-  return <img src={imgSrc} alt={alt} className={className} style={style} />;
+  return (
+    <img 
+      src={imgSrc} 
+      alt={alt} 
+      className={className} 
+      style={style} 
+      onError={(e) => {
+        if (fallback && imgSrc !== fallback) {
+          setImgSrc(fallback);
+        } else {
+          e.target.style.display = 'none';
+        }
+      }} 
+    />
+  );
 };
 
 export default OfflineImage;

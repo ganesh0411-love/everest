@@ -4453,7 +4453,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         {/* Staff Management */}
-        <div className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
+        <div 
+          className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}
+          onClick={() => setCurrentView('Staff Management')}
+        >
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-2">Staff Management</h3>
           <div className="flex items-center justify-between">
             <div className="flex gap-2">

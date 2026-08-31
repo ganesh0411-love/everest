@@ -13,10 +13,10 @@ import {
 import { 
   Centers, 
   AddBulkCustomer, 
-  StaffManagement, 
   DashboardOverview, 
   CustomerKYCUpdate, 
 } from './components/Placeholders';
+import StaffManagement from './components/StaffManagement';
 import ApplicationStatus from './components/ApplicationStatus';
 import AddCustomerModal from './components/AddCustomerModal';
 import RecycleBinView from './components/RecycleBinView';
@@ -134,7 +134,9 @@ function App() {
   useEffect(() => {
     // Only overwrite localStorage if we have a valid logged-in user and it's not loading
     if (!isDbLoading && user && userProfile) {
-      localStorage.setItem('everest_customers', JSON.stringify(customers));
+      if (customers.length > 0) {
+        localStorage.setItem('everest_customers', JSON.stringify(customers));
+      }
     }
   }, [customers, isDbLoading, user, userProfile]);
 
@@ -440,7 +442,7 @@ function App() {
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
       case 'Centers': return <div className="flex-1 overflow-y-auto"><Centers /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
-      case 'Staff Management': return <div className="flex-1 overflow-y-auto"><StaffManagement /></div>;
+      case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} /></div>;
       case 'Dashboard Overview': return <div className="flex-1 overflow-y-auto"><DashboardOverview /></div>;
       case 'Customer KYC Update': return <div className="flex-1 overflow-y-auto"><CustomerKYCUpdate /></div>;
       case 'Application Status': 
@@ -713,7 +715,7 @@ function App() {
         <CustomerDashboard userProfile={userProfile} customers={customers} />
       ) : (
         <>
-          {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && <Header currentView={currentView} setCurrentView={switchTab} />}
+          {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Staff Management' && <Header currentView={currentView} setCurrentView={switchTab} />}
       
       {renderView()}
 
@@ -826,7 +828,7 @@ function App() {
         />
       )}
 
-      {currentView !== 'Customer Detail' && (
+      {currentView !== 'Customer Detail' && currentView !== 'Staff Management' && (
         <div className="flex-shrink-0 z-40 relative">
           <Footer currentView={currentView} setCurrentView={switchTab} />
         </div>

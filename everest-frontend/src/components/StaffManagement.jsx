@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { ArrowLeft, Search, MoreVertical, Home, Users, Plus } from 'lucide-react';
 import AddStaffForm from './AddStaffForm';
 
@@ -32,20 +34,19 @@ const StaffManagement = ({ onBack, setCurrentView }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
 
-  // Initialize from LocalStorage or fallback to dummyData
-  const [staffList, setStaffList] = useState(() => {
-    try {
-      const saved = localStorage.getItem('staff_members_list');
-      return saved ? JSON.parse(saved) : dummyData;
-    } catch (e) {
-      return dummyData;
-    }
-  });
+  const [staffList, setStaffList] = useState([]);
 
-  // Persist to LocalStorage on every change
+  // Fetch real-time data from Firestore
   useEffect(() => {
-    localStorage.setItem('staff_members_list', JSON.stringify(staffList));
-  }, [staffList]);
+    const unsubscribe = onSnapshot(collection(db, 'staff'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setStaffList(data);
+    }, (error) => {
+      console.error("Error fetching staff:", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleOpenAddForm = () => {
     setEditingStaff(null);
@@ -57,18 +58,24 @@ const StaffManagement = ({ onBack, setCurrentView }) => {
     setShowAddForm(true);
   };
 
-  const handleFormSubmit = (staffData) => {
-    if (editingStaff) {
-      setStaffList(prev => prev.map(s => s.id === staffData.id ? staffData : s));
-    } else {
-      setStaffList(prev => [staffData, ...prev]);
+  const handleFormSubmit = async (staffData) => {
+    try {
+      await setDoc(doc(db, 'staff', staffData.id), staffData);
+      setShowAddForm(false);
+    } catch (error) {
+      console.error("Error saving staff:", error);
+      alert("Failed to save staff. Please try again.");
     }
-    setShowAddForm(false);
   };
 
-  const handleDeleteStaff = (staffId) => {
-    setStaffList(prev => prev.filter(s => s.id !== staffId));
-    setShowAddForm(false);
+  const handleDeleteStaff = async (staffId) => {
+    try {
+      await deleteDoc(doc(db, 'staff', staffId));
+      setShowAddForm(false);
+    } catch (error) {
+      console.error("Error deleting staff:", error);
+      alert("Failed to delete staff. Please try again.");
+    }
   };
 
   return (
@@ -125,10 +132,10 @@ const StaffManagement = ({ onBack, setCurrentView }) => {
             </button>
           </div>
 
-          {/* Table Headers (Static) */}
-          <div className="grid grid-cols-4 gap-2 px-4 py-3 bg-slate-50/80 rounded-2xl mt-6 text-xs font-bold text-purple-800 text-center items-center">
+          {/* Table Headers (Responsive) */}
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-2 px-4 py-3 bg-slate-50/80 rounded-2xl mt-6 text-xs font-bold text-purple-800 text-center items-center">
             <div className="text-left col-span-1">Name</div>
-            <div>ID</div>
+            <div className="hidden md:block">ID</div>
             <div>Designation</div>
             <div>Status</div>
           </div>
@@ -148,7 +155,7 @@ const StaffManagement = ({ onBack, setCurrentView }) => {
           }).map((staff, index) => (
             <div key={index} className="flex items-center justify-between p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors rounded-xl">
               {/* Name & Avatar */}
-              <div className="flex items-center gap-3 w-1/4 min-w-[120px]">
+              <div className="flex items-center gap-3 w-1/3 md:w-1/4 min-w-[110px]">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${staff.photoBase64 ? 'bg-transparent' : staff.avatarColor || 'bg-slate-100'}`}>
                   {staff.photoBase64 ? (
                     <img src={staff.photoBase64} alt={staff.name} className="w-full h-full object-cover" />
@@ -167,21 +174,24 @@ const StaffManagement = ({ onBack, setCurrentView }) => {
                     </svg>
                   )}
                 </div>
-                <span className="font-bold text-slate-800 text-xs sm:text-sm truncate">{staff.name}</span>
+                <div className="flex flex-col overflow-hidden">
+                  <span className="font-bold text-slate-800 text-xs sm:text-sm truncate">{staff.name}</span>
+                  <span className="text-[10px] text-slate-500 font-medium md:hidden">{staff.id}</span>
+                </div>
               </div>
               
-              {/* ID */}
-              <div className="w-1/4 text-center text-xs sm:text-sm text-slate-600 font-medium">
+              {/* ID (Desktop Only) */}
+              <div className="hidden md:block w-1/4 text-center text-xs sm:text-sm text-slate-600 font-medium">
                 {staff.id}
               </div>
 
               {/* Designation */}
-              <div className="w-1/4 text-center text-xs text-slate-600 leading-tight">
+              <div className="w-1/3 md:w-1/4 text-center text-[10px] sm:text-xs text-slate-600 leading-tight px-1">
                 {staff.designation}
               </div>
 
               {/* Status & Actions */}
-              <div className="w-1/4 flex items-center justify-end gap-2 pr-1">
+              <div className="w-1/3 md:w-1/4 flex items-center justify-end gap-1 sm:gap-2 pr-1">
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 rounded-full border border-emerald-200">
                   <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                   <span className="text-[10px] sm:text-xs font-semibold text-emerald-700">Active</span>

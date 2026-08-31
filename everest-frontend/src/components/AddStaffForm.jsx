@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { compressImage, uploadImageToStorage } from '../utils/storageUpload';
 import { 
   ChevronLeft, Trash2, Camera, User, Hash, Calendar, 
   Briefcase, Lock, Eye, EyeOff, Phone, MapPin, Shield, Check, X, Image as ImageIcon, AlertTriangle
@@ -8,6 +9,8 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
   const [showPassword, setShowPassword] = useState(false);
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Refs for hidden file inputs
   const galleryInputRef = useRef(null);
@@ -86,21 +89,33 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
     setFormData(prev => ({ ...prev, mobileNumber: val }));
   };
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
+    if (!file) return;
+    
+    setShowPhotoSheet(false);
+    setIsUploadingPhoto(true);
+
+    try {
+      // Compress the image
+      const compressedBlob = await compressImage(file, 800, 0.7);
+      
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ 
           ...prev, 
-          photoFile: file, 
+          photoFile: compressedBlob, 
           photoPreview: reader.result,
           photoBase64: reader.result
         }));
+        setIsUploadingPhoto(false);
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(compressedBlob);
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      setIsUploadingPhoto(false);
+      alert('Failed to process image. Please try another.');
     }
-    setShowPhotoSheet(false);
   };
 
   const handleRemovePhoto = () => {
@@ -113,15 +128,33 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
     setShowPhotoSheet(false);
   };
 
-  const handleSubmit = () => {
-    // Submit even if partial, as requested
-    const newStaff = {
-      ...formData,
-      status: 'Active', // Default status for new staff
-    };
-    // Go back in history stack safely to maintain integrity before unmounting
-    window.history.back();
-    onSubmit(newStaff);
+  const handleSubmit = async () => {
+    setIsSaving(true);
+    try {
+      let finalPhotoUrl = formData.photoBase64;
+      
+      // Upload to Storage if there is a new photo file
+      if (formData.photoFile) {
+        finalPhotoUrl = await uploadImageToStorage(formData.photoFile, 'staff_profiles', formData.id);
+      }
+
+      // Submit even if partial, as requested
+      const newStaff = {
+        ...formData,
+        status: 'Active', // Default status for new staff
+        photoBase64: finalPhotoUrl, // URL instead of Base64
+        photoFile: null, // Don't persist Blob to Firestore
+        photoPreview: null // Don't persist DataURL to Firestore
+      };
+      
+      // Go back in history stack safely to maintain integrity before unmounting
+      window.history.back();
+      onSubmit(newStaff);
+    } catch (error) {
+      console.error("Staff Save Error:", error);
+      alert("Failed to upload photo and save staff. Please try again.");
+      setIsSaving(false);
+    }
   };
 
   const handleSafeBack = () => {
@@ -142,8 +175,8 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
       {/* STATIC TOP SECTION: Header */}
       <div className="shrink-0 flex flex-col z-20">
         {/* Curved Gradient Header */}
-        <div className="bg-gradient-to-br from-purple-500 to-blue-500 pb-12 pt-6 px-4 relative z-0">
-          <div className="flex items-center justify-between mb-4 mt-2">
+        <div className="bg-gradient-to-br from-purple-500 to-blue-500 pb-6 md:pb-12 pt-6 px-4 relative z-0">
+          <div className="flex items-center justify-between mb-2 md:mb-4 mt-2">
             <button 
               onClick={handleSafeBack}
               className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-purple-600 shadow-sm shrink-0"
@@ -160,17 +193,22 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
       </div>
 
       {/* SCROLLABLE FORM AREA */}
-      <div className="flex-1 bg-white rounded-t-[2.5rem] -mt-8 z-10 flex flex-col shadow-[0_-4px_10px_rgba(0,0,0,0.05)] overflow-hidden">
-        <div className="flex-1 overflow-y-auto px-6 pt-8 pb-28 space-y-5">
+      <div className="flex-1 bg-white rounded-t-[1.5rem] md:rounded-t-[2.5rem] -mt-4 md:-mt-8 z-10 flex flex-col shadow-[0_-4px_10px_rgba(0,0,0,0.05)] overflow-hidden">
+        <div className="flex-1 overflow-y-auto px-6 pt-5 md:pt-8 pb-28 space-y-5">
           
           {/* Profile Photo */}
           <div>
             <label className="block text-sm font-bold text-slate-800 mb-2">Profile Photo</label>
             <div 
-              onClick={() => setShowPhotoSheet(true)}
-              className="border-2 border-dashed border-purple-200 rounded-2xl bg-purple-50/50 flex flex-col items-center justify-center cursor-pointer hover:bg-purple-50 transition-colors w-full max-w-[200px] mx-auto overflow-hidden relative aspect-square"
+              onClick={() => !isUploadingPhoto && setShowPhotoSheet(true)}
+              className={`border-2 border-dashed border-purple-200 rounded-2xl bg-purple-50/50 flex flex-col items-center justify-center ${isUploadingPhoto ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-purple-50'} transition-colors w-full max-w-[200px] mx-auto overflow-hidden relative aspect-square`}
             >
-              {formData.photoPreview ? (
+              {isUploadingPhoto ? (
+                <div className="flex flex-col items-center justify-center p-6 space-y-3">
+                  <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                  <span className="text-purple-600 font-bold text-sm">Processing...</span>
+                </div>
+              ) : formData.photoPreview ? (
                 <img src={formData.photoPreview} alt="Profile preview" className="w-full h-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center p-6">
@@ -194,8 +232,8 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
           />
           <input 
             type="file" 
-            accept="image/png, image/jpeg" 
-            capture="user" 
+            accept="image/*" 
+            capture="environment" 
             className="hidden" 
             ref={cameraInputRef} 
             onChange={handlePhotoUpload} 
@@ -407,17 +445,28 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
       <div className="shrink-0 w-full bg-white border-t border-slate-100 p-4 pb-safe z-50 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
         <button 
           onClick={handleSafeBack}
-          className="flex-1 py-3.5 rounded-xl border-2 border-rose-100 text-rose-500 font-bold flex items-center justify-center gap-2 bg-rose-50/30 hover:bg-rose-50 transition-colors"
+          disabled={isSaving}
+          className="flex-1 py-3.5 rounded-xl border-2 border-rose-100 text-rose-500 font-bold flex items-center justify-center gap-2 bg-rose-50/30 hover:bg-rose-50 transition-colors disabled:opacity-50"
         >
           <X size={18} strokeWidth={2.5} />
           <span>Cancel</span>
         </button>
         <button 
           onClick={handleSubmit}
-          className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/40 transition-shadow"
+          disabled={isSaving}
+          className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/40 transition-shadow disabled:opacity-50"
         >
-          <Check size={18} strokeWidth={2.5} />
-          <span>Submit</span>
+          {isSaving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Saving details...</span>
+            </>
+          ) : (
+            <>
+              <Check size={18} strokeWidth={2.5} />
+              <span>Submit</span>
+            </>
+          )}
         </button>
       </div>
 

@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom';
 import PdfPreviewModal from './PdfPreviewModal';
 import AddCustomerModal from './AddCustomerModal';
 import ApprovalDetailsModal from './ApprovalDetailsModal';
+import OfflineImage from './OfflineImage';
+
+const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
+
 
 const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer }) => {
   const [activeTab, setActiveTab] = useState('Pending');
@@ -114,13 +118,14 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                   </td>
                   <td className="p-2 truncate overflow-hidden">
                     <div className="flex items-center gap-2">
-                      <img 
-                        src={app.image} 
+                      <OfflineImage 
+                        src={app.photoUrl || app.photo || app.image || app.applicantPhoto || app.profileImage || app.avatar_url || defaultAvatar}
+                        fallback={defaultAvatar}
                         alt={app.customerName} 
                         className={`w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm transition-transform flex-shrink-0 cursor-pointer hover:scale-105`}
                         onClick={(e) => { 
                           e.stopPropagation(); 
-                          setFullscreenImage(app.image); 
+                          setFullscreenImage(app.photoUrl || app.photo || app.image || app.applicantPhoto || app.profileImage || app.avatar_url || defaultAvatar); 
                         }}
                       />
                       <div className="truncate">

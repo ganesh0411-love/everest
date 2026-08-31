@@ -3,6 +3,9 @@ import { X, Building2, User, UserCircle, Phone, FileBadge, FileText, IdCard, Che
 import { App } from '@capacitor/app';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import OfflineImage from './OfflineImage';
+
+const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
 const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onStayPending, isReadOnly, onDelete }) => {
   const [activeView, setActiveView] = useState('main'); // 'main' | 'centerDetails'
@@ -294,13 +297,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
           
           <div className="flex items-start gap-4">
             <div className="w-20 h-24 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border border-slate-100 bg-slate-50">
-              {application.image ? (
-                <img src={application.image} alt={application.customerName} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                  <UserCircle size={40} />
-                </div>
-              )}
+              <OfflineImage src={application.photoUrl || application.photo || application.image || application.applicantPhoto || application.profileImage || application.avatar_url || defaultAvatar} fallback={defaultAvatar} alt={application.customerName} className="w-full h-full object-cover" />
             </div>
             
             <div className="flex flex-col h-24 flex-1 min-w-0 relative">
