@@ -2,10 +2,10 @@ import React from 'react';
 
 const FloatingActionButton = ({ isScrolled }) => {
   return (
-    <div className={`fixed z-[90] transition-all duration-500 ease-in-out pointer-events-none ${
+    <div className={`z-[90] transition-all duration-500 ease-in-out pointer-events-none ${
       isScrolled 
-        ? 'bottom-24 right-4 translate-x-0' 
-        : 'bottom-24 left-1/2 -translate-x-1/2'
+        ? 'fixed md:absolute bottom-24 md:bottom-8 right-4 md:right-8 translate-x-0' 
+        : 'fixed md:absolute bottom-24 md:bottom-8 left-1/2 -translate-x-1/2'
     }`}>
       <button className={`bg-brand-blue hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-500/30 flex items-center justify-center pointer-events-auto transition-all duration-500 hover:scale-105 active:scale-95 ${
         isScrolled 

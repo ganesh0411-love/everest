@@ -59,9 +59,21 @@ const Header = ({ currentView, setCurrentView }) => {
               <span className="text-emerald-600 text-[10px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
             </div>
           ) : (currentView === 'Customer') ? (
-            <h1 className="text-[22px] font-black text-slate-900 tracking-wider leading-tight mt-1 whitespace-nowrap" style={{ fontFamily: 'Georgia, serif' }}>
-              CUSTOMER LIST
-            </h1>
+            <>
+              <h1 className="md:hidden text-[22px] font-black text-slate-900 tracking-wider leading-tight mt-1 whitespace-nowrap" style={{ fontFamily: 'Georgia, serif' }}>
+                CUSTOMER LIST
+              </h1>
+              <div className="hidden md:flex items-center gap-2 z-10 relative">
+                <img src={logo} alt="Everest Logo" className="w-9 h-9 object-contain magic-crop mix-blend-multiply" />
+                <div className="relative">
+                  <select className="appearance-none bg-transparent font-bold text-lg text-slate-900 pr-4 outline-none cursor-pointer">
+                    <option value="main" className="text-slate-800">Main Branch</option>
+                    <option value="add" className="text-slate-800">Add Branch</option>
+                  </select>
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">▼</span>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="flex items-center gap-2">
               <img src={logo} alt="Everest Logo" className="w-9 h-9 object-contain magic-crop mix-blend-multiply" />
@@ -78,7 +90,7 @@ const Header = ({ currentView, setCurrentView }) => {
         <div className="flex flex-col items-end relative" ref={menuRef}>
           <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
           <button 
-            className="p-1 text-slate-500 hover:text-slate-700 transition-colors"
+            className="md:hidden p-1 text-slate-500 hover:text-slate-700 transition-colors"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -89,7 +101,7 @@ const Header = ({ currentView, setCurrentView }) => {
 
           {/* Admin Menu Dropdown */}
           {isMenuOpen && (
-            <div className="absolute top-12 right-0 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="md:hidden absolute top-12 right-0 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="bg-black py-3 px-4 text-center border-b-4 border-yellow-400">
                 <h3 className="text-yellow-400 font-bold text-sm tracking-wider">ADMIN DASHBOARD</h3>
               </div>
@@ -145,11 +157,27 @@ const Header = ({ currentView, setCurrentView }) => {
           )}
         </div>
       </div>
-      {(currentView !== 'Application Status' && currentView !== 'Customer') && (
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight -mt-2 ml-11" style={{ fontFamily: 'Georgia, serif' }}>
-          Everest Micro<span style={{ fontSize: '21px' }}>Finance</span>
-        </h1>
+
+      {/* Centered Desktop Title across main content */}
+      {(currentView === 'Customer' || currentView === 'Application Status') && (
+        <div className="hidden md:flex absolute top-1/2 left-[calc(50%+144px)] lg:left-[calc(50%+160px)] -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0">
+          {currentView === 'Customer' && (
+            <h1 className="text-[24px] font-black text-slate-900 tracking-wider leading-tight whitespace-nowrap" style={{ fontFamily: 'Georgia, serif' }}>
+              CUSTOMER LIST
+            </h1>
+          )}
+          {currentView === 'Application Status' && (
+            <div className="flex flex-col items-center">
+              <span className="font-black text-[24px] text-slate-900 leading-tight tracking-wider">APPLICATION STATUS</span>
+              <span className="text-emerald-600 text-[11px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
+            </div>
+          )}
+        </div>
       )}
+
+      <h1 className={`text-2xl font-black text-slate-900 tracking-tight leading-tight -mt-2 ml-11 ${(currentView === 'Application Status' || currentView === 'Customer') ? 'hidden md:block' : ''} relative z-10`} style={{ fontFamily: 'Georgia, serif' }}>
+        Everest Micro<span style={{ fontSize: '21px' }}>Finance</span>
+      </h1>
     </header>
   );
 };

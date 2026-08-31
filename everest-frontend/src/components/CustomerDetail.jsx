@@ -452,10 +452,10 @@ const CustomerDetail = ({ customer, onBack }) => {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-gradient-to-b from-[#115e41] via-[#1b7c58] to-[#f4f7f6] overflow-hidden relative font-sans w-full max-w-md mx-auto shadow-2xl">
+    <div className="flex flex-col h-[100dvh] md:h-full bg-gradient-to-b from-[#115e41] via-[#1b7c58] to-[#f4f7f6] overflow-hidden relative font-sans w-full max-w-md md:max-w-7xl mx-auto shadow-2xl md:shadow-none">
       
       {/* Top Section */}
-      <div className="px-3 sm:px-6 pt-6 pb-0 relative z-10 flex-shrink-0">
+      <div className="md:hidden px-3 sm:px-6 pt-6 pb-0 relative z-10 flex-shrink-0">
         <div className="grid grid-cols-[1fr_auto_1fr] items-start w-full gap-2">
           {/* Left: Back Button, Phone & Loan Amount */}
           <div className="flex flex-col gap-3 justify-start items-start min-w-0">
@@ -539,8 +539,70 @@ const CustomerDetail = ({ customer, onBack }) => {
         </div>
       </div>
 
-      {/* Metrics & Ledger Section */}
-      <div className="flex-1 bg-[#f8fafc] rounded-t-[2.5rem] pt-6 px-4 relative z-20 flex flex-col shadow-[0_-10px_30px_rgba(0,0,0,0.15)] mt-4 overflow-hidden">        
+      {/* Desktop Top Section */}
+      <div className="hidden md:flex flex-row justify-between items-stretch px-8 pt-6 pb-2 relative z-10 gap-6">
+        {/* Left: Profile Card */}
+        <div className="flex items-center bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)] gap-6 flex-1 max-w-[500px]">
+          {/* Back Button */}
+          <button onClick={onBack} className="text-white p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0">
+            <ArrowLeft className="w-8 h-8" />
+          </button>
+          
+          <div className="w-[80px] h-[80px] rounded-full border-[3px] border-white/50 overflow-hidden shadow-lg relative bg-slate-200 flex-shrink-0">
+            <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
+          </div>
+          
+          <div className="flex flex-col flex-1">
+            <h2 className="text-2xl font-bold text-white tracking-tight leading-tight">{formatName(customer.name)}</h2>
+            <p className="text-emerald-100 text-sm font-medium tracking-wide mt-1">{customer.center || customer.area || '\u00A0'}</p>
+            
+            <div className="flex items-center gap-3 mt-3">
+              <a href={`tel:${customer.phone || customer.mobile || ''}`} className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
+                <Phone className="w-4 h-4 text-white" />
+              </a>
+              <a href={customer.locationUrl || customer.customerLocationUrl || `https://maps.google.com/?q=${customer.city || customer.address || ''}`} target="_blank" rel="noopener noreferrer" className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
+                <MapPin className="w-4 h-4 text-white" />
+              </a>
+              <button onClick={() => setShowVerificationModal(true)} className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">
+                <MoreVertical className="w-4 h-4 text-white" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Metric Cards */}
+        <div className="flex gap-4 flex-1 justify-end">
+          {/* Loan Amount */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+            <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Loan Amount</p>
+            <h3 className="text-[28px] font-black text-[#4ade80] tracking-tighter flex items-center drop-shadow-md">
+              <IndianRupee className="w-6 h-6 mr-1 stroke-[3]" />
+              {loanAmount.toLocaleString('en-IN')}
+            </h3>
+          </div>
+          {/* Outstanding */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+            <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Outstanding</p>
+            <h3 className="text-[28px] font-black text-[#ef4444] tracking-tighter flex items-center drop-shadow-md">
+              <IndianRupee className="w-6 h-6 mr-1 stroke-[3]" />
+              {netBalance.toLocaleString('en-IN')}
+            </h3>
+          </div>
+          {/* Next Due */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-5 flex flex-col items-center justify-center min-w-[160px] shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+            <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-wider mb-2">Next Due</p>
+            <h3 className="text-xl font-bold text-white tracking-wider flex items-center mt-2 drop-shadow-md">
+              {nextFormattedDueDate}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Section */}
+      <div className="flex-1 bg-[#f8fafc] md:bg-transparent rounded-t-[2.5rem] md:rounded-none pt-6 md:pt-2 px-4 md:px-8 relative z-20 flex flex-col md:flex-row shadow-[0_-10px_30px_rgba(0,0,0,0.15)] md:shadow-none mt-4 md:mt-0 overflow-hidden gap-6 pb-0 md:pb-8">        
+        
+        {/* Left Column: Ledger */}
+        <div className="flex-1 flex flex-col relative md:bg-white md:rounded-[2rem] md:shadow-xl md:border md:border-slate-200 overflow-hidden">
         
         {/* Background Avatar Watermark */}
         {centerAvatarSrc && (
@@ -564,7 +626,7 @@ const CustomerDetail = ({ customer, onBack }) => {
         )}
 
         {/* Live Installment Ledger Table */}
-        <div ref={scrollContainerRef} className="relative z-10 flex-1 overflow-y-auto mb-[80px] custom-scrollbar flex flex-col">
+        <div ref={scrollContainerRef} className="relative z-10 flex-1 overflow-y-auto mb-[80px] md:mb-0 custom-scrollbar flex flex-col">
           {installments.length > 0 && (
             <div className="flex items-center justify-between px-2 pb-1 bg-[#f8fafc] relative z-30">
               <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest bg-slate-200 px-2.5 py-1 rounded-md border border-slate-300 shadow-sm">
@@ -655,10 +717,57 @@ const CustomerDetail = ({ customer, onBack }) => {
             )}
           </table>
         </div>
+        </div>
+
+        {/* Right Column: Quick Actions Sidebar (Desktop Only) */}
+        <div className="hidden md:flex w-[320px] flex-col gap-4 relative z-20">
+          <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 p-6 flex flex-col gap-5 h-full">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3">Quick Actions</h3>
+            
+            {/* Entry Action (Primary) */}
+            <button 
+              onClick={handleOpenCollectionModal}
+              className="bg-gradient-to-br from-[#1b7c58] to-[#124b33] rounded-2xl p-6 flex flex-col items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all group"
+            >
+              <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                <IndianRupee className="w-8 h-8 text-white stroke-[2.5]" />
+              </div>
+              <span className="text-white font-bold tracking-widest uppercase">Record Entry</span>
+            </button>
+
+            {/* Schedule Action */}
+            <button 
+              onClick={() => setShowScheduleModal(true)}
+              className="bg-slate-50 hover:bg-emerald-50 rounded-2xl p-5 flex items-center gap-4 border border-slate-200 hover:border-emerald-200 transition-colors group"
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-200 group-hover:bg-emerald-100 flex items-center justify-center transition-colors">
+                <Clock className="w-6 h-6 text-slate-600 group-hover:text-emerald-600" />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-slate-800 font-bold">Schedule</span>
+                <span className="text-xs text-slate-500 font-medium">View repayment plan</span>
+              </div>
+            </button>
+
+            {/* Statement Action */}
+            <button 
+              onClick={() => setShowStatementModal(true)}
+              className="bg-slate-50 hover:bg-blue-50 rounded-2xl p-5 flex items-center gap-4 border border-slate-200 hover:border-blue-200 transition-colors group"
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-200 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                <FileText className="w-6 h-6 text-slate-600 group-hover:text-blue-600" />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-slate-800 font-bold">Statement</span>
+                <span className="text-xs text-slate-500 font-medium">Generate report</span>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Bottom Navigation */}
-      <div className="absolute bottom-0 left-0 w-full z-50">
+      <div className="absolute bottom-0 left-0 w-full z-50 md:hidden">
         <div className="bg-[#124b33] rounded-t-[2rem] h-20 flex justify-between items-center px-8 relative shadow-[0_-15px_30px_rgba(0,0,0,0.15)] border-t border-white/5 pb-2">
           
           {/* SCHEDULE */}
