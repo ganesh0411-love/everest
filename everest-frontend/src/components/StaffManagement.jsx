@@ -38,26 +38,23 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
 
   // Fetch real-time data from Firestore
   useEffect(() => {
+    if (!activeBranch?.id) return;
+
     let q;
-    if (activeBranch.id !== 'main') {
-      q = query(collection(db, 'staff'), where('branchId', '==', activeBranch.id));
-    } else {
+    if (activeBranch.id === 'main') {
       q = collection(db, 'staff');
+    } else {
+      q = query(collection(db, 'staff'), where('branchId', '==', activeBranch.id));
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = [];
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        if (activeBranch.id === 'main') {
-          if (!data.branchId || data.branchId === 'main') {
-            fetched.push({ id: docSnap.id, ...data });
-          }
-        } else {
-          fetched.push({ id: docSnap.id, ...data });
-        }
-      });
-      setStaffList(fetched);
+      const fetchedStaffList = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(s => {
+          if (activeBranch.id === 'main') return !s.branchId || s.branchId === 'main';
+          return s.branchId === activeBranch.id;
+        });
+      setStaffList(fetchedStaffList);
     }, (error) => {
       console.error("Error fetching staff:", error);
     });
@@ -77,7 +74,13 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
 
   const handleFormSubmit = async (staffData) => {
     try {
-      await setDoc(doc(db, 'staff', staffData.id), staffData);
+      const staffPayload = {
+        ...staffData,
+        branchId: activeBranch.id,
+        branchName: activeBranch.name,
+        createdAt: staffData.createdAt || new Date().toISOString()
+      };
+      await setDoc(doc(db, 'staff', staffData.id), staffPayload);
       setShowAddForm(false);
     } catch (error) {
       console.error("Error saving staff:", error);
