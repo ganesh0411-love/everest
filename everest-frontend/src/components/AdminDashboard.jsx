@@ -4098,29 +4098,21 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     resetCadState();
   };
 
-  const [staffImages, setStaffImages] = React.useState({
-    vignesh: "https://ui-avatars.com/api/?name=Vignesh&background=random",
-    ganesh: "https://ui-avatars.com/api/?name=Ganesh&background=random",
-    joseph: "https://ui-avatars.com/api/?name=Joseph+Vijay&background=random"
-  });
+  const [dashboardStaffList, setDashboardStaffList] = React.useState([]);
 
   React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem('everest_customers');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const vignesh = parsed.find(c => c.name && c.name.toLowerCase().includes('vignesh'));
-        const ganesh = parsed.find(c => c.name && c.name.toLowerCase().includes('ganesh'));
-        const joseph = parsed.find(c => c.name && c.name.toLowerCase().includes('joseph'));
-        
-        setStaffImages({
-          vignesh: vignesh?.image || "https://ui-avatars.com/api/?name=Vignesh&background=random",
-          ganesh: ganesh?.image || "https://ui-avatars.com/api/?name=Ganesh&background=random",
-          joseph: joseph?.image || "https://ui-avatars.com/api/?name=Joseph+Vijay&background=random"
-        });
-      }
-    } catch(e) {}
-  }, []);
+    const unsubscribe = onSnapshot(collection(db, 'staff'), (snapshot) => {
+      const allStaff = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const filtered = allStaff.filter(staff => {
+        if (activeBranch.id === 'main') {
+          return !staff.branchId || staff.branchId === 'main';
+        }
+        return staff.branchId === activeBranch.id;
+      });
+      setDashboardStaffList(filtered);
+    });
+    return () => unsubscribe();
+  }, [activeBranch.id]);
 
   // Ref to track currently hovered element during touch drag
   const currentTouchCardRef = React.useRef(null);
@@ -4478,9 +4470,33 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-2">Staff Management</h3>
           <div className="flex items-center justify-between">
             <div className="flex gap-2">
-              <img src={staffImages.vignesh} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover" alt="Vignesh" />
-              <img src={staffImages.ganesh} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover" alt="Ganesh" />
-              <img src={staffImages.joseph} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover" alt="Joseph Vijay" />
+              {dashboardStaffList.length === 0 ? (
+                <span className="text-xs font-bold text-slate-400 italic py-1">+ Add Staff</span>
+              ) : (
+                dashboardStaffList.slice(0, 4).map((staff, idx) => {
+                  const avatarUrl = staff.photoBase64 || staff.photoUrl || staff.avatar || staff.photo;
+                  
+                  if (avatarUrl) {
+                    return (
+                      <img key={staff.id || idx} src={avatarUrl} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover bg-slate-100" alt={staff.name} />
+                    );
+                  }
+                  
+                  const nameParts = (staff.name || 'S').trim().split(' ');
+                  let initials = nameParts[0].charAt(0).toUpperCase();
+                  if (nameParts.length > 1) {
+                    initials += nameParts[nameParts.length - 1].charAt(0).toUpperCase();
+                  } else if (nameParts[0].length > 1) {
+                    initials += nameParts[0].charAt(1).toUpperCase();
+                  }
+                  
+                  return (
+                    <div key={staff.id || idx} className="w-7 h-7 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-blue-100 text-blue-700 font-black text-[10px] uppercase">
+                      {initials}
+                    </div>
+                  );
+                })
+              )}
             </div>
             <span className="text-slate-400 font-bold text-sm">&gt;</span>
           </div>

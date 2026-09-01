@@ -57,7 +57,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   };
 
   return (
-    <div className="w-full flex-1 max-w-4xl mx-auto bg-white min-h-full flex flex-col animate-in fade-in duration-300 relative">
+    <div className="w-full flex-1 max-w-4xl md:max-w-none mx-auto bg-white min-h-full flex flex-col animate-in fade-in duration-300 relative md:px-6 md:py-6">
       
       {/* Header & Tabs */}
       <div className="px-4 py-3 border-b border-slate-200 sticky top-0 bg-white z-20">
@@ -91,10 +91,10 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
           <table className="w-full text-left whitespace-nowrap table-fixed">
             <thead className="text-[10px] font-bold text-black uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="p-2 w-12 text-center">S.no</th>
-                <th className="p-2 w-24">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
-                <th className="p-2 text-left truncate">CUSTOMER</th>
-                <th className="p-2 w-16 text-center">ACTIONS</th>
+                <th className="p-2 w-12 md:w-[5%] text-left md:pl-6">S.no</th>
+                <th className="p-2 w-24 md:w-[15%] text-left">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
+                <th className="p-2 text-left w-auto md:w-[60%]">CUSTOMER</th>
+                <th className="p-2 w-16 md:w-[20%] text-right md:pr-6">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -112,7 +112,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                     }
                   }}
                 >
-                  <td className="p-2 font-bold text-slate-800 text-sm text-center">{index + 1}</td>
+                  <td className="p-2 font-bold text-slate-800 text-sm text-left md:pl-6">{index + 1}</td>
                   <td className="p-2 font-semibold text-slate-600 text-xs">
                     {activeTab === 'Approved' ? formatDate(app.approvalDate || app.appDate) : formatDate(app.appDate)}
                   </td>
@@ -133,7 +133,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       </div>
                     </div>
                   </td>
-                  <td className="p-2 flex items-center justify-center relative">
+                  <td className="p-2 flex items-center justify-center md:justify-end md:pr-6 relative">
                     
                     {/* Three-Dot Menu Button */}
                     <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
