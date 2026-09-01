@@ -55,7 +55,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
           {/* Always show Logo & Branch on Left */}
           <div className="flex items-center gap-2">
             <img src={logo} alt="Everest Logo" className="w-10 h-10 object-contain magic-crop mix-blend-multiply" />
-            <div className="hidden md:flex flex-col">
+            <div className="hidden md:block">
               <h1 className="text-[18px] font-black text-slate-900 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
                 Everest Micro<span style={{ fontSize: '15px' }}>Finance</span>
               </h1>
@@ -186,7 +186,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             <span className="text-emerald-600 text-[10px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
           </div>
         )}
-        {currentView !== 'Customer' && currentView !== 'Application Status' && (
+        {currentView !== 'Customer' && currentView !== 'Application Status' && currentView !== 'Home' && currentView !== 'HOME' && (
           <h1 className="text-[18px] font-black text-slate-900 tracking-wider leading-tight whitespace-nowrap uppercase" style={{ fontFamily: 'Georgia, serif' }}>
             {currentView}
           </h1>
