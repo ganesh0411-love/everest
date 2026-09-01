@@ -31,10 +31,16 @@ import EMICalculator from './components/EMICalculator';
 import OfflineImage from './components/OfflineImage';
 import CustomerDetail from './components/CustomerDetail';
 import DesktopSidebar from './components/DesktopSidebar';
+import AddBranchModal from './components/AddBranchModal';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
 function App() {
+  const [activeBranch, setActiveBranch] = useState({ id: 'main', name: 'Main Branch' });
+  const [branches, setBranches] = useState([{ id: 'main', name: 'Main Branch' }]);
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
+  const [isAddBranchModalOpen, setIsAddBranchModalOpen] = useState(false);
+
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('everest_user_profile');
     return saved ? JSON.parse(saved) : null;
@@ -54,6 +60,19 @@ function App() {
   const [authChecking, setAuthChecking] = useState(() => {
     return !localStorage.getItem('everest_user_profile');
   });
+
+  // Fetch Branches Globally
+  useEffect(() => {
+    if (user && userProfile) {
+      const unsub = onSnapshot(collection(db, 'branches'), (snapshot) => {
+        const fetchedBranches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setBranches([{ id: 'main', name: 'Main Branch' }, ...fetchedBranches]);
+      }, (error) => {
+        console.error("Error fetching branches:", error);
+      });
+      return () => unsub();
+    }
+  }, [user, userProfile]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -98,7 +117,11 @@ function App() {
       try {
         let q;
         if (userProfile.role === 'admin') {
-          q = collection(db, 'customers');
+          if (activeBranch.id !== 'main') {
+            q = query(collection(db, 'customers'), where('branchId', '==', activeBranch.id));
+          } else {
+            q = collection(db, 'customers');
+          }
         } else if (userProfile.role === 'staff') {
           // Simplified staff query
           q = query(collection(db, 'customers'), where('center_id', '==', userProfile.center_id || ''));
@@ -110,7 +133,14 @@ function App() {
         unsubscribe = onSnapshot(q, (querySnapshot) => {
           const fetched = [];
           querySnapshot.forEach((docSnap) => {
-            fetched.push({ ...docSnap.data(), id: docSnap.id });
+            const data = docSnap.data();
+            if (userProfile.role === 'admin' && activeBranch.id === 'main') {
+              if (!data.branchId || data.branchId === 'main') {
+                fetched.push({ ...data, id: docSnap.id });
+              }
+            } else {
+              fetched.push({ ...data, id: docSnap.id });
+            }
           });
           setCustomers(fetched);
           setIsDbLoading(false);
@@ -131,7 +161,7 @@ function App() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [user, userProfile, authChecking]);
+  }, [user, userProfile, authChecking, activeBranch.id]);
 
   useEffect(() => {
     // Only overwrite localStorage if we have a valid logged-in user and it's not loading
@@ -438,13 +468,25 @@ function App() {
     return `${years} year${years !== 1 ? 's' : ''} ago`;
   };
 
+  const handleBranchSwitch = (newBranch) => {
+    setIsSwitchingBranch(true);
+    setActiveBranch(newBranch);
+    setCurrentView('Home');
+    setViewHistory(['Home']);
+    
+    // Simulate switching delay to enforce isolation feel
+    setTimeout(() => {
+      setIsSwitchingBranch(false);
+    }, 600);
+  };
+
   const renderView = () => {
     switch(currentView) {
-      case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} /></div>;
+      case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} activeBranch={activeBranch} /></div>;
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
       case 'Centers': return <div className="flex-1 overflow-y-auto"><Centers /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
-      case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} /></div>;
+      case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} /></div>;
       case 'Dashboard Overview': return <div className="flex-1 overflow-y-auto"><DashboardOverview /></div>;
       case 'Customer KYC Update': return <div className="flex-1 overflow-y-auto"><CustomerKYCUpdate /></div>;
       case 'Application Status': 
@@ -456,7 +498,6 @@ function App() {
                 const nowIso = new Date().toISOString();
                 try {
                   await updateDoc(doc(db, 'customers', id), { status: newStatus, lastUpdated: nowIso, ...extraData });
-                  // setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus, lastUpdated: nowIso } : c));
                 } catch(e) {
                   console.error('Update error', e);
                 }
@@ -466,17 +507,16 @@ function App() {
                 const c = customers.find(x => x.id === id);
                 try {
                   await updateDoc(doc(db, 'customers', id), { status: 'Recycled', previousStatus: c?.status || 'Pending', lastUpdated: nowIso });
-                  // setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: 'Recycled', previousStatus: c.status, lastUpdated: nowIso } : c));
                 } catch(e) { console.error('Delete error', e); }
               }}
               onUpdateCustomer={async (updatedCustomer) => {
                 const nowIso = new Date().toISOString();
                 const toSave = { ...updatedCustomer, lastUpdated: nowIso };
                 try {
-                  await setDoc(doc(db, 'customers', updatedCustomer.id), toSave, { merge: true });
-                  // setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? toSave : c));
-                } catch(e) { console.error('Update customer error', e); }
+                  await updateDoc(doc(db, 'customers', updatedCustomer.id), toSave);
+                } catch(e) { console.error('Update full customer error', e); }
               }}
+              activeBranch={activeBranch}
             />
           </div>
         );
@@ -489,7 +529,6 @@ function App() {
                 const nowIso = new Date().toISOString();
                 try {
                   await updateDoc(doc(db, 'customers', id), { status: prevStatus, lastUpdated: nowIso });
-                  // setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus, lastUpdated: nowIso } : c));
                 } catch(e) { console.error('Restore error', e); }
               }}
               onPermanentDelete={async (id) => {
@@ -678,7 +717,11 @@ function App() {
   };
 
   if (authChecking) {
-    return <div className="h-[100dvh] bg-slate-900 flex items-center justify-center text-white">Authenticating...</div>;
+    return (
+      <div className="h-[100dvh] bg-slate-900 flex items-center justify-center text-white">
+        <div className="animate-pulse">Authenticating...</div>
+      </div>
+    );
   }
 
   if (!user) {
@@ -717,126 +760,159 @@ function App() {
         <CustomerDashboard userProfile={userProfile} customers={customers} />
       ) : (
         <div className="w-full h-full flex flex-col relative overflow-hidden">
-          {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Staff Management' && <Header currentView={currentView} setCurrentView={switchTab} />}
+          {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Staff Management' && (
+            <Header 
+              currentView={currentView} 
+              setCurrentView={switchTab}
+              branches={branches}
+              activeBranch={activeBranch}
+              onBranchChange={handleBranchSwitch}
+              onAddBranch={() => setIsAddBranchModalOpen(true)}
+            />
+          )}
           <div className="flex-1 flex flex-col md:flex-row w-full overflow-hidden relative">
-            <DesktopSidebar currentView={currentView} setCurrentView={switchTab} />
+            <DesktopSidebar 
+              currentView={currentView} 
+              setCurrentView={switchTab}
+              branches={branches}
+              activeBranch={activeBranch}
+              onBranchChange={handleBranchSwitch}
+              onAddBranch={() => setIsAddBranchModalOpen(true)}
+            />
             <div className="flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] max-w-4xl mx-auto md:max-w-none md:mx-0 overflow-hidden">
               {renderView()}
 
-      {/* Filter Modal Overlay */}
-      {isFilterOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex flex-col justify-end animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-md mx-auto rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom-full duration-300">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-800">Filter & Sort</h3>
-              <button onClick={() => setIsFilterOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 bg-slate-50 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto max-h-[60vh]">
-              <div className="mb-6">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">FILTER BY CATEGORY</h4>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { name: 'All', icon: LayoutGrid, color: 'text-blue-500' },
-                    { name: 'Settled', icon: CheckCircle2, color: 'text-emerald-500' },
-                    { name: 'Due Date', icon: CalendarClock, color: 'text-amber-500' },
-                    { name: 'Upcoming', icon: TrendingUp, color: 'text-purple-500' },
-                    { name: 'Microfinance', icon: Banknote, color: 'text-teal-500' },
-                    { name: 'Personal Loan', icon: User, color: 'text-rose-500' },
-                    { name: 'Agri Loan', icon: Sprout, color: 'text-green-500' },
-                    { name: 'Weekly Loan', icon: CalendarDays, color: 'text-orange-500' }
-                  ].map(cat => {
-                    const Icon = cat.icon;
-                    const isActive = tempCategory === cat.name;
-                    return (
-                      <button 
-                        key={cat.name}
-                        onClick={() => setTempCategory(cat.name)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${isActive ? 'bg-brand-blue text-white border-brand-blue shadow-md shadow-blue-500/20' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
-                      >
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : cat.color}`} />
-                        {cat.name}
+              {/* Filter Modal Overlay */}
+              {isFilterOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 z-50 flex flex-col justify-end animate-in fade-in duration-300">
+                  <div className="bg-white w-full max-w-md mx-auto rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom-full duration-300">
+                    <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+                      <h3 className="text-lg font-bold text-slate-800">Filter & Sort</h3>
+                      <button onClick={() => setIsFilterOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 bg-slate-50 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">SORT BY VALUES</h4>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { name: 'Recent', icon: Clock, color: 'text-sky-500' },
-                    { name: 'Oldest', icon: History, color: 'text-slate-500' },
-                    { name: 'Highest Amount', icon: ArrowUpRight, color: 'text-rose-500' },
-                    { name: 'Least Amount', icon: ArrowDownRight, color: 'text-emerald-500' },
-                    { name: 'By Name', icon: ArrowDownAZ, color: 'text-indigo-500' }
-                  ].map(sort => {
-                    const Icon = sort.icon;
-                    return (
-                      <label key={sort.name} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100">
-                            <Icon className={`w-5 h-5 ${sort.color}`} />
-                          </div>
-                          <span className="text-sm font-bold text-slate-700">{sort.name}</span>
+                    </div>
+                    
+                    <div className="p-5 overflow-y-auto max-h-[60vh]">
+                      <div className="mb-6">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">FILTER BY CATEGORY</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { name: 'All', icon: LayoutGrid, color: 'text-blue-500' },
+                            { name: 'Settled', icon: CheckCircle2, color: 'text-emerald-500' },
+                            { name: 'Due Date', icon: CalendarClock, color: 'text-amber-500' },
+                            { name: 'Upcoming', icon: TrendingUp, color: 'text-purple-500' },
+                            { name: 'Microfinance', icon: Banknote, color: 'text-teal-500' },
+                            { name: 'Personal Loan', icon: User, color: 'text-rose-500' },
+                            { name: 'Agri Loan', icon: Sprout, color: 'text-green-500' },
+                            { name: 'Weekly Loan', icon: CalendarDays, color: 'text-orange-500' }
+                          ].map(cat => {
+                            const Icon = cat.icon;
+                            const isActive = tempCategory === cat.name;
+                            return (
+                              <button 
+                                key={cat.name}
+                                onClick={() => setTempCategory(cat.name)}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${isActive ? 'bg-brand-blue text-white border-brand-blue shadow-md shadow-blue-500/20' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+                              >
+                                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : cat.color}`} />
+                                {cat.name}
+                              </button>
+                            );
+                          })}
                         </div>
-                        <input 
-                          type="radio" 
-                          name="sort" 
-                          checked={tempSort === sort.name} 
-                          onChange={() => setTempSort(sort.name)} 
-                          className="w-5 h-5 text-brand-blue border-slate-300 focus:ring-brand-blue accent-brand-blue cursor-pointer"
-                        />
-                      </label>
-                    );
-                  })}
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">SORT BY VALUES</h4>
+                        <div className="flex flex-col gap-2">
+                          {[
+                            { name: 'Recent', icon: Clock, color: 'text-sky-500' },
+                            { name: 'Oldest', icon: History, color: 'text-slate-500' },
+                            { name: 'Highest Amount', icon: ArrowUpRight, color: 'text-rose-500' },
+                            { name: 'Least Amount', icon: ArrowDownRight, color: 'text-emerald-500' },
+                            { name: 'By Name', icon: ArrowDownAZ, color: 'text-indigo-500' }
+                          ].map(sort => {
+                            const Icon = sort.icon;
+                            return (
+                              <label key={sort.name} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition-all">
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100">
+                                    <Icon className={`w-5 h-5 ${sort.color}`} />
+                                  </div>
+                                  <span className="text-sm font-bold text-slate-700">{sort.name}</span>
+                                </div>
+                                <input 
+                                  type="radio" 
+                                  name="sort" 
+                                  checked={tempSort === sort.name} 
+                                  onChange={() => setTempSort(sort.name)} 
+                                  className="w-5 h-5 text-brand-blue border-slate-300 focus:ring-brand-blue accent-brand-blue cursor-pointer"
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 border-t border-slate-100 flex gap-3 pb-safe bg-white">
+                      <button 
+                        onClick={clearFilter}
+                        className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                      >
+                        Clear Filter
+                      </button>
+                      <button 
+                        onClick={applyFilter}
+                        className="flex-[2] py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            
-            <div className="p-4 border-t border-slate-100 flex gap-3 pb-safe bg-white">
-              <button 
-                onClick={clearFilter}
-                className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Clear Filter
-              </button>
-              <button 
-                onClick={applyFilter}
-                className="flex-[2] py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              )}
 
-      {isAddCustomerOpen && (
-        <AddCustomerModal 
-          onClose={() => setIsAddCustomerOpen(false)} 
-          onAddCustomer={async (newCustomer) => {
-            const nowIso = new Date().toISOString();
-            const customerToSave = { ...newCustomer, lastUpdated: nowIso };
-            try {
-              await setDoc(doc(db, 'customers', customerToSave.id), customerToSave);
-              // setCustomers(prev => [customerToSave, ...prev]);
-            } catch(e) {
-              console.error('Error adding customer', e);
-              throw e;
-            }
-          }}
-        />
-      )}
+              {isAddCustomerOpen && (
+                <AddCustomerModal 
+                  onClose={() => setIsAddCustomerOpen(false)} 
+                  activeBranch={activeBranch}
+                  onAddCustomer={async (newCustomer) => {
+                    const nowIso = new Date().toISOString();
+                    const customerToSave = { ...newCustomer, lastUpdated: nowIso };
+                    try {
+                      await setDoc(doc(db, 'customers', customerToSave.id), customerToSave);
+                    } catch(e) {
+                      console.error('Error adding customer', e);
+                      throw e;
+                    }
+                  }}
+                />
+              )}
 
-      {currentView !== 'Customer Detail' && currentView !== 'Staff Management' && (
-        <div className="flex-shrink-0 z-40 relative md:hidden">
-          <Footer currentView={currentView} setCurrentView={switchTab} />
-        </div>
-      )}
+              {isAddBranchModalOpen && (
+                <AddBranchModal 
+                  isOpen={isAddBranchModalOpen}
+                  onClose={() => setIsAddBranchModalOpen(false)}
+                  onBranchAdded={handleBranchSwitch}
+                />
+              )}
+
+              {/* Branch Switching Flash Overlay */}
+              {isSwitchingBranch && (
+                <div className="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center animate-in fade-in duration-200">
+                  <div className="w-12 h-12 border-4 border-slate-100 border-t-brand-blue rounded-full animate-spin mb-4"></div>
+                  <h2 className="text-xl font-black text-slate-800 tracking-wider">Loading {activeBranch.name}...</h2>
+                  <p className="text-slate-500 font-medium text-sm mt-2">Isolating environment context</p>
+                </div>
+              )}
+
+              {currentView !== 'Customer Detail' && currentView !== 'Staff Management' && (
+                <div className="flex-shrink-0 z-40 relative md:hidden">
+                  <Footer currentView={currentView} setCurrentView={switchTab} />
+                </div>
+              )}
             </div>
           </div>
         </div>

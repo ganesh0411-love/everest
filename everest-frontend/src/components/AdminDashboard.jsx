@@ -5,7 +5,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { area as turfArea } from '@turf/area';
 import { length as turfLength } from '@turf/length';
 import { db } from '../firebase';
-import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 
 // ============================================================================
 // DUAL-ENVIRONMENT API CONFIGURATION & AUTOMATIC FALLBACK MECHANISM (WITH FLOW)
@@ -710,7 +710,7 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
   );
 };
 
-const AdminDashboard = ({ setCurrentView }) => {
+const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
   const cardShadowClass = "interactive-card";
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
 
@@ -1349,14 +1349,31 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   const [savedProjects, setSavedProjects] = React.useState([]);
 
   React.useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'cad_saved_projects'), (snapshot) => {
-      const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let q;
+    if (activeBranch.id !== 'main') {
+      q = query(collection(db, 'cad_saved_projects'), where('branchId', '==', activeBranch.id));
+    } else {
+      q = collection(db, 'cad_saved_projects');
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const projects = [];
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (activeBranch.id === 'main') {
+          if (!data.branchId || data.branchId === 'main') {
+            projects.push({ id: doc.id, ...data });
+          }
+        } else {
+          projects.push({ id: doc.id, ...data });
+        }
+      });
       setSavedProjects(projects.sort((a,b) => b.id.localeCompare(a.id)));
     }, (error) => {
       console.error("Error fetching cad_saved_projects:", error);
     });
     return () => unsubscribe();
-  }, []);
+  }, [activeBranch.id]);
 
   const [cadMetricOffsets, setCadMetricOffsets] = React.useState({});
 
@@ -1724,7 +1741,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 isAreaDropdownOpen,
                 isSurveyDropdownOpen,
                 isSubDivisionDropdownOpen
-             }
+             },
+             branchId: activeBranch.id
          };
          try {
              await setDoc(doc(db, 'cad_saved_projects', cadLoadedProjectId), newData);

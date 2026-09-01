@@ -3,7 +3,7 @@ import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 
-const Header = ({ currentView, setCurrentView }) => {
+const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const menuRef = useRef(null);
@@ -62,9 +62,22 @@ const Header = ({ currentView, setCurrentView }) => {
             </div>
             
             <div className="relative ml-1">
-              <select className="appearance-none bg-transparent font-bold text-[14px] text-slate-900 pr-4 outline-none cursor-pointer">
-                <option value="main" className="text-slate-800">Main Branch</option>
-                <option value="add" className="text-slate-800">Add Branch</option>
+              <select 
+                className="appearance-none bg-transparent font-bold text-[14px] text-slate-900 pr-4 outline-none cursor-pointer"
+                value={activeBranch?.id || 'main'}
+                onChange={(e) => {
+                  if (e.target.value === 'add') {
+                    onAddBranch?.();
+                  } else {
+                    const branch = branches.find(b => b.id === e.target.value);
+                    if (branch) onBranchChange?.(branch);
+                  }
+                }}
+              >
+                {branches.map(b => (
+                  <option key={b.id} value={b.id} className="text-slate-800">{b.name}</option>
+                ))}
+                <option value="add" className="text-slate-800 font-bold text-brand-blue">+ Add Branch</option>
               </select>
               <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
             </div>

@@ -7,7 +7,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
 import { uploadImageToStorage } from '../utils/storageUpload';
 
-const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
+const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
   const [step, setStep] = useState('form'); // 'form', 'confirm', 'success'
   const [showPdf, setShowPdf] = useState(false);
   const [pdfAutoMode, setPdfAutoMode] = useState(null);
@@ -22,7 +22,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [leaderCustomerId, setLeaderCustomerId] = useState(initialData?.leaderCustomerId || '');
   const [groupName, setGroupName] = useState(initialData?.groupName || '');
   const [photo, setPhoto] = useState(initialData?.image || null);
-  const [branch, setBranch] = useState(initialData?.branch || 'BATLAGUNDU');
+  const [branch, setBranch] = useState(initialData?.branch || activeBranch.name);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -456,7 +456,8 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         disbursedAmount: parseFloat(disbursedAmount) || 0,
         category: 'Upcoming',
         // Schema Verification: Explicit mapping
-        appDate, appDay, appNumber, image: updatedProfilePic, branch,
+        appDate, appDay, appNumber, image: updatedProfilePic, branchName: branch,
+        branchId: activeBranch.id,
         center, city, district, nameTitle, customerName,
         phone, altPhone, customerStatus, dob, age,
         gender, maritalStatus, religion: '', caste: '', education: '', occupation,
@@ -635,9 +636,9 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
               <label className="block text-xs font-semibold text-slate-500 mb-1">Branch</label>
               <input 
                 type="text"
+                readOnly
                 value={branch} 
-                onChange={(e) => setBranch(e.target.value.toUpperCase())}
-                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 outline-none font-bold text-slate-800 tracking-wider uppercase focus:border-brand-blue transition-colors"
+                className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 outline-none font-bold text-slate-800 tracking-wider uppercase focus:border-brand-blue transition-colors cursor-not-allowed"
               />
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { ArrowLeft, Search, MoreVertical, Home, Users, Plus } from 'lucide-react';
 import AddStaffForm from './AddStaffForm';
 
@@ -27,7 +27,7 @@ const dummyData = [
   { id: 'EMP007', name: 'Vijay Das', designation: 'Field Officer', status: 'Active', avatarColor: 'bg-indigo-100' },
 ];
 
-const StaffManagement = ({ onBack, setCurrentView }) => {
+const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
   // State for Add/Edit Form
@@ -38,15 +38,32 @@ const StaffManagement = ({ onBack, setCurrentView }) => {
 
   // Fetch real-time data from Firestore
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'staff'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStaffList(data);
+    let q;
+    if (activeBranch.id !== 'main') {
+      q = query(collection(db, 'staff'), where('branchId', '==', activeBranch.id));
+    } else {
+      q = collection(db, 'staff');
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (activeBranch.id === 'main') {
+          if (!data.branchId || data.branchId === 'main') {
+            fetched.push({ id: docSnap.id, ...data });
+          }
+        } else {
+          fetched.push({ id: docSnap.id, ...data });
+        }
+      });
+      setStaffList(fetched);
     }, (error) => {
       console.error("Error fetching staff:", error);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [activeBranch.id]);
 
   const handleOpenAddForm = () => {
     setEditingStaff(null);
