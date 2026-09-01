@@ -55,31 +55,33 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
           {/* Always show Logo & Branch on Left */}
           <div className="flex items-center gap-2">
             <img src={logo} alt="Everest Logo" className="w-10 h-10 object-contain magic-crop mix-blend-multiply" />
-            <div className="hidden md:block">
-              <h1 className="text-[18px] font-black text-slate-900 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
-                Everest Micro<span style={{ fontSize: '15px' }}>Finance</span>
-              </h1>
-            </div>
-            
-            <div className="relative ml-1">
-              <select 
-                className="appearance-none bg-transparent font-bold text-[14px] text-slate-900 pr-4 outline-none cursor-pointer"
-                value={activeBranch?.id || 'main'}
-                onChange={(e) => {
-                  if (e.target.value === 'add') {
-                    onAddBranch?.();
-                  } else {
-                    const branch = branches.find(b => b.id === e.target.value);
-                    if (branch) onBranchChange?.(branch);
-                  }
-                }}
-              >
-                {branches.map(b => (
-                  <option key={b.id} value={b.id} className="text-slate-800">{b.name}</option>
-                ))}
-                <option value="add" className="text-slate-800 font-bold text-brand-blue">+ Add Branch</option>
-              </select>
-              <span className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
+            <div className="flex flex-col justify-center items-start">
+              <div className="relative inline-flex items-center">
+                <span className="font-bold text-[14px] text-slate-900">{activeBranch?.name || 'Main Branch'}</span>
+                <span className="ml-1 text-[10px] text-slate-400">▼</span>
+                <select 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  value={activeBranch?.id || 'main'}
+                  onChange={(e) => {
+                    if (e.target.value === 'add') {
+                      onAddBranch?.();
+                    } else {
+                      const branch = branches.find(b => b.id === e.target.value);
+                      if (branch) onBranchChange?.(branch);
+                    }
+                  }}
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id} className="text-slate-800">{b.name}</option>
+                  ))}
+                  <option value="add" className="text-slate-800 font-bold text-brand-blue">+ Add Branch</option>
+                </select>
+              </div>
+              <div className="hidden md:block">
+                <h1 className="text-[18px] font-black text-slate-900 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+                  Everest Micro<span style={{ fontSize: '15px' }}>Finance</span>
+                </h1>
+              </div>
             </div>
           </div>
         <div className="flex flex-col items-end relative" ref={menuRef}>
@@ -166,27 +168,29 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             <span className="text-emerald-600 text-[11px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
           </div>
         )}
-        {currentView !== 'Customer' && currentView !== 'Application Status' && (
+        {currentView !== 'Customer' && currentView !== 'Application Status' && currentView !== 'Home' && currentView !== 'HOME' && currentView !== 'Dashboard Overview' && (
           <h1 className="text-[24px] font-black text-slate-900 tracking-wider leading-tight whitespace-nowrap uppercase" style={{ fontFamily: 'Georgia, serif' }}>
             {currentView}
           </h1>
         )}
       </div>
 
-      {/* Mobile Title */}
-      <div className="md:hidden w-full flex justify-center mt-2 pb-1 border-t border-slate-200/60 pt-2">
-        {currentView === 'Customer' && (
-          <h1 className="text-[18px] font-black text-slate-900 tracking-wider leading-tight whitespace-nowrap" style={{ fontFamily: 'Georgia, serif' }}>
+      {/* Unified Mobile Title / Brand */}
+      <div className="md:hidden w-full flex justify-center mt-1 pb-1">
+        {(currentView === 'Home' || currentView === 'HOME') ? (
+          <h1 className="text-[24px] font-black text-slate-900 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+            Everest Micro<span style={{ fontSize: '19px' }}>Finance</span>
+          </h1>
+        ) : currentView === 'Customer' ? (
+          <h1 className="text-[18px] font-black text-slate-900 tracking-wider leading-tight whitespace-nowrap uppercase" style={{ fontFamily: 'Georgia, serif' }}>
             CUSTOMER LIST
           </h1>
-        )}
-        {currentView === 'Application Status' && (
+        ) : currentView === 'Application Status' ? (
           <div className="flex flex-col items-center">
-            <span className="font-black text-[18px] text-slate-900 leading-tight tracking-wider">APPLICATION STATUS</span>
+            <span className="font-black text-[18px] text-slate-900 leading-tight tracking-wider uppercase">APPLICATION STATUS</span>
             <span className="text-emerald-600 text-[10px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
           </div>
-        )}
-        {currentView !== 'Customer' && currentView !== 'Application Status' && currentView !== 'Home' && currentView !== 'HOME' && (
+        ) : (
           <h1 className="text-[18px] font-black text-slate-900 tracking-wider leading-tight whitespace-nowrap uppercase" style={{ fontFamily: 'Georgia, serif' }}>
             {currentView}
           </h1>
