@@ -228,13 +228,13 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
       icon: <UserCircle size={20} className="text-amber-500" />,
       bg: 'bg-amber-100',
     },
-    {
-      id: 'nominee',
-      title: 'Nominee & Contact Details',
-      subtitle: `Nominee : ${application.nomineeName || 'Geetha'}`,
-      icon: <FileBadge size={20} className="text-purple-600" />,
-      bg: 'bg-purple-100',
-    },
+    (application.nomineeName && application.nomineeName.trim() !== '') ? {
+        id: 'nominee',
+        title: 'Nominee & Contact Details',
+        subtitle: `Nominee : ${application.nomineeName}`,
+        icon: <FileBadge size={20} className="text-purple-600" />,
+        bg: 'bg-purple-100',
+      } : null,
     {
       id: 'pastLoans',
       title: 'Previous Record',
@@ -258,7 +258,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
       icon: <Settings size={20} className="text-slate-600" />,
       bg: 'bg-slate-200',
     }] : [])
-  ];
+  ].filter(Boolean);
 
   const handleRowClick = (rowId) => {
     if (rowId === 'loanDetails') {

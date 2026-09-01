@@ -720,7 +720,7 @@ function App() {
           {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Staff Management' && <Header currentView={currentView} setCurrentView={switchTab} />}
           <div className="flex-1 flex flex-col md:flex-row w-full overflow-hidden relative">
             <DesktopSidebar currentView={currentView} setCurrentView={switchTab} />
-            <div className="flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] max-w-4xl mx-auto md:max-w-none md:mx-0">
+            <div className="flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] max-w-4xl mx-auto md:max-w-none md:mx-0 overflow-hidden">
               {renderView()}
 
       {/* Filter Modal Overlay */}

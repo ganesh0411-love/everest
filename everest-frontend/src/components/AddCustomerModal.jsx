@@ -461,10 +461,13 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         phone, altPhone, customerStatus, dob, age,
         gender, maritalStatus, religion: '', caste: '', education: '', occupation,
         idsChecked, loanType, tenureVal, tenureUnit, interestPercent,
-        nomineeName, nomineeRelation, address, pincode: pincode.join(''),
+        nomineeName: nomineeName.trim() ? nomineeName.trim() : '',
+        nomineeRelation: nomineeName.trim() ? nomineeRelation : '',
+        nomineeOccupation: nomineeName.trim() ? nomineeOccupation : '',
+        address, pincode: pincode.join(''),
         aadhaar: aadhaar.join(''), pan, voterId, smartCard, kycDocs: cleanKycDocs(finalKycDocs), 
         customerLocationUrl, centerLocationUrl, centerLeaderName, leaderCustomerId, groupName,
-        nomineeOccupation, nomineeIdsChecked, nomineeAadhaar: nomineeAadhaar.join(''), nomineePan, nomineeVoterId, nomineeSmartCard, nomineeKycDocs: cleanKycDocs(finalNomineeKycDocs)
+        nomineeIdsChecked, nomineeAadhaar: nomineeAadhaar.join(''), nomineePan, nomineeVoterId, nomineeSmartCard, nomineeKycDocs: cleanKycDocs(finalNomineeKycDocs)
       };
       
       if (onAddCustomer) {
@@ -608,8 +611,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 space-y-6">
         
         {/* Section 1: Registration Data */}
-        <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">REGISTRATION DATA</h3>
+        <section className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200">
+          <div className="flex items-center gap-3 mb-5 pb-3 border-b border-slate-100">
+            <span className="bg-slate-800 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-widest">01</span>
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Registration Data</h3>
+          </div>
           
           <div className="flex gap-4 mb-5 items-start">
             <div className="w-24 h-24 shrink-0 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100 overflow-hidden relative" onClick={handlePhotoCapture}>
@@ -655,8 +661,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         </section>
 
         {/* Section 2: Core Identity */}
-        <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">CORE IDENTITY & CONTACT</h3>
+        <section className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 mt-6">
+          <div className="flex items-center gap-3 mb-5 pb-3 border-b border-slate-100">
+            <span className="bg-slate-800 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-widest">02</span>
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Core Identity & Contact</h3>
+          </div>
           
           <div className="space-y-4">
             <div>
@@ -727,8 +736,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         </section>
 
         {/* New Section: Center Details */}
-        <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">CENTER DETAILS</h3>
+        <section className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 mt-6">
+          <div className="flex items-center gap-3 mb-5 pb-3 border-b border-slate-100">
+            <span className="bg-slate-800 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-widest">03</span>
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Center Details</h3>
+          </div>
           
           <div className="space-y-4">
             <div>
@@ -795,8 +807,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         </section>
 
         {/* Section 3: Personal & Demographic */}
-        <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">PERSONAL DETAILS</h3>
+        <section className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 mt-6">
+          <div className="flex items-center gap-3 mb-5 pb-3 border-b border-slate-100">
+            <span className="bg-slate-800 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-widest">04</span>
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Personal Details</h3>
+          </div>
           
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
@@ -833,10 +848,16 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
             <label className="block text-xs font-semibold text-slate-500 mb-1">Occupation</label>
             <input type="text" value={occupation} onChange={e => setOccupation(e.target.value)} placeholder="E.g. Teacher, Farmer" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-medium text-slate-700" />
           </div>
+        </section>
 
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <h4 className="text-xs font-bold text-slate-600 mb-3">NOMINEE DETAILS</h4>
-            <div className="space-y-4">
+        {/* Section 5: Nominee Details */}
+        <section className="bg-slate-50 p-5 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 mt-6">
+          <div className="flex items-center gap-3 mb-5 pb-3 border-b border-slate-200">
+            <span className="bg-slate-800 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-widest">05</span>
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Nominee Details</h3>
+          </div>
+          
+          <div className="space-y-4">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1">Nominee Name</label>
                 <input type="text" value={nomineeName} onChange={e => setNomineeName(e.target.value)} placeholder="Full Name" className="w-full p-3 border border-slate-200 rounded-xl outline-none bg-white font-medium text-slate-700" />
@@ -854,8 +875,6 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
                   <option>Daughter</option>
                 </select>
               </div>
-            </div>
-          </div>
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1">Occupation</label>
                 <input type="text" value={nomineeOccupation} onChange={e => setNomineeOccupation(e.target.value)} placeholder="E.g. Teacher, Farmer" className="w-full p-3 border border-slate-200 rounded-xl outline-none bg-white font-medium text-slate-700" />
@@ -961,11 +980,15 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
                   </div>
                 )}
               </div>
+            </div>
         </section>
 
         {/* Section 4: Address & ID */}
-        <section className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">ADDRESS & VERIFICATION</h3>
+        <section className="bg-white p-5 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] border border-slate-200 mt-6">
+          <div className="flex items-center gap-3 mb-5 pb-3 border-b border-slate-100">
+            <span className="bg-slate-800 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-widest">06</span>
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Address & Verification</h3>
+          </div>
           
           <div className="space-y-4">
             <div className="relative">
@@ -1109,8 +1132,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         </section>
 
         {/* Section 5: Financial Details */}
-        <section className="bg-blue-50/50 p-5 rounded-2xl border border-blue-200">
-          <h3 className="text-xs font-bold text-brand-blue uppercase tracking-wider mb-4 border-b border-blue-100 pb-2">FINANCIAL & LOAN DETAILS</h3>
+        <section className="bg-blue-50/50 p-5 rounded-2xl border border-blue-200 shadow-[0_2px_10px_rgba(0,0,0,0.04)] mt-6">
+          <div className="flex items-center gap-3 mb-5 pb-3 border-b border-blue-100">
+            <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-widest">07</span>
+            <h3 className="text-xs font-black text-brand-blue uppercase tracking-widest">Financial & Loan Details</h3>
+          </div>
           
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

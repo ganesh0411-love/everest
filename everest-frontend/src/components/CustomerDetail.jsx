@@ -162,20 +162,43 @@ const CustomerDetail = ({ customer, onBack }) => {
     });
   
     let lateCount = 0;
+    const now = new Date();
+    now.setHours(0,0,0,0);
   
-    Object.values(dueGroups).forEach(groupEntries => {
-      const isLate = groupEntries.some(e => {
-        // compute the date string with weekday to match the exact requirement
-        const dObj = parseDate(e.date);
-        const weekday = !isNaN(dObj.getTime()) ? dObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() : '';
-        const dateStrWithDay = `${e.date} (${weekday})`;
+    Object.keys(dueGroups).forEach(dueNumberStr => {
+      const dueNumber = parseInt(dueNumberStr, 10);
+      const groupEntries = dueGroups[dueNumberStr];
+      
+      // Calculate scheduled due date for this cycle
+      const scheduledDateObj = new Date(baseDateObj);
+      const idx = dueNumber - 1;
+      
+      if (planToken === 'DAY') {
+        scheduledDateObj.setDate(scheduledDateObj.getDate() + idx);
+      } else if (planToken === 'MONTH') {
+        scheduledDateObj.setMonth(scheduledDateObj.getMonth() + idx);
+      } else { // WEEK
+        scheduledDateObj.setDate(scheduledDateObj.getDate() + (idx * 7));
+      }
+      scheduledDateObj.setHours(0,0,0,0);
+      
+      const hasBounced = groupEntries.some(e => e.status === 'BOUNCED');
+      
+      const totalPaid = groupEntries
+        .filter(e => e.status === 'PAID')
+        .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
         
-        const isPaidLateDay = e.status === 'PAID' && (dateStrWithDay.includes('(THU)') || dateStrWithDay.includes('(FRI)') || dateStrWithDay.includes('(SAT)') || dateStrWithDay.includes('(SUN)'));
-        const isPending = e.status === 'PENDING';
-        return isPaidLateDay || isPending;
+      let latestPaymentDate = new Date(0);
+      groupEntries.filter(e => e.status === 'PAID').forEach(e => {
+        const d = parseDate(e.date);
+        d.setHours(0,0,0,0);
+        if (d > latestPaymentDate) latestPaymentDate = d;
       });
-  
-      if (isLate) {
+      
+      const isLateSettled = totalPaid >= emiAmount && latestPaymentDate > scheduledDateObj;
+      const isPartiallyPaidAndPastDue = totalPaid < emiAmount && now > scheduledDateObj;
+      
+      if (hasBounced || isLateSettled || isPartiallyPaidAndPastDue) {
         lateCount += 1;
       }
     });
@@ -186,11 +209,13 @@ const CustomerDetail = ({ customer, onBack }) => {
   const latePaymentCount = calculateLatePayments(installments);
 
   const nextDueDateObj = new Date(baseDateObj);
-  const isDailyPlan = String(customer.planType || '').toLowerCase() === 'daily' || 
-                      String(customer.loanType || '').toLowerCase().includes('daily') || 
-                      customer.totalDays === 100;
-  const intervalDays = isDailyPlan ? 1 : 7;
-  nextDueDateObj.setDate(nextDueDateObj.getDate() + (effectiveInstallmentCount * intervalDays));
+  if (planToken === 'DAY') {
+    nextDueDateObj.setDate(nextDueDateObj.getDate() + effectiveInstallmentCount);
+  } else if (planToken === 'MONTH') {
+    nextDueDateObj.setMonth(nextDueDateObj.getMonth() + effectiveInstallmentCount);
+  } else { // WEEK
+    nextDueDateObj.setDate(nextDueDateObj.getDate() + (effectiveInstallmentCount * 7));
+  }
 
   const dd = String(nextDueDateObj.getDate()).padStart(2, '0');
   const mm = String(nextDueDateObj.getMonth() + 1).padStart(2, '0');
