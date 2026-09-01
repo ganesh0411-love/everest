@@ -34,3 +34,27 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8fafc;
 }
+/* AddCustomerModal Dynamic Form Styles */
+.add-customer-modal input[data-filled="true"], 
+.add-customer-modal select[data-filled="true"], 
+.add-customer-modal textarea[data-filled="true"] {
+  border-color: rgba(16, 163, 127, 0.4) !important;
+  background-color: rgba(236, 253, 245, 0.35) !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+  box-shadow: 0 0 10px rgba(16, 163, 127, 0.05) !important;
+}
+
+.add-customer-modal input:focus, 
+.add-customer-modal select:focus, 
+.add-customer-modal textarea:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+  outline: none !important;
+}
+
+.add-customer-modal input[data-filled="false"], 
+.add-customer-modal select[data-filled="false"], 
+.add-customer-modal textarea[data-filled="false"] {
+  border-color: #e2e8f0;
+}

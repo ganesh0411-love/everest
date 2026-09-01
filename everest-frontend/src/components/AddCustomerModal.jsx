@@ -26,6 +26,30 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    const handleInput = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+        if (e.target.value.trim() !== '') {
+          e.target.dataset.filled = 'true';
+        } else {
+          e.target.dataset.filled = 'false';
+        }
+      }
+    };
+    const initInputs = () => {
+      document.querySelectorAll('.add-customer-modal input, .add-customer-modal select, .add-customer-modal textarea').forEach(el => {
+        el.dataset.filled = el.value.trim() !== '' ? 'true' : 'false';
+      });
+    };
+    setTimeout(initInputs, 100);
+    document.addEventListener('input', handleInput);
+    document.addEventListener('change', handleInput);
+    return () => {
+      document.removeEventListener('input', handleInput);
+      document.removeEventListener('change', handleInput);
+    };
+  }, [step]);
+
+  useEffect(() => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const d = new Date(appDate);
     if (!isNaN(d)) setAppDay(days[d.getDay()]);
@@ -313,6 +337,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   const [loanAmount, setLoanAmount] = useState(initialData?.loanAmount || '');
   const [repayAmount, setRepayAmount] = useState(initialData?.repayAmount || '');
   const [interestPercent, setInterestPercent] = useState(initialData?.interestPercent || '');
+  const [disbursedAmount, setDisbursedAmount] = useState(initialData?.disbursedAmount || '');
 
   const handleFinancialChange = (field, value) => {
     let loan = parseFloat(field === 'loanAmount' ? value : loanAmount) || 0;
@@ -428,6 +453,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
         status: initialData?.status || 'Pending',
         loanAmount: parseFloat(loanAmount) || 0,
         repayAmount: parseFloat(repayAmount) || 0,
+        disbursedAmount: parseFloat(disbursedAmount) || 0,
         category: 'Upcoming',
         // Schema Verification: Explicit mapping
         appDate, appDay, appNumber, image: updatedProfilePic, branch,
@@ -551,7 +577,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-[#f8fafc] z-50 flex flex-col animate-in slide-in-from-bottom-full duration-300">
+    <div className="fixed inset-0 bg-[#f8fafc] z-50 flex flex-col animate-in slide-in-from-bottom-full duration-300 add-customer-modal">
       
       {/* 2-Step Confirmation Dialog */}
       {step === 'confirm' && (
@@ -1137,6 +1163,18 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData }) => {
                 </div>
               </div>
             </div>
+
+            <div className="mt-4">
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Disbursed Amount (₹)</label>
+              <input 
+                type="number" 
+                value={disbursedAmount} 
+                onChange={e => setDisbursedAmount(e.target.value)} 
+                placeholder="Actual amount handed to customer" 
+                className="w-full p-3 border rounded-xl outline-none transition-all duration-200 border-slate-200 bg-white text-slate-700" 
+              />
+            </div>
+            
           </div>
         </section>
 
