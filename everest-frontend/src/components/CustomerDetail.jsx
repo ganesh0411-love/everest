@@ -186,7 +186,11 @@ const CustomerDetail = ({ customer, onBack }) => {
   const latePaymentCount = calculateLatePayments(installments);
 
   const nextDueDateObj = new Date(baseDateObj);
-  nextDueDateObj.setDate(nextDueDateObj.getDate() + (effectiveInstallmentCount * 7));
+  const isDailyPlan = String(customer.planType || '').toLowerCase() === 'daily' || 
+                      String(customer.loanType || '').toLowerCase().includes('daily') || 
+                      customer.totalDays === 100;
+  const intervalDays = isDailyPlan ? 1 : 7;
+  nextDueDateObj.setDate(nextDueDateObj.getDate() + (effectiveInstallmentCount * intervalDays));
 
   const dd = String(nextDueDateObj.getDate()).padStart(2, '0');
   const mm = String(nextDueDateObj.getMonth() + 1).padStart(2, '0');

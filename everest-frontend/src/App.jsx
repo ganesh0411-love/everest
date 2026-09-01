@@ -81,6 +81,7 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+
   useEffect(() => {
     let unsubscribe = null;
     
@@ -202,7 +203,7 @@ function App() {
   // Filter, Sort, and Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('Microfinance');
+  const [activeCategory, setActiveCategory] = useState('All');
   const [activeSort, setActiveSort] = useState('Recent');
   
   // Temp state for the modal before applying
