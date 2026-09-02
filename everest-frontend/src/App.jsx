@@ -216,7 +216,50 @@ function App() {
     }
   };
 
+  const verifySessionGuard = async () => {
+    if (!user || userProfile?.role !== 'staff') return;
+    try {
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const staffQuery = query(collection(db, 'staff'), where('uid', '==', user.uid));
+      const staffSnaps = await getDocs(staffQuery);
+      
+      let serverVersion = 0;
+      let isRecycled = false;
+
+      if (!staffSnaps.empty) {
+        const staffDoc = staffSnaps.docs[0].data();
+        serverVersion = staffDoc.sessionVersion || 0;
+        isRecycled = (staffDoc.status === 'Recycled');
+      } else {
+        const phoneToCheck = userProfile?.phone || user.phoneNumber;
+        if (phoneToCheck) {
+           const cleanPhone = phoneToCheck.replace(/\D/g, '').slice(-10);
+           const phoneQuery = query(collection(db, 'staff'), where('phone', '==', cleanPhone));
+           const phoneSnaps = await getDocs(phoneQuery);
+           if (!phoneSnaps.empty) {
+             const staffDoc = phoneSnaps.docs[0].data();
+             serverVersion = staffDoc.sessionVersion || 0;
+             isRecycled = (staffDoc.status === 'Recycled');
+           }
+        }
+      }
+
+      const localVersion = parseInt(localStorage.getItem('everest_staff_session_version') || '0', 10);
+      
+      if (isRecycled || serverVersion !== localVersion) {
+        console.warn('Session Invalidated on Action Guard. Forcefully signing out...');
+        await signOut(auth);
+        localStorage.removeItem('everest_staff_session_version');
+        localStorage.removeItem('everest_user_profile');
+        alert('Your session has expired or credentials have been updated. Please log in again.');
+      }
+    } catch (e) {
+      console.warn('Silent failure in session guard', e);
+    }
+  };
+
   const navigateToView = (newView) => {
+    verifySessionGuard();
     setViewHistory(prev => {
       if (prev[prev.length - 1] === newView) return prev;
       return [...prev, newView];
@@ -225,6 +268,7 @@ function App() {
   };
 
   const switchTab = (newView) => {
+    verifySessionGuard();
     if (newView === 'Home') {
       setViewHistory(['Home']);
     } else {

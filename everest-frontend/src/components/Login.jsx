@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecaptchaVerifier, signInWithPhoneNumber, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { auth, db } from '../firebase';
+import { auth, db, secondaryAuth } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
 const Login = ({ onLoginSuccess }) => {
@@ -112,39 +112,48 @@ const Login = ({ onLoginSuccess }) => {
     console.log('Attempting Staff Sign-In with:', { internalEmail, cleanPassword });
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, internalEmail, cleanPassword);
-      console.log('Staff Sign-In Successful! UID:', userCredential.user.uid);
-      const user = userCredential.user;
+      // 1. Strict pre-routing verification (Pre-flight using secondaryAuth/secondaryDb to prevent UI flicker)
+      const { secondaryAuth, secondaryDb } = await import('../firebase');
+      const userCredential = await signInWithEmailAndPassword(secondaryAuth, internalEmail, cleanPassword);
+      const uid = userCredential.user.uid;
       
-      const q = doc(db, 'users', user.uid);
-      const profileSnap = await getDoc(q);
-      
-      if (profileSnap.exists()) {
-        const profile = profileSnap.data();
-        if (profile.role === 'staff') {
-          const { collection, query, where, getDocs } = await import('firebase/firestore');
-          const staffQuery = query(collection(db, 'staff'), where('uid', '==', user.uid));
-          const staffSnaps = await getDocs(staffQuery);
-          
-          if (!staffSnaps.empty) {
-            const staffDoc = staffSnaps.docs[0].data();
-            if (staffDoc.status === 'Recycled') {
-              await signOut(auth);
-              setError('Your account has been deactivated.');
-              setLoading(false);
-              return;
-            }
-          }
-        }
+      let staffData = null;
+      const staffDocRef = doc(secondaryDb, 'staff', uid);
+      const staffSnap = await getDoc(staffDocRef);
+
+      if (staffSnap.exists()) {
+        staffData = staffSnap.data();
+      } else {
+        // Fallback lookup by phone
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const q = query(collection(secondaryDb, 'staff'), where('phone', '==', cleanPhone));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) staffData = qSnap.docs[0].data();
       }
 
+      // 2. Reject immediately if deleted or recycled
+      if (!staffData || staffData.status === 'Recycled') {
+        await signOut(secondaryAuth);
+        localStorage.removeItem('everest_manual_session');
+        setError('Invalid credentials or account deactivated.');
+        setLoading(false);
+        return; // STOP execution here - do not enter dashboard
+      }
+
+      // 3. Authorized active staff -> proceed to dashboard
+      await signOut(secondaryAuth);
+      await signInWithEmailAndPassword(auth, internalEmail, cleanPassword);
+      console.log('Staff Sign-In Auth Successful! UID:', uid);
+      
+      // 4. Finalize Login
+      localStorage.setItem('everest_staff_session_version', (staffData.sessionVersion || 0).toString());
       setLoading(false);
       if (onLoginSuccess) {
         onLoginSuccess(user);
       }
-    } catch (error) {
-      console.error('Firebase Auth Sign-In Error:', error.code, error.message);
-      const errMsg = `Authentication failed: [${error.code}] ${error.message}`;
+    } catch (loginError) {
+      console.error('Staff Sign-In Failed:', loginError.code, loginError.message);
+      const errMsg = `Login Failed: [${loginError.code}] ${loginError.message}`;
       setError(errMsg);
       alert(errMsg);
       setLoading(false);

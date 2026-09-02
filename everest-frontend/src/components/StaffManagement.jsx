@@ -76,6 +76,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
 
   const handleFormSubmit = async (staffData) => {
     try {
+      const isEdit = !!staffData.uid; // Check if this is an existing staff being edited
       let uid = staffData.uid || null;
 
       // Only create auth account if this is a new staff member (no existing UID)
@@ -110,24 +111,26 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         try {
           const userCred = await createUserWithEmailAndPassword(secondaryAuth, internalEmail, cleanPassword);
           uid = userCred.user.uid;
+          console.log('Firebase Auth user created successfully with UID:', uid);
           await secondaryAuth.signOut(); // Ensure we sign out immediately after creation
           
           // Create the RBAC profile document in /users
           await setDoc(doc(db, 'users', uid), {
+            uid: uid,
+            phone: cleanPhone,
             role: 'staff',
             branchId: activeBranch.id,
+            status: 'Active',
             permissions: {
               canDeleteCustomer: false,
               canEditLedger: true
             }
           });
         } catch (authError) {
-          console.error("Error creating Firebase Auth for staff:", authError);
-          // If the email is already in use, we could try fetching or alert. 
-          // Assuming happy path for now, but log it.
-          if (authError.code !== 'auth/email-already-in-use') {
-             throw authError; // Rethrow to abort creation if it's a real failure
-          }
+          console.error('CRITICAL: Firebase Auth User Creation Failed:', authError);
+          alert(`Failed to create login account in Firebase Auth: [${authError.code}] ${authError.message}`);
+          // HALT EXECUTION - DO NOT WRITE TO FIRESTORE IF AUTH FAILS
+          return;
         }
       }
 
@@ -139,8 +142,17 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         createdAt: staffData.createdAt || new Date().toISOString()
       };
       
+      // Bump session version on edit
+      if (isEdit) {
+        staffPayload.sessionVersion = Date.now();
+      }
+      
       await setDoc(doc(db, 'staff', staffData.id), staffPayload);
       setShowAddForm(false);
+      
+      if (isEdit) {
+        alert("Staff credentials updated. Existing active sessions will be required to re-authenticate.");
+      }
     } catch (error) {
       console.error("Error saving staff:", error);
       alert("Failed to save staff. Please try again.");
@@ -148,12 +160,17 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   };
 
   const handleDeleteStaff = async (staffId) => {
+    if (!window.confirm("Do you want to soft-delete this staff member and invalidate all active sessions across all devices?")) {
+      return;
+    }
+
     try {
       const staff = staffList.find(s => s.id === staffId);
       const prevStatus = staff?.status || 'Active';
       await updateDoc(doc(db, 'staff', staffId), {
         status: 'Recycled',
         previousStatus: prevStatus,
+        sessionVersion: Date.now(), // Force active sessions to invalidate
         deletedAt: new Date().toISOString()
       });
       setShowAddForm(false);

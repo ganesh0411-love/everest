@@ -35,5 +35,6 @@ const db = initializeFirestore(app, {
 
 const storage = getStorage(app);
 const analytics = getAnalytics(app);
+const secondaryDb = getFirestore(secondaryApp);
 
-export { auth, db, storage, secondaryAuth };
+export { auth, db, storage, secondaryAuth, secondaryDb };
