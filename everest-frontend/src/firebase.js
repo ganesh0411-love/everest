@@ -18,6 +18,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+// Secondary app for admin account creation without logging out active session
+const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp');
+const secondaryAuth = getAuth(secondaryApp);
 auth.settings.appVerificationDisabledForTesting = true;
 // Enforce browser local persistence for authentication to survive server restarts/tab closes
 setPersistence(auth, browserLocalPersistence).catch((err) => {
@@ -32,4 +36,4 @@ const db = initializeFirestore(app, {
 const storage = getStorage(app);
 const analytics = getAnalytics(app);
 
-export { auth, db, storage };
+export { auth, db, storage, secondaryAuth };

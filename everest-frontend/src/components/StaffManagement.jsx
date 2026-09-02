@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
+import { db, secondaryAuth } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, updateDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { ArrowLeft, Search, MoreVertical, Home, Users, Plus } from 'lucide-react';
 import AddStaffForm from './AddStaffForm';
 
@@ -75,12 +76,69 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
 
   const handleFormSubmit = async (staffData) => {
     try {
+      let uid = staffData.uid || null;
+
+      // Only create auth account if this is a new staff member (no existing UID)
+      if (!uid && secondaryAuth) {
+        // 1. Sanitize Phone (extract last 10 digits strictly)
+        const cleanPhone = (staffData.phone || '').replace(/\D/g, '').slice(-10);
+        const internalEmail = `${cleanPhone}@everestmicro.internal`;
+
+        // 2. Normalize Password to continuous DDMMYYYY
+        let cleanPassword = '';
+        if (staffData.dob) {
+          const parts = staffData.dob.split(/[-/.]/);
+          if (parts.length === 3) {
+            if (parts[0].length === 4) {
+              // YYYY-MM-DD -> DDMMYYYY
+              cleanPassword = `${parts[2]}${parts[1]}${parts[0]}`;
+            } else {
+              // DD-MM-YYYY -> DDMMYYYY
+              cleanPassword = `${parts[0]}${parts[1]}${parts[2]}`;
+            }
+          } else {
+            cleanPassword = staffData.dob.replace(/\D/g, '');
+          }
+        }
+        // Fallback if password was manually entered in form
+        if (staffData.password && staffData.password.trim().length >= 6) {
+          cleanPassword = staffData.password.trim();
+        }
+
+        console.log('Creating Staff Auth Account with:', { internalEmail, cleanPassword });
+
+        try {
+          const userCred = await createUserWithEmailAndPassword(secondaryAuth, internalEmail, cleanPassword);
+          uid = userCred.user.uid;
+          await secondaryAuth.signOut(); // Ensure we sign out immediately after creation
+          
+          // Create the RBAC profile document in /users
+          await setDoc(doc(db, 'users', uid), {
+            role: 'staff',
+            branchId: activeBranch.id,
+            permissions: {
+              canDeleteCustomer: false,
+              canEditLedger: true
+            }
+          });
+        } catch (authError) {
+          console.error("Error creating Firebase Auth for staff:", authError);
+          // If the email is already in use, we could try fetching or alert. 
+          // Assuming happy path for now, but log it.
+          if (authError.code !== 'auth/email-already-in-use') {
+             throw authError; // Rethrow to abort creation if it's a real failure
+          }
+        }
+      }
+
       const staffPayload = {
         ...staffData,
+        uid: uid, // save the auth UID alongside staff data
         branchId: activeBranch.id,
         branchName: activeBranch.name,
         createdAt: staffData.createdAt || new Date().toISOString()
       };
+      
       await setDoc(doc(db, 'staff', staffData.id), staffPayload);
       setShowAddForm(false);
     } catch (error) {

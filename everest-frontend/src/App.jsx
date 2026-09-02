@@ -83,9 +83,17 @@ function App() {
         // Fetch fresh profile in background
         getDoc(doc(db, 'users', currentUser.phoneNumber || currentUser.uid))
           .then(profileSnap => {
-            const profileData = profileSnap.exists() 
-              ? profileSnap.data() 
-              : { role: 'customer', phone: currentUser.phoneNumber };
+            let profileData;
+            if (profileSnap.exists()) {
+              profileData = profileSnap.data();
+            } else {
+              // Ensure hardcoded admin always gets the admin role if document is missing
+              if (currentUser.phoneNumber === '+919659030144') {
+                profileData = { role: 'admin', phone: currentUser.phoneNumber };
+              } else {
+                profileData = { role: 'customer', phone: currentUser.phoneNumber };
+              }
+            }
             setUserProfile(profileData);
             localStorage.setItem('everest_user_profile', JSON.stringify(profileData));
           })
