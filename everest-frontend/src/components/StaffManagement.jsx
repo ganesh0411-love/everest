@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, updateDoc } from 'firebase/firestore';
 import { ArrowLeft, Search, MoreVertical, Home, Users, Plus } from 'lucide-react';
 import AddStaffForm from './AddStaffForm';
 
@@ -51,6 +51,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
       const fetchedStaffList = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(s => {
+          if (s.status === 'Recycled') return false;
           if (activeBranch.id === 'main') return !s.branchId || s.branchId === 'main';
           return s.branchId === activeBranch.id;
         });
@@ -90,7 +91,13 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
 
   const handleDeleteStaff = async (staffId) => {
     try {
-      await deleteDoc(doc(db, 'staff', staffId));
+      const staff = staffList.find(s => s.id === staffId);
+      const prevStatus = staff?.status || 'Active';
+      await updateDoc(doc(db, 'staff', staffId), {
+        status: 'Recycled',
+        previousStatus: prevStatus,
+        deletedAt: new Date().toISOString()
+      });
       setShowAddForm(false);
     } catch (error) {
       console.error("Error deleting staff:", error);

@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, query, where, onSnapshot, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestoreEntry, onPermanentDeleteEntry }) => {
   const [activeTab, setActiveTab] = useState('customers');
+  const [recycledStaff, setRecycledStaff] = useState([]);
   
   const recycledCustomers = customers.filter(c => c.status === 'Recycled');
   const recycledEntries = customers.flatMap(c => 
@@ -12,11 +15,44 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestor
     }))
   ).sort((a, b) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
 
+  useEffect(() => {
+    const q = query(collection(db, 'staff'), where('status', '==', 'Recycled'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const staffList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      staffList.sort((a, b) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
+      setRecycledStaff(staffList);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
     const d = new Date(timestamp);
     if (isNaN(d)) return timestamp;
     return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+  };
+
+  const handleRestoreStaff = async (staffId, prevStatus) => {
+    try {
+      await updateDoc(doc(db, 'staff', staffId), {
+        status: prevStatus || 'Active',
+        deletedAt: null
+      });
+    } catch (e) {
+      console.error('Error restoring staff:', e);
+      alert('Failed to restore staff.');
+    }
+  };
+
+  const handlePermanentDeleteStaff = async (staffId) => {
+    if (window.confirm('Permanently delete this staff member? This cannot be undone.')) {
+      try {
+        await deleteDoc(doc(db, 'staff', staffId));
+      } catch (e) {
+        console.error('Error permanently deleting staff:', e);
+        alert('Failed to delete staff.');
+      }
+    }
   };
 
   return (
@@ -44,6 +80,12 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestor
         >
           Ledger Entries
         </button>
+        <button 
+          onClick={() => setActiveTab('staff')}
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'staff' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Staff Profiles
+        </button>
       </div>
 
       {activeTab === 'customers' ? (
@@ -70,7 +112,7 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestor
                     {index + 1}
                   </div>
                   <div className="col-span-3 text-left text-xs font-medium text-slate-600">
-                    {formatDate(customer.lastUpdated)}
+                    {formatDate(customer.lastUpdated || customer.deletedAt)}
                   </div>
                   <div className="col-span-4 text-left text-sm font-bold text-slate-800 truncate">
                     {customer.name?.replace(/^(Mr\.|Mrs\.|Miss)\s*/i, '').trim() || customer.customerName?.replace(/^(Mr\.|Mrs\.|Miss)\s*/i, '').trim()}
@@ -98,7 +140,7 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestor
             </div>
           </div>
         )
-      ) : (
+      ) : activeTab === 'entries' ? (
         recycledEntries.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,6 +183,57 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestor
                         if(window.confirm('Permanently delete this entry?')) onPermanentDeleteEntry(entry.customerId, entry.id);
                       }}
                       className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded transition-colors"
+                      title="Permanent Delete"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      ) : (
+        recycledStaff.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <p className="font-semibold text-slate-500">No deleted staff profiles</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+            <div className="grid grid-cols-12 gap-2 p-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
+              <div className="col-span-2 text-center">S.No</div>
+              <div className="col-span-3 text-left">Deleted Date</div>
+              <div className="col-span-4 text-left">Staff Name</div>
+              <div className="col-span-3 text-center"></div>
+            </div>
+            
+            <div className="divide-y divide-slate-100 flex-1 overflow-y-auto pb-32">
+              {recycledStaff.map((staff, index) => (
+                <div key={staff.id} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-50 transition-colors">
+                  <div className="col-span-2 text-center text-sm font-semibold text-slate-400">
+                    {index + 1}
+                  </div>
+                  <div className="col-span-3 text-left text-xs font-medium text-slate-600 flex flex-col">
+                    <span>{formatDate(staff.deletedAt)}</span>
+                  </div>
+                  <div className="col-span-4 text-left flex flex-col truncate">
+                    <span className="text-sm font-bold text-slate-800 truncate">{staff.name || 'Unknown'}</span>
+                    <span className="text-[10px] font-medium text-slate-500 truncate">{staff.mobileNumber || staff.phone || staff.designation || 'Staff'}</span>
+                  </div>
+                  <div className="col-span-3 flex justify-center gap-2">
+                    <button 
+                      onClick={() => handleRestoreStaff(staff.id, staff.previousStatus)}
+                      className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded transition-colors"
+                      title="Restore Staff"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </button>
+                    <button 
+                      onClick={() => handlePermanentDeleteStaff(staff.id)}
+                      className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded transition-colors"
                       title="Permanent Delete"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>

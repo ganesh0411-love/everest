@@ -79,14 +79,48 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingStaff, staffCount]);
 
-  const handleChange = (e) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleMobileChange = (e) => {
+  const handlePhoneChange = (e) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-    setFormData(prev => ({ ...prev, mobileNumber: val }));
+    setFormData((prev) => ({
+      ...prev,
+      mobileNumber: val,
+      username: val // Auto-fills Username with Mobile Number
+    }));
+  };
+
+  const handleDobChange = (e) => {
+    const rawDob = e.target.value; // e.g. "1997-12-22"
+    let formattedPassword = '';
+    
+    if (rawDob) {
+      // Strip hyphens, slashes, or dots and rearrange YYYY-MM-DD to DDMMYYYY if necessary
+      const parts = rawDob.split(/[-/.]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // Format: YYYY-MM-DD -> DDMMYYYY
+          formattedPassword = `${parts[2]}${parts[1]}${parts[0]}`;
+        } else {
+          // Format: DD-MM-YYYY -> DDMMYYYY
+          formattedPassword = `${parts[0]}${parts[1]}${parts[2]}`;
+        }
+      } else {
+        formattedPassword = rawDob.replace(/\D/g, '');
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      dob: rawDob,
+      password: formattedPassword // Auto-fills Password with continuous digits
+    }));
   };
 
   const handlePhotoUpload = async (e) => {
@@ -141,6 +175,8 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
       // Submit even if partial, as requested
       const newStaff = {
         ...formData,
+        role: 'staff',
+        phone: formData.mobileNumber,
         status: 'Active', // Default status for new staff
         photoBase64: finalPhotoUrl, // URL instead of Base64
         photoFile: null, // Don't persist Blob to Firestore
@@ -249,7 +285,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                   type="text" 
                   name="name"
                   value={formData.name}
-                  onChange={handleChange}
+                  onChange={handleInputChange}
                   placeholder="Enter staff name"
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
                 />
@@ -262,10 +298,29 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                   type="date" 
                   name="dob"
                   value={formData.dob}
-                  onChange={handleChange}
+                  onChange={handleDobChange}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow text-slate-700 appearance-none"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Mobile Number (Strict 10-digit validation) */}
+          <div>
+            <label className="block text-sm font-bold text-slate-800 mb-1.5">Mobile Number</label>
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+              <input 
+                type="tel" 
+                name="mobileNumber"
+                value={formData.mobileNumber}
+                onChange={handlePhoneChange}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={10}
+                placeholder="Enter mobile number"
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
+              />
             </div>
           </div>
 
@@ -281,7 +336,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                 type="text" 
                 name="id"
                 value={formData.id}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 placeholder="Enter staff ID"
                 className="w-full pl-10 pr-16 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow font-medium text-slate-700"
               />
@@ -299,7 +354,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                 type="date" 
                 name="joiningDate"
                 value={formData.joiningDate}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow text-slate-700 appearance-none"
               />
             </div>
@@ -314,7 +369,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                 type="text" 
                 name="designation"
                 value={formData.designation}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 placeholder="Enter designation"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
               />
@@ -338,7 +393,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                     type="text" 
                     name="username"
                     value={formData.username}
-                    onChange={handleChange}
+                    onChange={handleInputChange}
                     placeholder=""
                     autoComplete="off"
                     className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
@@ -355,7 +410,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                     type={showPassword ? 'text' : 'password'} 
                     name="password"
                     value={formData.password}
-                    onChange={handleChange}
+                    onChange={handleInputChange}
                     placeholder=""
                     autoComplete="new-password"
                     className="w-full pl-10 pr-12 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
@@ -372,24 +427,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
             </div>
           </div>
 
-          {/* Mobile Number (Strict 10-digit validation) */}
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">Mobile Number</label>
-            <div className="relative">
-              <Phone className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="tel" 
-                name="mobileNumber"
-                value={formData.mobileNumber}
-                onChange={handleMobileChange}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={10}
-                placeholder="Enter mobile number"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
-              />
-            </div>
-          </div>
+
 
           {/* Address */}
           <div>
@@ -400,7 +438,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                 type="text" 
                 name="address"
                 value={formData.address}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 placeholder="Enter full address"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
               />
@@ -416,7 +454,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                 type="text" 
                 name="permission"
                 value={formData.permission}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 placeholder="Select permission"
                 className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow cursor-pointer"
                 readOnly
