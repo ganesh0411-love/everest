@@ -4469,16 +4469,16 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         >
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-2">Staff Management</h3>
           <div className="flex items-center justify-between">
-            <div className="flex gap-2">
+            <div className="flex -space-x-2">
               {dashboardStaffList.length === 0 ? (
-                <span className="text-xs font-bold text-slate-400 italic py-1">+ Add Staff</span>
+                <span className="text-xs font-bold text-slate-400 italic py-1 pl-2">+ Add Staff</span>
               ) : (
                 dashboardStaffList.slice(0, 4).map((staff, idx) => {
                   const avatarUrl = staff.photoBase64 || staff.photoUrl || staff.avatar || staff.photo;
                   
                   if (avatarUrl) {
                     return (
-                      <img key={staff.id || idx} src={avatarUrl} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover bg-slate-100" alt={staff.name} />
+                      <img key={staff.id || idx} src={avatarUrl} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover bg-slate-100 relative z-10" alt={staff.name} />
                     );
                   }
                   
@@ -4491,7 +4491,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   }
                   
                   return (
-                    <div key={staff.id || idx} className="w-7 h-7 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-blue-100 text-blue-700 font-black text-[10px] uppercase">
+                    <div key={staff.id || idx} className="w-7 h-7 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-blue-100 text-blue-700 font-black text-[10px] uppercase relative z-10">
                       {initials}
                     </div>
                   );
