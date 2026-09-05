@@ -96,28 +96,28 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
               </div>
             </div>
           </div>
-        <div className="flex flex-col items-end relative" ref={menuRef}>
+        <div className="flex items-center gap-2 relative" ref={menuRef}>
             {userProfile?.role === 'staff' ? (
-              <div className="flex items-center gap-2.5 mr-1 mt-1">
+              <div className="flex items-center gap-1.5">
                 {(userProfile.photoUrl && userProfile.photoUrl.trim() !== '') ? (
-                  <img src={userProfile.photoUrl} alt="avatar" className="w-9 h-9 rounded-full object-cover" />
+                  <img src={userProfile.photoUrl} alt="avatar" className="w-7 h-7 rounded-full object-cover shrink-0" />
                 ) : (
-                  <div className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
-                    <span className="text-slate-400 font-bold text-sm">
+                  <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
+                    <span className="text-slate-400 font-bold text-xs">
                       {userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'S'}
                     </span>
                   </div>
                 )}
-                <div className="flex flex-col items-end">
+                <div className="flex flex-col text-right leading-none">
                   <span className="text-[#1ca3a6] font-bold text-[13px] leading-tight mb-0 truncate max-w-[150px]">{userProfile.name}</span>
-                  <span className="text-slate-500 font-mono text-[10px] tracking-wider leading-none">{userProfile.staffId}</span>
+                  <span className="text-slate-500 font-mono text-[10px] tracking-wider mt-0.5">{userProfile.staffId}</span>
                 </div>
               </div>
             ) : (
             <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
           )}
           <button 
-            className="md:hidden p-1 text-slate-500 hover:text-slate-700 transition-colors"
+            className="md:hidden p-1 text-slate-500 hover:text-slate-700 transition-colors shrink-0"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

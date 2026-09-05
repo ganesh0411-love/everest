@@ -32,26 +32,35 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestor
     return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
   };
 
-  const handleRestoreStaff = async (staffId, prevStatus) => {
+  const handleRestoreStaff = async (e, staff) => {
+    e.stopPropagation();
+    const targetDocId = staff.docId || staff.uid || staff.id;
     try {
-      await updateDoc(doc(db, 'staff', staffId), {
-        status: prevStatus || 'Active',
+      await updateDoc(doc(db, 'staff', targetDocId), {
+        status: staff.previousStatus || 'Active',
         deletedAt: null
       });
-    } catch (e) {
-      console.error('Error restoring staff:', e);
-      alert('Failed to restore staff.');
+      setRecycledStaff(prev => prev.filter(s => (s.docId || s.uid || s.id) !== targetDocId));
+      alert('Staff restored successfully.');
+    } catch (err) {
+      console.error('Restore failed:', err);
+      alert(`Failed to restore: ${err.message}`);
     }
   };
 
-  const handlePermanentDeleteStaff = async (staffId) => {
-    if (window.confirm('Permanently delete this staff member? This cannot be undone.')) {
-      try {
-        await deleteDoc(doc(db, 'staff', staffId));
-      } catch (e) {
-        console.error('Error permanently deleting staff:', e);
-        alert('Failed to delete staff.');
-      }
+  const handlePermanentDeleteStaff = async (e, staff) => {
+    e.stopPropagation();
+    if (!window.confirm(`Permanently delete ${staff.name}? This cannot be undone.`)) return;
+
+    const targetDocId = staff.docId || staff.uid || staff.id;
+    try {
+      await deleteDoc(doc(db, 'staff', targetDocId));
+      await deleteDoc(doc(db, 'users', targetDocId)).catch(() => {});
+      setRecycledStaff(prev => prev.filter(s => (s.docId || s.uid || s.id) !== targetDocId));
+      alert('Staff deleted permanently.');
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert(`Failed to delete: ${err.message}`);
     }
   };
 
@@ -225,14 +234,14 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestor
                   </div>
                   <div className="col-span-3 flex justify-center gap-2">
                     <button 
-                      onClick={() => handleRestoreStaff(staff.id, staff.previousStatus)}
+                      onClick={(e) => handleRestoreStaff(e, staff)}
                       className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded transition-colors"
                       title="Restore Staff"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </button>
                     <button 
-                      onClick={() => handlePermanentDeleteStaff(staff.id)}
+                      onClick={(e) => handlePermanentDeleteStaff(e, staff)}
                       className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded transition-colors"
                       title="Permanent Delete"
                     >

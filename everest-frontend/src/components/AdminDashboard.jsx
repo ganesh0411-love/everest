@@ -4103,13 +4103,20 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   React.useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'staff'), (snapshot) => {
       const allStaff = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const filtered = allStaff.filter(staff => {
-        if (activeBranch.id === 'main') {
-          return !staff.branchId || staff.branchId === 'main';
-        }
-        return staff.branchId === activeBranch.id;
-      });
-      setDashboardStaffList(filtered);
+      
+      const activeStaffList = allStaff
+        .filter(staff => {
+          const isBranchMatch = activeBranch.id === 'main' 
+            ? (!staff.branchId || staff.branchId === 'main') 
+            : (staff.branchId === activeBranch.id || staff.branch === activeBranch.id);
+            
+          return isBranchMatch && staff.status !== 'Recycled' && staff.status !== 'Deleted';
+        })
+        .filter((staff, index, self) => 
+          index === self.findIndex(s => (s.uid || s.id) === (staff.uid || staff.id))
+        );
+
+      setDashboardStaffList(activeStaffList);
     });
     return () => unsubscribe();
   }, [activeBranch.id]);
