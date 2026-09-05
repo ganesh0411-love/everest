@@ -170,6 +170,67 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
       // Bump session version on edit
       if (isEdit) {
         staffPayload.sessionVersion = Date.now();
+        staffPayload.credentialsVersion = Date.now();
+        
+        // --- START NEW AUTH SYNC LOGIC ---
+        try {
+          const oldRawPhone = editingStaff.mobileNumber || editingStaff.phone || '';
+          const oldCleanPhone = String(oldRawPhone).replace(/\D/g, '').slice(-10);
+          const oldEmail = `${oldCleanPhone}@everestmicro.internal`;
+
+          let oldPassword = '';
+          if (editingStaff.password && String(editingStaff.password).trim().length > 0) {
+            oldPassword = String(editingStaff.password).trim();
+          } else if (editingStaff.dob) {
+            const parts = editingStaff.dob.split(/[-/.]/);
+            if (parts.length === 3) {
+              if (parts[0].length === 4) oldPassword = `${parts[2]}${parts[1]}${parts[0]}`;
+              else oldPassword = `${parts[0]}${parts[1]}${parts[2]}`;
+            } else {
+              oldPassword = editingStaff.dob.replace(/\D/g, '');
+            }
+          } else {
+            oldPassword = oldCleanPhone;
+          }
+
+          const newRawPhone = staffData.mobileNumber || staffData.phone || '';
+          const newCleanPhone = String(newRawPhone).replace(/\D/g, '').slice(-10);
+          const newEmail = `${newCleanPhone}@everestmicro.internal`;
+
+          let newPassword = '';
+          if (staffData.password && String(staffData.password).trim().length > 0) {
+            newPassword = String(staffData.password).trim();
+          } else if (staffData.dob) {
+            const parts = staffData.dob.split(/[-/.]/);
+            if (parts.length === 3) {
+              if (parts[0].length === 4) newPassword = `${parts[2]}${parts[1]}${parts[0]}`;
+              else newPassword = `${parts[0]}${parts[1]}${parts[2]}`;
+            } else {
+              newPassword = staffData.dob.replace(/\D/g, '');
+            }
+          } else {
+            newPassword = newCleanPhone;
+          }
+
+          if (oldEmail !== newEmail || oldPassword !== newPassword) {
+            const { signInWithEmailAndPassword, updateEmail, updatePassword } = await import('firebase/auth');
+            await signInWithEmailAndPassword(secondaryAuth, oldEmail, oldPassword);
+            if (oldEmail !== newEmail) {
+              await updateEmail(secondaryAuth.currentUser, newEmail);
+              // Also sync the users collection phone number
+              const { updateDoc } = await import('firebase/firestore');
+              await updateDoc(doc(db, 'users', uid), { phone: newCleanPhone });
+            }
+            if (oldPassword !== newPassword) {
+              await updatePassword(secondaryAuth.currentUser, newPassword);
+            }
+            await secondaryAuth.signOut();
+          }
+        } catch (authSyncErr) {
+          console.error("Failed to sync updated credentials to Firebase Auth:", authSyncErr);
+          // Non-fatal, just log it. Admin might have to recreate if they forcefully changed old password manually elsewhere.
+        }
+        // --- END NEW AUTH SYNC LOGIC ---
       }
       
       // CRITICAL FIX: Use uid for new documents, docId for existing documents to prevent overwriting

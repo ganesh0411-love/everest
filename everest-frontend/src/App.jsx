@@ -92,13 +92,15 @@ function App() {
                   const { collection, query, where, getDocs } = await import('firebase/firestore');
                   const staffQuery = query(collection(db, 'staff'), where('uid', '==', currentUser.uid));
                   const staffSnaps = await getDocs(staffQuery);
-                  if (!staffSnaps.empty) {
-                    const sDoc = staffSnaps.docs[0].data();
-                    profileData.name = sDoc.name || 'Staff Member';
-                    profileData.staffId = sDoc.staffId || sDoc.id || sDoc.phone || 'N/A';
-                    profileData.branchId = sDoc.branchId || profileData.branchId || 'main';
-                    profileData.branchName = sDoc.branchName || profileData.branchName || 'Main Branch';
-                  }
+                    if (!staffSnaps.empty) {
+                      const sDoc = staffSnaps.docs[0].data();
+                      profileData.name = sDoc.name || 'Staff Member';
+                      profileData.staffId = sDoc.staffId || sDoc.id || sDoc.phone || 'N/A';
+                      profileData.branchId = sDoc.branchId || profileData.branchId || 'main';
+                      profileData.branchName = sDoc.branchName || profileData.branchName || 'Main Branch';
+                      profileData.credentialsVersion = sDoc.credentialsVersion || null;
+                      profileData.photoBase64 = sDoc.photoBase64 || sDoc.photoUrl || sDoc.avatarUrl || sDoc.profileImage || null;
+                    }
                   
                   // CRITICAL FIX: Lock the global application branch context to this staff's assigned branch
                   if (profileData.branchId) {
@@ -132,6 +134,29 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Real-time Staff Access & Credential Version Control
+  useEffect(() => {
+    if (!auth.currentUser || userProfile?.role !== 'staff') return;
+
+    const unsub = onSnapshot(doc(db, 'staff', auth.currentUser.uid), (docSnap) => {
+      if (!docSnap.exists() || docSnap.data().status === 'Recycled' || docSnap.data().status === 'Deleted') {
+        alert("Your staff session has been deactivated or removed by Admin. Logging out.");
+        signOut(auth);
+        setUser(null);
+        setUserProfile(null);
+        localStorage.removeItem('everest_user_profile');
+      } else if (docSnap.data().credentialsVersion && userProfile?.credentialsVersion && docSnap.data().credentialsVersion > userProfile.credentialsVersion) {
+        alert("Your login credentials have been updated by Admin. Please log in again.");
+        signOut(auth);
+        setUser(null);
+        setUserProfile(null);
+        localStorage.removeItem('everest_user_profile');
+      }
+    });
+
+    return () => unsub();
+  }, [auth.currentUser, userProfile?.role, userProfile?.credentialsVersion]);
 
 
   useEffect(() => {

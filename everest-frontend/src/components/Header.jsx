@@ -99,19 +99,41 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
         <div className="flex items-center gap-2 relative" ref={menuRef}>
             {userProfile?.role === 'staff' ? (
               <div className="flex items-center gap-1.5">
-                {(userProfile.photoUrl && userProfile.photoUrl.trim() !== '') ? (
-                  <img src={userProfile.photoUrl} alt="avatar" className="w-7 h-7 rounded-full object-cover shrink-0" />
-                ) : (
-                  <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
-                    <span className="text-slate-400 font-bold text-xs">
-                      {userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'S'}
-                    </span>
-                  </div>
-                )}
-                <div className="flex flex-col text-right leading-none">
-                  <span className="text-[#1ca3a6] font-bold text-[13px] leading-tight mb-0 truncate max-w-[150px]">{userProfile.name}</span>
-                  <span className="text-slate-500 font-mono text-[10px] tracking-wider mt-0.5">{userProfile.staffId}</span>
-                </div>
+                {(() => {
+                  const staffPhoto = userProfile.photoBase64 || userProfile.photoUrl || userProfile.profileImage || userProfile.photo;
+                  return (
+                    <>
+                      {/* Circular Avatar Container */}
+                      <div className="w-8 h-8 rounded-full border border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">
+                        {staffPhoto ? (
+                          <img
+                            src={staffPhoto}
+                            alt={userProfile?.name || "Staff Avatar"}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to initials only if image fails to load
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <span className="text-xs font-bold text-gray-700">
+                            {(userProfile?.name || 'S').charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Staff Name & ID */}
+                      <div className="flex flex-col text-left leading-tight">
+                        <span className="text-xs font-bold text-gray-800 truncate max-w-[85px]">
+                          {userProfile?.name || 'Staff'}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-mono">
+                          {userProfile?.staffId || userProfile?.id || ''}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             ) : (
             <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
