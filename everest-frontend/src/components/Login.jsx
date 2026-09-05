@@ -138,12 +138,26 @@ const Login = ({ onLoginSuccess }) => {
       }
 
       // 2. Reject immediately if deleted or recycled
-      if (!staffData || staffData.status === 'Recycled') {
+      if (!staffData || staffData.status === 'Recycled' || staffData.status === 'Deleted') {
         await signOut(secondaryAuth);
         localStorage.removeItem('everest_manual_session');
         setError('Invalid credentials or account deactivated.');
         setLoading(false);
         return; // STOP execution here - do not enter dashboard
+      }
+
+      // CRITICAL GATEKEEPER: Reject if the password or phone doesn't match the admin-assigned credentials
+      const storedPhone = staffData.mobileNumber || staffData.phone;
+      const phoneMismatch = storedPhone && storedPhone !== cleanPhone;
+      const passwordMismatch = staffData.authPassword && staffData.authPassword !== authPassword;
+
+      if (phoneMismatch || passwordMismatch) {
+        console.warn(`Credential mismatch detected. Phone Match: ${!phoneMismatch}, Password Match: ${!passwordMismatch}`);
+        await signOut(secondaryAuth);
+        localStorage.removeItem('everest_manual_session');
+        setError('Invalid credentials. Please contact Admin.');
+        setLoading(false);
+        return;
       }
 
       // 3. Authorized active staff -> proceed to dashboard
@@ -158,6 +172,59 @@ const Login = ({ onLoginSuccess }) => {
         onLoginSuccess(primaryCred.user);
       }
     } catch (loginError) {
+      if (loginError.code === 'auth/invalid-credential' || loginError.code === 'auth/user-not-found' || loginError.code === 'auth/wrong-password') {
+        // FALLBACK: Detect split-brain state and Auto-Repair (Account Rotation)
+        try {
+          const { secondaryDb } = await import('../firebase');
+          const { collection, query, where, getDocs, setDoc, deleteDoc, doc } = await import('firebase/firestore');
+          const { createUserWithEmailAndPassword } = await import('firebase/auth');
+          
+          const q = query(collection(secondaryDb, 'staff'), where('phone', '==', cleanPhone));
+          const qSnap = await getDocs(q);
+          
+          if (!qSnap.empty) {
+            const staffData = qSnap.docs[0].data();
+            if (staffData.authPassword && staffData.authPassword === authPassword) {
+              console.warn("Firebase Auth out of sync. Repairing credentials via Account Rotation...");
+              
+              // 1. Create a fresh Auth account to escape the broken credential state
+              const newEmail = `${cleanPhone}_${Date.now()}@everestmicro.internal`;
+              const { auth: primaryAuth } = await import('../firebase');
+              const newUserCred = await createUserWithEmailAndPassword(primaryAuth, newEmail, authPassword);
+              const newUid = newUserCred.user.uid;
+              const oldUid = staffData.uid || qSnap.docs[0].id;
+              
+              // 2. Migrate Firestore records to the new UID
+              await setDoc(doc(secondaryDb, 'staff', newUid), {
+                ...staffData,
+                uid: newUid,
+                authEmail: newEmail,
+                repairedAt: new Date().toISOString()
+              });
+              await setDoc(doc(secondaryDb, 'users', newUid), {
+                phone: cleanPhone,
+                role: 'staff',
+                branchId: staffData.branchId || staffData.branch || ''
+              });
+              
+              // 3. Clean up old orphaned records
+              await deleteDoc(doc(secondaryDb, 'staff', oldUid));
+              await deleteDoc(doc(secondaryDb, 'users', oldUid));
+              
+              console.log('Staff Sign-In Repaired Successfully! New UID:', newUid);
+              localStorage.setItem('everest_staff_session_version', (staffData.sessionVersion || 0).toString());
+              setLoading(false);
+              if (onLoginSuccess) {
+                onLoginSuccess(newUserCred.user);
+              }
+              return; // Successful repair bypasses the error
+            }
+          }
+        } catch (repairErr) {
+          console.error("Auto-repair mechanism failed:", repairErr);
+        }
+      }
+
       console.error('Staff Sign-In Failed:', loginError);
       let errMsg = 'Login Failed. Please check your credentials.';
       if (loginError.code) {

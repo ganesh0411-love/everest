@@ -80,40 +80,43 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
     try {
       let uid = staffData.uid;
 
-      if (!isEdit) {
-        // Strict Phone Validation & Internal Email Normalization
-        const rawPhone = staffData.mobileNumber || staffData.phone || '';
-        let cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
+      // --- EXTRACTED LOGIC (RUNS FOR BOTH CREATE AND EDIT) ---
+      const rawPhone = staffData.mobileNumber || staffData.phone || editingStaff?.mobileNumber || editingStaff?.phone || '';
+      let cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
 
-        if (!cleanPhone || cleanPhone.length !== 10) {
-          alert("Please enter a valid 10-digit mobile number for staff login creation.");
-          return;
-        }
+      if (!cleanPhone || cleanPhone.length !== 10) {
+        alert("Please enter a valid 10-digit mobile number for staff login creation.");
+        return;
+      }
 
-        const internalEmail = `${cleanPhone}@everestmicro.internal`;
-        
-        let authPassword = '';
-        if (staffData.password && String(staffData.password).trim().length > 0) {
-          authPassword = String(staffData.password).trim();
-        } else if (staffData.dob) {
-          const parts = staffData.dob.split(/[-/.]/);
-          if (parts.length === 3) {
-            if (parts[0].length === 4) {
-              authPassword = `${parts[2]}${parts[1]}${parts[0]}`;
-            } else {
-              authPassword = `${parts[0]}${parts[1]}${parts[2]}`;
-            }
+      const internalEmail = `${cleanPhone}@everestmicro.internal`;
+      
+      let authPassword = '';
+      const rawPassword = staffData.password || staffData.authPassword || editingStaff?.authPassword || '';
+      if (rawPassword && String(rawPassword).trim().length > 0) {
+        authPassword = String(rawPassword).trim();
+      } else if (staffData.dob) {
+        const parts = staffData.dob.split(/[-/.]/);
+        if (parts.length === 3) {
+          if (parts[0].length === 4) {
+            authPassword = `${parts[2]}${parts[1]}${parts[0]}`;
           } else {
-            authPassword = staffData.dob.replace(/\D/g, '');
+            authPassword = `${parts[0]}${parts[1]}${parts[2]}`;
           }
         } else {
-          authPassword = cleanPhone; // ultimate fallback
+          authPassword = staffData.dob.replace(/\D/g, '');
         }
+      } else {
+        authPassword = cleanPhone; // ultimate fallback
+      }
 
-        if (authPassword.length < 6) {
-          alert("Password / DOB must contain at least 6 characters.");
-          return;
-        }
+      if (authPassword.length < 6) {
+        alert("Password / DOB must contain at least 6 characters.");
+        return;
+      }
+      // --- END EXTRACTED LOGIC ---
+
+      if (!isEdit) {
 
         console.log("=== CREATING STAFF AUTH ===");
         console.log("Clean Phone:", cleanPhone);
@@ -154,7 +157,11 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         uid: uid, 
         branchId: activeBranch.id,
         branchName: activeBranch.name,
-        createdAt: staffData.createdAt || new Date().toISOString()
+        phone: cleanPhone,
+        mobileNumber: cleanPhone,
+        authPassword: authPassword,
+        createdAt: staffData.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
       
       // 1. Remove raw file objects that cannot be serialized directly into Firestore
@@ -179,8 +186,9 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           const oldEmail = `${oldCleanPhone}@everestmicro.internal`;
 
           let oldPassword = '';
-          if (editingStaff.password && String(editingStaff.password).trim().length > 0) {
-            oldPassword = String(editingStaff.password).trim();
+          const oldRawPassword = editingStaff.password || editingStaff.authPassword || '';
+          if (oldRawPassword && String(oldRawPassword).trim().length > 0) {
+            oldPassword = String(oldRawPassword).trim();
           } else if (editingStaff.dob) {
             const parts = editingStaff.dob.split(/[-/.]/);
             if (parts.length === 3) {
@@ -193,42 +201,57 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
             oldPassword = oldCleanPhone;
           }
 
-          const newRawPhone = staffData.mobileNumber || staffData.phone || '';
-          const newCleanPhone = String(newRawPhone).replace(/\D/g, '').slice(-10);
-          const newEmail = `${newCleanPhone}@everestmicro.internal`;
-
-          let newPassword = '';
-          if (staffData.password && String(staffData.password).trim().length > 0) {
-            newPassword = String(staffData.password).trim();
-          } else if (staffData.dob) {
-            const parts = staffData.dob.split(/[-/.]/);
-            if (parts.length === 3) {
-              if (parts[0].length === 4) newPassword = `${parts[2]}${parts[1]}${parts[0]}`;
-              else newPassword = `${parts[0]}${parts[1]}${parts[2]}`;
-            } else {
-              newPassword = staffData.dob.replace(/\D/g, '');
-            }
-          } else {
-            newPassword = newCleanPhone;
-          }
-
-          if (oldEmail !== newEmail || oldPassword !== newPassword) {
+          if (oldEmail !== internalEmail || oldPassword !== authPassword) {
             const { signInWithEmailAndPassword, updateEmail, updatePassword } = await import('firebase/auth');
-            await signInWithEmailAndPassword(secondaryAuth, oldEmail, oldPassword);
-            if (oldEmail !== newEmail) {
-              await updateEmail(secondaryAuth.currentUser, newEmail);
-              // Also sync the users collection phone number
-              const { updateDoc } = await import('firebase/firestore');
-              await updateDoc(doc(db, 'users', uid), { phone: newCleanPhone });
+            
+            // Generate a list of possible old passwords to recover from split-brain state
+            const possibleOldPasswords = new Set([
+              oldPassword,
+              editingStaff.password,
+              editingStaff.authPassword,
+              oldCleanPhone
+            ].filter(Boolean).map(p => String(p).trim()));
+
+            if (editingStaff.dob) {
+              const parts = editingStaff.dob.split(/[-/.]/);
+              if (parts.length === 3) {
+                possibleOldPasswords.add(`${parts[0]}${parts[1]}${parts[2]}`);
+                possibleOldPasswords.add(`${parts[2]}${parts[1]}${parts[0]}`);
+              }
+              possibleOldPasswords.add(editingStaff.dob.replace(/\D/g, ''));
             }
-            if (oldPassword !== newPassword) {
-              await updatePassword(secondaryAuth.currentUser, newPassword);
+
+            let signedIn = false;
+            for (const p of possibleOldPasswords) {
+              try {
+                await signInWithEmailAndPassword(secondaryAuth, oldEmail, p);
+                signedIn = true;
+                break; // Success!
+              } catch (e) {
+                // Ignore and try next
+              }
             }
-            await secondaryAuth.signOut();
+
+            if (!signedIn) {
+              console.warn("Unable to sync Firebase Auth password. Admin changes will apply to Firestore only. Login.jsx will repair it on next login.");
+            } else {
+              if (oldEmail !== internalEmail) {
+                await updateEmail(secondaryAuth.currentUser, internalEmail);
+                // Also sync the users collection phone number
+                const { updateDoc } = await import('firebase/firestore');
+                await updateDoc(doc(db, 'users', uid), { phone: cleanPhone });
+              }
+              if (oldPassword !== authPassword) {
+                await updatePassword(secondaryAuth.currentUser, authPassword);
+              }
+              await secondaryAuth.signOut();
+            }
+
+
           }
         } catch (authSyncErr) {
           console.error("Failed to sync updated credentials to Firebase Auth:", authSyncErr);
-          // Non-fatal, just log it. Admin might have to recreate if they forcefully changed old password manually elsewhere.
+          throw authSyncErr; // CRITICAL: Must be fatal to prevent split-brain state between Firestore and Auth
         }
         // --- END NEW AUTH SYNC LOGIC ---
       }
