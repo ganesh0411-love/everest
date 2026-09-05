@@ -105,16 +105,20 @@ const Login = ({ onLoginSuccess }) => {
       return;
     }
 
-    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    const cleanPhone = String(phoneNumber || '').replace(/\D/g, '').slice(-10);
     const internalEmail = `${cleanPhone}@everestmicro.internal`;
-    const cleanPassword = password.trim();
+    const authPassword = String(password || '').trim();
 
-    console.log('Attempting Staff Sign-In with:', { internalEmail, cleanPassword });
+    console.log("=== ATTEMPTING STAFF LOGIN ===");
+    console.log("Input Phone:", cleanPhone);
+    console.log("Attempted Email:", internalEmail);
+    console.log("Attempted Password String Length:", authPassword.length);
+    console.log("Attempted Password Value (Debug):", authPassword);
 
     try {
       // 1. Strict pre-routing verification (Pre-flight using secondaryAuth/secondaryDb to prevent UI flicker)
       const { secondaryAuth, secondaryDb } = await import('../firebase');
-      const userCredential = await signInWithEmailAndPassword(secondaryAuth, internalEmail, cleanPassword);
+      const userCredential = await signInWithEmailAndPassword(secondaryAuth, internalEmail, authPassword);
       const uid = userCredential.user.uid;
       
       let staffData = null;
@@ -142,20 +146,23 @@ const Login = ({ onLoginSuccess }) => {
 
       // 3. Authorized active staff -> proceed to dashboard
       await signOut(secondaryAuth);
-      await signInWithEmailAndPassword(auth, internalEmail, cleanPassword);
+      const primaryCred = await signInWithEmailAndPassword(auth, internalEmail, authPassword);
       console.log('Staff Sign-In Auth Successful! UID:', uid);
       
       // 4. Finalize Login
       localStorage.setItem('everest_staff_session_version', (staffData.sessionVersion || 0).toString());
       setLoading(false);
       if (onLoginSuccess) {
-        onLoginSuccess(user);
+        onLoginSuccess(primaryCred.user);
       }
     } catch (loginError) {
-      console.error('Staff Sign-In Failed:', loginError.code, loginError.message);
-      const errMsg = `Login Failed: [${loginError.code}] ${loginError.message}`;
+      console.error('Staff Sign-In Failed:', loginError);
+      let errMsg = 'Login Failed. Please check your credentials.';
+      if (loginError.code) {
+        errMsg = `Login Failed: [${loginError.code}] ${loginError.message}`;
+        alert(errMsg);
+      }
       setError(errMsg);
-      alert(errMsg);
       setLoading(false);
     }
   };

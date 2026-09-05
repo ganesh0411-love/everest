@@ -3,7 +3,7 @@ import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 
-const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch }) => {
+const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, userProfile }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const menuRef = useRef(null);
@@ -49,6 +49,14 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     { name: 'Recycle Bin', icon: '🗑️' }
   ];
 
+  const getDisplayBranch = () => {
+    if (userProfile?.role === 'staff') {
+      const staffBranch = userProfile?.branch || userProfile?.branchName || userProfile?.branchId;
+      return staffBranch?.toLowerCase() === 'theni' ? 'Theni Branch' : 'Main Branch';
+    }
+    return activeBranch?.name || 'Main Branch';
+  };
+
   return (
     <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto md:max-w-none md:mx-0 bg-[#eaf5f4] ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'}`}>
       <div className={`flex justify-between relative ${(currentView === 'Customer') ? 'items-center pb-1' : 'items-start'}`}>
@@ -57,25 +65,29 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             <img src={logo} alt="Everest Logo" className="w-10 h-10 object-contain magic-crop mix-blend-multiply" />
             <div className="flex flex-col justify-center items-start">
               <div className="relative inline-flex items-center">
-                <span className="font-bold text-[14px] text-slate-900">{activeBranch?.name || 'Main Branch'}</span>
-                <span className="ml-1 text-[10px] text-slate-400">▼</span>
-                <select 
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  value={activeBranch?.id || 'main'}
-                  onChange={(e) => {
-                    if (e.target.value === 'add') {
-                      onAddBranch?.();
-                    } else {
-                      const branch = branches.find(b => b.id === e.target.value);
-                      if (branch) onBranchChange?.(branch);
-                    }
-                  }}
-                >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id} className="text-slate-800">{b.name}</option>
-                  ))}
-                  <option value="add" className="text-slate-800 font-bold text-brand-blue">+ Add Branch</option>
-                </select>
+                <span className="font-bold text-[14px] text-slate-900">{getDisplayBranch()}</span>
+                {userProfile?.role !== 'staff' && (
+                  <>
+                    <span className="ml-1 text-[10px] text-slate-400">▼</span>
+                    <select 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      value={activeBranch?.id || 'main'}
+                      onChange={(e) => {
+                        if (e.target.value === 'add') {
+                          onAddBranch?.();
+                        } else {
+                          const branch = branches.find(b => b.id === e.target.value);
+                          if (branch) onBranchChange?.(branch);
+                        }
+                      }}
+                    >
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id} className="text-slate-800">{b.name}</option>
+                      ))}
+                      <option value="add" className="text-slate-800 font-bold text-brand-blue">+ Add Branch</option>
+                    </select>
+                  </>
+                )}
               </div>
               <div className="hidden md:block">
                 <h1 className="text-[18px] font-black text-slate-900 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
@@ -85,7 +97,14 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             </div>
           </div>
         <div className="flex flex-col items-end relative" ref={menuRef}>
-          <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
+          {userProfile?.role === 'staff' ? (
+            <div className="flex flex-col items-end mr-1 mt-1">
+              <span className="text-[#1ca3a6] font-bold text-[13px] leading-tight mb-0 truncate max-w-[150px]">{userProfile.name}</span>
+              <span className="text-slate-500 font-mono text-[10px] tracking-wider leading-none">{userProfile.staffId}</span>
+            </div>
+          ) : (
+            <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
+          )}
           <button 
             className="md:hidden p-1 text-slate-500 hover:text-slate-700 transition-colors"
             onClick={() => setIsMenuOpen(!isMenuOpen)}

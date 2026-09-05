@@ -82,10 +82,35 @@ function App() {
         
         // Fetch fresh profile in background
         getDoc(doc(db, 'users', currentUser.phoneNumber || currentUser.uid))
-          .then(profileSnap => {
+          .then(async profileSnap => {
             let profileData;
             if (profileSnap.exists()) {
               profileData = profileSnap.data();
+              // Augment staff profile with details from staff collection
+              if (profileData.role === 'staff') {
+                try {
+                  const { collection, query, where, getDocs } = await import('firebase/firestore');
+                  const staffQuery = query(collection(db, 'staff'), where('uid', '==', currentUser.uid));
+                  const staffSnaps = await getDocs(staffQuery);
+                  if (!staffSnaps.empty) {
+                    const sDoc = staffSnaps.docs[0].data();
+                    profileData.name = sDoc.name || 'Staff Member';
+                    profileData.staffId = sDoc.staffId || sDoc.id || sDoc.phone || 'N/A';
+                    profileData.branchId = sDoc.branchId || profileData.branchId || 'main';
+                    profileData.branchName = sDoc.branchName || profileData.branchName || 'Main Branch';
+                  }
+                  
+                  // CRITICAL FIX: Lock the global application branch context to this staff's assigned branch
+                  if (profileData.branchId) {
+                    setActiveBranch({ 
+                      id: profileData.branchId, 
+                      name: profileData.branchName || (profileData.branchId === 'main' ? 'Main Branch' : 'Theni Branch')
+                    });
+                  }
+                } catch (e) {
+                  console.error('Failed to augment staff profile', e);
+                }
+              }
             } else {
               // Ensure hardcoded admin always gets the admin role if document is missing
               if (currentUser.phoneNumber === '+919659030144') {
@@ -131,8 +156,9 @@ function App() {
             q = collection(db, 'customers');
           }
         } else if (userProfile.role === 'staff') {
-          // Simplified staff query
-          q = query(collection(db, 'customers'), where('center_id', '==', userProfile.center_id || ''));
+          // Strict staff query by branch
+          const staffBranchId = userProfile.branchId || activeBranch.id || 'main';
+          q = query(collection(db, 'customers'), where('branchId', '==', staffBranchId));
         } else {
           // Customer role
           q = query(collection(db, 'customers'), where('phone', '==', user.phoneNumber));
@@ -820,6 +846,7 @@ function App() {
               activeBranch={activeBranch}
               onBranchChange={handleBranchSwitch}
               onAddBranch={() => setIsAddBranchModalOpen(true)}
+              userProfile={userProfile}
             />
           )}
           <div className="flex-1 flex flex-col md:flex-row w-full overflow-hidden relative">
@@ -934,7 +961,17 @@ function App() {
                     const nowIso = new Date().toISOString();
                     const customerToSave = { ...newCustomer, lastUpdated: nowIso };
                     try {
-                      await setDoc(doc(db, 'customers', customerToSave.id), customerToSave);
+                      const { collection, addDoc, setDoc, doc } = await import('firebase/firestore');
+                      
+                      if (customerToSave.docId) {
+                        // Edit existing customer
+                        await setDoc(doc(db, 'customers', customerToSave.docId), customerToSave);
+                      } else {
+                        // Fresh customer - let Firestore generate a unique document ID
+                        customerToSave.customerId = customerToSave.id; 
+                        delete customerToSave.id; // ensure we don't accidentally map this back as doc id manually
+                        await addDoc(collection(db, 'customers'), customerToSave);
+                      }
                     } catch(e) {
                       console.error('Error adding customer', e);
                       throw e;

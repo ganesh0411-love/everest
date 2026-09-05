@@ -50,7 +50,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedStaffList = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .map(doc => ({ docId: doc.id, ...doc.data() }))
         .filter(s => {
           if (s.status === 'Recycled') return false;
           if (activeBranch.id === 'main') return !s.branchId || s.branchId === 'main';
@@ -62,7 +62,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
     });
 
     return () => unsubscribe();
-  }, [activeBranch.id]);
+  }, [activeBranch]);
 
   const handleOpenAddForm = () => {
     setEditingStaff(null);
@@ -75,46 +75,58 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   };
 
   const handleFormSubmit = async (staffData) => {
+    const isEdit = !!editingStaff;
+    
     try {
-      const isEdit = !!staffData.uid; // Check if this is an existing staff being edited
-      let uid = staffData.uid || null;
+      let uid = staffData.uid;
 
-      // Only create auth account if this is a new staff member (no existing UID)
-      if (!uid && secondaryAuth) {
-        // 1. Sanitize Phone (extract last 10 digits strictly)
-        const cleanPhone = (staffData.phone || '').replace(/\D/g, '').slice(-10);
+      if (!isEdit) {
+        // Strict Phone Validation & Internal Email Normalization
+        const rawPhone = staffData.mobileNumber || staffData.phone || '';
+        let cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
+
+        if (!cleanPhone || cleanPhone.length !== 10) {
+          alert("Please enter a valid 10-digit mobile number for staff login creation.");
+          return;
+        }
+
         const internalEmail = `${cleanPhone}@everestmicro.internal`;
-
-        // 2. Normalize Password to continuous DDMMYYYY
-        let cleanPassword = '';
-        if (staffData.dob) {
+        
+        let authPassword = '';
+        if (staffData.password && String(staffData.password).trim().length > 0) {
+          authPassword = String(staffData.password).trim();
+        } else if (staffData.dob) {
           const parts = staffData.dob.split(/[-/.]/);
           if (parts.length === 3) {
             if (parts[0].length === 4) {
-              // YYYY-MM-DD -> DDMMYYYY
-              cleanPassword = `${parts[2]}${parts[1]}${parts[0]}`;
+              authPassword = `${parts[2]}${parts[1]}${parts[0]}`;
             } else {
-              // DD-MM-YYYY -> DDMMYYYY
-              cleanPassword = `${parts[0]}${parts[1]}${parts[2]}`;
+              authPassword = `${parts[0]}${parts[1]}${parts[2]}`;
             }
           } else {
-            cleanPassword = staffData.dob.replace(/\D/g, '');
+            authPassword = staffData.dob.replace(/\D/g, '');
           }
-        }
-        // Fallback if password was manually entered in form
-        if (staffData.password && staffData.password.trim().length >= 6) {
-          cleanPassword = staffData.password.trim();
+        } else {
+          authPassword = cleanPhone; // ultimate fallback
         }
 
-        console.log('Creating Staff Auth Account with:', { internalEmail, cleanPassword });
+        if (authPassword.length < 6) {
+          alert("Password / DOB must contain at least 6 characters.");
+          return;
+        }
+
+        console.log("=== CREATING STAFF AUTH ===");
+        console.log("Clean Phone:", cleanPhone);
+        console.log("Generated Email:", internalEmail);
+        console.log("Password String Length:", authPassword.length);
+        console.log("Password Value (Debug):", authPassword);
 
         try {
-          const userCred = await createUserWithEmailAndPassword(secondaryAuth, internalEmail, cleanPassword);
+          const userCred = await createUserWithEmailAndPassword(secondaryAuth, internalEmail, authPassword);
           uid = userCred.user.uid;
           console.log('Firebase Auth user created successfully with UID:', uid);
-          await secondaryAuth.signOut(); // Ensure we sign out immediately after creation
+          await secondaryAuth.signOut(); 
           
-          // Create the RBAC profile document in /users
           await setDoc(doc(db, 'users', uid), {
             uid: uid,
             phone: cleanPhone,
@@ -128,34 +140,48 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           });
         } catch (authError) {
           console.error('CRITICAL: Firebase Auth User Creation Failed:', authError);
-          alert(`Failed to create login account in Firebase Auth: [${authError.code}] ${authError.message}`);
-          // HALT EXECUTION - DO NOT WRITE TO FIRESTORE IF AUTH FAILS
+          if (authError.code === 'auth/email-already-in-use') {
+            alert("This mobile number is already registered in Firebase Authentication. Please use a different number or clean the existing user from Firebase Console.");
+          } else {
+            alert(`Failed to create login account in Firebase Auth: [${authError.code || 'ERROR'}] ${authError.message}`);
+          }
           return;
         }
       }
 
       const staffPayload = {
         ...staffData,
-        uid: uid, // save the auth UID alongside staff data
+        uid: uid, 
         branchId: activeBranch.id,
         branchName: activeBranch.name,
         createdAt: staffData.createdAt || new Date().toISOString()
       };
+      
+      // 1. Remove raw file objects that cannot be serialized directly into Firestore
+      delete staffPayload.photoFile;
+
+      // 2. Strict undefined-scrubbing across all payload keys
+      Object.keys(staffPayload).forEach((key) => {
+        if (staffPayload[key] === undefined) {
+          delete staffPayload[key];
+        }
+      });
       
       // Bump session version on edit
       if (isEdit) {
         staffPayload.sessionVersion = Date.now();
       }
       
-      await setDoc(doc(db, 'staff', staffData.id), staffPayload);
+      // CRITICAL FIX: Use uid for new documents, docId for existing documents to prevent overwriting
+      await setDoc(doc(db, 'staff', isEdit ? staffData.docId : uid), staffPayload);
       setShowAddForm(false);
       
       if (isEdit) {
         alert("Staff credentials updated. Existing active sessions will be required to re-authenticate.");
       }
     } catch (error) {
-      console.error("Error saving staff:", error);
-      alert("Failed to save staff. Please try again.");
+      console.error("Full Staff Creation Error:", error);
+      alert(`Failed to save staff: [${error.code || 'ERROR'}] ${error.message}`);
     }
   };
 
@@ -167,10 +193,11 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
     try {
       const staff = staffList.find(s => s.id === staffId);
       const prevStatus = staff?.status || 'Active';
-      await updateDoc(doc(db, 'staff', staffId), {
+      // CRITICAL FIX: Use docId instead of staffId for Firestore operations
+      await updateDoc(doc(db, 'staff', staff?.docId || staffId), {
         status: 'Recycled',
         previousStatus: prevStatus,
-        sessionVersion: Date.now(), // Force active sessions to invalidate
+        sessionVersion: Date.now(), 
         deletedAt: new Date().toISOString()
       });
       setShowAddForm(false);

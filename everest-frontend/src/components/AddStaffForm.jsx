@@ -174,12 +174,13 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
 
       // Submit even if partial, as requested
       const newStaff = {
+        ...(editingStaff || {}),
         ...formData,
         role: 'staff',
         phone: formData.mobileNumber,
         status: 'Active', // Default status for new staff
+        photoFile: undefined,
         photoBase64: finalPhotoUrl, // URL instead of Base64
-        photoFile: null, // Don't persist Blob to Firestore
         photoPreview: null // Don't persist DataURL to Firestore
       };
       
