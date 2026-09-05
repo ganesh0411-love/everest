@@ -209,6 +209,15 @@ function App() {
   const [currentView, setCurrentView] = useState('Home');
   const [viewHistory, setViewHistory] = useState(['Home']);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  
+  // 🛑 FIX: Force Home Page Default on fresh login/reload
+  useEffect(() => {
+    if (user) {
+      setCurrentView('Home');
+      setViewHistory(['Home']);
+    }
+  }, [user?.uid]);
+
   const backPressCountRef = useRef(0);
   const currentTouchCardRef = useRef(null);
 
@@ -806,7 +815,8 @@ function App() {
     return <Login onLoginSuccess={setUser} />;
   }
 
-  if (isDbLoading) {
+  // 🛑 FIX: Eliminate Admin Flicker - Wait for both DB and Role Resolution
+  if (isDbLoading || !userProfile) {
     return (
       <div className="h-[100dvh] bg-slate-900 flex flex-col items-center justify-center text-white relative overflow-hidden">
         {/* Abstract Corporate Background Elements */}
@@ -820,12 +830,16 @@ function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold mb-1 tracking-wider text-white">EVEREST</h1>
-          <p className="text-slate-400 text-sm mb-12 font-medium tracking-widest uppercase">Micro Finance</p>
+          <h1 className="text-3xl font-black mb-2 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">
+            EVEREST
+          </h1>
+          <p className="text-slate-400 font-medium mb-8 tracking-wide text-sm uppercase">Microfinance</p>
           
           <div className="flex flex-col items-center">
             <div className="w-8 h-8 border-3 border-slate-700 border-t-emerald-400 rounded-full animate-spin mb-4"></div>
-            <p className="text-emerald-400/80 text-[10px] font-bold uppercase tracking-widest animate-pulse">Initializing Database...</p>
+            <p className="text-emerald-400/80 text-[10px] font-bold uppercase tracking-widest animate-pulse">
+              {!userProfile ? 'Resolving Role...' : 'Initializing Database...'}
+            </p>
           </div>
         </div>
       </div>

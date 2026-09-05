@@ -97,12 +97,23 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             </div>
           </div>
         <div className="flex flex-col items-end relative" ref={menuRef}>
-          {userProfile?.role === 'staff' ? (
-            <div className="flex flex-col items-end mr-1 mt-1">
-              <span className="text-[#1ca3a6] font-bold text-[13px] leading-tight mb-0 truncate max-w-[150px]">{userProfile.name}</span>
-              <span className="text-slate-500 font-mono text-[10px] tracking-wider leading-none">{userProfile.staffId}</span>
-            </div>
-          ) : (
+            {userProfile?.role === 'staff' ? (
+              <div className="flex items-center gap-2.5 mr-1 mt-1">
+                <div className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
+                  {userProfile.photoUrl ? (
+                    <img src={userProfile.photoUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-slate-400 font-bold text-sm">
+                      {userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'S'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[#1ca3a6] font-bold text-[13px] leading-tight mb-0 truncate max-w-[150px]">{userProfile.name}</span>
+                  <span className="text-slate-500 font-mono text-[10px] tracking-wider leading-none">{userProfile.staffId}</span>
+                </div>
+              </div>
+            ) : (
             <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
           )}
           <button 

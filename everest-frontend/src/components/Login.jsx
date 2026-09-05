@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RecaptchaVerifier, signInWithPhoneNumber, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, db, secondaryAuth } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Login = ({ onLoginSuccess }) => {
   const [loginType, setLoginType] = useState('otp'); // 'otp' or 'staff'
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState('');
   const [verificationId, setVerificationId] = useState(null);
   const [error, setError] = useState('');
@@ -270,16 +272,25 @@ const Login = ({ onLoginSuccess }) => {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-2">Password</label>
-                <input
-                  type="password"
-                  placeholder="Enter Password"
-                  className="block w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all font-semibold"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter Password"
+                      className="block w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all font-semibold pr-12"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
               <button
                 type="submit"
                 disabled={loading || phoneNumber.length < 10 || !password}
