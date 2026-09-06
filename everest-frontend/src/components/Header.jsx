@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
+import { Pencil } from 'lucide-react';
 
-const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, userProfile }) => {
+const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const menuRef = useRef(null);
@@ -64,29 +65,40 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
           <div className="flex items-center gap-2">
             <img src={logo} alt="Everest Logo" className="w-10 h-10 object-contain magic-crop mix-blend-multiply" />
             <div className="flex flex-col justify-center items-start">
-              <div className="relative inline-flex items-center">
-                <span className="font-bold text-[14px] text-slate-900">{getDisplayBranch()}</span>
-                {userProfile?.role !== 'staff' && (
-                  <>
-                    <span className="ml-1 text-[10px] text-slate-400">▼</span>
-                    <select 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      value={activeBranch?.id || 'main'}
-                      onChange={(e) => {
-                        if (e.target.value === 'add') {
-                          onAddBranch?.();
-                        } else {
-                          const branch = branches.find(b => b.id === e.target.value);
-                          if (branch) onBranchChange?.(branch);
-                        }
-                      }}
-                    >
-                      {branches.map(b => (
-                        <option key={b.id} value={b.id} className="text-slate-800">{b.name}</option>
-                      ))}
-                      <option value="add" className="text-slate-800 font-bold text-brand-blue">+ Add Branch</option>
-                    </select>
-                  </>
+              <div className="flex items-center gap-2">
+                <div className="relative inline-flex items-center">
+                  <span className="font-bold text-[14px] text-slate-900">{getDisplayBranch()}</span>
+                  {userProfile?.role !== 'staff' && (
+                    <>
+                      <span className="ml-1 text-[10px] text-slate-400">▼</span>
+                      <select 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        value={activeBranch?.id || 'main'}
+                        onChange={(e) => {
+                          if (e.target.value === 'add') {
+                            onAddBranch?.();
+                          } else {
+                            const branch = branches.find(b => b.id === e.target.value);
+                            if (branch) onBranchChange?.(branch);
+                          }
+                        }}
+                      >
+                        {branches.map(b => (
+                          <option key={b.id} value={b.id} className="text-slate-800">{b.name}</option>
+                        ))}
+                        <option value="add" className="text-slate-800 font-bold text-brand-blue">+ Add Branch</option>
+                      </select>
+                    </>
+                  )}
+                </div>
+                {userProfile?.role !== 'staff' && activeBranch?.id !== 'main' && (
+                  <button 
+                    onClick={() => onEditBranch?.()}
+                    className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
+                    title="Edit Branch"
+                  >
+                    <Pencil size={12} />
+                  </button>
                 )}
               </div>
               <div className="hidden md:block">

@@ -32,6 +32,7 @@ import OfflineImage from './components/OfflineImage';
 import CustomerDetail from './components/CustomerDetail';
 import DesktopSidebar from './components/DesktopSidebar';
 import AddBranchModal from './components/AddBranchModal';
+import EditBranchModal from './components/EditBranchModal';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
@@ -40,6 +41,7 @@ function App() {
   const [branches, setBranches] = useState([{ id: 'main', name: 'Main Branch' }]);
   const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
   const [isAddBranchModalOpen, setIsAddBranchModalOpen] = useState(false);
+  const [isEditBranchModalOpen, setIsEditBranchModalOpen] = useState(false);
 
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('everest_user_profile');
@@ -647,6 +649,21 @@ function App() {
     }, 600);
   };
 
+  const handleBranchUpdated = (updatedBranch) => {
+    setBranches(prev => prev.map(b => b.id === updatedBranch.id ? updatedBranch : b));
+    if (activeBranch.id === updatedBranch.id) {
+      setActiveBranch(updatedBranch);
+    }
+  };
+
+  const handleBranchDeleted = (deletedBranchId) => {
+    setBranches(prev => prev.filter(b => b.id !== deletedBranchId));
+    if (activeBranch.id === deletedBranchId) {
+      const fallbackBranch = branches.find(b => b.id !== deletedBranchId) || { id: 'main', name: 'Main Branch' };
+      handleBranchSwitch(fallbackBranch);
+    }
+  };
+
   const renderView = () => {
     switch(currentView) {
       case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} activeBranch={activeBranch} /></div>;
@@ -940,6 +957,7 @@ function App() {
               activeBranch={activeBranch}
               onBranchChange={handleBranchSwitch}
               onAddBranch={() => setIsAddBranchModalOpen(true)}
+              onEditBranch={() => setIsEditBranchModalOpen(true)}
               userProfile={userProfile}
             />
           )}
@@ -951,6 +969,7 @@ function App() {
               activeBranch={activeBranch}
               onBranchChange={handleBranchSwitch}
               onAddBranch={() => setIsAddBranchModalOpen(true)}
+              onEditBranch={() => setIsEditBranchModalOpen(true)}
             />
             <div className="flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] max-w-4xl mx-auto md:max-w-none md:mx-0 overflow-hidden">
               {renderView()}
@@ -1079,6 +1098,16 @@ function App() {
                   isOpen={isAddBranchModalOpen}
                   onClose={() => setIsAddBranchModalOpen(false)}
                   onBranchAdded={handleBranchSwitch}
+                />
+              )}
+
+              {isEditBranchModalOpen && (
+                <EditBranchModal
+                  isOpen={isEditBranchModalOpen}
+                  onClose={() => setIsEditBranchModalOpen(false)}
+                  activeBranch={activeBranch}
+                  onBranchUpdated={handleBranchUpdated}
+                  onBranchDeleted={handleBranchDeleted}
                 />
               )}
 
