@@ -95,7 +95,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         .map(doc => ({ docId: doc.id, ...doc.data() }))
         .filter(s => {
           if (s.status === 'Recycled') return false;
-          if (activeBranch.id === 'main') return !s.branchId || s.branchId === 'main';
+          if (activeBranch.id === 'main') return true;
           return s.branchId === activeBranch.id;
         });
       setStaffList(fetchedStaffList);

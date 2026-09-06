@@ -277,13 +277,7 @@ function App() {
           const fetched = [];
           querySnapshot.forEach((docSnap) => {
             const data = docSnap.data();
-            if (userProfile.role === 'admin' && activeBranch.id === 'main') {
-              if (!data.branchId || data.branchId === 'main') {
-                fetched.push({ ...data, id: docSnap.id });
-              }
-            } else {
-              fetched.push({ ...data, id: docSnap.id });
-            }
+            fetched.push({ ...data, id: docSnap.id });
           });
           setCustomers(fetched);
           setIsDbLoading(false);

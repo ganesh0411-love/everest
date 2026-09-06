@@ -1360,13 +1360,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       const projects = [];
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (activeBranch.id === 'main') {
-          if (!data.branchId || data.branchId === 'main') {
-            projects.push({ id: doc.id, ...data });
-          }
-        } else {
-          projects.push({ id: doc.id, ...data });
-        }
+        projects.push({ id: doc.id, ...data });
       });
       setSavedProjects(projects.sort((a,b) => b.id.localeCompare(a.id)));
     }, (error) => {
@@ -4107,7 +4101,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       const activeStaffList = allStaff
         .filter(staff => {
           const isBranchMatch = activeBranch.id === 'main' 
-            ? (!staff.branchId || staff.branchId === 'main') 
+            ? true 
             : (staff.branchId === activeBranch.id || staff.branch === activeBranch.id);
             
           return isBranchMatch && staff.status !== 'Recycled' && staff.status !== 'Deleted';

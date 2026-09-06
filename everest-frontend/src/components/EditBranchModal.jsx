@@ -13,6 +13,8 @@ const EditBranchModal = ({ isOpen, onClose, activeBranch, onBranchUpdated, onBra
   }, [isOpen, activeBranch]);
 
   if (!isOpen || !activeBranch) return null;
+  if (activeBranch.id === 'main' || activeBranch.name.toLowerCase() === 'main branch') return null;
+
 
   const handleUpdate = async (e) => {
     e.preventDefault();
