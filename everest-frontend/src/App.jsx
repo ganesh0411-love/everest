@@ -86,8 +86,49 @@ function App() {
             let profileData;
             if (profileSnap.exists()) {
               profileData = profileSnap.data();
-              // Augment staff profile with details from staff collection
-              if (profileData.role === 'staff') {
+            } else {
+              // Ensure hardcoded admin always gets the admin role if document is missing
+              if (currentUser.phoneNumber === '+919659030144') {
+                profileData = { role: 'admin', phone: currentUser.phoneNumber };
+              } else {
+                profileData = { role: 'customer', phone: currentUser.phoneNumber || (currentUser.email ? currentUser.email.split('@')[0] : '') };
+              }
+            }
+
+            // CRITICAL ROLE RESOLUTION GUARD: Fallback to check if staff document exists
+            if (profileData.role !== 'staff' && profileData.role !== 'admin') {
+              try {
+                const { collection, query, where, getDocs } = await import('firebase/firestore');
+                
+                const cleanPhone = String(profileData.phone || '').replace(/\D/g, '').slice(-10);
+                
+                let staffSnaps;
+                if (cleanPhone && cleanPhone.length === 10) {
+                  staffSnaps = await getDocs(query(collection(db, 'staff'), where('phone', '==', cleanPhone)));
+                }
+                
+                if (!staffSnaps || staffSnaps.empty) {
+                  staffSnaps = await getDocs(query(collection(db, 'staff'), where('uid', '==', currentUser.uid)));
+                }
+
+                if (staffSnaps && !staffSnaps.empty) {
+                  console.log("Role resolved to staff via fallback query.");
+                  profileData.role = 'staff';
+                  
+                  // Auto-repair the users collection
+                  setDoc(doc(db, 'users', currentUser.uid), {
+                    ...profileData,
+                    uid: currentUser.uid,
+                    updatedAt: new Date().toISOString()
+                  }, { merge: true }).catch(() => {});
+                }
+              } catch (e) {
+                console.error("Error during fallback staff resolution:", e);
+              }
+            }
+
+            // Augment staff profile with details from staff collection
+            if (profileData.role === 'staff') {
                 try {
                   const { collection, query, where, getDocs } = await import('firebase/firestore');
                   const staffQuery = query(collection(db, 'staff'), where('uid', '==', currentUser.uid));
@@ -113,14 +154,7 @@ function App() {
                   console.error('Failed to augment staff profile', e);
                 }
               }
-            } else {
-              // Ensure hardcoded admin always gets the admin role if document is missing
-              if (currentUser.phoneNumber === '+919659030144') {
-                profileData = { role: 'admin', phone: currentUser.phoneNumber };
-              } else {
-                profileData = { role: 'customer', phone: currentUser.phoneNumber };
-              }
-            }
+            
             setUserProfile(profileData);
             localStorage.setItem('everest_user_profile', JSON.stringify(profileData));
           })

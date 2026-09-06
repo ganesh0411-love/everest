@@ -257,12 +257,14 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
               staffPayload.uid = newCred.user.uid;
               
               // Also sync the users collection with new UID
-              await updateDoc(doc(db, 'users', isEdit ? staffData.docId : uid), { 
+              await setDoc(doc(db, 'users', newCred.user.uid), { 
                 uid: newCred.user.uid,
                 phone: cleanPhone,
                 mobileNumber: cleanPhone,
+                role: 'staff',
+                status: 'Active',
                 updatedAt: new Date().toISOString()
-              }).catch(() => {});
+              }, { merge: true });
             } catch (authErr) {
               if (authErr.code !== 'auth/email-already-in-use') {
                 console.error("Secondary Auth creation error:", authErr);
