@@ -37,4 +37,4 @@ const storage = getStorage(app);
 const analytics = getAnalytics(app);
 const secondaryDb = getFirestore(secondaryApp);
 
-export { auth, db, storage, secondaryAuth, secondaryDb };
+export { auth, db, storage, secondaryAuth, secondaryDb, firebaseConfig };

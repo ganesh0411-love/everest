@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db, secondaryAuth } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, updateDoc, getDocs } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { firebaseConfig } from '../firebase';
 import { ArrowLeft, Search, MoreVertical, Home, Users, Plus } from 'lucide-react';
 import AddStaffForm from './AddStaffForm';
 
@@ -241,10 +243,40 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
             oldPassword = oldCleanPhone;
           }
 
-          if (oldEmail !== internalEmail || oldPassword !== authPassword) {
-            const { signInWithEmailAndPassword, updateEmail, updatePassword } = await import('firebase/auth');
+          if (oldCleanPhone !== cleanPhone) {
+            // PHONE NUMBER CHANGED: Provision new Auth identity
+            console.log("Phone number changed. Provisioning new Auth identity...");
+            const secApp = initializeApp(firebaseConfig, `PhoneSync_${Date.now()}`);
+            const secAuth = getAuth(secApp);
+            try {
+              const newCred = await createUserWithEmailAndPassword(
+                secAuth, 
+                internalEmail, 
+                authPassword
+              );
+              staffPayload.uid = newCred.user.uid;
+              
+              // Also sync the users collection with new UID
+              await updateDoc(doc(db, 'users', isEdit ? staffData.docId : uid), { 
+                uid: newCred.user.uid,
+                phone: cleanPhone,
+                mobileNumber: cleanPhone,
+                updatedAt: new Date().toISOString()
+              }).catch(() => {});
+            } catch (authErr) {
+              if (authErr.code !== 'auth/email-already-in-use') {
+                console.error("Secondary Auth creation error:", authErr);
+                throw authErr;
+              } else {
+                console.warn("Auth user already exists for this new phone number. Re-using existing Auth identity is generally unsafe unless manually cleared, but proceeding.");
+              }
+            } finally {
+              await deleteApp(secApp);
+            }
+          } else if (oldPassword !== authPassword) {
+            // ONLY PASSWORD CHANGED (Phone unchanged)
+            const { signInWithEmailAndPassword, updatePassword } = await import('firebase/auth');
             
-            // Generate a list of possible old passwords to recover from split-brain state
             const possibleOldPasswords = new Set([
               oldPassword,
               editingStaff.password,
@@ -266,7 +298,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
               try {
                 await signInWithEmailAndPassword(secondaryAuth, oldEmail, p);
                 signedIn = true;
-                break; // Success!
+                break;
               } catch (e) {
                 // Ignore and try next
               }
@@ -275,19 +307,9 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
             if (!signedIn) {
               console.warn("Unable to sync Firebase Auth password. Admin changes will apply to Firestore only. Login.jsx will repair it on next login.");
             } else {
-              if (oldEmail !== internalEmail) {
-                await updateEmail(secondaryAuth.currentUser, internalEmail);
-                // Also sync the users collection phone number
-                const { updateDoc } = await import('firebase/firestore');
-                await updateDoc(doc(db, 'users', uid), { phone: cleanPhone });
-              }
-              if (oldPassword !== authPassword) {
-                await updatePassword(secondaryAuth.currentUser, authPassword);
-              }
+              await updatePassword(secondaryAuth.currentUser, authPassword);
               await secondaryAuth.signOut();
             }
-
-
           }
         } catch (authSyncErr) {
           console.error("Failed to sync updated credentials to Firebase Auth:", authSyncErr);
