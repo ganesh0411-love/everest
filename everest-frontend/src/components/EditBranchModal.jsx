@@ -25,29 +25,54 @@ const EditBranchModal = ({ isOpen, onClose, activeBranch, onBranchUpdated, onBra
     setIsSubmitting(true);
     
     try {
-      const batch = writeBatch(db);
+      const oldBranchName = activeBranch.name.trim();
+      const legacyAliases = [oldBranchName, "Theni", "Periyakulam"].filter(Boolean);
 
-      // 1. Update the branch doc
-      const branchRef = doc(db, 'branches', activeBranch.id);
-      batch.update(branchRef, { name: newBranchName, updatedAt: new Date().toISOString() });
+      const updateCollectionRecords = async (collectionName, oldNames, newName) => {
+        const docsToUpdate = new Map();
 
-      // Helper function to query and queue batch updates
-      const queueBatchUpdates = async (collectionName, fieldName) => {
-        const q = query(collection(db, collectionName), where(fieldName, '==', activeBranch.name));
-        const snap = await getDocs(q);
-        snap.forEach(document => {
-          batch.update(document.ref, { [fieldName]: newBranchName, updatedAt: new Date().toISOString() });
-        });
+        for (const name of oldNames) {
+          if (!name) continue;
+          const q1 = query(collection(db, collectionName), where('branch', '==', name));
+          const s1 = await getDocs(q1);
+          s1.forEach(d => docsToUpdate.set(d.id, d.ref));
+
+          const q2 = query(collection(db, collectionName), where('branchName', '==', name));
+          const s2 = await getDocs(q2);
+          s2.forEach(d => docsToUpdate.set(d.id, d.ref));
+        }
+
+        let batch = writeBatch(db);
+        let count = 0;
+
+        for (const [id, ref] of docsToUpdate) {
+          batch.update(ref, {
+            branch: newName,
+            branchName: newName,
+            updatedAt: new Date().toISOString()
+          });
+          count++;
+          if (count === 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
+        }
+        if (count > 0) {
+          await batch.commit();
+        }
       };
 
-      // 2. Update references across collections
-      await queueBatchUpdates('staff', 'branch');
-      await queueBatchUpdates('customers', 'branch');
-      await queueBatchUpdates('applications', 'branch');
-      await queueBatchUpdates('loans', 'branch');
-      await queueBatchUpdates('collections', 'branch');
+      const collectionsToUpdate = ['staff', 'users', 'customers', 'applications', 'loans', 'collections'];
+      for (const col of collectionsToUpdate) {
+        await updateCollectionRecords(col, legacyAliases, newBranchName);
+      }
 
-      await batch.commit();
+      // Update the branch document itself
+      const branchRef = doc(db, 'branches', activeBranch.id);
+      const branchBatch = writeBatch(db);
+      branchBatch.update(branchRef, { name: newBranchName, updatedAt: new Date().toISOString() });
+      await branchBatch.commit();
 
       onBranchUpdated({ ...activeBranch, name: newBranchName });
       onClose();
@@ -65,29 +90,47 @@ const EditBranchModal = ({ isOpen, onClose, activeBranch, onBranchUpdated, onBra
 
     setIsSubmitting(true);
     try {
-      const batch = writeBatch(db);
+      const oldBranchName = activeBranch.name.trim();
 
-      // Helper function to query and queue batch deletes
-      const queueBatchDeletes = async (collectionName, fieldName) => {
-        const q = query(collection(db, collectionName), where(fieldName, '==', activeBranch.name));
-        const snap = await getDocs(q);
-        snap.forEach(document => {
-          batch.delete(document.ref);
+      // Collect all document references to delete
+      const docsToDelete = [];
+      const collectionsToDelete = ['staff', 'users', 'customers', 'applications', 'loans', 'collections'];
+      
+      for (const col of collectionsToDelete) {
+        // Query by branch
+        const q1 = query(collection(db, col), where('branch', '==', oldBranchName));
+        const snap1 = await getDocs(q1);
+        snap1.forEach(d => {
+          if (!docsToDelete.some(item => item.ref.id === d.ref.id && item.col === col)) {
+             docsToDelete.push({ ref: d.ref, col });
+          }
         });
-      };
 
-      // 1. Queue deletion of associated records
-      await queueBatchDeletes('staff', 'branch');
-      await queueBatchDeletes('customers', 'branch');
-      await queueBatchDeletes('applications', 'branch');
-      await queueBatchDeletes('loans', 'branch');
-      await queueBatchDeletes('collections', 'branch');
+        // Query by branchName
+        const q2 = query(collection(db, col), where('branchName', '==', oldBranchName));
+        const snap2 = await getDocs(q2);
+        snap2.forEach(d => {
+          if (!docsToDelete.some(item => item.ref.id === d.ref.id && item.col === col)) {
+             docsToDelete.push({ ref: d.ref, col });
+          }
+        });
+      }
 
-      // 2. Delete the actual branch document
+      // Add the branch document itself
       const branchRef = doc(db, 'branches', activeBranch.id);
-      batch.delete(branchRef);
+      docsToDelete.push({ ref: branchRef, col: 'branches' });
 
-      await batch.commit();
+      // Chunk execution (Firestore limit is 500)
+      const chunkSize = 450;
+      for (let i = 0; i < docsToDelete.length; i += chunkSize) {
+        const chunk = docsToDelete.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        
+        chunk.forEach(item => {
+          batch.delete(item.ref);
+        });
+        await batch.commit();
+      }
 
       onBranchDeleted(activeBranch.id);
       onClose();

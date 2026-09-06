@@ -99,6 +99,31 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           return s.branchId === activeBranch.id;
         });
       setStaffList(fetchedStaffList);
+
+      // 2. Direct Sync in Staff Document Inspector: Normalise mismatches on load
+      fetchedStaffList.forEach(s => {
+        if (activeBranch.id !== 'main' && activeBranch.name) {
+          const expectedName = activeBranch.name.trim();
+          if (s.branch !== expectedName || s.branchName !== expectedName) {
+            console.log(`Normalizing legacy staff ${s.name} to branch ${expectedName}`);
+            import('firebase/firestore').then(({ updateDoc, doc }) => {
+              updateDoc(doc(db, 'staff', s.docId), { 
+                branch: expectedName, 
+                branchName: expectedName, 
+                updatedAt: new Date().toISOString() 
+              }).catch(e => console.error("Staff norm failed:", e));
+              
+              if (s.uid) {
+                updateDoc(doc(db, 'users', s.uid), { 
+                  branch: expectedName, 
+                  branchName: expectedName, 
+                  updatedAt: new Date().toISOString() 
+                }).catch(e => console.error("Users norm failed:", e));
+              }
+            });
+          }
+        }
+      });
     }, (error) => {
       console.error("Error fetching staff:", error);
     });
@@ -171,12 +196,18 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           uid = userCred.user.uid;
           console.log('Firebase Auth user created successfully with UID:', uid);
           await secondaryAuth.signOut(); 
-          
+          const selectedBranchName = (activeBranch?.name || staffData.branch || '').trim();
+          if (!selectedBranchName) {
+            alert("Please select a valid branch before creating staff.");
+            return;
+          }
           await setDoc(doc(db, 'users', uid), {
             uid: uid,
             phone: cleanPhone,
             role: 'staff',
             branchId: activeBranch.id,
+            branchName: selectedBranchName,
+            branch: selectedBranchName,
             status: 'Active',
             permissions: {
               canDeleteCustomer: false,
@@ -194,11 +225,18 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         }
       }
 
+      const selectedBranchName = (activeBranch?.name || staffData.branch || '').trim();
+      if (!selectedBranchName) {
+        alert("Please select a valid branch before creating staff.");
+        return;
+      }
+      
       const staffPayload = {
         ...staffData,
         uid: uid, 
-        branchId: activeBranch.id,
-        branchName: activeBranch.name,
+        branchId: activeBranch?.id,
+        branchName: selectedBranchName,
+        branch: selectedBranchName,
         phone: cleanPhone,
         mobileNumber: cleanPhone,
         authPassword: authPassword,

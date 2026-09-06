@@ -149,7 +149,7 @@ function App() {
                   if (profileData.branchId) {
                     setActiveBranch({ 
                       id: profileData.branchId, 
-                      name: profileData.branchName || (profileData.branchId === 'main' ? 'Main Branch' : 'Theni Branch')
+                      name: profileData.branch || profileData.branchName || (profileData.branchId === 'main' ? 'Main Branch' : profileData.branchId)
                     });
                   }
                 } catch (e) {
@@ -206,6 +206,33 @@ function App() {
           setUser(null);
           setUserProfile(null);
           localStorage.removeItem('everest_user_profile');
+        } else {
+          // Sync branch rename cascade in real-time
+          if (
+            staffData.branch !== userProfile?.branch || 
+            staffData.branchName !== userProfile?.branchName ||
+            staffData.branchId !== userProfile?.branchId
+          ) {
+            setUserProfile(prev => {
+              if (!prev) return prev;
+              const newProfile = { 
+                ...prev, 
+                ...staffData, 
+                branch: staffData.branch, 
+                branchName: staffData.branchName, 
+                branchId: staffData.branchId 
+              };
+              localStorage.setItem('everest_user_profile', JSON.stringify(newProfile));
+              return newProfile;
+            });
+
+            if (staffData.branchId) {
+              setActiveBranch({ 
+                id: staffData.branchId, 
+                name: staffData.branch || staffData.branchName || (staffData.branchId === 'main' ? 'Main Branch' : staffData.branchId)
+              });
+            }
+          }
         }
       }, (err) => {
         console.error("Session listener error:", err);

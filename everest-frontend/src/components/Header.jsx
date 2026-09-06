@@ -7,7 +7,9 @@ import { Pencil } from 'lucide-react';
 const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const menuRef = useRef(null);
+  const branchDropdownRef = useRef(null);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -15,6 +17,9 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
         setIsSettingsOpen(false);
+      }
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target)) {
+        setIsBranchDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -53,7 +58,8 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
   const getDisplayBranch = () => {
     if (userProfile?.role === 'staff') {
       const staffBranch = userProfile?.branch || userProfile?.branchName || userProfile?.branchId;
-      return staffBranch?.toLowerCase() === 'theni' ? 'Theni Branch' : 'Main Branch';
+      if (staffBranch?.toLowerCase() === 'main' || staffBranch?.toLowerCase() === 'main branch') return 'Main Branch';
+      return staffBranch || 'Main Branch';
     }
     return activeBranch?.name || 'Main Branch';
   };
@@ -66,40 +72,81 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             <img src={logo} alt="Everest Logo" className="w-10 h-10 object-contain magic-crop mix-blend-multiply" />
             <div className="flex flex-col justify-center items-start">
               <div className="flex items-center gap-2">
-                <div className="relative inline-flex items-center">
+                <div className="relative inline-flex items-center" ref={branchDropdownRef}>
                   <span className="font-bold text-[14px] text-slate-900">{getDisplayBranch()}</span>
                   {userProfile?.role !== 'staff' && (
                     <>
                       <span className="ml-1 text-[10px] text-slate-400">▼</span>
-                      <select 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        value={activeBranch?.id || 'main'}
-                        onChange={(e) => {
-                          if (e.target.value === 'add') {
-                            onAddBranch?.();
-                          } else {
-                            const branch = branches.find(b => b.id === e.target.value);
-                            if (branch) onBranchChange?.(branch);
-                          }
-                        }}
-                      >
-                        {branches.map(b => (
-                          <option key={b.id} value={b.id} className="text-slate-800">{b.name}</option>
-                        ))}
-                        <option value="add" className="text-slate-800 font-bold text-brand-blue">+ Add Branch</option>
-                      </select>
+                      
+                      {/* Invisible overlay button to toggle custom dropdown */}
+                      <div 
+                        className="absolute inset-0 w-full h-full cursor-pointer z-10"
+                        onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
+                      />
+                      
+                      {/* Custom Dropdown Menu */}
+                      {isBranchDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-xl border border-slate-100 z-50 py-1 max-h-64 overflow-y-auto">
+                          <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-50 mb-1">
+                            Select Branch
+                          </div>
+                          
+                          {branches.map((b) => {
+                            const branchName = typeof b === 'string' ? b : b.name;
+                            const isMain = branchName.toLowerCase() === 'main branch' || branchName.toLowerCase() === 'main';
+
+                            return (
+                              <div
+                                key={b.id || branchName}
+                                onClick={() => { 
+                                  const branchObj = typeof b === 'string' ? branches.find(br => br.name === b) : b;
+                                  if (branchObj) onBranchChange?.(branchObj);
+                                  setIsBranchDropdownOpen(false); 
+                                }}
+                                className="flex items-center justify-between px-3 py-2.5 mx-1 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              >
+                                <span className={`font-medium truncate ${activeBranch?.id === b.id ? 'text-brand-blue' : ''}`}>{branchName}</span>
+
+                                {/* Show pencil icon for all editable branches */}
+                                {!isMain && (
+                                  <button
+                                    type="button"
+                                    title={`Edit ${branchName}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Prevent closing dropdown without opening modal
+                                      setIsBranchDropdownOpen(false);
+                                      onEditBranch?.(b); // Assuming we pass the full branch or we could fallback to App updating activeBranch before modal opens. Wait, App expects to edit activeBranch. So we should probably set it to active branch first! No, onEditBranch might not take params. Oh, App.jsx `onEditBranch` takes no params and edits `activeBranch`.
+                                      onBranchChange?.(b); // Set as active branch so App.jsx edits the right one!
+                                      setTimeout(() => {
+                                        onEditBranch?.();
+                                      }, 0);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-brand-blue hover:bg-blue-50 rounded transition-colors ml-2 flex-shrink-0"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5"/>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                          
+                          <div className="h-px bg-slate-100 my-1"></div>
+                          
+                          <div
+                            onClick={() => {
+                              setIsBranchDropdownOpen(false);
+                              onAddBranch?.();
+                            }}
+                            className="flex items-center px-3 py-2.5 mx-1 text-sm font-bold text-brand-blue hover:bg-blue-50 cursor-pointer rounded-md transition-colors"
+                          >
+                            + Add Branch
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
-                {userProfile?.role !== 'staff' && activeBranch?.id !== 'main' && (
-                  <button 
-                    onClick={() => onEditBranch?.()}
-                    className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
-                    title="Edit Branch"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                )}
+                {/* The global pencil icon is removed since we now have it inside the dropdown per requirement */}
               </div>
               <div className="hidden md:block">
                 <h1 className="text-[18px] font-black text-slate-900 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
