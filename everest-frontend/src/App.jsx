@@ -173,21 +173,42 @@ function App() {
   useEffect(() => {
     if (!auth.currentUser || userProfile?.role !== 'staff') return;
 
-    const unsub = onSnapshot(doc(db, 'staff', auth.currentUser.uid), (docSnap) => {
-      if (!docSnap.exists() || docSnap.data().status === 'Recycled' || docSnap.data().status === 'Deleted') {
-        alert("Your staff session has been deactivated or removed by Admin. Logging out.");
-        signOut(auth);
-        setUser(null);
-        setUserProfile(null);
-        localStorage.removeItem('everest_user_profile');
-      } else if (docSnap.data().credentialsVersion && userProfile?.credentialsVersion && docSnap.data().credentialsVersion > userProfile.credentialsVersion) {
-        alert("Your login credentials have been updated by Admin. Please log in again.");
-        signOut(auth);
-        setUser(null);
-        setUserProfile(null);
-        localStorage.removeItem('everest_user_profile');
-      }
-    });
+    let unsub = () => {};
+    
+    import('firebase/firestore').then(({ collection, query, where, onSnapshot }) => {
+      const staffQuery = query(collection(db, 'staff'), where('uid', '==', auth.currentUser.uid));
+      
+      unsub = onSnapshot(staffQuery, (snapshot) => {
+        if (snapshot.empty) {
+          const cleanPhone = auth.currentUser.phoneNumber ? auth.currentUser.phoneNumber.replace(/\D/g, '').slice(-10) : (auth.currentUser.email ? auth.currentUser.email.split('@')[0].replace(/\D/g, '') : '');
+          if (!cleanPhone) {
+            alert("Your staff session has been deactivated or removed by Admin. Logging out.");
+            signOut(auth);
+            setUser(null);
+            setUserProfile(null);
+            localStorage.removeItem('everest_user_profile');
+          }
+          return;
+        }
+
+        const staffData = snapshot.docs[0].data();
+        if (staffData.status === 'Recycled' || staffData.status === 'Deleted') {
+          alert("Your staff session has been deactivated or removed by Admin. Logging out.");
+          signOut(auth);
+          setUser(null);
+          setUserProfile(null);
+          localStorage.removeItem('everest_user_profile');
+        } else if (staffData.credentialsVersion && userProfile?.credentialsVersion && staffData.credentialsVersion > userProfile.credentialsVersion) {
+          alert("Your login credentials have been updated by Admin. Please log in again.");
+          signOut(auth);
+          setUser(null);
+          setUserProfile(null);
+          localStorage.removeItem('everest_user_profile');
+        }
+      }, (err) => {
+        console.error("Session listener error:", err);
+      });
+    }).catch(e => console.error("Error setting up session listener:", e));
 
     return () => unsub();
   }, [auth.currentUser, userProfile?.role, userProfile?.credentialsVersion]);
