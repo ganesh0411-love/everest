@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { compressImage, uploadImageToStorage } from '../utils/storageUpload';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 import { 
   ChevronLeft, Trash2, Camera, User, Hash, Calendar, 
   Briefcase, Lock, Eye, EyeOff, Phone, MapPin, Shield, Check, X, Image as ImageIcon, AlertTriangle
@@ -65,10 +67,31 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
         photoBase64: editingStaff.photoBase64 || null
       });
     } else {
-      // Auto-generate a ST + 4-digit ID for new staff (e.g. ST0001)
-      const nextSerial = staffCount + 1;
-      const generatedId = `ST${String(nextSerial).padStart(4, '0')}`;
-      setFormData(prev => ({ ...prev, id: generatedId }));
+      // Auto-generate a global 7-digit numeric unique Staff ID
+      const generateUniqueId = async () => {
+        let isUnique = false;
+        let newId = '';
+        while (!isUnique) {
+          // Generate a random 7-digit number between 1000000 and 9999999
+          newId = Math.floor(1000000 + Math.random() * 9000000).toString();
+          try {
+            const q = query(collection(db, 'staff'), where('id', '==', newId));
+            const snapshot = await getDocs(q);
+            if (snapshot.empty) {
+              isUnique = true;
+            }
+          } catch (e) {
+            console.error("Error generating unique ID:", e);
+            // Fallback just in case
+            isUnique = true; 
+          }
+        }
+        return newId;
+      };
+
+      generateUniqueId().then(generatedId => {
+        setFormData(prev => ({ ...prev, id: generatedId }));
+      });
     }
 
     return () => {

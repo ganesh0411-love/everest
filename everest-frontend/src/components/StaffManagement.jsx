@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, secondaryAuth } from '../firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, updateDoc, getDocs } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { ArrowLeft, Search, MoreVertical, Home, Users, Plus } from 'lucide-react';
 import AddStaffForm from './AddStaffForm';
@@ -36,6 +36,46 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   const [editingStaff, setEditingStaff] = useState(null);
 
   const [staffList, setStaffList] = useState([]);
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  const handleMigrateIds = async () => {
+    if (!window.confirm("Are you sure you want to migrate all legacy Staff IDs to 7-digit numeric IDs?")) return;
+    setIsMigrating(true);
+    try {
+      const staffRef = collection(db, 'staff');
+      const snapshot = await getDocs(staffRef);
+      let migratedCount = 0;
+      
+      const existingIds = new Set(snapshot.docs.map(d => d.data().id));
+
+      for (const document of snapshot.docs) {
+        const staffData = document.data();
+        const currentId = staffData.id || '';
+        
+        // If it's not exactly a 7 digit number
+        if (!/^\d{7}$/.test(currentId)) {
+          let isUnique = false;
+          let newId = '';
+          while (!isUnique) {
+            newId = Math.floor(1000000 + Math.random() * 9000000).toString();
+            if (!existingIds.has(newId)) {
+              isUnique = true;
+              existingIds.add(newId);
+            }
+          }
+          await updateDoc(doc(db, 'staff', document.id), { id: newId });
+          migratedCount++;
+        }
+      }
+      alert(`Migration complete. Successfully updated ${migratedCount} staff records.`);
+      setSearchQuery('');
+    } catch (err) {
+      console.error("Migration error:", err);
+      alert("Failed to migrate IDs: " + err.message);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   // Fetch real-time data from Firestore
   useEffect(() => {
@@ -352,6 +392,22 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
             <div>Designation</div>
             <div>Status</div>
           </div>
+          
+          {searchQuery === 'MIGRATE_IDS' && (
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+              <div>
+                <h3 className="text-amber-800 font-bold text-sm">Legacy ID Migration</h3>
+                <p className="text-amber-700 text-xs mt-0.5">Convert all non-numeric IDs to 7-digit numeric IDs</p>
+              </div>
+              <button 
+                onClick={handleMigrateIds}
+                disabled={isMigrating}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
+              >
+                {isMigrating ? 'Migrating...' : 'Run Migration'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -389,12 +445,12 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                 </div>
                 <div className="flex flex-col overflow-hidden">
                   <span className="font-bold text-slate-800 text-xs sm:text-sm truncate">{staff.name}</span>
-                  <span className="text-[10px] text-slate-500 font-medium md:hidden">{staff.id}</span>
+                  <span className="text-xs text-slate-800 font-bold tracking-wide md:hidden mt-0.5">{staff.id}</span>
                 </div>
               </div>
               
               {/* ID (Desktop Only) */}
-              <div className="hidden md:block w-1/4 text-center text-xs sm:text-sm text-slate-600 font-medium">
+              <div className="hidden md:block w-1/4 text-center text-sm text-slate-800 font-bold tracking-wide">
                 {staff.id}
               </div>
 
