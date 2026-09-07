@@ -668,46 +668,94 @@ function App() {
   }, [processedCustomers]);
 
   // 1. SUMMARY METRICS CALCULATION ENGINE
+  // STRICT FINANCIAL SUMMARY METRICS ENGINE
   const summaryMetrics = useMemo(() => {
-    const today = new Date();
-    const approvedCustomers = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
+    try {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    return approvedCustomers.reduce((acc, curr) => {
-      // 1. Disbursement Amount (pulled from loan/application data)
-      const disbursed = Number(
-        curr.disbursementAmount ||
-        curr.disbursedAmount ||
-        curr.netDisbursed ||
-        curr.sanctionedAmount ||
-        0
-      );
+      let totalLoan = 0;
+      let totalCollection = 0;
+      let totalOutstanding = 0;
+      let totalOverdue = 0;
 
-      // 2. Total Loan Amount
-      const loanAmt = Number(curr.loanAmount || curr.principalAmount || 0);
+      const approvedCustomers = (processedCustomers || []).filter(c => c && (c.status === 'Approved' || c.status === 'approved'));
 
-      // 3. Outstanding Amount (Pending balance)
-      const outstanding = Number(curr.outstandingAmount || curr.balance || 0);
+      approvedCustomers.forEach((customer) => {
+        if (!customer) return;
 
-      // 4. Overdue (OD) Amount: sum of bounced/past-due unpaid installments
-      let od = Number(curr.odAmount || curr.overdueAmount || 0);
-      if (!od && Array.isArray(curr.schedule)) {
-        od = curr.schedule.reduce((subOd, inst) => {
-          const dueDate = inst.dueDate ? new Date(inst.dueDate) : null;
-          const isPastDue = dueDate && dueDate < today;
-          const isUnpaid = inst.status !== 'Paid' && inst.status !== 'closed';
-          return isPastDue && isUnpaid ? subOd + Number(inst.amount || inst.emiAmount || 0) : subOd;
-        }, 0);
-      } else if (!od && curr.bouncedAmount) {
-        od = Number(curr.bouncedAmount);
-      }
+        // 1. Loan Amount
+        const customerLoan = Number(
+          customer.loanAmount || 
+          customer.principalAmount || 
+          customer.amount || 
+          0
+        );
+        totalLoan += isNaN(customerLoan) ? 0 : customerLoan;
 
-      return {
-        totalDisbursed: acc.totalDisbursed + disbursed,
-        totalLoan: acc.totalLoan + loanAmt,
-        totalOutstanding: acc.totalOutstanding + outstanding,
-        totalOverdue: acc.totalOverdue + od
-      };
-    }, { totalDisbursed: 0, totalLoan: 0, totalOutstanding: 0, totalOverdue: 0 });
+        // 2. Collection
+        let customerPaid = 0;
+        if (customer.paidAmount !== undefined && customer.paidAmount !== null) {
+          customerPaid = Number(customer.paidAmount);
+        } else if (customer.totalPaid !== undefined && customer.totalPaid !== null) {
+          customerPaid = Number(customer.totalPaid);
+        } else if (Array.isArray(customer.payments)) {
+          customerPaid = customer.payments.reduce((sum, p) => sum + Number(p?.amount || 0), 0);
+        } else if (Array.isArray(customer.schedule)) {
+          customerPaid = customer.schedule
+            .filter((inst) => inst && (inst.status === 'Paid' || inst.status === 'closed' || inst.paidDate))
+            .reduce((sum, inst) => sum + Number(inst?.amount || inst?.emiAmount || inst?.paidAmount || 0), 0);
+        }
+        totalCollection += isNaN(customerPaid) ? 0 : customerPaid;
+
+        // 3. Outstanding
+        let customerOutstanding = 0;
+        if (customer.outstandingAmount !== undefined && customer.outstandingAmount !== null) {
+          customerOutstanding = Number(customer.outstandingAmount);
+        } else if (customer.balance !== undefined && customer.balance !== null) {
+          customerOutstanding = Number(customer.balance);
+        } else {
+          customerOutstanding = Math.max(0, customerLoan - customerPaid);
+        }
+        totalOutstanding += isNaN(customerOutstanding) ? 0 : customerOutstanding;
+
+        // 4. Overdue (OD) Waterfall
+        let customerOd = 0;
+        if (Array.isArray(customer.schedule) && customer.schedule.length > 0) {
+          const validSchedule = customer.schedule.filter(Boolean);
+          const sortedSchedule = [...validSchedule].sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
+
+          let availablePaidPool = customerPaid;
+
+          sortedSchedule.forEach((inst) => {
+            const instAmount = Number(inst.amount || inst.emiAmount || 0);
+            const instDueDate = inst.dueDate ? new Date(inst.dueDate) : null;
+            const isPastDue = instDueDate && new Date(instDueDate.getFullYear(), instDueDate.getMonth(), instDueDate.getDate()) <= today;
+
+            if (availablePaidPool >= instAmount) {
+              availablePaidPool -= instAmount;
+            } else {
+              const unpaidPortion = instAmount - availablePaidPool;
+              availablePaidPool = 0;
+              if (isPastDue) {
+                customerOd += unpaidPortion;
+              }
+            }
+          });
+        } else if (customer.odAmount !== undefined && customer.odAmount !== null) {
+          customerOd = Number(customer.odAmount);
+        } else if (customer.overdueAmount !== undefined && customer.overdueAmount !== null) {
+          customerOd = Number(customer.overdueAmount);
+        }
+
+        totalOverdue += isNaN(customerOd) ? 0 : customerOd;
+      });
+
+      return { totalLoan, totalCollection, totalOutstanding, totalOverdue };
+    } catch (err) {
+      console.error("Critical error inside summaryMetrics:", err);
+      return { totalLoan: 0, totalCollection: 0, totalOutstanding: 0, totalOverdue: 0 };
+    }
   }, [processedCustomers]);
 
   const formatDate = (dateString) => {
@@ -968,7 +1016,7 @@ function App() {
                                     Collection
                                   </span>
                                   <div className="text-lg md:text-xl font-bold text-emerald-600 mt-0.5">
-                                    ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
+                                    ₹{summaryMetrics.totalCollection.toLocaleString('en-IN')}
                                   </div>
                                 </div>
                               </div>
