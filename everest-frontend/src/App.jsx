@@ -1383,6 +1383,7 @@ function App() {
                       } else {
                         // Fresh customer - let Firestore generate a unique document ID
                         customerToSave.customerId = customerToSave.id; 
+                        customerToSave.applicationNumber = customerToSave.id;
                         delete customerToSave.id; // ensure we don't accidentally map this back as doc id manually
                         await addDoc(collection(db, 'customers'), customerToSave);
                       }

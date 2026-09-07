@@ -128,8 +128,11 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                           setFullscreenImage(app.photoUrl || app.photo || app.image || app.applicantPhoto || app.profileImage || app.avatar_url || defaultAvatar); 
                         }}
                       />
-                      <div className="truncate">
+                      <div className="truncate flex flex-col">
                         <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
+                        <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate">
+                          ID: {app.customerId || app.applicationNumber || app.id}
+                        </div>
                       </div>
                     </div>
                   </td>
