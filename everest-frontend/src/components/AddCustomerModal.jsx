@@ -558,6 +558,8 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
               tenureVal: tenureVal,
               tenureUnit: tenureUnit,
               image: photo,
+              branch: activeBranch?.name || branch || 'Andipatti',
+              branchName: activeBranch?.name || branch || 'Andipatti',
               center: center,
               city: city,
               district: district,
