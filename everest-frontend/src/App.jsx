@@ -143,7 +143,7 @@ function App() {
                     if (!staffSnaps.empty) {
                       const sDoc = staffSnaps.docs[0].data();
                       profileData.name = sDoc.name || 'Staff Member';
-                      profileData.staffId = sDoc.staffId || sDoc.id || sDoc.phone || 'N/A';
+                      profileData.staffId = sDoc.staffId || sDoc.employeeId || sDoc.customId || sDoc.phone || 'N/A';
                       profileData.branchId = sDoc.branchId || profileData.branchId || 'main';
                       profileData.branchName = sDoc.branchName || profileData.branchName || 'Main Branch';
                       profileData.credentialsVersion = sDoc.credentialsVersion || null;
@@ -270,9 +270,9 @@ function App() {
             q = collection(db, 'customers');
           }
         } else if (userProfile.role === 'staff') {
-          // Strict staff query by branch
-          const staffBranchId = userProfile.branchId || activeBranch.id || 'main';
-          q = query(collection(db, 'customers'), where('branchId', '==', staffBranchId));
+          // Strict staff-level portfolio isolation
+          const currentStaffId = userProfile.staffId || userProfile.employeeId || 'N/A';
+          q = query(collection(db, 'customers'), where('staffId', '==', currentStaffId));
         } else {
           // Customer role
           q = query(collection(db, 'customers'), where('phone', '==', user.phoneNumber));
@@ -1376,7 +1376,7 @@ function App() {
                     const customerToSave = { 
                       ...newCustomer, 
                       lastUpdated: nowIso,
-                      staffId: newCustomer.staffId || userProfile?.id || userProfile?.staffId || userProfile?.uid || '',
+                      staffId: newCustomer.staffId || userProfile?.staffId || userProfile?.employeeId || '',
                       assignedStaff: newCustomer.assignedStaff || userProfile?.name || userProfile?.staffName || userProfile?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : ''),
                       staffDesignation: newCustomer.staffDesignation || userProfile?.designation || userProfile?.jobRole || userProfile?.subRole || userProfile?.title || 'Collection Agent',
                       staffContact: newCustomer.staffContact || userProfile?.phone || userProfile?.contactNumber || userProfile?.mobileNumber || ''

@@ -49,7 +49,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   const handleAssignStaff = async (staffMember) => {
     try {
       const payload = {
-        staffId: staffMember.staffId || staffMember.uid || staffMember.id || '',
+        staffId: staffMember.staffId || staffMember.employeeId || staffMember.customId || '',
         assignedStaff: staffMember.name || staffMember.displayName || '',
         staffDesignation: staffMember.designation || staffMember.jobRole || staffMember.subRole || staffMember.role || 'Collection Agent',
         staffContact: staffMember.phone || staffMember.contactNumber || ''
@@ -565,7 +565,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                             className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg flex flex-col transition-colors border-b border-slate-50 last:border-0"
                           >
                             <span className="font-bold text-slate-800 text-[14px]">{staff.name || staff.displayName}</span>
-                            <span className="text-slate-500 text-[12px] font-medium">{staff.staffId || staff.uid} &bull; {staff.designation || staff.role}</span>
+                            <span className="text-slate-500 text-[12px] font-medium">{staff.staffId || staff.employeeId || staff.customId} &bull; {staff.designation || staff.role}</span>
                           </button>
                         )) : (
                           <div className="p-3 text-center text-slate-500 text-sm font-medium">Loading staff...</div>
