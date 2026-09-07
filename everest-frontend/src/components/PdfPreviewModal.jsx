@@ -313,7 +313,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
 
   // Safe fallback UI rendering values
   const appNo = application?.appNumber ? String(application.appNumber).padStart(2, '0') : '01';
-  const branchName = application?.branch || 'BATLAGUNDU';
+  const branchName = application?.branch || application?.branchName || '';
   const formatDateToDDMMYYYY = (dateStr) => {
     if (!dateStr) return '';
     if (dateStr.includes('-')) {

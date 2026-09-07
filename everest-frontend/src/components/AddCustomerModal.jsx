@@ -457,7 +457,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
         category: 'Upcoming',
         // Schema Verification: Explicit mapping
         appDate, appDay, appNumber, image: updatedProfilePic, branchName: branch,
-        branchId: activeBranch.id,
+        branch: branch, branchId: activeBranch.id,
         center, city, district, nameTitle, customerName,
         phone, altPhone, customerStatus, dob, age,
         gender, maritalStatus, religion: '', caste: '', education: '', occupation,

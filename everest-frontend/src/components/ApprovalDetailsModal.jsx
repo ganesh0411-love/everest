@@ -210,7 +210,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
     {
       id: 'centerDetails',
       title: 'Center Details',
-      subtitle: `Branch : ${application.branch || 'BATLAGUNDU'}`,
+      subtitle: `Branch : ${application.branch || application.branchName || 'N/A'}`,
       icon: <Building2 size={20} className="text-emerald-600" />,
       bg: 'bg-emerald-100',
     },
@@ -423,7 +423,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Branch Name</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">BATLAGUNDU</span>
+                <span className="pt-[1px]">{application.branch || application.branchName || 'N/A'}</span>
               </div>
               
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
