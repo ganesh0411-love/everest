@@ -1373,7 +1373,14 @@ function App() {
                   activeBranch={activeBranch}
                   onAddCustomer={async (newCustomer) => {
                     const nowIso = new Date().toISOString();
-                    const customerToSave = { ...newCustomer, lastUpdated: nowIso };
+                    const customerToSave = { 
+                      ...newCustomer, 
+                      lastUpdated: nowIso,
+                      staffId: newCustomer.staffId || userProfile?.id || userProfile?.staffId || userProfile?.uid || '',
+                      assignedStaff: newCustomer.assignedStaff || userProfile?.name || userProfile?.staffName || userProfile?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : ''),
+                      staffDesignation: newCustomer.staffDesignation || userProfile?.designation || userProfile?.role || 'Staff',
+                      staffContact: newCustomer.staffContact || userProfile?.phone || userProfile?.contactNumber || userProfile?.mobileNumber || ''
+                    };
                     try {
                       const { collection, addDoc, setDoc, doc } = await import('firebase/firestore');
                       

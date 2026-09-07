@@ -217,7 +217,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
     {
       id: 'staff',
       title: 'Staff',
-      subtitle: `Staff Name : ${application.staffName || 'Ramesh'}`,
+      subtitle: `Staff Name : ${application.assignedStaff || application.staffName || 'N/A'}`,
       icon: <User size={20} className="text-rose-500" />,
       bg: 'bg-rose-100',
     },
@@ -496,25 +496,25 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff ID</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.staffId || 'STF001'}</span>
+                <span className="pt-[1px]">{application.staffId || application.staffCode || 'N/A'}</span>
               </div>
               
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff Name</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.staffName || 'Ramesh'}</span>
+                <span className="pt-[1px]">{application.assignedStaff || application.staffName || 'N/A'}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Designation</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.staffDesignation || 'Field Officer'}</span>
+                <span className="pt-[1px]">{application.staffDesignation || application.designation || 'N/A'}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Contact Number</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.staffContact || '7200312058'}</span>
+                <span className="pt-[1px]">{application.staffContact || application.contactNumber || 'N/A'}</span>
               </div>
             </div>
           </div>
