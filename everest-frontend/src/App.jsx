@@ -28,7 +28,7 @@ import loanAmountIcon from './assets/loan-amount-icon.png';
 import collectionIcon from './assets/collection-icon.png';
 import outstandingIcon from './assets/outstanding-icon.png';
 import overdueIcon from './assets/overdue-icon.png';
-import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, onSnapshot, or } from 'firebase/firestore';
 import Login from './components/Login';
 import CustomerDashboard from './components/CustomerDashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -270,9 +270,15 @@ function App() {
             q = collection(db, 'customers');
           }
         } else if (userProfile.role === 'staff') {
-          // Strict staff-level portfolio isolation
+          // Strict staff-level portfolio isolation checking both ID and name
           const currentStaffId = userProfile.staffId || userProfile.employeeId || 'N/A';
-          q = query(collection(db, 'customers'), where('staffId', '==', currentStaffId));
+          q = query(
+            collection(db, 'customers'), 
+            or(
+              where('staffId', '==', currentStaffId),
+              where('assignedStaff', '==', userProfile.name)
+            )
+          );
         } else {
           // Customer role
           q = query(collection(db, 'customers'), where('phone', '==', user.phoneNumber));
