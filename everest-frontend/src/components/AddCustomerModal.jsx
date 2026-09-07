@@ -447,7 +447,9 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
       };
 
       const newCustomer = {
-        id: customerId,
+        ...(initialData || {}),
+        id: initialData?.id || customerId,
+        customerId: customerId,
         name: `${nameTitle} ${customerName}`,
         date: appDate,
         status: initialData?.status || 'Pending',
