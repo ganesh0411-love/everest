@@ -32,6 +32,7 @@ const dummyData = [
 
 const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
   
   // State for Add/Edit Form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -393,6 +394,16 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
     }
   };
 
+  const filteredStaff = staffList.filter(staff => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const nameMatch = (staff.name || staff.staffName || '').toLowerCase().includes(q);
+    const idMatch = (staff.staffId || staff.id || '').toLowerCase().includes(q);
+    const designationMatch = (staff.designation || staff.role || '').toLowerCase().includes(q);
+    const branchMatch = (staff.branch || staff.branchName || '').toLowerCase().includes(q);
+    return nameMatch || idMatch || designationMatch || branchMatch;
+  });
+
   return (
     <div className="flex flex-col h-[100dvh] bg-white overflow-hidden relative pb-[72px]">
       
@@ -447,13 +458,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
             </button>
           </div>
 
-          {/* Table Headers (Responsive) */}
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-2 px-4 py-3 bg-slate-50/80 rounded-2xl mt-6 text-xs font-bold text-purple-800 text-center items-center">
-            <div className="text-left col-span-1">Name</div>
-            <div className="hidden md:block">ID</div>
-            <div>Designation</div>
-            <div>Status</div>
-          </div>
+          {/* Desktop Table View and Mobile Cards below */}
           
           {searchQuery === 'MIGRATE_IDS' && (
             <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
@@ -476,24 +481,77 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
       {/* SCROLLABLE STAFF LIST AREA */}
       <div className="flex-1 overflow-y-auto px-5 pb-6 bg-white z-10">
         
-        {/* Staff List */}
-        <div className="flex flex-col gap-3">
-          {staffList.filter(staff => {
-            const q = searchQuery.toLowerCase();
-            return staff.name.toLowerCase().includes(q) || 
-                   staff.id.toLowerCase().includes(q) || 
-                   staff.designation.toLowerCase().includes(q);
-          }).map((staff, index) => (
-            <div key={index} className="flex items-center justify-between p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors rounded-xl">
-              {/* Name & Avatar */}
-              <div className="flex items-center gap-3 w-1/3 md:w-1/4 min-w-[110px]">
+        {/* Desktop Table View */}
+        <div className="hidden md:block w-full overflow-x-auto mt-2 bg-white rounded-lg shadow-sm">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+              <tr>
+                <th className="py-3 px-4 text-left">Name</th>
+                <th className="py-3 px-4 text-left">Branch</th>
+                <th className="py-3 px-4 text-left">ID</th>
+                <th className="py-3 px-4 text-left">Designation</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredStaff.map((staff, index) => (
+                <tr key={index} className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${staff.photoBase64 ? 'bg-transparent' : staff.avatarColor || 'bg-slate-100'}`}>
+                        {staff.photoBase64 ? (
+                          <img src={staff.photoBase64} alt={staff.name || staff.staffName} className="w-full h-full object-cover" />
+                        ) : (
+                          <svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+                            <mask id={`mask__beam_desktop_${index}`} maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask>
+                            <g mask={`url(#mask__beam_desktop_${index})`}>
+                              <rect width="36" height="36" fill="#f0f0f0"></rect>
+                              <rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(196 18 18) scale(1)" fill="#474747" rx="36"></rect>
+                              <g transform="translate(-4 -1) rotate(6 18 18)">
+                                <path d="M15 19c2 1 4 1 6 0" stroke="#FFFFFF" fill="none" strokeLinecap="round"></path>
+                                <rect x="10" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect>
+                                <rect x="24" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect>
+                              </g>
+                            </g>
+                          </svg>
+                        )}
+                      </div>
+                      <span className="font-bold text-slate-800 text-sm">{staff.name || staff.staffName}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-sm text-brand-blue font-bold">
+                    {staff.branch || staff.branchName || staff.branchId}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-slate-800 font-bold">
+                    {staff.staffId || staff.id || staff.employeeId || staff.customId || staff.uid}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-slate-600">
+                    <div className="flex items-center justify-between">
+                      <span>{staff.designation || staff.role || staff.position || 'Staff'}</span>
+                      {!isMainBranch && (
+                        <button onClick={() => handleOpenEditForm(staff)} className="text-slate-400 hover:text-purple-600 p-1 transition-colors">
+                          <MoreVertical size={18} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden flex flex-col gap-3">
+          {filteredStaff.map((staff, index) => (
+            <div key={index} className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${staff.photoBase64 ? 'bg-transparent' : staff.avatarColor || 'bg-slate-100'}`}>
                   {staff.photoBase64 ? (
-                    <img src={staff.photoBase64} alt={staff.name} className="w-full h-full object-cover" />
+                    <img src={staff.photoBase64} alt={staff.name || staff.staffName} className="w-full h-full object-cover" />
                   ) : (
                     <svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-                      <mask id="mask__beam" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask>
-                      <g mask="url(#mask__beam)">
+                      <mask id={`mask__beam_mobile_${index}`} maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask>
+                      <g mask={`url(#mask__beam_mobile_${index})`}>
                         <rect width="36" height="36" fill="#f0f0f0"></rect>
                         <rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(196 18 18) scale(1)" fill="#474747" rx="36"></rect>
                         <g transform="translate(-4 -1) rotate(6 18 18)">
@@ -505,34 +563,21 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                     </svg>
                   )}
                 </div>
-                <div className="flex flex-col overflow-hidden">
-                  <span className="font-bold text-slate-800 text-xs sm:text-sm truncate">{staff.name}</span>
-                  <span className="text-xs text-slate-800 font-bold tracking-wide md:hidden mt-0.5">{staff.id}</span>
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-800 text-sm">{staff.name || staff.staffName}</span>
+                  <span className="text-xs text-brand-blue font-semibold">{staff.branch || staff.branchName || staff.branchId}</span>
                 </div>
               </div>
-              
-              {/* ID (Desktop Only) */}
-              <div className="hidden md:block w-1/4 text-center text-sm text-slate-800 font-bold tracking-wide">
-                {staff.id}
-              </div>
-
-              {/* Designation */}
-              <div className="w-1/3 md:w-1/4 text-center text-[10px] sm:text-xs text-slate-600 leading-tight px-1">
-                {staff.designation}
-              </div>
-
-              {/* Status & Actions */}
-              <div className="w-1/3 md:w-1/4 flex items-center justify-end gap-1 sm:gap-2 pr-1">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 rounded-full border border-emerald-200">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                  <span className="text-[10px] sm:text-xs font-semibold text-emerald-700">Active</span>
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-xs font-bold text-slate-700">{staff.staffId || staff.id || staff.employeeId || staff.customId || staff.uid}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500">{staff.designation || staff.role || staff.position || 'Staff'}</span>
+                  {!isMainBranch && (
+                    <button onClick={() => handleOpenEditForm(staff)} className="text-slate-400 hover:text-purple-600 p-1 transition-colors">
+                      <MoreVertical size={16} />
+                    </button>
+                  )}
                 </div>
-                <button 
-                  onClick={() => handleOpenEditForm(staff)}
-                  className="text-slate-400 hover:text-purple-600 p-1 transition-colors"
-                >
-                  <MoreVertical size={18} />
-                </button>
               </div>
             </div>
           ))}

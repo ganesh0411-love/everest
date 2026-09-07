@@ -427,8 +427,21 @@ function App() {
   const [activeSort, setActiveSort] = useState('Recent');
   
   // Temp state for the modal before applying
-  const [tempCategory, setTempCategory] = useState('Microfinance');
+  const [tempCategory, setTempCategory] = useState('All');
   const [tempSort, setTempSort] = useState('Recent');
+  const [activeBranchFilter, setActiveBranchFilter] = useState('All');
+  const [tempBranchFilter, setTempBranchFilter] = useState('All');
+
+  // Automatically reset all filter selections whenever the user switches activeBranch
+  useEffect(() => {
+    setActiveCategory('All');
+    setActiveSort('Recent');
+    setActiveBranchFilter('All');
+    setTempCategory('All');
+    setTempBranchFilter('All');
+    setSearchQuery('');
+  }, [activeBranch?.id, activeBranch?.name]);
+
 
   const currentViewRef = useRef(currentView);
   useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
@@ -540,18 +553,21 @@ function App() {
   const openFilter = () => {
     setTempCategory(activeCategory);
     setTempSort(activeSort);
+    setTempBranchFilter(activeBranchFilter);
     setIsFilterOpen(true);
   };
 
   const applyFilter = () => {
     setActiveCategory(tempCategory);
     setActiveSort(tempSort);
+    setActiveBranchFilter(tempBranchFilter);
     setIsFilterOpen(false);
   };
 
   const clearFilter = () => {
     setActiveCategory('All');
     setActiveSort('Recent');
+    setActiveBranchFilter('All');
     setIsFilterOpen(false);
   };
 
@@ -565,14 +581,42 @@ function App() {
     });
     
     if (activeCategory !== 'All') {
-      const loanTypeCategories = ['Microfinance', 'Personal Loan', 'Agri Loan', 'Weekly Loan'];
+      const loanTypeCategories = ['Microfinance', 'Personal Loan', 'Agri Loan', 'Weekly Loan', 'Daily Loan'];
       if (loanTypeCategories.includes(activeCategory)) {
-        const matchType = activeCategory === 'Microfinance' ? 'Micro Finance' : activeCategory;
-        filtered = filtered.filter(c => c.loanType === activeCategory || c.loanType === matchType);
+        const matchType = activeCategory === 'Microfinance' ? 'Micro Finance' : (activeCategory === 'Daily Loan' ? 'Daily' : activeCategory);
+        filtered = filtered.filter(c => 
+          (c.loanType || '').trim().toLowerCase() === activeCategory.trim().toLowerCase() ||
+          (c.loanType || '').toLowerCase().includes(activeCategory.toLowerCase()) ||
+          (c.loanType || '').toLowerCase().includes(matchType.toLowerCase())
+        );
       } else {
         filtered = filtered.filter(c => c.category === activeCategory);
       }
     }
+
+    const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
+    if (isMainBranch && activeBranchFilter && activeBranchFilter !== 'All') {
+      const cleanBranchStr = (val) => {
+        if (!val || typeof val !== 'string') return '';
+        return val.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      };
+      
+      const target = cleanBranchStr(activeBranchFilter);
+
+      filtered = filtered.filter(c => {
+        const candidates = [
+          c.branch,
+          c.branchName,
+          c.branchId,
+          c.assignedBranch
+        ]
+          .map(cleanBranchStr)
+          .filter((v) => v.length > 0);
+
+        return candidates.some((cand) => cand === target);
+      });
+    }
+
 
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
@@ -605,7 +649,7 @@ function App() {
     });
 
     return filtered;
-  }, [activeCategory, activeSort, customers, searchQuery]);
+  }, [activeCategory, activeSort, customers, searchQuery, activeBranch, activeBranchFilter]);
 
   // Aggregate Financials (Dynamic Based on UI Stream)
   const { totalLoan, totalOutstanding } = useMemo(() => {
@@ -820,78 +864,143 @@ function App() {
                   onTouchEnd={handleTouchEnd}
                   onTouchCancel={handleTouchEnd}
                 >
-                  {processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved').length > 0 ? (
-                    <div className="p-2 space-y-2 pb-24">
-                      <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider">
-                        Entries: {processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved').length}
-                      </div>
-                      {processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved').map(customer => (
-                        <div key={customer.id} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
-                          <div className="flex-1 min-w-0 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
-                              <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
-                            </div>
-                            <div className="min-w-0 pr-2">
-                              <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
-                              <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
-                            </div>
-                          </div>
-                          
-                          {/* Status Badges - Strict Fixed Width Column */}
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-                            <div className="flex flex-col items-center justify-center w-6 gap-1">
-                              {customer.status === 'Pending' && (
-                                <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
-                              )}
-                              {customer.status === 'Approved' && (
-                                <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                            <div className="text-right min-w-[70px]">
-                              <div className="text-sm font-bold text-red-600">₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}</div>
-                            </div>
-                            <div className="relative">
-                              <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                </svg>
-                              </button>
-                              {activeHomeMenuId === customer.id && (
-                                <div className="absolute right-0 top-8 w-32 bg-white rounded-lg shadow-lg border border-slate-100 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                  <button 
-                                    onClick={async () => {
-                                      const nowIso = new Date().toISOString();
-                                      try {
-                                        await updateDoc(doc(db, 'customers', customer.id), { status: 'Recycled', previousStatus: customer.status, lastUpdated: nowIso });
-                                      } catch(e) { console.error('Delete error', e); }
-                                      setActiveHomeMenuId(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                  {(() => {
+                    const isMainBranchView = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
+                    const approvedCustomers = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
+                    
+                    if (isMainBranchView) {
+                      console.log(`[Main Branch Filter] Selected: "${activeBranchFilter}", Total Customers: ${customers.length}, Filtered: ${approvedCustomers.length}`);
+                    }
+                    
+                    if (approvedCustomers.length === 0) {
+                      return <EmptyState />;
+                    }
+
+                    return (
+                      <div className="p-2 space-y-2 pb-24">
+                        <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider">
+                          Entries: {approvedCustomers.length}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState />
-                  )}
+                        
+                        {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
+                        {isMainBranchView && (
+                          <div className="hidden md:block overflow-x-auto bg-white border border-slate-200 rounded-lg shadow-sm mb-4">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
+                                  <th className="p-3 font-semibold">Customer</th>
+                                  <th className="p-3 font-semibold border-l border-slate-200">Branch</th>
+                                  <th className="p-3 font-semibold border-l border-slate-200">Assigned Staff</th>
+                                  <th className="p-3 font-semibold border-l border-slate-200">Loan Type</th>
+                                  <th className="p-3 font-semibold border-l border-slate-200">Loan Amount</th>
+                                  <th className="p-3 font-semibold border-l border-slate-200 text-right">Outstanding</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200">
+                                {approvedCustomers.map(customer => (
+                                  <tr key={`desktop-${customer.id}`} className="hover:bg-slate-50 transition-colors">
+                                    <td className="p-3 flex items-center gap-3">
+                                      <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
+                                        <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
+                                      </div>
+                                      <div className="min-w-0 pr-2">
+                                        <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
+                                        <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
+                                      {customer.branch || customer.branchName || 'Main Branch'}
+                                    </td>
+                                    <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
+                                      {customer.assignedStaff || customer.staffName || customer.staff || '--'}
+                                    </td>
+                                    <td className="p-3 border-l border-slate-200 whitespace-nowrap">
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
+                                        {customer.loanType || customer.category || customer.type || 'N/A'}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 border-l border-slate-200 text-sm font-bold text-brand-blue whitespace-nowrap">
+                                      ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
+                                    </td>
+                                    <td className="p-3 border-l border-slate-200 text-sm font-bold text-red-600 whitespace-nowrap text-right">
+                                      ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        
+                        {/* STANDARD CARD VIEW (Hidden on desktop if Main Branch is active) */}
+                        <div className={isMainBranchView ? "md:hidden space-y-2" : "space-y-2"}>
+                          {approvedCustomers.map(customer => (
+                            <div key={`mobile-${customer.id}`} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
+                              <div className="flex-1 min-w-0 flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
+                                  <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="min-w-0 pr-2">
+                                  <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
+                                  <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
+                                </div>
+                              </div>
+                              
+                              {/* Status Badges - Strict Fixed Width Column */}
+                              <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                                <div className="flex flex-col items-center justify-center w-6 gap-1">
+                                  {customer.status === 'Pending' && (
+                                    <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                  {customer.status === 'Approved' && (
+                                    <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-right min-w-[70px]">
+                                  <div className="text-sm font-bold text-red-600">₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}</div>
+                                </div>
+                                <div className="relative">
+                                  <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                    </svg>
+                                  </button>
+                                  {activeHomeMenuId === customer.id && (
+                                    <div className="absolute right-0 top-8 w-32 bg-white rounded-lg shadow-lg border border-slate-100 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                      <button 
+                                        onClick={async () => {
+                                          const nowIso = new Date().toISOString();
+                                          try {
+                                            await updateDoc(doc(db, 'customers', customer.id), { status: 'Recycled', previousStatus: customer.status, lastUpdated: nowIso });
+                                          } catch(e) { console.error('Delete error', e); }
+                                          setActiveHomeMenuId(null);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </main>
               </>
             )}
-            {!isAddCustomerOpen && !isFilterOpen && (
+            {!(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') && !isAddCustomerOpen && !isFilterOpen && (
               <div onClick={() => setIsAddCustomerOpen(true)}>
                 <FloatingActionButton isScrolled={isScrolled} />
               </div>
@@ -1018,7 +1127,8 @@ function App() {
                             { name: 'Microfinance', icon: Banknote, color: 'text-teal-500' },
                             { name: 'Personal Loan', icon: User, color: 'text-rose-500' },
                             { name: 'Agri Loan', icon: Sprout, color: 'text-green-500' },
-                            { name: 'Weekly Loan', icon: CalendarDays, color: 'text-orange-500' }
+                            { name: 'Weekly Loan', icon: CalendarDays, color: 'text-orange-500' },
+                            { name: 'Daily Loan', icon: CalendarDays, color: 'text-yellow-500' }
                           ].map(cat => {
                             const Icon = cat.icon;
                             const isActive = tempCategory === cat.name;
@@ -1035,6 +1145,23 @@ function App() {
                           })}
                         </div>
                       </div>
+
+                      {(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') && (
+                        <div className="mb-6">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">BRANCH-WISE FILTER</h4>
+                          <select 
+                            value={tempBranchFilter}
+                            onChange={(e) => setTempBranchFilter(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-blue/30 focus:border-brand-blue font-semibold appearance-none"
+                            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\\\'http://www.w3.org/2000/svg\\\' fill=\\\'none\\\' viewBox=\\\'0 0 24 24\\\' stroke=\\\'%2364748b\\\'%3E%3Cpath stroke-linecap=\\\'round\\\' stroke-linejoin=\\\'round\\\' stroke-width=\\\'2\\\' d=\\\'M19 9l-7 7-7-7\\\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' }}
+                          >
+                            <option value="All">All Branches</option>
+                            {branches.filter(b => b.id !== 'main').map(b => (
+                              <option key={b.id} value={b.name}>{b.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
                       <div>
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">SORT BY VALUES</h4>
