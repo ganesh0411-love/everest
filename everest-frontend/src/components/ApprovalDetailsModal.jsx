@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, User, UserCircle, Phone, FileBadge, FileText, IdCard, ChevronRight, ArrowLeft, MapPin, Wallet, CheckCircle2, Eye, XCircle, Settings, Trash2 } from 'lucide-react';
 import { App } from '@capacitor/app';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import OfflineImage from './OfflineImage';
 
@@ -13,7 +13,61 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   const [isVerified, setIsVerified] = useState(false);
   const [isNomineeOk, setIsNomineeOk] = useState(false);
 
-  // Approval Popup State
+  // Admin Staff Assignment State
+  const [showStaffDropdown, setShowStaffDropdown] = useState(false);
+  const [staffList, setStaffList] = useState([]);
+  const [localApp, setLocalApp] = useState(application);
+  const storedProfile = localStorage.getItem('everest_user_profile');
+  const userProfile = storedProfile ? JSON.parse(storedProfile) : null;
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'Admin' || userProfile?.role === 'main_admin';
+  const isStaffEmpty = !localApp.staffId || localApp.staffId === 'N/A';
+  const canAssignStaff = isAdmin || isStaffEmpty;
+
+  // Sync prop changes
+  useEffect(() => {
+    setLocalApp(application);
+  }, [application]);
+
+  useEffect(() => {
+    if (canAssignStaff && showStaffDropdown && staffList.length === 0) {
+      const fetchStaff = async () => {
+        try {
+          const staffRef = collection(db, 'staff');
+          const q = localApp.branchName ? query(staffRef, where('branch', '==', localApp.branchName)) : staffRef;
+          const snap = await getDocs(q);
+          const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          // filter active only
+          setStaffList(list.filter(s => s.status !== 'Inactive'));
+        } catch(err) {
+          console.error("Error fetching staff", err);
+        }
+      }
+      fetchStaff();
+    }
+  }, [canAssignStaff, showStaffDropdown, localApp.branchName]);
+
+  const handleAssignStaff = async (staffMember) => {
+    try {
+      const payload = {
+        staffId: staffMember.staffId || staffMember.uid || staffMember.id || '',
+        assignedStaff: staffMember.name || staffMember.displayName || '',
+        staffDesignation: staffMember.designation || staffMember.jobRole || staffMember.subRole || staffMember.role || 'Collection Agent',
+        staffContact: staffMember.phone || staffMember.contactNumber || ''
+      };
+      
+      const appRef = doc(db, 'customers', localApp.id);
+      await updateDoc(appRef, payload);
+      
+      setLocalApp(prev => ({ ...prev, ...payload }));
+      setShowStaffDropdown(false);
+      setToastMsg('Staff assigned successfully!');
+      setTimeout(() => setToastMsg(''), 3000);
+    } catch(err) {
+      console.error("Assign staff error:", err);
+      setToastMsg('Failed to assign staff.');
+      setTimeout(() => setToastMsg(''), 3000);
+    }
+  };
   const [showApprovalPopup, setShowApprovalPopup] = useState(false);
   const [approvalDate, setApprovalDate] = useState(() => {
     const today = new Date();
@@ -482,39 +536,73 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
 
           {/* Sub-View: Staff Details */}
           <div className={`absolute inset-0 w-full h-full bg-white px-5 py-4 overflow-y-auto scrollbar-hide transition-transform duration-300 ease-in-out ${activeView === 'staff' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-3">
-              <button 
-                onClick={() => setActiveView('main')} 
-                className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
-              >
-                <ArrowLeft size={20} strokeWidth={2.5} />
-              </button>
-              <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">3. Staff</h2>
+            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setActiveView('main')} 
+                  className="p-1.5 -ml-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors text-slate-700 shrink-0"
+                >
+                  <ArrowLeft size={20} strokeWidth={2.5} />
+                </button>
+                <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">3. Staff</h2>
+              </div>
+              {canAssignStaff && !isReadOnly && (
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowStaffDropdown(!showStaffDropdown)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg font-bold text-[13px] transition-colors shadow-sm active:scale-95"
+                  >
+                    Assign
+                  </button>
+                  
+                  {showStaffDropdown && (
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                      <div className="max-h-60 overflow-y-auto p-1">
+                        {staffList.length > 0 ? staffList.map(staff => (
+                          <button
+                            key={staff.id}
+                            onClick={() => handleAssignStaff(staff)}
+                            className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg flex flex-col transition-colors border-b border-slate-50 last:border-0"
+                          >
+                            <span className="font-bold text-slate-800 text-[14px]">{staff.name || staff.displayName}</span>
+                            <span className="text-slate-500 text-[12px] font-medium">{staff.staffId || staff.uid} &bull; {staff.designation || staff.role}</span>
+                          </button>
+                        )) : (
+                          <div className="p-3 text-center text-slate-500 text-sm font-medium">Loading staff...</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight">
-              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight relative">
+              {showStaffDropdown && (
+                 <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowStaffDropdown(false)} />
+              )}
+              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff ID</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.staffId || application.staffCode || 'N/A'}</span>
+                <span className="pt-[1px]">{localApp.staffId || localApp.staffCode || 'N/A'}</span>
               </div>
               
-              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff Name</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.assignedStaff || application.staffName || 'N/A'}</span>
+                <span className="pt-[1px]">{localApp.assignedStaff || localApp.staffName || 'N/A'}</span>
               </div>
 
-              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Designation</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.staffDesignation || application.designation || 'N/A'}</span>
+                <span className="pt-[1px]">{localApp.staffDesignation || localApp.designation || 'N/A'}</span>
               </div>
 
-              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Contact Number</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.staffContact || application.contactNumber || 'N/A'}</span>
+                <span className="pt-[1px]">{localApp.staffContact || localApp.contactNumber || 'N/A'}</span>
               </div>
             </div>
           </div>
