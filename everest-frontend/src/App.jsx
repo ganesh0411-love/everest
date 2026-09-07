@@ -23,6 +23,11 @@ import RecycleBinView from './components/RecycleBinView';
 import { App as CapacitorApp } from '@capacitor/app';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+
+import loanAmountIcon from './assets/loan-amount-icon.png';
+import collectionIcon from './assets/collection-icon.png';
+import outstandingIcon from './assets/outstanding-icon.png';
+import overdueIcon from './assets/overdue-icon.png';
 import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
 import Login from './components/Login';
 import CustomerDashboard from './components/CustomerDashboard';
@@ -928,57 +933,73 @@ function App() {
                         {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
                         {isMainBranchView && (
                           <div className="hidden md:block">
-                            {/* COMPACT 4-CARD SUMMARY METRICS BAR (DESKTOP MAIN BRANCH ONLY) */}
-                            <div className="grid grid-cols-4 gap-3 mb-4">
-                              {/* Card 1: Loan Amount (Blue / Indigo Theme) */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-300 transition-colors">
-                                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                                  <Coins className="w-5 h-5"/>
+                            {/* COMPACT 4-CARD SUMMARY METRICS BAR WITH CUSTOM ICONS */}
+                            <div className="hidden md:grid grid-cols-4 gap-3 mb-4">
+                              {/* Card 1: Loan Amount */}
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
+                                  <img 
+                                    src={loanAmountIcon} 
+                                    alt="Loan Amount" 
+                                    className="w-full h-full object-contain" 
+                                  />
                                 </div>
                                 <div className="text-right">
-                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                  <span className="text-xs md:text-sm font-extrabold text-slate-900 uppercase tracking-wider block">
                                     Loan Amount
                                   </span>
-                                  <div className="text-lg font-bold text-indigo-600 mt-0.5">
+                                  <div className="text-lg md:text-xl font-bold text-indigo-600 mt-0.5">
                                     ₹{summaryMetrics.totalLoan.toLocaleString('en-IN')}
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Card 2: Collection (Green / Emerald Theme) */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-emerald-300 transition-colors">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                  <ArrowDownLeft className="w-5 h-5"/>
+                              {/* Card 2: Collection */}
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
+                                  <img 
+                                    src={collectionIcon} 
+                                    alt="Collection" 
+                                    className="w-full h-full object-contain" 
+                                  />
                                 </div>
                                 <div className="text-right">
-                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                  <span className="text-xs md:text-sm font-extrabold text-slate-900 uppercase tracking-wider block">
                                     Collection
                                   </span>
-                                  <div className="text-lg font-bold text-emerald-600 mt-0.5">
+                                  <div className="text-lg md:text-xl font-bold text-emerald-600 mt-0.5">
                                     ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Card 3: Outstanding Amount (Amber Theme) */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-300 transition-colors">
-                                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                                  <Receipt className="w-5 h-5"/>
+                              {/* Card 3: Outstanding (Shortened label) */}
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
+                                  <img 
+                                    src={outstandingIcon} 
+                                    alt="Outstanding" 
+                                    className="w-full h-full object-contain" 
+                                  />
                                 </div>
                                 <div className="text-right">
-                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-                                    Outstanding Amount
+                                  <span className="text-xs md:text-sm font-extrabold text-slate-900 uppercase tracking-wider block">
+                                    Outstanding
                                   </span>
-                                  <div className="text-lg font-bold text-amber-600 mt-0.5">
+                                  <div className="text-lg md:text-xl font-bold text-amber-600 mt-0.5">
                                     ₹{summaryMetrics.totalOutstanding.toLocaleString('en-IN')}
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Card 4: OD Amount (Rose / Red Theme) */}
+                              {/* Card 4: Overdue (OD) Amount (Preserved as requested) */}
                               <div className="bg-white px-4 py-3 rounded-xl border border-rose-100 bg-rose-50/20 shadow-sm flex items-center justify-between hover:border-rose-200 transition-colors">
-                                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                                  <ClockAlert className="w-5 h-5"/>
+                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
+                                  <img 
+                                    src={overdueIcon} 
+                                    alt="Overdue" 
+                                    className="w-full h-full object-contain" 
+                                  />
                                 </div>
                                 <div className="text-right flex flex-col items-end">
                                   <div className="flex items-center gap-1.5">
@@ -989,7 +1010,7 @@ function App() {
                                       OD Amount (Overdue)
                                     </span>
                                   </div>
-                                  <div className="text-lg font-bold text-rose-600 mt-0.5">
+                                  <div className="text-lg md:text-xl font-bold text-rose-600 mt-0.5">
                                     ₹{summaryMetrics.totalOverdue.toLocaleString('en-IN')}
                                   </div>
                                 </div>
