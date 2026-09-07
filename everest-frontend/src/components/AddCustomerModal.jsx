@@ -17,7 +17,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   const [appDate, setAppDate] = useState(initialData?.appDate || new Date().toISOString().split('T')[0]);
   const [appDay, setAppDay] = useState(initialData?.appDay || '');
   const [appNumber] = useState(initialData?.appNumber || Math.floor(1000000000 + Math.random() * 9000000000));
-  const [customerId] = useState(initialData?.id || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
+  const [customerId] = useState(initialData?.customerId || initialData?.applicationNumber || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
   const [centerLeaderName, setCenterLeaderName] = useState(initialData?.centerLeaderName || '');
   const [leaderCustomerId, setLeaderCustomerId] = useState(initialData?.leaderCustomerId || '');
   const [groupName, setGroupName] = useState(initialData?.groupName || '');
@@ -450,6 +450,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
         ...(initialData || {}),
         id: initialData?.id || customerId,
         customerId: customerId,
+        applicationNumber: customerId,
         name: `${nameTitle} ${customerName}`,
         date: appDate,
         status: initialData?.status || 'Pending',
