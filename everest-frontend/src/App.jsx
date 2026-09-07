@@ -8,7 +8,7 @@ import Footer from './components/Footer';
 import { 
   CheckCircle2, LayoutGrid, CalendarClock, TrendingUp, 
   Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownAZ,
-  Banknote, User, Sprout, CalendarDays
+  Banknote, User, Sprout, CalendarDays, Search, Filter
 } from 'lucide-react';
 import { 
   Centers, 
@@ -889,10 +889,8 @@ function App() {
               </main>
             ) : (
               <>
-                <div className="flex-shrink-0 z-30 bg-[#f8fafc] pb-2">
-                  <div className={(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? 'md:hidden' : ''}>
-                    <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
-                  </div>
+                <div className={`flex-shrink-0 z-30 bg-[#f8fafc] pb-2 ${(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? 'md:hidden' : ''}`}>
+                  <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
                   <SearchBar 
                     onFilterClick={openFilter} 
                     value={searchQuery}
@@ -923,71 +921,115 @@ function App() {
 
                     return (
                       <div className="p-2 space-y-2 pb-24">
-                        <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider">
+                        <div className={`px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider ${isMainBranchView ? 'md:hidden' : ''}`}>
                           Entries: {approvedCustomers.length}
                         </div>
                         
                         {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
                         {isMainBranchView && (
-                          <>
-                            <div className="hidden md:grid grid-cols-4 gap-4 mb-6">
+                          <div className="hidden md:block">
+                            {/* 1. TOP HEADER */}
+                            <div className="flex items-center justify-between mb-4 mt-2">
+                              <h1 className="text-xl md:text-2xl font-bold tracking-wider text-slate-800 uppercase">
+                                Customer List
+                              </h1>
+                            </div>
+
+                            {/* 2. COMPACT 4-CARD SUMMARY METRICS BAR (MAIN BRANCH DESKTOP ONLY) */}
+                            <div className="grid grid-cols-4 gap-3 mb-4">
                               {/* Card 1: Disbursement Amount */}
-                              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-slate-300 transition-colors">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Disbursement Amount</span>
-                                  <span className="p-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">₹</span>
-                                </div>
-                                <div className="mt-3">
-                                  <div className="text-2xl font-bold text-slate-800">
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div>
+                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                    Disbursement Amount
+                                  </span>
+                                  <div className="text-lg font-bold text-slate-800 mt-0.5">
                                     ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
                                   </div>
-                                  <p className="text-xs text-slate-400 mt-1">Total disbursed via applications</p>
                                 </div>
+                                <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-xs">
+                                  ₹
+                                </span>
                               </div>
 
                               {/* Card 2: Loan Amount */}
-                              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-blue-200 transition-colors">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Loan Amount</span>
-                                  <span className="p-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold">₹</span>
-                                </div>
-                                <div className="mt-3">
-                                  <div className="text-2xl font-bold text-blue-600">
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div>
+                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                    Loan Amount
+                                  </span>
+                                  <div className="text-lg font-bold text-blue-600 mt-0.5">
                                     ₹{summaryMetrics.totalLoan.toLocaleString('en-IN')}
                                   </div>
-                                  <p className="text-xs text-slate-400 mt-1">Total principal sanctioned</p>
                                 </div>
+                                <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-xs">
+                                  ₹
+                                </span>
                               </div>
 
                               {/* Card 3: Outstanding Amount */}
-                              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-amber-200 transition-colors">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Outstanding Amount</span>
-                                  <span className="p-2 rounded-xl bg-amber-50 text-amber-600 text-xs font-bold">₹</span>
-                                </div>
-                                <div className="mt-3">
-                                  <div className="text-2xl font-bold text-amber-600">
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                <div>
+                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                    Outstanding Amount
+                                  </span>
+                                  <div className="text-lg font-bold text-amber-600 mt-0.5">
                                     ₹{summaryMetrics.totalOutstanding.toLocaleString('en-IN')}
                                   </div>
-                                  <p className="text-xs text-slate-400 mt-1">Total pending balance</p>
                                 </div>
+                                <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 font-bold flex items-center justify-center text-xs">
+                                  ₹
+                                </span>
                               </div>
 
                               {/* Card 4: Overdue (OD) Amount */}
-                              <div className="bg-white p-5 rounded-2xl border border-rose-100 bg-rose-50/20 shadow-sm flex flex-col justify-between hover:border-rose-200 transition-colors">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-semibold text-rose-600 uppercase tracking-wider">OD Amount (Overdue)</span>
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">Past Due</span>
-                                </div>
-                                <div className="mt-3">
-                                  <div className="text-2xl font-bold text-rose-600">
+                              <div className="bg-white px-4 py-3 rounded-xl border border-rose-100 bg-rose-50/20 shadow-sm flex items-center justify-between">
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider block">
+                                      OD Amount (Overdue)
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
+                                      Past Due
+                                    </span>
+                                  </div>
+                                  <div className="text-lg font-bold text-rose-600 mt-0.5">
                                     ₹{summaryMetrics.totalOverdue.toLocaleString('en-IN')}
                                   </div>
-                                  <p className="text-xs text-rose-500/80 mt-1">Total unpaid bounced / crossed EMIs</p>
                                 </div>
+                                <span className="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 font-bold flex items-center justify-center text-xs">
+                                  !
+                                </span>
                               </div>
                             </div>
-                            <div className="hidden md:block overflow-x-auto bg-white border border-slate-200 rounded-lg shadow-sm mb-4">
+
+                            {/* 3. SEARCH BAR & FILTER ROW */}
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                  type="text"
+                                  placeholder="Search Customer"
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <button
+                                onClick={openFilter}
+                                className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                              >
+                                <Filter className="w-4 h-4 text-slate-600" />
+                              </button>
+                            </div>
+
+                            {/* 4. ENTRIES COUNTER */}
+                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                              ENTRIES: {approvedCustomers.length}
+                            </div>
+
+                            {/* 5. CUSTOMER TABLE (DESKTOP VIEW) */}
+                            <div className="bg-white border border-slate-200 rounded-lg shadow-sm mb-4 overflow-hidden">
                             <table className="w-full text-left border-collapse">
                               <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
@@ -1033,7 +1075,7 @@ function App() {
                               </tbody>
                             </table>
                           </div>
-                          </>
+                          </div>
                         )}
                         
                         {/* STANDARD CARD VIEW (Hidden on desktop if Main Branch is active) */}
