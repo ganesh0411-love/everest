@@ -1378,7 +1378,7 @@ function App() {
                       lastUpdated: nowIso,
                       staffId: newCustomer.staffId || userProfile?.id || userProfile?.staffId || userProfile?.uid || '',
                       assignedStaff: newCustomer.assignedStaff || userProfile?.name || userProfile?.staffName || userProfile?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : ''),
-                      staffDesignation: newCustomer.staffDesignation || userProfile?.designation || userProfile?.role || 'Staff',
+                      staffDesignation: newCustomer.staffDesignation || userProfile?.designation || userProfile?.jobRole || userProfile?.subRole || userProfile?.title || 'Collection Agent',
                       staffContact: newCustomer.staffContact || userProfile?.phone || userProfile?.contactNumber || userProfile?.mobileNumber || ''
                     };
                     try {
