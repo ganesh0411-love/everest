@@ -670,92 +670,37 @@ function App() {
   // 1. SUMMARY METRICS CALCULATION ENGINE
   // STRICT FINANCIAL SUMMARY METRICS ENGINE
   const summaryMetrics = useMemo(() => {
-    try {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let totalLoan = 0;
+    let totalOutstanding = 0;
 
-      let totalLoan = 0;
-      let totalCollection = 0;
-      let totalOutstanding = 0;
-      let totalOverdue = 0;
+    // Use the exact customer array rendered in the table
+    const approvedCustomers = (processedCustomers || []).filter(c => c && (c.status === 'Approved' || c.status === 'approved'));
+    const list = Array.isArray(approvedCustomers) ? approvedCustomers : [];
 
-      const approvedCustomers = (processedCustomers || []).filter(c => c && (c.status === 'Approved' || c.status === 'approved'));
+    list.forEach((customer) => {
+      if (!customer) return;
 
-      approvedCustomers.forEach((customer) => {
-        if (!customer) return;
+      // 1. Exact value from LOAN AMOUNT table column
+      const loan = Number(customer.loanAmount || customer.principalAmount || customer.amount || 0);
+      totalLoan += isNaN(loan) ? 0 : loan;
 
-        // 1. Loan Amount
-        const customerLoan = Number(
-          customer.loanAmount || 
-          customer.principalAmount || 
-          customer.amount || 
-          0
-        );
-        totalLoan += isNaN(customerLoan) ? 0 : customerLoan;
+      // 2. Exact value from OUTSTANDING table column
+      const outstanding = Number(customer.outstandingAmount || customer.balance || 0);
+      totalOutstanding += isNaN(outstanding) ? 0 : outstanding;
+    });
 
-        // 2. Collection
-        let customerPaid = 0;
-        if (customer.paidAmount !== undefined && customer.paidAmount !== null) {
-          customerPaid = Number(customer.paidAmount);
-        } else if (customer.totalPaid !== undefined && customer.totalPaid !== null) {
-          customerPaid = Number(customer.totalPaid);
-        } else if (Array.isArray(customer.payments)) {
-          customerPaid = customer.payments.reduce((sum, p) => sum + Number(p?.amount || 0), 0);
-        } else if (Array.isArray(customer.schedule)) {
-          customerPaid = customer.schedule
-            .filter((inst) => inst && (inst.status === 'Paid' || inst.status === 'closed' || inst.paidDate))
-            .reduce((sum, inst) => sum + Number(inst?.amount || inst?.emiAmount || inst?.paidAmount || 0), 0);
-        }
-        totalCollection += isNaN(customerPaid) ? 0 : customerPaid;
+    // 3. Collection = Total Loan - Total Outstanding
+    const totalCollection = Math.max(0, totalLoan - totalOutstanding);
 
-        // 3. Outstanding
-        let customerOutstanding = 0;
-        if (customer.outstandingAmount !== undefined && customer.outstandingAmount !== null) {
-          customerOutstanding = Number(customer.outstandingAmount);
-        } else if (customer.balance !== undefined && customer.balance !== null) {
-          customerOutstanding = Number(customer.balance);
-        } else {
-          customerOutstanding = Math.max(0, customerLoan - customerPaid);
-        }
-        totalOutstanding += isNaN(customerOutstanding) ? 0 : customerOutstanding;
+    // Preserve existing OD amount for now (will be refactored next)
+    const totalOverdue = list.reduce((sum, c) => sum + Number(c.odAmount || c.overdueAmount || 0), 0);
 
-        // 4. Overdue (OD) Waterfall
-        let customerOd = 0;
-        if (Array.isArray(customer.schedule) && customer.schedule.length > 0) {
-          const validSchedule = customer.schedule.filter(Boolean);
-          const sortedSchedule = [...validSchedule].sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
-
-          let availablePaidPool = customerPaid;
-
-          sortedSchedule.forEach((inst) => {
-            const instAmount = Number(inst.amount || inst.emiAmount || 0);
-            const instDueDate = inst.dueDate ? new Date(inst.dueDate) : null;
-            const isPastDue = instDueDate && new Date(instDueDate.getFullYear(), instDueDate.getMonth(), instDueDate.getDate()) <= today;
-
-            if (availablePaidPool >= instAmount) {
-              availablePaidPool -= instAmount;
-            } else {
-              const unpaidPortion = instAmount - availablePaidPool;
-              availablePaidPool = 0;
-              if (isPastDue) {
-                customerOd += unpaidPortion;
-              }
-            }
-          });
-        } else if (customer.odAmount !== undefined && customer.odAmount !== null) {
-          customerOd = Number(customer.odAmount);
-        } else if (customer.overdueAmount !== undefined && customer.overdueAmount !== null) {
-          customerOd = Number(customer.overdueAmount);
-        }
-
-        totalOverdue += isNaN(customerOd) ? 0 : customerOd;
-      });
-
-      return { totalLoan, totalCollection, totalOutstanding, totalOverdue };
-    } catch (err) {
-      console.error("Critical error inside summaryMetrics:", err);
-      return { totalLoan: 0, totalCollection: 0, totalOutstanding: 0, totalOverdue: 0 };
-    }
+    return {
+      totalLoan,
+      totalCollection,
+      totalOutstanding,
+      totalOverdue
+    };
   }, [processedCustomers]);
 
   const formatDate = (dateString) => {
