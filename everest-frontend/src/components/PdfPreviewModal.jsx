@@ -328,7 +328,7 @@ const PdfPreviewModal = ({ application, onClose, autoMode = null }) => {
   const appDate = formatDateToDDMMYYYY(application?.appDate) || '26-05-2026';
   const appDay = application?.appDay || 'Wednesday';
   const customerName = application?.customerName || 'MR. JOSEPH VIJAY';
-  const customerId = application?.customerId || application?.applicationNumber || application?.id || 'EMF00001';
+  const customerId = application?.customerId?.startsWith('EMF') ? application.customerId : (application?.applicationNumber?.startsWith('EMF') ? application.applicationNumber : (application?.id?.startsWith('EMF') ? application.id : 'EMF-PENDING'));
   const gender = application?.gender || 'MALE';
   const rawDob = formatDateToDDMMYYYY(application?.dob) || '';
   const dob = rawDob.replace(/\D/g, '').padEnd(8, ' ');

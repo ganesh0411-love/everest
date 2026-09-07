@@ -131,7 +131,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       <div className="truncate flex flex-col">
                         <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate">
-                          ID: {app.customerId || app.applicationNumber || app.id}
+                          ID: {app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}
                         </div>
                       </div>
                     </div>

@@ -311,7 +311,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                   {application.customerName || 'Vignesh K'}
                 </h2>
                 <p className="text-[13px] text-slate-700 font-bold whitespace-nowrap truncate">
-                  ID: {application.customerId || application.applicationNumber || application.id || '--'}
+                  ID: {application.customerId?.startsWith('EMF') ? application.customerId : (application.applicationNumber?.startsWith('EMF') ? application.applicationNumber : (application.id && application.id.startsWith('EMF') ? application.id : 'EMF-PENDING'))}
                 </p>
               </div>
             </div>
