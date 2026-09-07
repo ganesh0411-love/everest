@@ -7,7 +7,7 @@ import FloatingActionButton from './components/FloatingActionButton';
 import Footer from './components/Footer';
 import { 
   CheckCircle2, LayoutGrid, CalendarClock, TrendingUp, 
-  Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownAZ,
+  Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownLeft, ArrowDownAZ,
   Banknote, User, Sprout, CalendarDays, Search, Filter, Coins, Receipt, ClockAlert
 } from 'lucide-react';
 import { 
@@ -928,49 +928,43 @@ function App() {
                         {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
                         {isMainBranchView && (
                           <div className="hidden md:block">
-                            {/* 1. COMPACT 4-CARD SUMMARY METRICS BAR (STARTS AT TOP - NO DUPLICATE HEADER) */}
+                            {/* COMPACT 4-CARD SUMMARY METRICS BAR (DESKTOP MAIN BRANCH ONLY) */}
                             <div className="grid grid-cols-4 gap-3 mb-4">
-                              {/* Card 1: Disbursement Amount */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-200 transition-colors">
-                                {/* Left Icon */}
+                              {/* Card 1: Loan Amount (Blue / Indigo Theme) */}
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-300 transition-colors">
                                 <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                                  <ArrowUpRight className="w-5 h-5" />
+                                  <Coins className="w-5 h-5"/>
                                 </div>
-                                {/* Right Data */}
-                                <div className="text-right">
-                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-                                    Disbursement Amount
-                                  </span>
-                                  <div className="text-lg font-bold text-slate-800 mt-0.5">
-                                    ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Card 2: Loan Amount */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-emerald-200 transition-colors">
-                                {/* Left Icon */}
-                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                  <Coins className="w-5 h-5" />
-                                </div>
-                                {/* Right Data */}
                                 <div className="text-right">
                                   <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                                     Loan Amount
                                   </span>
-                                  <div className="text-lg font-bold text-emerald-600 mt-0.5">
+                                  <div className="text-lg font-bold text-indigo-600 mt-0.5">
                                     ₹{summaryMetrics.totalLoan.toLocaleString('en-IN')}
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Card 3: Outstanding Amount */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-200 transition-colors">
-                                {/* Left Icon */}
-                                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                                  <Receipt className="w-5 h-5" />
+                              {/* Card 2: Collection (Green / Emerald Theme) */}
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-emerald-300 transition-colors">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                  <ArrowDownLeft className="w-5 h-5"/>
                                 </div>
-                                {/* Right Data */}
+                                <div className="text-right">
+                                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                    Collection
+                                  </span>
+                                  <div className="text-lg font-bold text-emerald-600 mt-0.5">
+                                    ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Card 3: Outstanding Amount (Amber Theme) */}
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-300 transition-colors">
+                                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                  <Receipt className="w-5 h-5"/>
+                                </div>
                                 <div className="text-right">
                                   <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                                     Outstanding Amount
@@ -981,16 +975,14 @@ function App() {
                                 </div>
                               </div>
 
-                              {/* Card 4: Overdue (OD) Amount */}
+                              {/* Card 4: OD Amount (Rose / Red Theme) */}
                               <div className="bg-white px-4 py-3 rounded-xl border border-rose-100 bg-rose-50/20 shadow-sm flex items-center justify-between hover:border-rose-200 transition-colors">
-                                {/* Left Icon */}
                                 <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                                  <ClockAlert className="w-5 h-5" />
+                                  <ClockAlert className="w-5 h-5"/>
                                 </div>
-                                {/* Right Data */}
                                 <div className="text-right flex flex-col items-end">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
                                       Past Due
                                     </span>
                                     <span className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider block">
