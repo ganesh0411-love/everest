@@ -8,7 +8,7 @@ import Footer from './components/Footer';
 import { 
   CheckCircle2, LayoutGrid, CalendarClock, TrendingUp, 
   Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownAZ,
-  Banknote, User, Sprout, CalendarDays, Search, Filter
+  Banknote, User, Sprout, CalendarDays, Search, Filter, Coins, Receipt, ClockAlert
 } from 'lucide-react';
 import { 
   Centers, 
@@ -928,18 +928,16 @@ function App() {
                         {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
                         {isMainBranchView && (
                           <div className="hidden md:block">
-                            {/* 1. TOP HEADER */}
-                            <div className="flex items-center justify-between mb-4 mt-2">
-                              <h1 className="text-xl md:text-2xl font-bold tracking-wider text-slate-800 uppercase">
-                                Customer List
-                              </h1>
-                            </div>
-
-                            {/* 2. COMPACT 4-CARD SUMMARY METRICS BAR (MAIN BRANCH DESKTOP ONLY) */}
+                            {/* 1. COMPACT 4-CARD SUMMARY METRICS BAR (STARTS AT TOP - NO DUPLICATE HEADER) */}
                             <div className="grid grid-cols-4 gap-3 mb-4">
                               {/* Card 1: Disbursement Amount */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                                <div>
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-200 transition-colors">
+                                {/* Left Icon */}
+                                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                                  <ArrowUpRight className="w-5 h-5" />
+                                </div>
+                                {/* Right Data */}
+                                <div className="text-right">
                                   <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                                     Disbursement Amount
                                   </span>
@@ -947,29 +945,33 @@ function App() {
                                     ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
                                   </div>
                                 </div>
-                                <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-xs">
-                                  ₹
-                                </span>
                               </div>
 
                               {/* Card 2: Loan Amount */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                                <div>
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-emerald-200 transition-colors">
+                                {/* Left Icon */}
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                  <Coins className="w-5 h-5" />
+                                </div>
+                                {/* Right Data */}
+                                <div className="text-right">
                                   <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                                     Loan Amount
                                   </span>
-                                  <div className="text-lg font-bold text-blue-600 mt-0.5">
+                                  <div className="text-lg font-bold text-emerald-600 mt-0.5">
                                     ₹{summaryMetrics.totalLoan.toLocaleString('en-IN')}
                                   </div>
                                 </div>
-                                <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-xs">
-                                  ₹
-                                </span>
                               </div>
 
                               {/* Card 3: Outstanding Amount */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                                <div>
+                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-200 transition-colors">
+                                {/* Left Icon */}
+                                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                  <Receipt className="w-5 h-5" />
+                                </div>
+                                {/* Right Data */}
+                                <div className="text-right">
                                   <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                                     Outstanding Amount
                                   </span>
@@ -977,33 +979,32 @@ function App() {
                                     ₹{summaryMetrics.totalOutstanding.toLocaleString('en-IN')}
                                   </div>
                                 </div>
-                                <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 font-bold flex items-center justify-center text-xs">
-                                  ₹
-                                </span>
                               </div>
 
                               {/* Card 4: Overdue (OD) Amount */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-rose-100 bg-rose-50/20 shadow-sm flex items-center justify-between">
-                                <div>
+                              <div className="bg-white px-4 py-3 rounded-xl border border-rose-100 bg-rose-50/20 shadow-sm flex items-center justify-between hover:border-rose-200 transition-colors">
+                                {/* Left Icon */}
+                                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                                  <ClockAlert className="w-5 h-5" />
+                                </div>
+                                {/* Right Data */}
+                                <div className="text-right flex flex-col items-end">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider block">
-                                      OD Amount (Overdue)
-                                    </span>
                                     <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
                                       Past Due
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider block">
+                                      OD Amount (Overdue)
                                     </span>
                                   </div>
                                   <div className="text-lg font-bold text-rose-600 mt-0.5">
                                     ₹{summaryMetrics.totalOverdue.toLocaleString('en-IN')}
                                   </div>
                                 </div>
-                                <span className="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 font-bold flex items-center justify-center text-xs">
-                                  !
-                                </span>
                               </div>
                             </div>
 
-                            {/* 3. SEARCH BAR & FILTER ROW */}
+                            {/* 2. SEARCH BAR & FILTER ROW */}
                             <div className="flex items-center gap-3 mb-3">
                               <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1023,12 +1024,12 @@ function App() {
                               </button>
                             </div>
 
-                            {/* 4. ENTRIES COUNTER */}
+                            {/* 3. ENTRIES COUNTER */}
                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                               ENTRIES: {approvedCustomers.length}
                             </div>
 
-                            {/* 5. CUSTOMER TABLE (DESKTOP VIEW) */}
+                            {/* 4. CUSTOMER TABLE (DESKTOP VIEW) */}
                             <div className="bg-white border border-slate-200 rounded-lg shadow-sm mb-4 overflow-hidden">
                             <table className="w-full text-left border-collapse">
                               <thead>
