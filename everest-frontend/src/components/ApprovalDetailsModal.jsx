@@ -381,9 +381,9 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Requested Amount</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Disbursement Amount</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">₹{application.loanAmount || '0'}</span>
+                <span className="pt-[1px]">₹{application.disbursementAmount || application.disbursedAmount || application.loanAmount || '0'}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
