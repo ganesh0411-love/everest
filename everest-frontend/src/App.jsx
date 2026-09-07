@@ -662,6 +662,49 @@ function App() {
     }, { totalLoan: 0, totalOutstanding: 0 });
   }, [processedCustomers]);
 
+  // 1. SUMMARY METRICS CALCULATION ENGINE
+  const summaryMetrics = useMemo(() => {
+    const today = new Date();
+    const approvedCustomers = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
+
+    return approvedCustomers.reduce((acc, curr) => {
+      // 1. Disbursement Amount (pulled from loan/application data)
+      const disbursed = Number(
+        curr.disbursementAmount ||
+        curr.disbursedAmount ||
+        curr.netDisbursed ||
+        curr.sanctionedAmount ||
+        0
+      );
+
+      // 2. Total Loan Amount
+      const loanAmt = Number(curr.loanAmount || curr.principalAmount || 0);
+
+      // 3. Outstanding Amount (Pending balance)
+      const outstanding = Number(curr.outstandingAmount || curr.balance || 0);
+
+      // 4. Overdue (OD) Amount: sum of bounced/past-due unpaid installments
+      let od = Number(curr.odAmount || curr.overdueAmount || 0);
+      if (!od && Array.isArray(curr.schedule)) {
+        od = curr.schedule.reduce((subOd, inst) => {
+          const dueDate = inst.dueDate ? new Date(inst.dueDate) : null;
+          const isPastDue = dueDate && dueDate < today;
+          const isUnpaid = inst.status !== 'Paid' && inst.status !== 'closed';
+          return isPastDue && isUnpaid ? subOd + Number(inst.amount || inst.emiAmount || 0) : subOd;
+        }, 0);
+      } else if (!od && curr.bouncedAmount) {
+        od = Number(curr.bouncedAmount);
+      }
+
+      return {
+        totalDisbursed: acc.totalDisbursed + disbursed,
+        totalLoan: acc.totalLoan + loanAmt,
+        totalOutstanding: acc.totalOutstanding + outstanding,
+        totalOverdue: acc.totalOverdue + od
+      };
+    }, { totalDisbursed: 0, totalLoan: 0, totalOutstanding: 0, totalOverdue: 0 });
+  }, [processedCustomers]);
+
   const formatDate = (dateString) => {
     const d = new Date(dateString);
     if (isNaN(d)) return dateString;
@@ -847,7 +890,9 @@ function App() {
             ) : (
               <>
                 <div className="flex-shrink-0 z-30 bg-[#f8fafc] pb-2">
-                  <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
+                  <div className={(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? 'md:hidden' : ''}>
+                    <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
+                  </div>
                   <SearchBar 
                     onFilterClick={openFilter} 
                     value={searchQuery}
@@ -884,7 +929,65 @@ function App() {
                         
                         {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
                         {isMainBranchView && (
-                          <div className="hidden md:block overflow-x-auto bg-white border border-slate-200 rounded-lg shadow-sm mb-4">
+                          <>
+                            <div className="hidden md:grid grid-cols-4 gap-4 mb-6">
+                              {/* Card 1: Disbursement Amount */}
+                              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-slate-300 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Disbursement Amount</span>
+                                  <span className="p-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">₹</span>
+                                </div>
+                                <div className="mt-3">
+                                  <div className="text-2xl font-bold text-slate-800">
+                                    ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
+                                  </div>
+                                  <p className="text-xs text-slate-400 mt-1">Total disbursed via applications</p>
+                                </div>
+                              </div>
+
+                              {/* Card 2: Loan Amount */}
+                              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-blue-200 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Loan Amount</span>
+                                  <span className="p-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold">₹</span>
+                                </div>
+                                <div className="mt-3">
+                                  <div className="text-2xl font-bold text-blue-600">
+                                    ₹{summaryMetrics.totalLoan.toLocaleString('en-IN')}
+                                  </div>
+                                  <p className="text-xs text-slate-400 mt-1">Total principal sanctioned</p>
+                                </div>
+                              </div>
+
+                              {/* Card 3: Outstanding Amount */}
+                              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-amber-200 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Outstanding Amount</span>
+                                  <span className="p-2 rounded-xl bg-amber-50 text-amber-600 text-xs font-bold">₹</span>
+                                </div>
+                                <div className="mt-3">
+                                  <div className="text-2xl font-bold text-amber-600">
+                                    ₹{summaryMetrics.totalOutstanding.toLocaleString('en-IN')}
+                                  </div>
+                                  <p className="text-xs text-slate-400 mt-1">Total pending balance</p>
+                                </div>
+                              </div>
+
+                              {/* Card 4: Overdue (OD) Amount */}
+                              <div className="bg-white p-5 rounded-2xl border border-rose-100 bg-rose-50/20 shadow-sm flex flex-col justify-between hover:border-rose-200 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-rose-600 uppercase tracking-wider">OD Amount (Overdue)</span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">Past Due</span>
+                                </div>
+                                <div className="mt-3">
+                                  <div className="text-2xl font-bold text-rose-600">
+                                    ₹{summaryMetrics.totalOverdue.toLocaleString('en-IN')}
+                                  </div>
+                                  <p className="text-xs text-rose-500/80 mt-1">Total unpaid bounced / crossed EMIs</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="hidden md:block overflow-x-auto bg-white border border-slate-200 rounded-lg shadow-sm mb-4">
                             <table className="w-full text-left border-collapse">
                               <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
@@ -930,6 +1033,7 @@ function App() {
                               </tbody>
                             </table>
                           </div>
+                          </>
                         )}
                         
                         {/* STANDARD CARD VIEW (Hidden on desktop if Main Branch is active) */}
