@@ -109,9 +109,24 @@ const Login = ({ onLoginSuccess }) => {
 
     const sanitizedIdentifier = String(phoneNumber || '').trim();
     const cleanPhone = sanitizedIdentifier.replace(/\D/g, '').slice(-10);
-    const internalEmail = `${cleanPhone}@everestmicro.internal`;
     const sanitizedPassword = String(password || '').trim();
     const authPassword = sanitizedPassword;
+
+    let internalEmail = `${cleanPhone}@everestmicro.internal`;
+    try {
+      const { secondaryDb } = await import('../firebase');
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const q = query(collection(secondaryDb, 'staff'), where('phone', '==', cleanPhone));
+      const qSnap = await getDocs(q);
+      if (!qSnap.empty) {
+        const preflightData = qSnap.docs[0].data();
+        if (preflightData.authEmail) {
+          internalEmail = preflightData.authEmail;
+        }
+      }
+    } catch (lookupErr) {
+      console.warn("Could not pre-resolve auth email, defaulting to standard pattern:", lookupErr);
+    }
 
     console.log("=== ATTEMPTING STAFF LOGIN ===");
     console.log("Input Phone:", cleanPhone);
