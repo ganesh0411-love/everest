@@ -532,8 +532,8 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
       {/* STATIC TOP SECTION: Header & Action Bar */}
       <div className="shrink-0 flex flex-col z-20">
         
-        {/* Curved Gradient Header */}
-        <div className="bg-gradient-to-br from-purple-500 to-blue-500 pb-12 pt-6 px-4 relative z-0">
+        {/* Curved Gradient Header (Mobile Only) */}
+        <div className="md:hidden bg-gradient-to-br from-purple-500 to-blue-500 pb-12 pt-6 px-4 relative z-0">
           <div className="flex items-center justify-between mb-4 mt-2">
             <button 
               onClick={onBack}
@@ -548,8 +548,16 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           </div>
         </div>
 
-        {/* Action Bar (Pulled up over the curve) */}
-        <div className="bg-white rounded-t-[2.5rem] -mt-8 pt-8 px-5 pb-4 z-10 shadow-[0_4px_10px_rgba(0,0,0,0.03)] relative">
+        {/* Clean Desktop Header */}
+        <div className="hidden md:flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200">
+           <div>
+             <h1 className="text-xl font-bold text-slate-800">Staff Management</h1>
+             <p className="text-sm text-slate-500 mt-0.5">Manage your staff details</p>
+           </div>
+        </div>
+
+        {/* Action Bar (Pulled up over the curve on mobile, flat on desktop) */}
+        <div className="bg-white rounded-t-[2.5rem] md:rounded-none -mt-8 md:mt-0 pt-8 md:pt-4 px-5 md:px-6 pb-4 z-10 shadow-[0_4px_10px_rgba(0,0,0,0.03)] md:shadow-none md:border-b md:border-slate-200 relative">
           <div className="flex items-center gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
@@ -719,8 +727,8 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         </div>
       </div>
 
-      {/* Custom Bottom Navigation Bar (Fixed at bottom) */}
-      <div className="absolute bottom-0 left-0 w-full h-[72px] bg-white border-t border-slate-100 flex justify-around items-center px-6 pb-safe z-50">
+      {/* Custom Bottom Navigation Bar (Fixed at bottom, Mobile Only) */}
+      <div className="md:hidden absolute bottom-0 left-0 w-full h-[72px] bg-white border-t border-slate-100 flex justify-around items-center px-6 pb-safe z-50">
         
         <button 
           onClick={() => setCurrentView && setCurrentView('Home')}
