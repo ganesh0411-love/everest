@@ -65,7 +65,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
   };
 
   return (
-    <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto md:max-w-none md:mx-0 bg-[#eaf5f4] md:py-4 ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'}`}>
+    <header className={`w-full px-4 shadow-sm relative z-50 flex-col max-w-4xl mx-auto md:max-w-none md:mx-0 bg-[#eaf5f4] md:py-4 ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'} ${currentView === 'Staff Management' ? 'hidden md:flex' : 'flex'}`}>
       <div className={`flex justify-between relative ${(currentView === 'Customer') ? 'items-center pb-1' : 'items-start'}`}>
           {/* Always show Logo & Branch on Left */}
           <div className="flex items-center gap-2 md:gap-4">
@@ -279,7 +279,13 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             <span className="text-emerald-600 text-[11px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Track & Manage Loan Requests</span>
           </div>
         )}
-        {currentView !== 'Customer' && currentView !== 'Application Status' && currentView !== 'Home' && currentView !== 'HOME' && currentView !== 'Dashboard Overview' && (
+        {currentView === 'Staff Management' && (
+          <div className="flex flex-col items-center">
+            <span className="font-black text-[24px] text-slate-900 leading-tight tracking-wider">STAFF MANAGEMENT</span>
+            <span className="text-blue-600 text-[11px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Manage & Monitor Staff Profiles</span>
+          </div>
+        )}
+        {currentView !== 'Customer' && currentView !== 'Application Status' && currentView !== 'Staff Management' && currentView !== 'Home' && currentView !== 'HOME' && currentView !== 'Dashboard Overview' && (
           <h1 className="text-[24px] font-black text-slate-900 tracking-wider leading-tight whitespace-nowrap uppercase" style={{ fontFamily: 'Georgia, serif' }}>
             {currentView}
           </h1>

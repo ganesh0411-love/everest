@@ -1238,7 +1238,7 @@ function App() {
         <CustomerDashboard userProfile={userProfile} customers={customers} />
       ) : (
         <div className="w-full h-full flex flex-col relative overflow-hidden">
-          {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Staff Management' && (
+          {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && (
             <Header 
               currentView={currentView} 
               setCurrentView={switchTab}
@@ -1435,7 +1435,7 @@ function App() {
                 </div>
               )}
 
-              {currentView !== 'Customer Detail' && currentView !== 'Staff Management' && (
+              {currentView !== 'Customer Detail' && (
                 <div className="flex-shrink-0 z-40 relative md:hidden">
                   <Footer currentView={currentView} setCurrentView={switchTab} />
                 </div>

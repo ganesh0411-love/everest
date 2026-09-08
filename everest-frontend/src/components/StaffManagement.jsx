@@ -517,7 +517,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   });
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-white overflow-hidden relative pb-[72px]">
+    <div className="flex flex-col h-full bg-white overflow-hidden relative pb-[72px]">
       
       {showAddForm && (
         <AddStaffForm 
