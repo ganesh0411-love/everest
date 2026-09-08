@@ -139,7 +139,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   }, [approvalDate, application]);
 
   const viewSequence = isReadOnly 
-    ? ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc', 'userSettings']
+    ? ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc', ...(isAdmin ? ['userSettings'] : [])]
     : ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc'];
 
   const syncNomineeData = async () => {
@@ -317,7 +317,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
       icon: <IdCard size={20} className="text-indigo-600" />,
       bg: 'bg-indigo-100',
     },
-    ...(isReadOnly ? [{
+    ...(isReadOnly && isAdmin ? [{
       id: 'userSettings',
       title: 'User Setting',
       subtitle: 'Manage account & deletion',
@@ -558,13 +558,13 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
                 </button>
                 <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">3. Staff</h2>
               </div>
-              {canAssignStaff && !isReadOnly && (
+              {isAdmin && (
                 <div className="relative">
                   <button 
                     onClick={() => setShowStaffDropdown(!showStaffDropdown)}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg font-bold text-[13px] transition-colors shadow-sm active:scale-95"
                   >
-                    Assign
+                    + Assign Staff
                   </button>
                   
                   {showStaffDropdown && (
