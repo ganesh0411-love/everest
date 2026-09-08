@@ -140,15 +140,15 @@ function App() {
                   const { collection, query, where, getDocs } = await import('firebase/firestore');
                   const staffQuery = query(collection(db, 'staff'), where('uid', '==', currentUser.uid));
                   const staffSnaps = await getDocs(staffQuery);
-                    if (!staffSnaps.empty) {
-                      const sDoc = staffSnaps.docs[0].data();
-                      profileData.name = sDoc.name || 'Staff Member';
-                      profileData.staffId = sDoc.staffId || sDoc.employeeId || sDoc.customId || sDoc.phone || 'N/A';
-                      profileData.branchId = sDoc.branchId || profileData.branchId || 'main';
-                      profileData.branchName = sDoc.branchName || profileData.branchName || 'Main Branch';
-                      profileData.credentialsVersion = sDoc.credentialsVersion || null;
-                      profileData.photoBase64 = sDoc.photoBase64 || sDoc.photoUrl || sDoc.avatarUrl || sDoc.profileImage || null;
-                    }
+                      if (!staffSnaps.empty) {
+                        const sDoc = staffSnaps.docs[0].data();
+                        profileData.name = sDoc.name || 'Staff Member';
+                        profileData.staffId = sDoc.staffId || sDoc.id || sDoc.employeeId || sDoc.customId || sDoc.phone || 'N/A';
+                        profileData.branchId = sDoc.branchId || profileData.branchId || 'main';
+                        profileData.branchName = sDoc.branchName || profileData.branchName || 'Main Branch';
+                        profileData.credentialsVersion = sDoc.credentialsVersion || null;
+                        profileData.photoBase64 = sDoc.photoBase64 || sDoc.photoUrl || sDoc.avatarUrl || sDoc.profileImage || null;
+                      }
                   
                   // CRITICAL FIX: Lock the global application branch context to this staff's assigned branch
                   if (profileData.branchId) {
