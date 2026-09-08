@@ -4,6 +4,7 @@ import PdfPreviewModal from './PdfPreviewModal';
 import AddCustomerModal from './AddCustomerModal';
 import ApprovalDetailsModal from './ApprovalDetailsModal';
 import OfflineImage from './OfflineImage';
+import { Eye } from 'lucide-react';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
@@ -18,6 +19,34 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const [pdfAutoMode, setPdfAutoMode] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedPendingApp, setSelectedPendingApp] = useState(null);
+
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe || isRightSwipe) {
+      const currentTabIndex = tabs.findIndex(t => t.id === activeTab);
+      if (isLeftSwipe && currentTabIndex < tabs.length - 1) {
+        setActiveTab(tabs[currentTabIndex + 1].id);
+      } else if (isRightSwipe && currentTabIndex > 0) {
+        setActiveTab(tabs[currentTabIndex - 1].id);
+      }
+    }
+  };
 
   const tabs = [
     { id: 'Pending', label: 'Pending', activeClass: 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' },
@@ -87,7 +116,12 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       </div>
 
       {/* Dynamic Data Table / List Cards */}
-      <div className="p-2 w-full flex-1 overflow-y-auto">
+      <div 
+        className="p-2 w-full flex-1 overflow-y-auto"
+        onTouchStart={isMainBranch ? onTouchStart : undefined}
+        onTouchMove={isMainBranch ? onTouchMove : undefined}
+        onTouchEnd={isMainBranch ? onTouchEnd : undefined}
+      >
         <div className="w-full pb-32">
           <table className="w-full text-left whitespace-nowrap table-fixed">
             <thead className="text-[10px] font-bold text-black uppercase tracking-wider bg-slate-50 border-b border-slate-200">
@@ -131,7 +165,10 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       />
                       <div className="truncate flex flex-col">
                         <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
-                        <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate">
+                        <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate md:hidden">
+                          {isMainBranch ? (app.branch || app.branchName || 'Main') : `ID: ${app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}`}
+                        </div>
+                        <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate hidden md:block">
                           ID: {app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}
                         </div>
                       </div>
@@ -204,84 +241,69 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       </div>
                     )}
                   </td>
-                  <td className="p-2 flex items-center justify-center md:hidden relative">
-                    
-                    {/* Three-Dot Menu Button */}
-                    <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                    </button>
-
-                    {/* Embedded Dropdown Menu */}
-                    {activeMenuId === app.id && (
-                      <div 
-                        className="absolute right-10 top-10 w-48 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
-                        onClick={(e) => e.stopPropagation()}
+                  <td className="p-2 flex items-center justify-center md:hidden relative h-full min-h-[48px]">
+                    {isMainBranch ? (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setSelectedPendingApp(app); }} 
+                        className="p-1.5 text-blue-500 hover:text-blue-700 transition-colors rounded-lg hover:bg-blue-50 bg-blue-50/50"
                       >
-                        <button 
-                          onClick={() => {
-                            setIsEditing(app);
-                            setActiveMenuId(null);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
-                        >
-                          <span>✏️</span> Edit Details
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setActivePdfApp(app);
-                            setActiveMenuId(null);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
-                        >
-                          <span>📄</span> View PDF
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setPdfAutoMode('share');
-                            setActivePdfApp(app);
-                            setActiveMenuId(null);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
-                        >
-                          <span>🔗</span> Share
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setPdfAutoMode('print');
-                            setActivePdfApp(app);
-                            setActiveMenuId(null);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
-                        >
-                          <span>🖨️</span> Print PDF
-                        </button>
-                        <button onClick={() => deleteApp(app.id)} className="w-full text-left px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3">
-                          <span>🗑️</span> Delete
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Action Triggers based on Tab */}
-                    {activeTab === 'Pending' && (
+                        <Eye size={20} />
+                      </button>
+                    ) : (
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); setSelectedPendingApp(app); }} className="w-7 h-7 rounded bg-emerald-50 text-emerald-500 flex items-center justify-center hover:bg-emerald-100 border border-emerald-100 transition-colors" title="Review & Approve">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        {/* Three-Dot Menu Button */}
+                        <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                           </svg>
                         </button>
+
+                        {/* Embedded Dropdown Menu */}
+                        {activeMenuId === app.id && (
+                          <div 
+                            className="absolute right-10 top-10 w-48 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button 
+                              onClick={() => {
+                                setIsEditing(app);
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                            >
+                              <span>✏️</span> Edit Details
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setActivePdfApp(app);
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                            >
+                              <span>📄</span> View PDF
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setPdfAutoMode('share');
+                                setActivePdfApp(app);
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                            >
+                              <span>🔗</span> Share
+                            </button>
+                            <button 
+                              onClick={() => deleteApp(app.id)} 
+                              className="w-full text-left px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3"
+                            >
+                              <span>🗑️</span> Delete
+                            </button>
+                          </div>
+                        )}
                       </>
                     )}
-
-                    {(activeTab === 'Approved' || activeTab === 'Rejected') && (
-                      <button onClick={() => updateStatus(app.id, 'Pending')} className="w-7 h-7 rounded bg-amber-50 text-amber-600 flex items-center justify-center hover:bg-amber-100 border border-amber-100 transition-colors" title="Move to Pending">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    )}
                   </td>
+
                 </tr>
               ))}
             </tbody>
@@ -334,6 +356,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       {selectedPendingApp && (
         <ApprovalDetailsModal
           application={selectedPendingApp}
+          isReadOnly={isMainBranch}
           onClose={() => setSelectedPendingApp(null)}
           onApprove={(id, popupData) => {
             updateStatus(id, 'Approved', popupData);
