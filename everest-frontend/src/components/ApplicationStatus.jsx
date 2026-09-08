@@ -118,9 +118,9 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       {/* Dynamic Data Table / List Cards */}
       <div 
         className="p-2 w-full flex-1 overflow-y-auto"
-        onTouchStart={isMainBranch ? onTouchStart : undefined}
-        onTouchMove={isMainBranch ? onTouchMove : undefined}
-        onTouchEnd={isMainBranch ? onTouchEnd : undefined}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         <div className="w-full pb-32">
           <table className="w-full text-left whitespace-nowrap table-fixed">
@@ -166,7 +166,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       <div className="truncate flex flex-col">
                         <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate md:hidden">
-                          {isMainBranch ? (app.branch || app.branchName || 'Main') : `ID: ${app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}`}
+                          {isMainBranch ? (app.branch || app.branchName || 'Main') : `Staff: ${app.assignedStaffName || app.staffName || 'Unassigned'}`}
                         </div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate hidden md:block">
                           ID: {app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}
@@ -250,7 +250,15 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                         <Eye size={20} />
                       </button>
                     ) : (
-                      <>
+                      <div className="flex gap-1.5 items-center relative">
+                        {/* Green Checkmark for Pending Apps */}
+                        {activeTab === 'Pending' && (
+                          <button onClick={(e) => { e.stopPropagation(); setSelectedPendingApp(app); }} className="w-7 h-7 rounded bg-emerald-50 text-emerald-500 flex items-center justify-center hover:bg-emerald-100 border border-emerald-100 transition-colors shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        )}
                         {/* Three-Dot Menu Button */}
                         <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -261,7 +269,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                         {/* Embedded Dropdown Menu */}
                         {activeMenuId === app.id && (
                           <div 
-                            className="absolute right-10 top-10 w-48 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
+                            className="absolute right-8 top-8 w-48 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <button 
@@ -300,7 +308,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                             </button>
                           </div>
                         )}
-                      </>
+                      </div>
                     )}
                   </td>
 
