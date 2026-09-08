@@ -111,12 +111,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
               ) : currentApps.map((app, index) => (
                 <tr 
                   key={app.id} 
-                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors w-full ${activeTab === 'Pending' ? 'cursor-pointer' : ''}`}
-                  onClick={() => {
-                    if (activeTab === 'Pending') {
-                      setSelectedPendingApp(app);
-                    }
-                  }}
+                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors w-full`}
                 >
                   <td className="p-2 font-bold text-slate-800 text-sm text-left md:pl-6">{index + 1}</td>
                   <td className="p-2 font-semibold text-slate-600 text-xs">
@@ -166,7 +161,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                     ) : (
                       <div className="flex items-center gap-2">
                         {activeTab === 'Pending' && (
-                          <button onClick={(e) => { e.stopPropagation(); updateStatus(app.id, 'Approved'); }} className="w-7 h-7 rounded bg-emerald-50 text-emerald-500 flex items-center justify-center hover:bg-emerald-100 border border-emerald-100 transition-colors" title="Approve">
+                          <button onClick={(e) => { e.stopPropagation(); setSelectedPendingApp(app); }} className="w-7 h-7 rounded bg-emerald-50 text-emerald-500 flex items-center justify-center hover:bg-emerald-100 border border-emerald-100 transition-colors" title="Review & Approve">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
@@ -271,14 +266,9 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                     {/* Action Triggers based on Tab */}
                     {activeTab === 'Pending' && (
                       <>
-                        <button onClick={() => updateStatus(app.id, 'Approved')} className="w-7 h-7 rounded bg-emerald-50 text-emerald-500 flex items-center justify-center hover:bg-emerald-100 border border-emerald-100 transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedPendingApp(app); }} className="w-7 h-7 rounded bg-emerald-50 text-emerald-500 flex items-center justify-center hover:bg-emerald-100 border border-emerald-100 transition-colors" title="Review & Approve">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                        <button onClick={() => updateStatus(app.id, 'Rejected')} className="w-7 h-7 rounded bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 border border-rose-100 transition-colors">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                           </svg>
                         </button>
                       </>

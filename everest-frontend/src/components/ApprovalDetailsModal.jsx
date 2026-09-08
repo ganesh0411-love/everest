@@ -118,13 +118,25 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   };
 
 
-  // Auto-calculate 7 days from approvalDate
+  // Auto-calculate dynamic next due date based on loan scheme
   const nextDueDate = React.useMemo(() => {
     if (!approvalDate) return '';
     const date = new Date(approvalDate);
-    date.setDate(date.getDate() + 7);
+    
+    const loanType = (application?.loanType || application?.scheme || '').toLowerCase();
+    
+    if (loanType.includes('daily')) {
+      date.setDate(date.getDate() + 1);
+    } else if (loanType.includes('weekly')) {
+      date.setDate(date.getDate() + 7);
+    } else if (loanType.includes('monthly') || loanType.includes('personal') || loanType.includes('agri')) {
+      date.setMonth(date.getMonth() + 1);
+    } else {
+      date.setDate(date.getDate() + 7); // Fallback
+    }
+    
     return date.toISOString().split('T')[0];
-  }, [approvalDate]);
+  }, [approvalDate, application]);
 
   const viewSequence = isReadOnly 
     ? ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc', 'userSettings']
