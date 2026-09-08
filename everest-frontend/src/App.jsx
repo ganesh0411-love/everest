@@ -1227,11 +1227,13 @@ function App() {
                                 <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
                                   {isMainBranchView ? (
                                     <div className="flex items-center justify-end">
-                                      <div className="text-sm font-semibold text-emerald-600">
+                                      <div className="w-[72px] text-right text-sm font-semibold text-emerald-600">
                                         ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
                                       </div>
-                                      <div className="h-6 w-[1.5px] bg-gray-800 mx-2"></div>
-                                      <div className="text-sm font-semibold text-rose-600">
+                                      <div className="w-[16px] flex justify-center items-center">
+                                        <div className="w-[2px] h-6 bg-gray-900 rounded-full flex-shrink-0"></div>
+                                      </div>
+                                      <div className="w-[72px] text-left text-sm font-semibold text-rose-600">
                                         ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
                                       </div>
                                     </div>
