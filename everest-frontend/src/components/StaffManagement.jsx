@@ -523,7 +523,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   });
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden relative pb-[72px]">
+    <div className={`flex flex-col h-full bg-white overflow-hidden relative ${isMainBranch ? '' : 'pb-[72px]'}`}>
       
       {showAddForm && (
         <AddStaffForm 
@@ -735,32 +735,34 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
       </div>
 
       {/* Custom Bottom Navigation Bar (Fixed at bottom, Mobile Only) */}
-      <div className="md:hidden absolute bottom-0 left-0 w-full h-[72px] bg-white border-t border-slate-100 flex justify-around items-center px-6 pb-safe z-50">
-        
-        <button 
-          onClick={() => setCurrentView && setCurrentView('Home')}
-          className="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 hover:text-purple-600 transition-colors"
-        >
-          <Home size={26} strokeWidth={2.5} />
-          <span className="text-[10px] font-semibold">Home</span>
-        </button>
+      {!isMainBranch && (
+        <div className="md:hidden absolute bottom-0 left-0 w-full h-[72px] bg-white border-t border-slate-100 flex justify-around items-center px-6 pb-safe z-50">
+          
+          <button 
+            onClick={() => setCurrentView && setCurrentView('Home')}
+            className="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 hover:text-purple-600 transition-colors"
+          >
+            <Home size={26} strokeWidth={2.5} />
+            <span className="text-[10px] font-semibold">Home</span>
+          </button>
 
-        <button 
-          onClick={handleOpenAddForm}
-          className="relative -top-5 w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-purple-500/40 hover:scale-105 transition-transform"
-        >
-          <Plus size={32} strokeWidth={2.5} />
-        </button>
+          <button 
+            onClick={handleOpenAddForm}
+            className="relative -top-5 w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-purple-500/40 hover:scale-105 transition-transform"
+          >
+            <Plus size={32} strokeWidth={2.5} />
+          </button>
 
-        <button 
-          onClick={() => setCurrentView && setCurrentView('Centers')}
-          className="flex flex-col items-center justify-center gap-1 w-16 text-purple-700 transition-colors"
-        >
-          <Users size={28} strokeWidth={2.5} fill="currentColor" />
-          <span className="text-[10px] font-bold text-purple-800">Groups</span>
-        </button>
+          <button 
+            onClick={() => setCurrentView && setCurrentView('Centers')}
+            className="flex flex-col items-center justify-center gap-1 w-16 text-purple-700 transition-colors"
+          >
+            <Users size={28} strokeWidth={2.5} fill="currentColor" />
+            <span className="text-[10px] font-bold text-purple-800">Groups</span>
+          </button>
 
-      </div>
+        </div>
+      )}
     </div>
   );
 };
