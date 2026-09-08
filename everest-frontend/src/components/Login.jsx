@@ -107,9 +107,11 @@ const Login = ({ onLoginSuccess }) => {
       return;
     }
 
-    const cleanPhone = String(phoneNumber || '').replace(/\D/g, '').slice(-10);
+    const sanitizedIdentifier = String(phoneNumber || '').trim();
+    const cleanPhone = sanitizedIdentifier.replace(/\D/g, '').slice(-10);
     const internalEmail = `${cleanPhone}@everestmicro.internal`;
-    const authPassword = String(password || '').trim();
+    const sanitizedPassword = String(password || '').trim();
+    const authPassword = sanitizedPassword;
 
     console.log("=== ATTEMPTING STAFF LOGIN ===");
     console.log("Input Phone:", cleanPhone);
@@ -184,7 +186,7 @@ const Login = ({ onLoginSuccess }) => {
           
           if (!qSnap.empty) {
             const staffData = qSnap.docs[0].data();
-            if (staffData.authPassword && staffData.authPassword === authPassword) {
+            if (staffData.authPassword && String(staffData.authPassword).trim() === authPassword) {
               console.warn("Firebase Auth out of sync. Repairing credentials via Account Rotation...");
               
               // 1. Create a fresh Auth account to escape the broken credential state
