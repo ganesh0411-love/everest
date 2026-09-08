@@ -112,37 +112,40 @@ const Login = ({ onLoginSuccess }) => {
     const sanitizedPassword = String(password || '').trim();
     const authPassword = sanitizedPassword;
 
-    let internalEmail = `${cleanPhone}@everestmicro.internal`;
-    try {
-      const { secondaryDb } = await import('../firebase');
-      const { collection, query, where, getDocs } = await import('firebase/firestore');
-      const q = query(collection(secondaryDb, 'staff'), where('phone', '==', cleanPhone));
-      const qSnap = await getDocs(q);
-      if (!qSnap.empty) {
-        // Find the active record, ignoring recycled/deleted ones
-        const activeDoc = qSnap.docs.find(doc => {
-          const status = doc.data().status;
-          return status !== 'Deleted' && status !== 'Recycled';
-        });
-        const preflightData = activeDoc ? activeDoc.data() : qSnap.docs[0].data();
-        if (preflightData.authEmail) {
-          internalEmail = preflightData.authEmail;
-        }
-      }
-    } catch (lookupErr) {
-      console.warn("Could not pre-resolve auth email, defaulting to standard pattern:", lookupErr);
-    }
-
     console.log("=== ATTEMPTING STAFF LOGIN ===");
     console.log("Input Phone:", cleanPhone);
-    console.log("Attempted Email:", internalEmail);
     console.log("Attempted Password String Length:", authPassword.length);
-    console.log("Attempted Password Value (Debug):", authPassword);
 
     try {
-      // 1. Strict pre-routing verification (Pre-flight using secondaryAuth/secondaryDb to prevent UI flicker)
       const { secondaryAuth, secondaryDb } = await import('../firebase');
-      const userCredential = await signInWithEmailAndPassword(secondaryAuth, internalEmail, authPassword);
+      
+      const potentialEmails = [
+        `${cleanPhone}@everestmicro.internal`,
+        ...Array.from({ length: 10 }, (_, i) => `${cleanPhone}_${i + 1}@everestmicro.internal`)
+      ];
+
+      let userCredential = null;
+      let internalEmail = '';
+
+      for (const testEmail of potentialEmails) {
+        try {
+          userCredential = await signInWithEmailAndPassword(secondaryAuth, testEmail, authPassword);
+          internalEmail = testEmail;
+          console.log("Deterministically resolved active Auth email:", internalEmail);
+          break; // Success!
+        } catch (err) {
+          if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!userCredential) {
+        throw { code: 'auth/invalid-credential', message: 'Invalid credentials. Password did not match any active or rotated identity.' };
+      }
+      
+      // 1. Strict pre-routing verification (Pre-flight using secondaryAuth/secondaryDb to prevent UI flicker)
       const uid = userCredential.user.uid;
       
       let staffData = null;
@@ -221,37 +224,55 @@ const Login = ({ onLoginSuccess }) => {
             if (staffData.authPassword && String(staffData.authPassword).trim() === authPassword) {
               console.warn("Firebase Auth out of sync. Repairing credentials via Account Rotation...");
               
-              // 1. Create a fresh Auth account to escape the broken credential state
-              const newEmail = `${cleanPhone}_${Date.now()}@everestmicro.internal`;
-              const { auth: primaryAuth } = await import('../firebase');
-              const newUserCred = await createUserWithEmailAndPassword(primaryAuth, newEmail, authPassword);
-              const newUid = newUserCred.user.uid;
-              const oldUid = staffData.uid || targetDoc.id;
-              
-              // 2. Migrate Firestore records to the new UID
-              await setDoc(doc(secondaryDb, 'staff', newUid), {
-                ...staffData,
-                uid: newUid,
-                authEmail: newEmail,
-                repairedAt: new Date().toISOString()
-              });
-              await setDoc(doc(secondaryDb, 'users', newUid), {
-                phone: cleanPhone,
-                role: 'staff',
-                branchId: staffData.branchId || staffData.branch || ''
-              });
-              
-              // 3. Clean up old orphaned records
-              await deleteDoc(doc(secondaryDb, 'staff', oldUid));
-              await deleteDoc(doc(secondaryDb, 'users', oldUid));
-              
-              console.log('Staff Sign-In Repaired Successfully! New UID:', newUid);
-              localStorage.setItem('everest_staff_session_version', (staffData.sessionVersion || 0).toString());
-              setLoading(false);
-              if (onLoginSuccess) {
-                onLoginSuccess(newUserCred.user);
+              let rotationSuccess = false;
+              for (let i = 1; i <= 10; i++) {
+                try {
+                  const newEmail = `${cleanPhone}_${i}@everestmicro.internal`;
+                  const { auth: primaryAuth } = await import('../firebase');
+                  const newUserCred = await createUserWithEmailAndPassword(primaryAuth, newEmail, authPassword);
+                  const newUid = newUserCred.user.uid;
+                  const oldUid = staffData.uid || targetDoc.id;
+                  
+                  // Migrate Firestore records to the new UID
+                  await setDoc(doc(secondaryDb, 'staff', newUid), {
+                    ...staffData,
+                    uid: newUid,
+                    authEmail: newEmail,
+                    updatedAt: new Date().toISOString()
+                  });
+                  
+                  await setDoc(doc(secondaryDb, 'users', newUid), {
+                    uid: newUid,
+                    phone: staffData.phone || cleanPhone,
+                    role: 'staff',
+                    branchId: staffData.branchId || '',
+                    branchName: staffData.branchName || staffData.branch || '',
+                    branch: staffData.branchName || staffData.branch || '',
+                    status: 'Active',
+                    permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true }
+                  });
+                  
+                  if (oldUid !== newUid) {
+                    await deleteDoc(doc(secondaryDb, 'staff', oldUid)).catch(() => {});
+                    await deleteDoc(doc(secondaryDb, 'users', oldUid)).catch(() => {});
+                  }
+                  
+                  console.log('Staff Sign-In Repaired Successfully! New UID:', newUid);
+                  localStorage.setItem('everest_staff_session_version', (staffData.sessionVersion || 0).toString());
+                  setLoading(false);
+                  if (onLoginSuccess) {
+                    onLoginSuccess(newUserCred.user);
+                  }
+                  rotationSuccess = true;
+                  break;
+                } catch (rotErr) {
+                  if (rotErr.code !== 'auth/email-already-in-use') throw rotErr;
+                }
               }
-              return; // Successful repair bypasses the error
+              
+              if (rotationSuccess) {
+                return; // Successful repair bypasses the error
+              }
             }
           }
         } catch (repairErr) {

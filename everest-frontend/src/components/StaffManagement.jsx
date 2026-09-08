@@ -243,29 +243,39 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
               } catch (adoptError) {
                 console.warn("Adoption failed, performing account rotation to generate new Auth user...");
                 try {
-                  const newEmail = `${cleanPhone}_${Date.now()}@everestmicro.internal`;
-                  const newCred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, authPassword);
-                  uid = newCred.user.uid;
-                  console.log("Successfully created rotated Firebase Auth user:", uid);
-                  await secondaryAuth.signOut();
-                  
-                  // Also inject the rotated auth email into the staffPayload so it can be saved in Firestore
-                  staffData.authEmail = newEmail;
-                  
-                  const selectedBranchName = (activeBranch?.name || staffData.branch || '').trim();
-                  await setDoc(doc(db, 'users', uid), {
-                    uid: uid,
-                    phone: cleanPhone,
-                    role: 'staff',
-                    branchId: activeBranch.id || '',
-                    branchName: selectedBranchName,
-                    branch: selectedBranchName,
-                    status: 'Active',
-                    permissions: {
-                      canDeleteCustomer: false,
-                      canEditLedger: true
+                    let rotationSuccess = false;
+                    for (let i = 1; i <= 10; i++) {
+                      try {
+                        const newEmail = `${cleanPhone}_${i}@everestmicro.internal`;
+                        const newCred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, authPassword);
+                        uid = newCred.user.uid;
+                        console.log(`Successfully created rotated Firebase Auth user (${newEmail}):`, uid);
+                        await secondaryAuth.signOut();
+                        
+                        // Also inject the rotated auth email into the staffPayload so it can be saved in Firestore
+                        staffData.authEmail = newEmail;
+                        
+                        const selectedBranchName = (activeBranch?.name || staffData.branch || '').trim();
+                        await setDoc(doc(db, 'users', uid), {
+                          uid: uid,
+                          phone: cleanPhone,
+                          role: 'staff',
+                          branchId: activeBranch.id || '',
+                          branchName: selectedBranchName,
+                          branch: selectedBranchName,
+                          status: 'Active',
+                          permissions: {
+                            canDeleteCustomer: false,
+                            canEditLedger: true
+                          }
+                        });
+                        rotationSuccess = true;
+                        break;
+                      } catch (rotErr) {
+                        if (rotErr.code !== 'auth/email-already-in-use') throw rotErr;
+                      }
                     }
-                  });
+                    if (!rotationSuccess) throw new Error("Exceeded maximum account rotations (10). Please clean Firebase Console.");
                 } catch (rotationError) {
                   console.error("Account rotation failed:", rotationError);
                   alert(`Failed to rotate account: ${rotationError.message}`);
