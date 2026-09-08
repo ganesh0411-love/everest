@@ -210,7 +210,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
             branchName: selectedBranchName,
             branch: selectedBranchName,
             status: 'Active',
-            permissions: {
+            permissions: staffData.permissions || {
               canDeleteCustomer: false,
               canEditLedger: true
             }
@@ -235,7 +235,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                   branchName: selectedBranchName,
                   branch: selectedBranchName,
                   status: 'Active',
-                  permissions: {
+                  permissions: staffData.permissions || {
                     canDeleteCustomer: false,
                     canEditLedger: true
                   }
@@ -264,7 +264,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                           branchName: selectedBranchName,
                           branch: selectedBranchName,
                           status: 'Active',
-                          permissions: {
+                          permissions: staffData.permissions || {
                             canDeleteCustomer: false,
                             canEditLedger: true
                           }
@@ -365,6 +365,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                 mobileNumber: cleanPhone,
                 role: 'staff',
                 status: 'Active',
+                permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true },
                 updatedAt: new Date().toISOString()
               }, { merge: true });
             } catch (authErr) {
@@ -429,7 +430,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                   branchName: selectedBranchName || '',
                   branch: selectedBranchName || '',
                   status: 'Active',
-                  permissions: { canDeleteCustomer: false, canEditLedger: true }
+                  permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true }
                 });
               } finally {
                 await deleteApp(secApp);
