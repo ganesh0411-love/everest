@@ -734,90 +734,18 @@ function App() {
     let totalOutstanding = 0;
     let totalOverdue = 0;
 
-    const parseDate = (dStr) => {
-      if (!dStr) return new Date();
-      if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
-        const parts = dStr.split('-');
-        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      }
-      return new Date(dStr);
-    };
-
-    // Use the exact customer array rendered in the table
-    const approvedCustomers = (processedCustomers || []).filter(c => c && (c.status === 'Approved' || c.status === 'approved'));
+    let approvedCustomers = (processedCustomers || []).filter(c => c && (c.status === 'Approved' || c.status === 'approved'));
+    if (isOdFilterActive) {
+      approvedCustomers = approvedCustomers.filter(c => c.dynamicOverdue > 0 || c.dynamicPendingDues > 0);
+    }
     const list = Array.isArray(approvedCustomers) ? approvedCustomers : [];
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
     list.forEach((customer) => {
-      if (!customer) return;
-
-      // 1. LOAN AMOUNT
       const loan = Number(customer.loanAmount || customer.principalAmount || customer.amount || 0);
       totalLoan += isNaN(loan) ? 0 : loan;
-
-      // Calculate Total Paid for Collection and Outstanding
-      const installments = customer.installments || [];
-      const nonBouncedInstallments = installments.filter(inst => inst.status !== 'BOUNCED');
-      const totalPaid = nonBouncedInstallments.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0);
-
-      // 2. COLLECTION
-      totalCollection += totalPaid;
-
-      // 3. OUTSTANDING
-      const repayAmount = Number(customer.repayAmount || 0);
-      const remainingBalance = Math.max(0, repayAmount - totalPaid);
-      totalOutstanding += remainingBalance;
-
-      // 4. OVERDUE
-      const getPlanToken = () => {
-        if (customer.tenureUnit) return customer.tenureUnit.toUpperCase().replace(/S$/, '');
-        if (customer.weeks) return 'WEEK';
-        if (customer.days) return 'DAY';
-        if (customer.months) return 'MONTH';
-        return 'WEEK';
-      };
-      
-      const getPlanCount = () => {
-        if (customer.tenureVal) return Number(customer.tenureVal);
-        if (customer.weeks) return Number(customer.weeks);
-        if (customer.days) return Number(customer.days);
-        if (customer.months) return Number(customer.months);
-        return 12;
-      };
-
-      const planToken = getPlanToken();
-      const planCount = getPlanCount();
-      const emiAmount = repayAmount > 0 && planCount > 0 ? Math.round(repayAmount / planCount) : 0;
-      
-      const rawDueDate = customer.nextDueDate || customer.dueDate || '26-05-2026';
-      if (rawDueDate && planCount > 0) {
-        const baseDateObj = parseDate(rawDueDate);
-        let expectedInstallmentsCount = 0;
-        
-        for (let idx = 0; idx < planCount; idx++) {
-          const scheduledDateObj = new Date(baseDateObj);
-          if (planToken === 'DAY') {
-            scheduledDateObj.setDate(scheduledDateObj.getDate() + idx);
-          } else if (planToken === 'MONTH') {
-            scheduledDateObj.setMonth(scheduledDateObj.getMonth() + idx);
-          } else { // WEEK
-            scheduledDateObj.setDate(scheduledDateObj.getDate() + (idx * 7));
-          }
-          scheduledDateObj.setHours(0,0,0,0);
-          
-          if (scheduledDateObj < today) {
-            expectedInstallmentsCount++;
-          } else {
-            break;
-          }
-        }
-        
-        const expectedPaid = Math.min(repayAmount, expectedInstallmentsCount * emiAmount);
-        const overdueAmount = Math.max(0, expectedPaid - totalPaid);
-        totalOverdue += overdueAmount;
-      }
+      totalCollection += (customer.dynamicTotalPaid || 0);
+      totalOutstanding += (customer.dynamicOutstanding || 0);
+      totalOverdue += (customer.dynamicOverdue || 0);
     });
 
     return {
@@ -826,7 +754,7 @@ function App() {
       totalOutstanding,
       totalOverdue
     };
-  }, [processedCustomers]);
+  }, [processedCustomers, isOdFilterActive]);
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);
@@ -1032,7 +960,11 @@ function App() {
                 >
                   {(() => {
                     const isMainBranchView = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
-                    const approvedCustomers = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
+                    let approvedCustomers = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
+                    
+                    if (isOdFilterActive) {
+                      approvedCustomers = approvedCustomers.filter(c => c.dynamicOverdue > 0 || c.dynamicPendingDues > 0);
+                    }
                     
                     if (isMainBranchView) {
                       console.log(`[Main Branch Filter] Selected: "${activeBranchFilter}", Total Customers: ${customers.length}, Filtered: ${approvedCustomers.length}`);
@@ -1176,7 +1108,8 @@ function App() {
                                 {isOdFilterActive ? (
                                   <tr className="bg-rose-50/50 border-b border-rose-100 text-rose-700 text-[11px] uppercase tracking-wider">
                                     <th className="p-3 font-semibold">Customer</th>
-                                    <th className="p-3 font-semibold border-l border-rose-100 text-center">No. of Installments (Pending Dues)</th>
+                                    <th className="p-3 font-semibold border-l border-rose-100">Branch</th>
+                                    <th className="p-3 font-semibold border-l border-rose-100 text-center">Pending Dues</th>
                                     <th className="p-3 font-semibold border-l border-rose-100 text-right">Loan Amount</th>
                                     <th className="p-3 font-semibold border-l border-rose-100 text-right">Paid</th>
                                     <th className="p-3 font-semibold border-l border-rose-100 text-right">Outstanding</th>
@@ -1215,6 +1148,9 @@ function App() {
                                       
                                       {isOdFilterActive ? (
                                         <>
+                                          <td className="p-3 border-l border-rose-100 text-sm font-medium text-slate-700 whitespace-nowrap bg-rose-50/10">
+                                            {customer.branch || customer.branchName || 'Main Branch'}
+                                          </td>
                                           <td className="p-3 border-l border-rose-100 text-sm font-bold text-slate-700 text-center whitespace-nowrap bg-rose-50/10">
                                             {customer.dynamicPendingDues > 0 ? (
                                               <span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs">
