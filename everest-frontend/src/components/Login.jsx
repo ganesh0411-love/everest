@@ -119,7 +119,12 @@ const Login = ({ onLoginSuccess }) => {
       const q = query(collection(secondaryDb, 'staff'), where('phone', '==', cleanPhone));
       const qSnap = await getDocs(q);
       if (!qSnap.empty) {
-        const preflightData = qSnap.docs[0].data();
+        // Find the active record, ignoring recycled/deleted ones
+        const activeDoc = qSnap.docs.find(doc => {
+          const status = doc.data().status;
+          return status !== 'Deleted' && status !== 'Recycled';
+        });
+        const preflightData = activeDoc ? activeDoc.data() : qSnap.docs[0].data();
         if (preflightData.authEmail) {
           internalEmail = preflightData.authEmail;
         }
@@ -151,7 +156,13 @@ const Login = ({ onLoginSuccess }) => {
         const { collection, query, where, getDocs } = await import('firebase/firestore');
         const q = query(collection(secondaryDb, 'staff'), where('phone', '==', cleanPhone));
         const qSnap = await getDocs(q);
-        if (!qSnap.empty) staffData = qSnap.docs[0].data();
+        if (!qSnap.empty) {
+          const activeDoc = qSnap.docs.find(doc => {
+            const status = doc.data().status;
+            return status !== 'Deleted' && status !== 'Recycled';
+          });
+          staffData = activeDoc ? activeDoc.data() : qSnap.docs[0].data();
+        }
       }
 
       // 2. Reject immediately if deleted or recycled
@@ -200,7 +211,13 @@ const Login = ({ onLoginSuccess }) => {
           const qSnap = await getDocs(q);
           
           if (!qSnap.empty) {
-            const staffData = qSnap.docs[0].data();
+            const activeDoc = qSnap.docs.find(doc => {
+              const status = doc.data().status;
+              return status !== 'Deleted' && status !== 'Recycled';
+            });
+            const targetDoc = activeDoc || qSnap.docs[0];
+            const staffData = targetDoc.data();
+            
             if (staffData.authPassword && String(staffData.authPassword).trim() === authPassword) {
               console.warn("Firebase Auth out of sync. Repairing credentials via Account Rotation...");
               
@@ -209,7 +226,7 @@ const Login = ({ onLoginSuccess }) => {
               const { auth: primaryAuth } = await import('../firebase');
               const newUserCred = await createUserWithEmailAndPassword(primaryAuth, newEmail, authPassword);
               const newUid = newUserCred.user.uid;
-              const oldUid = staffData.uid || qSnap.docs[0].id;
+              const oldUid = staffData.uid || targetDoc.id;
               
               // 2. Migrate Firestore records to the new UID
               await setDoc(doc(secondaryDb, 'staff', newUid), {
