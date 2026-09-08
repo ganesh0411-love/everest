@@ -677,29 +677,95 @@ function App() {
   // STRICT FINANCIAL SUMMARY METRICS ENGINE
   const summaryMetrics = useMemo(() => {
     let totalLoan = 0;
+    let totalCollection = 0;
     let totalOutstanding = 0;
+    let totalOverdue = 0;
+
+    const parseDate = (dStr) => {
+      if (!dStr) return new Date();
+      if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
+        const parts = dStr.split('-');
+        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      }
+      return new Date(dStr);
+    };
 
     // Use the exact customer array rendered in the table
     const approvedCustomers = (processedCustomers || []).filter(c => c && (c.status === 'Approved' || c.status === 'approved'));
     const list = Array.isArray(approvedCustomers) ? approvedCustomers : [];
 
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
     list.forEach((customer) => {
       if (!customer) return;
 
-      // 1. Exact value from LOAN AMOUNT table column
+      // 1. LOAN AMOUNT
       const loan = Number(customer.loanAmount || customer.principalAmount || customer.amount || 0);
       totalLoan += isNaN(loan) ? 0 : loan;
 
-      // 2. Exact value from OUTSTANDING table column
-      const outstanding = Number(customer.outstandingAmount || customer.balance || 0);
-      totalOutstanding += isNaN(outstanding) ? 0 : outstanding;
+      // Calculate Total Paid for Collection and Outstanding
+      const installments = customer.installments || [];
+      const nonBouncedInstallments = installments.filter(inst => inst.status !== 'BOUNCED');
+      const totalPaid = nonBouncedInstallments.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0);
+
+      // 2. COLLECTION
+      totalCollection += totalPaid;
+
+      // 3. OUTSTANDING
+      const repayAmount = Number(customer.repayAmount || 0);
+      const remainingBalance = Math.max(0, repayAmount - totalPaid);
+      totalOutstanding += remainingBalance;
+
+      // 4. OVERDUE
+      const getPlanToken = () => {
+        if (customer.tenureUnit) return customer.tenureUnit.toUpperCase().replace(/S$/, '');
+        if (customer.weeks) return 'WEEK';
+        if (customer.days) return 'DAY';
+        if (customer.months) return 'MONTH';
+        return 'WEEK';
+      };
+      
+      const getPlanCount = () => {
+        if (customer.tenureVal) return Number(customer.tenureVal);
+        if (customer.weeks) return Number(customer.weeks);
+        if (customer.days) return Number(customer.days);
+        if (customer.months) return Number(customer.months);
+        return 12;
+      };
+
+      const planToken = getPlanToken();
+      const planCount = getPlanCount();
+      const emiAmount = repayAmount > 0 && planCount > 0 ? Math.round(repayAmount / planCount) : 0;
+      
+      const rawDueDate = customer.nextDueDate || customer.dueDate || '26-05-2026';
+      if (rawDueDate && planCount > 0) {
+        const baseDateObj = parseDate(rawDueDate);
+        let expectedInstallmentsCount = 0;
+        
+        for (let idx = 0; idx < planCount; idx++) {
+          const scheduledDateObj = new Date(baseDateObj);
+          if (planToken === 'DAY') {
+            scheduledDateObj.setDate(scheduledDateObj.getDate() + idx);
+          } else if (planToken === 'MONTH') {
+            scheduledDateObj.setMonth(scheduledDateObj.getMonth() + idx);
+          } else { // WEEK
+            scheduledDateObj.setDate(scheduledDateObj.getDate() + (idx * 7));
+          }
+          scheduledDateObj.setHours(0,0,0,0);
+          
+          if (scheduledDateObj < today) {
+            expectedInstallmentsCount++;
+          } else {
+            break;
+          }
+        }
+        
+        const expectedPaid = Math.min(repayAmount, expectedInstallmentsCount * emiAmount);
+        const overdueAmount = Math.max(0, expectedPaid - totalPaid);
+        totalOverdue += overdueAmount;
+      }
     });
-
-    // 3. Collection = Total Loan - Total Outstanding
-    const totalCollection = Math.max(0, totalLoan - totalOutstanding);
-
-    // Preserve existing OD amount for now (will be refactored next)
-    const totalOverdue = list.reduce((sum, c) => sum + Number(c.odAmount || c.overdueAmount || 0), 0);
 
     return {
       totalLoan,
