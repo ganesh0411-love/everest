@@ -719,8 +719,9 @@ function App() {
   const { totalLoan, totalOutstanding } = useMemo(() => {
     const activeStream = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
     return activeStream.reduce((acc, curr) => {
+      const loanAmt = Number(curr.loanAmount) || 0;
+      acc.totalLoan += loanAmt;
       const repay = parseFloat(curr.repayAmount) || 0;
-      acc.totalLoan += repay;
       acc.totalOutstanding += (curr.dynamicOutstanding !== undefined ? curr.dynamicOutstanding : repay);
       return acc;
     }, { totalLoan: 0, totalOutstanding: 0 });
@@ -1222,35 +1223,47 @@ function App() {
                                   </div>
                                 </div>
                                 
-                                {/* Status Badges - Strict Fixed Width Column */}
+                                {/* Dynamic Right Column */}
                                 <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-                                  <div className="flex flex-col items-center justify-center w-6 gap-1">
-                                    {customer.status === 'Pending' && (
-                                      <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                        </svg>
+                                  {isMainBranchView ? (
+                                    <div className="flex items-center justify-end">
+                                      <div className="text-sm font-semibold text-emerald-600">
+                                        ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
                                       </div>
-                                    )}
-                                    {customer.status === 'Approved' && (
-                                      <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
+                                      <div className="h-6 w-[1.5px] bg-gray-800 mx-2"></div>
+                                      <div className="text-sm font-semibold text-rose-600">
+                                        ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
                                       </div>
-                                    )}
-                                  </div>
-                                  <div className="text-right min-w-[70px]">
-                                    <div className="text-sm font-bold text-red-600">₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}</div>
-                                  </div>
-                                  <div className="relative">
-                                    <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                      </svg>
-                                    </button>
-                                    
-                                    {/* Action dropdown for this customer */}
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex flex-col items-center justify-center w-6 gap-1">
+                                        {customer.status === 'Pending' && (
+                                          <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                            </svg>
+                                          </div>
+                                        )}
+                                        {customer.status === 'Approved' && (
+                                          <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-right min-w-[70px]">
+                                        <div className="text-sm font-bold text-red-600">₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}</div>
+                                      </div>
+                                      <div className="relative">
+                                        <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                          </svg>
+                                        </button>
+                                        
+                                        {/* Action dropdown for this customer */}
                                     {activeHomeMenuId === customer.id && (
                                       <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-[999] custom-context-menu transform origin-top-right transition-all duration-200">
                                         <button onClick={(e) => { e.stopPropagation(); setCustomerToEdit(customer); setActiveHomeMenuId(null); setIsAddCustomerOpen(true); }} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-brand-blue/5 hover:text-brand-blue font-medium flex items-center gap-2">
@@ -1271,6 +1284,8 @@ function App() {
                                       </div>
                                     )}
                                   </div>
+                                  </>
+                                )}
                                 </div>
                               </div>
                             ))
