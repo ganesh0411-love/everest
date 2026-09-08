@@ -318,142 +318,142 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         }
       });
       
-      // Bump session version on edit
       if (isEdit) {
-        staffPayload.sessionVersion = Date.now();
-        staffPayload.credentialsVersion = Date.now();
-        
-        // --- START NEW AUTH SYNC LOGIC ---
-        try {
-          const oldRawPhone = editingStaff.mobileNumber || editingStaff.phone || '';
-          const oldCleanPhone = String(oldRawPhone).replace(/\D/g, '').slice(-10);
-          const oldEmail = `${oldCleanPhone}@everestmicro.internal`;
+        const oldRawPhone = editingStaff.mobileNumber || editingStaff.phone || '';
+        const oldCleanPhone = String(oldRawPhone).replace(/\D/g, '').slice(-10);
+        const oldEmail = `${oldCleanPhone}@everestmicro.internal`;
 
-          let oldPassword = '';
-          const oldRawPassword = editingStaff.password || editingStaff.authPassword || '';
-          if (oldRawPassword && String(oldRawPassword).trim().length > 0) {
-            oldPassword = String(oldRawPassword).trim();
-          } else if (editingStaff.dob) {
-            const parts = editingStaff.dob.split(/[-/.]/);
-            if (parts.length === 3) {
-              if (parts[0].length === 4) oldPassword = `${parts[2]}${parts[1]}${parts[0]}`;
-              else oldPassword = `${parts[0]}${parts[1]}${parts[2]}`;
-            } else {
-              oldPassword = editingStaff.dob.replace(/\D/g, '');
-            }
+        let oldPassword = '';
+        const oldRawPassword = editingStaff.password || editingStaff.authPassword || '';
+        if (oldRawPassword && String(oldRawPassword).trim().length > 0) {
+          oldPassword = String(oldRawPassword).trim();
+        } else if (editingStaff.dob) {
+          const parts = editingStaff.dob.split(/[-/.]/);
+          if (parts.length === 3) {
+            if (parts[0].length === 4) oldPassword = `${parts[2]}${parts[1]}${parts[0]}`;
+            else oldPassword = `${parts[0]}${parts[1]}${parts[2]}`;
           } else {
-            oldPassword = oldCleanPhone;
+            oldPassword = editingStaff.dob.replace(/\D/g, '');
           }
+        } else {
+          oldPassword = oldCleanPhone;
+        }
 
-          if (oldCleanPhone !== cleanPhone) {
-            // PHONE NUMBER CHANGED: Provision new Auth identity
-            console.log("Phone number changed. Provisioning new Auth identity...");
-            const secApp = initializeApp(firebaseConfig, `PhoneSync_${Date.now()}`);
-            const secAuth = getAuth(secApp);
-            try {
-              const newCred = await createUserWithEmailAndPassword(
-                secAuth, 
-                internalEmail, 
-                authPassword
-              );
-              staffPayload.uid = newCred.user.uid;
-              
-              // Also sync the users collection with new UID
-              await setDoc(doc(db, 'users', newCred.user.uid), { 
-                uid: newCred.user.uid,
-                phone: cleanPhone,
-                mobileNumber: cleanPhone,
-                role: 'staff',
-                status: 'Active',
-                permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true },
-                updatedAt: new Date().toISOString()
-              }, { merge: true });
-            } catch (authErr) {
-              if (authErr.code !== 'auth/email-already-in-use') {
-                console.error("Secondary Auth creation error:", authErr);
-                throw authErr;
-              } else {
-                console.warn("Auth user already exists for this new phone number. Re-using existing Auth identity is generally unsafe unless manually cleared, but proceeding.");
-              }
-            } finally {
-              await deleteApp(secApp);
-            }
-          } else if (oldPassword !== authPassword) {
-            // ONLY PASSWORD CHANGED (Phone unchanged)
-            const { signInWithEmailAndPassword, updatePassword } = await import('firebase/auth');
-            
-            const possibleOldPasswords = new Set([
-              oldPassword,
-              editingStaff.password,
-              editingStaff.authPassword,
-              oldCleanPhone
-            ].filter(Boolean).map(p => String(p).trim()));
+        const credentialsChanged = (oldCleanPhone !== cleanPhone) || (oldPassword !== authPassword);
 
-            if (editingStaff.dob) {
-              const parts = editingStaff.dob.split(/[-/.]/);
-              if (parts.length === 3) {
-                possibleOldPasswords.add(`${parts[0]}${parts[1]}${parts[2]}`);
-                possibleOldPasswords.add(`${parts[2]}${parts[1]}${parts[0]}`);
-              }
-              possibleOldPasswords.add(editingStaff.dob.replace(/\D/g, ''));
-            }
-
-            let signedIn = false;
-            for (const p of possibleOldPasswords) {
+        if (credentialsChanged) {
+          // Bump session version ONLY when credentials actually change
+          staffPayload.sessionVersion = Date.now();
+          staffPayload.credentialsVersion = Date.now();
+          
+          // --- START NEW AUTH SYNC LOGIC ---
+          try {
+            if (oldCleanPhone !== cleanPhone) {
+              // PHONE NUMBER CHANGED: Provision new Auth identity
+              console.log("Phone number changed. Provisioning new Auth identity...");
+              const secApp = initializeApp(firebaseConfig, `PhoneSync_${Date.now()}`);
+              const secAuth = getAuth(secApp);
               try {
-                await signInWithEmailAndPassword(secondaryAuth, oldEmail, p);
-                signedIn = true;
-                break;
-              } catch (e) {
-                // Ignore and try next
-              }
-            }
-
-            if (!signedIn) {
-              console.warn("Unable to sync Firebase Auth password. Forcibly rotating account to enforce new password...");
-              const secApp = initializeApp(firebaseConfig, `PasswordSync_${Date.now()}`);
-              const secAuthLocal = getAuth(secApp);
-              try {
-                const newEmail = `${cleanPhone}_${Date.now()}@everestmicro.internal`;
-                const newCred = await createUserWithEmailAndPassword(secAuthLocal, newEmail, authPassword);
+                const newCred = await createUserWithEmailAndPassword(
+                  secAuth, 
+                  internalEmail, 
+                  authPassword
+                );
                 staffPayload.uid = newCred.user.uid;
-                staffPayload.authEmail = newEmail;
                 
-                // Keep the existing docId so we update the same Firestore document, but its uid and authEmail will be updated!
-                // We should also ensure the `users` collection is updated with the new uid
-                await setDoc(doc(db, 'users', newCred.user.uid), {
+                // Also sync the users collection with new UID
+                await setDoc(doc(db, 'users', newCred.user.uid), { 
                   uid: newCred.user.uid,
                   phone: cleanPhone,
                   mobileNumber: cleanPhone,
                   role: 'staff',
-                  branchId: activeBranch?.id || '',
-                  branchName: selectedBranchName || '',
-                  branch: selectedBranchName || '',
                   status: 'Active',
-                  permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true }
-                });
+                  permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true },
+                  updatedAt: new Date().toISOString()
+                }, { merge: true });
+              } catch (authErr) {
+                if (authErr.code !== 'auth/email-already-in-use') {
+                  console.error("Secondary Auth creation error:", authErr);
+                  throw authErr;
+                } else {
+                  console.warn("Auth user already exists for this new phone number. Re-using existing Auth identity is generally unsafe unless manually cleared, but proceeding.");
+                }
               } finally {
                 await deleteApp(secApp);
               }
-            } else {
-              await updatePassword(secondaryAuth.currentUser, authPassword);
-              await secondaryAuth.signOut();
+            } else if (oldPassword !== authPassword) {
+              // ONLY PASSWORD CHANGED (Phone unchanged)
+              const { signInWithEmailAndPassword, updatePassword } = await import('firebase/auth');
+              
+              const possibleOldPasswords = new Set([
+                oldPassword,
+                editingStaff.password,
+                editingStaff.authPassword,
+                oldCleanPhone
+              ].filter(Boolean).map(p => String(p).trim()));
+
+              if (editingStaff.dob) {
+                const parts = editingStaff.dob.split(/[-/.]/);
+                if (parts.length === 3) {
+                  possibleOldPasswords.add(`${parts[0]}${parts[1]}${parts[2]}`);
+                  possibleOldPasswords.add(`${parts[2]}${parts[1]}${parts[0]}`);
+                }
+                possibleOldPasswords.add(editingStaff.dob.replace(/\D/g, ''));
+              }
+
+              let signedIn = false;
+              for (const p of possibleOldPasswords) {
+                try {
+                  await signInWithEmailAndPassword(secondaryAuth, oldEmail, p);
+                  signedIn = true;
+                  break;
+                } catch (e) {
+                  // Ignore and try next
+                }
+              }
+
+              if (!signedIn) {
+                console.warn("Unable to sync Firebase Auth password. Forcibly rotating account to enforce new password...");
+                const secApp = initializeApp(firebaseConfig, `PasswordSync_${Date.now()}`);
+                const secAuthLocal = getAuth(secApp);
+                try {
+                  const newEmail = `${cleanPhone}_${Date.now()}@everestmicro.internal`;
+                  const newCred = await createUserWithEmailAndPassword(secAuthLocal, newEmail, authPassword);
+                  staffPayload.uid = newCred.user.uid;
+                  staffPayload.authEmail = newEmail;
+                  
+                  // Keep the existing docId so we update the same Firestore document, but its uid and authEmail will be updated!
+                  // We should also ensure the `users` collection is updated with the new uid
+                  await setDoc(doc(db, 'users', newCred.user.uid), {
+                    uid: newCred.user.uid,
+                    phone: cleanPhone,
+                    mobileNumber: cleanPhone,
+                    role: 'staff',
+                    branchId: activeBranch?.id || '',
+                    branchName: selectedBranchName || '',
+                    branch: selectedBranchName || '',
+                    status: 'Active',
+                    permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true }
+                  });
+                } finally {
+                  await deleteApp(secApp);
+                }
+              } else {
+                await updatePassword(secondaryAuth.currentUser, authPassword);
+                await secondaryAuth.signOut();
+              }
             }
+          } catch (err) {
+            console.error("Auth sync failed inside edit", err);
+            throw err;
           }
-        } catch (authSyncErr) {
-          console.error("Failed to sync updated credentials to Firebase Auth:", authSyncErr);
-          throw authSyncErr; // CRITICAL: Must be fatal to prevent split-brain state between Firestore and Auth
         }
-        // --- END NEW AUTH SYNC LOGIC ---
       }
       
       // CRITICAL FIX: Use uid for new documents, docId for existing documents to prevent overwriting
       await setDoc(doc(db, 'staff', isEdit ? staffData.docId : uid), staffPayload);
       setShowAddForm(false);
       
-      if (isEdit) {
-        alert("Staff credentials updated. Existing active sessions will be required to re-authenticate.");
-      }
     } catch (error) {
       console.error("Full Staff Creation Error:", error);
       alert(`Failed to save staff: [${error.code || 'ERROR'}] ${error.message}`);

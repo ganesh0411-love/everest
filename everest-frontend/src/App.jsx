@@ -200,17 +200,17 @@ function App() {
 
         const staffData = snapshot.docs[0].data();
         if (staffData.status === 'Recycled' || staffData.status === 'Deleted') {
-          alert("Your staff session has been deactivated or removed by Admin. Logging out.");
           signOut(auth);
           setUser(null);
           setUserProfile(null);
           localStorage.removeItem('everest_user_profile');
+          window.location.reload();
         } else if (staffData.credentialsVersion && userProfile?.credentialsVersion && staffData.credentialsVersion > userProfile.credentialsVersion) {
-          alert("Your login credentials have been updated by Admin. Please log in again.");
           signOut(auth);
           setUser(null);
           setUserProfile(null);
           localStorage.removeItem('everest_user_profile');
+          window.location.reload();
         } else {
           // Sync branch rename cascade in real-time
           if (
@@ -400,7 +400,7 @@ function App() {
         await signOut(auth);
         localStorage.removeItem('everest_staff_session_version');
         localStorage.removeItem('everest_user_profile');
-        alert('Your session has expired or credentials have been updated. Please log in again.');
+        window.location.reload();
       }
     } catch (e) {
       console.warn('Silent failure in session guard', e);
