@@ -711,27 +711,29 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         </div>
 
         {/* Center Illustration */}
-        <div className="mt-8 mb-4 flex justify-center opacity-80 pointer-events-none">
-          <svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="50" y="40" width="100" height="130" rx="12" fill="#f8ebff" stroke="#c084fc" strokeWidth="4"/>
-            <rect x="75" y="30" width="50" height="20" rx="6" fill="#c084fc"/>
-            <circle cx="100" cy="80" r="16" fill="#93c5fd"/>
-            <path d="M100 96c-12 0-20 6-20 16v4h40v-4c0-10-8-16-20-16z" fill="#93c5fd"/>
-            <rect x="70" y="125" width="60" height="4" rx="2" fill="#cbd5e1"/>
-            <rect x="70" y="140" width="40" height="4" rx="2" fill="#cbd5e1"/>
-            <path d="M70 120 l 5 5 l 10 -10" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M70 135 l 5 5 l 10 -10" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M70 150 l 5 5 l 10 -10" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            
-            {/* Plant illustration */}
-            <path d="M30 160 C 40 140, 50 140, 45 160 Z" fill="#a78bfa"/>
-            <path d="M40 160 C 30 130, 10 130, 20 160 Z" fill="#8b5cf6"/>
-            <rect x="25" y="155" width="20" height="15" rx="3" fill="#6d28d9"/>
-            <circle cx="160" cy="110" r="4" fill="#fbcfe8"/>
-            <circle cx="40" cy="90" r="3" fill="#bfdbfe"/>
-            <circle cx="140" cy="50" r="5" fill="#fef08a"/>
-          </svg>
-        </div>
+        {!isMainBranch && (
+          <div className="mt-8 mb-4 flex justify-center opacity-80 pointer-events-none">
+            <svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="50" y="40" width="100" height="130" rx="12" fill="#f8ebff" stroke="#c084fc" strokeWidth="4"/>
+              <rect x="75" y="30" width="50" height="20" rx="6" fill="#c084fc"/>
+              <circle cx="100" cy="80" r="16" fill="#93c5fd"/>
+              <path d="M100 96c-12 0-20 6-20 16v4h40v-4c0-10-8-16-20-16z" fill="#93c5fd"/>
+              <rect x="70" y="125" width="60" height="4" rx="2" fill="#cbd5e1"/>
+              <rect x="70" y="140" width="40" height="4" rx="2" fill="#cbd5e1"/>
+              <path d="M70 120 l 5 5 l 10 -10" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M70 135 l 5 5 l 10 -10" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M70 150 l 5 5 l 10 -10" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              
+              {/* Plant illustration */}
+              <path d="M30 160 C 40 140, 50 140, 45 160 Z" fill="#a78bfa"/>
+              <path d="M40 160 C 30 130, 10 130, 20 160 Z" fill="#8b5cf6"/>
+              <rect x="25" y="155" width="20" height="15" rx="3" fill="#6d28d9"/>
+              <circle cx="160" cy="110" r="4" fill="#fbcfe8"/>
+              <circle cx="40" cy="90" r="3" fill="#bfdbfe"/>
+              <circle cx="140" cy="50" r="5" fill="#fef08a"/>
+            </svg>
+          </div>
+        )}
       </div>
 
       {/* Custom Bottom Navigation Bar (Fixed at bottom, Mobile Only) */}

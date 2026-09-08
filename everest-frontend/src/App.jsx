@@ -1575,7 +1575,7 @@ function App() {
                 </div>
               )}
 
-              {currentView !== 'Customer Detail' && (
+              {currentView !== 'Customer Detail' && !(currentView === 'Staff Management' && (activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch')) && (
                 <div className="flex-shrink-0 z-40 relative md:hidden">
                   <Footer currentView={currentView} setCurrentView={switchTab} />
                 </div>
