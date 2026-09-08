@@ -399,7 +399,31 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
             }
 
             if (!signedIn) {
-              console.warn("Unable to sync Firebase Auth password. Admin changes will apply to Firestore only. Login.jsx will repair it on next login.");
+              console.warn("Unable to sync Firebase Auth password. Forcibly rotating account to enforce new password...");
+              const secApp = initializeApp(firebaseConfig, `PasswordSync_${Date.now()}`);
+              const secAuthLocal = getAuth(secApp);
+              try {
+                const newEmail = `${cleanPhone}_${Date.now()}@everestmicro.internal`;
+                const newCred = await createUserWithEmailAndPassword(secAuthLocal, newEmail, authPassword);
+                staffPayload.uid = newCred.user.uid;
+                staffPayload.authEmail = newEmail;
+                
+                // Keep the existing docId so we update the same Firestore document, but its uid and authEmail will be updated!
+                // We should also ensure the `users` collection is updated with the new uid
+                await setDoc(doc(db, 'users', newCred.user.uid), {
+                  uid: newCred.user.uid,
+                  phone: cleanPhone,
+                  mobileNumber: cleanPhone,
+                  role: 'staff',
+                  branchId: activeBranch?.id || '',
+                  branchName: selectedBranchName || '',
+                  branch: selectedBranchName || '',
+                  status: 'Active',
+                  permissions: { canDeleteCustomer: false, canEditLedger: true }
+                });
+              } finally {
+                await deleteApp(secApp);
+              }
             } else {
               await updatePassword(secondaryAuth.currentUser, authPassword);
               await secondaryAuth.signOut();
