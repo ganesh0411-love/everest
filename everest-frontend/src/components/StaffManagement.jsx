@@ -241,9 +241,36 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                   }
                 });
               } catch (adoptError) {
-                console.error("Adoption failed:", adoptError);
-                alert("This mobile number is already registered in Firebase Authentication with a DIFFERENT password. Please use the original password or clean up Firebase Console.");
-                return;
+                console.warn("Adoption failed, performing account rotation to generate new Auth user...");
+                try {
+                  const newEmail = `${cleanPhone}_${Date.now()}@everestmicro.internal`;
+                  const newCred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, authPassword);
+                  uid = newCred.user.uid;
+                  console.log("Successfully created rotated Firebase Auth user:", uid);
+                  await secondaryAuth.signOut();
+                  
+                  // Also inject the rotated auth email into the staffPayload so it can be saved in Firestore
+                  staffData.authEmail = newEmail;
+                  
+                  const selectedBranchName = (activeBranch?.name || staffData.branch || '').trim();
+                  await setDoc(doc(db, 'users', uid), {
+                    uid: uid,
+                    phone: cleanPhone,
+                    role: 'staff',
+                    branchId: activeBranch.id || '',
+                    branchName: selectedBranchName,
+                    branch: selectedBranchName,
+                    status: 'Active',
+                    permissions: {
+                      canDeleteCustomer: false,
+                      canEditLedger: true
+                    }
+                  });
+                } catch (rotationError) {
+                  console.error("Account rotation failed:", rotationError);
+                  alert(`Failed to rotate account: ${rotationError.message}`);
+                  return;
+                }
               }
             } else {
               alert(`Failed to create login account in Firebase Auth: [${authError.code || 'ERROR'}] ${authError.message}`);
