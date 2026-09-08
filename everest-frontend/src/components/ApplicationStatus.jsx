@@ -9,6 +9,7 @@ const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 
 
 const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer, activeBranch }) => {
+  const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
   const [activeTab, setActiveTab] = useState('Pending');
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -93,12 +94,12 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
               <tr>
                 <th className="p-2 w-12 md:w-[5%] text-left md:pl-6">S.no</th>
                 <th className="p-2 w-24 md:w-[10%] text-left">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
-                <th className="p-2 text-left w-auto md:w-[25%]">CUSTOMER</th>
+                <th className="p-2 text-left w-auto md:w-[20%]">CUSTOMER</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[15%]">BRANCH</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[15%]">GROUP NAME</th>
-                <th className="p-2 text-left hidden md:table-cell md:w-[10%]">LOAN TYPE</th>
-                <th className="p-2 text-left hidden md:table-cell md:w-[10%]">LOAN AMOUNT</th>
-                <th className="p-2 text-left hidden md:table-cell md:w-[10%]">STATUS</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[12%]">LOAN TYPE</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[11%]">LOAN AMOUNT</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[12%]">{isMainBranch ? 'STATUS' : 'ACTIONS'}</th>
                 <th className="p-2 w-16 md:hidden text-right pr-2">ACTIONS</th>
               </tr>
             </thead>
@@ -153,14 +154,60 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                   <td className="p-2 hidden md:table-cell text-sm font-bold text-slate-800">
                     ₹{Number(app.loanAmount || 0).toLocaleString('en-IN')}
                   </td>
-                  <td className="p-2 hidden md:table-cell">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold border ${
-                      activeTab === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                      activeTab === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                      'bg-rose-50 text-rose-600 border-rose-100'
-                    }`}>
-                      {activeTab}
-                    </span>
+                  <td className="p-2 hidden md:table-cell relative">
+                    {isMainBranch ? (
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold border ${
+                        activeTab === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                        activeTab === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        'bg-rose-50 text-rose-600 border-rose-100'
+                      }`}>
+                        {activeTab}
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {activeTab === 'Pending' && (
+                          <button onClick={(e) => { e.stopPropagation(); updateStatus(app.id, 'Approved'); }} className="w-7 h-7 rounded bg-emerald-50 text-emerald-500 flex items-center justify-center hover:bg-emerald-100 border border-emerald-100 transition-colors" title="Approve">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        )}
+                        {(activeTab === 'Approved' || activeTab === 'Rejected') && (
+                          <button onClick={(e) => { e.stopPropagation(); updateStatus(app.id, 'Pending'); }} className="w-7 h-7 rounded bg-amber-50 text-amber-600 flex items-center justify-center hover:bg-amber-100 border border-amber-100 transition-colors" title="Move to Pending">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        )}
+                        <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                          </svg>
+                        </button>
+                        {activeMenuId === app.id && (
+                          <div 
+                            className="absolute right-0 top-10 w-48 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button 
+                              onClick={() => { setIsEditing(app); setActiveMenuId(null); }}
+                              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                            >
+                              <span>✏️</span> Edit Details
+                            </button>
+                            <button 
+                              onClick={() => { setActivePdfApp(app); setActiveMenuId(null); }}
+                              className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                            >
+                              <span>📄</span> View PDF
+                            </button>
+                            <button onClick={() => deleteApp(app.id)} className="w-full text-left px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3">
+                              <span>🗑️</span> Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="p-2 flex items-center justify-center md:hidden relative">
                     
