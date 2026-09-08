@@ -436,6 +436,7 @@ function App() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeSort, setActiveSort] = useState('Recent');
+  const [isOdFilterActive, setIsOdFilterActive] = useState(false);
   
   // Temp state for the modal before applying
   const [tempCategory, setTempCategory] = useState('All');
@@ -451,6 +452,7 @@ function App() {
     setTempCategory('All');
     setTempBranchFilter('All');
     setSearchQuery('');
+    setIsOdFilterActive(false);
   }, [activeBranch?.id, activeBranch?.name]);
 
 
@@ -579,16 +581,61 @@ function App() {
     setActiveCategory('All');
     setActiveSort('Recent');
     setActiveBranchFilter('All');
+    setIsOdFilterActive(false);
     setIsFilterOpen(false);
   };
 
   // Process Customers List
   const processedCustomers = useMemo(() => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const parseDate = (dStr) => {
+      if (!dStr) return new Date();
+      if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
+        const parts = dStr.split('-');
+        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      }
+      return new Date(dStr);
+    };
+
     let filtered = customers.map(c => {
       const repay = parseFloat(c.repayAmount) || 0;
       const insts = Array.isArray(c.installments) ? c.installments : [];
-      const sub = insts.reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0);
-      return { ...c, dynamicOutstanding: Math.max(0, repay - sub) };
+      const nonBouncedInsts = insts.filter(inst => inst.status !== 'BOUNCED');
+      const sub = nonBouncedInsts.reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0);
+      
+      const planToken = (c.tenureUnit ? c.tenureUnit.toUpperCase().replace(/S$/, '') : (c.weeks ? 'WEEK' : (c.days ? 'DAY' : (c.months ? 'MONTH' : 'WEEK'))));
+      const planCount = Number(c.tenureVal || c.weeks || c.days || c.months || 12);
+      const emiAmount = repay > 0 && planCount > 0 ? Math.round(repay / planCount) : 0;
+      const rawDueDate = c.nextDueDate || c.dueDate || '26-05-2026';
+      
+      let overdueAmount = 0;
+      let expectedInstallmentsCount = 0;
+
+      if (rawDueDate && planCount > 0) {
+        const baseDateObj = parseDate(rawDueDate);
+        for (let idx = 0; idx < planCount; idx++) {
+          const scheduledDateObj = new Date(baseDateObj);
+          if (planToken === 'DAY') scheduledDateObj.setDate(scheduledDateObj.getDate() + idx);
+          else if (planToken === 'MONTH') scheduledDateObj.setMonth(scheduledDateObj.getMonth() + idx);
+          else scheduledDateObj.setDate(scheduledDateObj.getDate() + (idx * 7));
+          scheduledDateObj.setHours(0,0,0,0);
+          
+          if (scheduledDateObj < today) expectedInstallmentsCount++;
+          else break;
+        }
+        const expectedPaid = Math.min(repay, expectedInstallmentsCount * emiAmount);
+        overdueAmount = Math.max(0, expectedPaid - sub);
+      }
+      const pendingDues = emiAmount > 0 ? Math.floor(overdueAmount / emiAmount) : (overdueAmount > 0 ? 1 : 0);
+
+      return { 
+        ...c, 
+        dynamicOutstanding: Math.max(0, repay - sub),
+        dynamicTotalPaid: sub,
+        dynamicOverdue: overdueAmount,
+        dynamicPendingDues: pendingDues
+      };
     });
     
     if (activeCategory !== 'All') {
@@ -1059,8 +1106,11 @@ function App() {
                                 </div>
                               </div>
 
-                              {/* Card 4: Overdue (OD) Amount (Preserved as requested) */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-rose-100 bg-rose-50/20 shadow-sm flex items-center justify-between hover:border-rose-200 transition-colors">
+                              {/* Card 4: Overdue (OD) Amount (Interactive Toggle) */}
+                              <div 
+                                onClick={() => setIsOdFilterActive(!isOdFilterActive)}
+                                className={`px-4 py-3 rounded-xl shadow-sm flex items-center justify-between transition-all cursor-pointer hover:shadow-md ${isOdFilterActive ? 'bg-rose-50 border-2 border-rose-400 scale-[1.02]' : 'bg-white border border-rose-100 bg-rose-50/20 hover:border-rose-200'}`}
+                              >
                                 <div className="w-11 h-11 flex items-center justify-center shrink-0">
                                   <img 
                                     src={overdueIcon} 
@@ -1071,7 +1121,7 @@ function App() {
                                 <div className="text-right flex flex-col items-end">
                                   <div className="flex items-center gap-1.5">
                                     <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
-                                      Past Due
+                                      {isOdFilterActive ? 'FILTER ACTIVE' : 'Past Due'}
                                     </span>
                                     <span className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider block">
                                       OD Amount (Overdue)
@@ -1104,29 +1154,50 @@ function App() {
                               </button>
                             </div>
 
-                            {/* 3. ENTRIES COUNTER */}
-                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                              ENTRIES: {approvedCustomers.length}
+                            {/* 3. ENTRIES COUNTER & RESET FILTER */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                ENTRIES: {approvedCustomers.length}
+                              </div>
+                              {isOdFilterActive && (
+                                <button 
+                                  onClick={() => setIsOdFilterActive(false)}
+                                  className="text-[10px] font-bold px-3 py-1 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200 transition-colors"
+                                >
+                                  Reset / Back to Full List
+                                </button>
+                              )}
                             </div>
 
                             {/* 4. CUSTOMER TABLE (DESKTOP VIEW) */}
                             <div className="bg-white border border-slate-200 rounded-lg shadow-sm mb-4 overflow-hidden">
                             <table className="w-full text-left border-collapse">
                               <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
-                                  <th className="p-3 font-semibold">Customer</th>
-                                  <th className="p-3 font-semibold border-l border-slate-200">Branch</th>
-                                  <th className="p-3 font-semibold border-l border-slate-200">Assigned Staff</th>
-                                  <th className="p-3 font-semibold border-l border-slate-200">Loan Type</th>
-                                  <th className="p-3 font-semibold border-l border-slate-200">Loan Amount</th>
-                                  <th className="p-3 font-semibold border-l border-slate-200 text-right">Outstanding</th>
-                                </tr>
+                                {isOdFilterActive ? (
+                                  <tr className="bg-rose-50/50 border-b border-rose-100 text-rose-700 text-[11px] uppercase tracking-wider">
+                                    <th className="p-3 font-semibold">Customer</th>
+                                    <th className="p-3 font-semibold border-l border-rose-100 text-center">No. of Installments (Pending Dues)</th>
+                                    <th className="p-3 font-semibold border-l border-rose-100 text-right">Loan Amount</th>
+                                    <th className="p-3 font-semibold border-l border-rose-100 text-right">Paid</th>
+                                    <th className="p-3 font-semibold border-l border-rose-100 text-right">Outstanding</th>
+                                    <th className="p-3 font-semibold border-l border-rose-100 text-right text-rose-700">OD Amount</th>
+                                  </tr>
+                                ) : (
+                                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
+                                    <th className="p-3 font-semibold">Customer</th>
+                                    <th className="p-3 font-semibold border-l border-slate-200">Branch</th>
+                                    <th className="p-3 font-semibold border-l border-slate-200">Assigned Staff</th>
+                                    <th className="p-3 font-semibold border-l border-slate-200">Loan Type</th>
+                                    <th className="p-3 font-semibold border-l border-slate-200 text-right">Loan Amount</th>
+                                    <th className="p-3 font-semibold border-l border-slate-200 text-right">Outstanding</th>
+                                  </tr>
+                                )}
                               </thead>
                               <tbody className="divide-y divide-slate-200">
                                 {approvedCustomers.length === 0 ? (
                                   <tr>
                                     <td colSpan="6" className="p-8 text-center text-slate-500">
-                                      No customers match your search or filter criteria
+                                      {isOdFilterActive ? 'No customers currently have overdue payments.' : 'No customers match your search or filter criteria'}
                                     </td>
                                   </tr>
                                 ) : (
@@ -1141,23 +1212,52 @@ function App() {
                                           <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
                                         </div>
                                       </td>
-                                      <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
-                                        {customer.branch || customer.branchName || 'Main Branch'}
-                                      </td>
-                                      <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
-                                        {customer.assignedStaff || customer.staffName || customer.staff || '--'}
-                                      </td>
-                                      <td className="p-3 border-l border-slate-200 whitespace-nowrap">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
-                                          {customer.loanType || customer.category || customer.type || 'N/A'}
-                                        </span>
-                                      </td>
-                                      <td className="p-3 border-l border-slate-200 text-sm font-bold text-brand-blue whitespace-nowrap">
-                                        ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
-                                      </td>
-                                      <td className="p-3 border-l border-slate-200 text-sm font-bold text-red-600 whitespace-nowrap text-right">
-                                        ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
-                                      </td>
+                                      
+                                      {isOdFilterActive ? (
+                                        <>
+                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-slate-700 text-center whitespace-nowrap bg-rose-50/10">
+                                            {customer.dynamicPendingDues > 0 ? (
+                                              <span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs">
+                                                {customer.dynamicPendingDues} Due{customer.dynamicPendingDues > 1 ? 's' : ''}
+                                              </span>
+                                            ) : (
+                                              <span className="text-slate-400">-</span>
+                                            )}
+                                          </td>
+                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-brand-blue whitespace-nowrap text-right bg-rose-50/10">
+                                            ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
+                                          </td>
+                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-emerald-600 whitespace-nowrap text-right bg-rose-50/10">
+                                            ₹{(customer.dynamicTotalPaid || 0).toLocaleString('en-IN')}
+                                          </td>
+                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-amber-600 whitespace-nowrap text-right bg-rose-50/10">
+                                            ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
+                                          </td>
+                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-rose-600 whitespace-nowrap text-right bg-rose-50/30">
+                                            ₹{(customer.dynamicOverdue || 0).toLocaleString('en-IN')}
+                                          </td>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
+                                            {customer.branch || customer.branchName || 'Main Branch'}
+                                          </td>
+                                          <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
+                                            {customer.assignedStaff || customer.staffName || customer.staff || '--'}
+                                          </td>
+                                          <td className="p-3 border-l border-slate-200 whitespace-nowrap">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
+                                              {customer.loanType || customer.category || customer.type || 'N/A'}
+                                            </span>
+                                          </td>
+                                          <td className="p-3 border-l border-slate-200 text-sm font-bold text-brand-blue whitespace-nowrap text-right">
+                                            ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
+                                          </td>
+                                          <td className="p-3 border-l border-slate-200 text-sm font-bold text-red-600 whitespace-nowrap text-right">
+                                            ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
+                                          </td>
+                                        </>
+                                      )}
                                     </tr>
                                   ))
                                 )}
@@ -1171,7 +1271,7 @@ function App() {
                         <div className={isMainBranchView ? "md:hidden space-y-2" : "space-y-2"}>
                           {approvedCustomers.length === 0 ? (
                             <div className="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-lg shadow-sm">
-                              No customers match your search or filter criteria
+                              {isOdFilterActive ? 'No customers currently have overdue payments.' : 'No customers match your search or filter criteria'}
                             </div>
                           ) : (
                             approvedCustomers.map(customer => (
