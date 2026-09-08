@@ -548,14 +548,6 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           </div>
         </div>
 
-        {/* Clean Desktop Header */}
-        <div className="hidden md:flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200">
-           <div>
-             <h1 className="text-xl font-bold text-slate-800">Staff Management</h1>
-             <p className="text-sm text-slate-500 mt-0.5">Manage your staff details</p>
-           </div>
-        </div>
-
         {/* Action Bar (Pulled up over the curve on mobile, flat on desktop) */}
         <div className="bg-white rounded-t-[2.5rem] md:rounded-none -mt-8 md:mt-0 pt-8 md:pt-4 px-5 md:px-6 pb-4 z-10 shadow-[0_4px_10px_rgba(0,0,0,0.03)] md:shadow-none md:border-b md:border-slate-200 relative">
           <div className="flex items-center gap-3">

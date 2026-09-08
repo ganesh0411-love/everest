@@ -65,12 +65,12 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
   };
 
   return (
-    <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto md:max-w-none md:mx-0 bg-[#eaf5f4] ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'}`}>
+    <header className={`w-full px-4 shadow-sm relative z-50 flex flex-col max-w-4xl mx-auto md:max-w-none md:mx-0 bg-[#eaf5f4] md:py-4 ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'}`}>
       <div className={`flex justify-between relative ${(currentView === 'Customer') ? 'items-center pb-1' : 'items-start'}`}>
           {/* Always show Logo & Branch on Left */}
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Everest Logo" className="w-10 h-10 object-contain magic-crop mix-blend-multiply" />
-            <div className="flex flex-col justify-center items-start">
+          <div className="flex items-center gap-2 md:gap-4">
+            <img src={logo} alt="Everest Logo" className="w-10 h-10 md:w-12 md:h-12 object-contain magic-crop mix-blend-multiply" />
+            <div className="flex flex-col justify-center items-start gap-0.5 md:gap-2 mt-1 md:mt-0">
               <div className="flex items-center gap-2">
                 <div className="relative inline-flex items-center" ref={branchDropdownRef}>
                   <span className="font-bold text-[14px] text-slate-900">{getDisplayBranch()}</span>
