@@ -4,7 +4,7 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, updateDoc
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { firebaseConfig } from '../firebase';
-import { ArrowLeft, Search, MoreVertical, Home, Users, Plus } from 'lucide-react';
+import { ArrowLeft, Search, MoreVertical, Home, Users, Plus, Radio, MapPin } from 'lucide-react';
 import AddStaffForm from './AddStaffForm';
 
 const dummyData = [
@@ -602,7 +602,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                 <th className="py-3 px-4 text-left border-l border-slate-200">ID</th>
                 <th className="py-3 px-4 text-left border-l border-slate-200">Phone Number</th>
                 <th className="py-3 px-4 text-left border-l border-slate-200">Designation</th>
-                <th className="py-3 px-4 text-left border-l border-slate-200 text-center">Attendance</th>
+                <th className="py-3 px-4 text-left border-l border-slate-200 text-center">Duty Tracking</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -643,10 +643,23 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                   <td className="py-3 px-4 text-sm text-slate-600 border-l border-slate-200">
                     {staff.designation || staff.role || staff.position || 'Staff'}
                   </td>
-                  <td className="py-3 px-4 border-l border-slate-200 text-center">
-                    <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-                      Present
-                    </span>
+                  <td className="py-3 px-4 border-l border-slate-200">
+                    <div className="flex items-center justify-center gap-3">
+                      <button 
+                        onClick={() => console.log('Live Tracking clicked')} 
+                        title="Live Movement Tracking (Coming Soon)"
+                        className="p-1.5 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:shadow-sm transition-all"
+                      >
+                        <Radio size={16} />
+                      </button>
+                      <button 
+                        onClick={() => console.log('Current Location clicked')} 
+                        title="Current / Attendance Location (Coming Soon)"
+                        className="p-1.5 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:shadow-sm transition-all"
+                      >
+                        <MapPin size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
