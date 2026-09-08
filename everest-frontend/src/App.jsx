@@ -629,14 +629,20 @@ function App() {
     }
 
 
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase();
+    if (searchQuery?.trim() !== '') {
+      const q = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(c => {
-        const nameMatch = String(c.name || '').toLowerCase().includes(q);
-        const appNumMatch = String(c.appNumber || '').toLowerCase().includes(q);
-        const phoneMatch = String(c.phone || '').toLowerCase().includes(q);
-        const idMatch = String(c.id || '').toLowerCase().includes(q);
-        return nameMatch || appNumMatch || phoneMatch || idMatch;
+        const nameMatch = String(c?.name || '').toLowerCase().includes(q);
+        const appNumMatch = String(c?.appNumber || '').toLowerCase().includes(q);
+        const phoneMatch = String(c?.phone || '').toLowerCase().includes(q);
+        const idMatch = String(c?.id || c?.customerId || '').toLowerCase().includes(q);
+        const branchMatch = String(c?.branch || c?.branchName || c?.branchId || '').toLowerCase().includes(q);
+        const staffMatch = String(c?.assignedStaffName || c?.staffName || c?.assignedStaff || c?.staff || '').toLowerCase().includes(q);
+        const loanTypeMatch = String(c?.loanType || c?.category || c?.type || c?.scheme || '').toLowerCase().includes(q);
+        const amountMatch = String(c?.loanAmount || c?.principalAmount || '').toLowerCase().includes(q);
+        const outMatch = String(c?.outstandingAmount || c?.balance || c?.repayAmount || c?.dynamicOutstanding || '').toLowerCase().includes(q);
+        
+        return nameMatch || appNumMatch || phoneMatch || idMatch || branchMatch || staffMatch || loanTypeMatch || amountMatch || outMatch;
       });
     }
 
@@ -984,10 +990,6 @@ function App() {
                     if (isMainBranchView) {
                       console.log(`[Main Branch Filter] Selected: "${activeBranchFilter}", Total Customers: ${customers.length}, Filtered: ${approvedCustomers.length}`);
                     }
-                    
-                    if (approvedCustomers.length === 0) {
-                      return <EmptyState />;
-                    }
 
                     return (
                       <div className="p-2 space-y-2 pb-24">
@@ -1121,36 +1123,44 @@ function App() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-200">
-                                {approvedCustomers.map(customer => (
-                                  <tr key={`desktop-${customer.id}`} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-3 flex items-center gap-3">
-                                      <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
-                                        <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
-                                      </div>
-                                      <div className="min-w-0 pr-2">
-                                        <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
-                                        <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
-                                      </div>
-                                    </td>
-                                    <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
-                                      {customer.branch || customer.branchName || 'Main Branch'}
-                                    </td>
-                                    <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
-                                      {customer.assignedStaff || customer.staffName || customer.staff || '--'}
-                                    </td>
-                                    <td className="p-3 border-l border-slate-200 whitespace-nowrap">
-                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
-                                        {customer.loanType || customer.category || customer.type || 'N/A'}
-                                      </span>
-                                    </td>
-                                    <td className="p-3 border-l border-slate-200 text-sm font-bold text-brand-blue whitespace-nowrap">
-                                      ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
-                                    </td>
-                                    <td className="p-3 border-l border-slate-200 text-sm font-bold text-red-600 whitespace-nowrap text-right">
-                                      ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
+                                {approvedCustomers.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="6" className="p-8 text-center text-slate-500">
+                                      No customers match your search or filter criteria
                                     </td>
                                   </tr>
-                                ))}
+                                ) : (
+                                  approvedCustomers.map(customer => (
+                                    <tr key={`desktop-${customer.id}`} className="hover:bg-slate-50 transition-colors">
+                                      <td className="p-3 flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
+                                          <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className="min-w-0 pr-2">
+                                          <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
+                                          <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
+                                        </div>
+                                      </td>
+                                      <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
+                                        {customer.branch || customer.branchName || 'Main Branch'}
+                                      </td>
+                                      <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
+                                        {customer.assignedStaff || customer.staffName || customer.staff || '--'}
+                                      </td>
+                                      <td className="p-3 border-l border-slate-200 whitespace-nowrap">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
+                                          {customer.loanType || customer.category || customer.type || 'N/A'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 border-l border-slate-200 text-sm font-bold text-brand-blue whitespace-nowrap">
+                                        ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
+                                      </td>
+                                      <td className="p-3 border-l border-slate-200 text-sm font-bold text-red-600 whitespace-nowrap text-right">
+                                        ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
                               </tbody>
                             </table>
                           </div>
@@ -1159,65 +1169,76 @@ function App() {
                         
                         {/* STANDARD CARD VIEW (Hidden on desktop if Main Branch is active) */}
                         <div className={isMainBranchView ? "md:hidden space-y-2" : "space-y-2"}>
-                          {approvedCustomers.map(customer => (
-                            <div key={`mobile-${customer.id}`} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
-                              <div className="flex-1 min-w-0 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
-                                  <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
-                                </div>
-                                <div className="min-w-0 pr-2">
-                                  <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
-                                  <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
-                                </div>
-                              </div>
-                              
-                              {/* Status Badges - Strict Fixed Width Column */}
-                              <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-                                <div className="flex flex-col items-center justify-center w-6 gap-1">
-                                  {customer.status === 'Pending' && (
-                                    <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                  {customer.status === 'Approved' && (
-                                    <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="text-right min-w-[70px]">
-                                  <div className="text-sm font-bold text-red-600">₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}</div>
-                                </div>
-                                <div className="relative">
-                                  <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                    </svg>
-                                  </button>
-                                  {activeHomeMenuId === customer.id && (
-                                    <div className="absolute right-0 top-8 w-32 bg-white rounded-lg shadow-lg border border-slate-100 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                      <button 
-                                        onClick={async () => {
-                                          const nowIso = new Date().toISOString();
-                                          try {
-                                            await updateDoc(doc(db, 'customers', customer.id), { status: 'Recycled', previousStatus: customer.status, lastUpdated: nowIso });
-                                          } catch(e) { console.error('Delete error', e); }
-                                          setActiveHomeMenuId(null);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
-                                      >
-                                        Delete
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                          {approvedCustomers.length === 0 ? (
+                            <div className="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-lg shadow-sm">
+                              No customers match your search or filter criteria
                             </div>
-                          ))}
+                          ) : (
+                            approvedCustomers.map(customer => (
+                              <div key={`mobile-${customer.id}`} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
+                                <div className="flex-1 min-w-0 flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
+                                    <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
+                                  </div>
+                                  <div className="min-w-0 pr-2">
+                                    <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
+                                    <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
+                                  </div>
+                                </div>
+                                
+                                {/* Status Badges - Strict Fixed Width Column */}
+                                <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                                  <div className="flex flex-col items-center justify-center w-6 gap-1">
+                                    {customer.status === 'Pending' && (
+                                      <div className="bg-amber-100 text-amber-700 p-1 rounded-md shadow-sm" title="Pending">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                    {customer.status === 'Approved' && (
+                                      <div className="bg-emerald-100 text-emerald-700 p-1 rounded-md shadow-sm" title="Approved">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="text-right min-w-[70px]">
+                                    <div className="text-sm font-bold text-red-600">₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}</div>
+                                  </div>
+                                  <div className="relative">
+                                    <button onClick={(e) => { e.stopPropagation(); setActiveHomeMenuId(activeHomeMenuId === customer.id ? null : customer.id); }} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                      </svg>
+                                    </button>
+                                    
+                                    {/* Action dropdown for this customer */}
+                                    {activeHomeMenuId === customer.id && (
+                                      <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-[999] custom-context-menu transform origin-top-right transition-all duration-200">
+                                        <button onClick={(e) => { e.stopPropagation(); setCustomerToEdit(customer); setActiveHomeMenuId(null); setIsAddCustomerOpen(true); }} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-brand-blue/5 hover:text-brand-blue font-medium flex items-center gap-2">
+                                          <Edit className="w-4 h-4" /> Edit Profile
+                                        </button>
+                                        <button onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if(window.confirm('Move to Recycle Bin?')) {
+                                            try {
+                                              const nowIso = new Date().toISOString();
+                                              await updateDoc(doc(db, 'customers', customer.id), { status: 'Recycled', previousStatus: customer.status, lastUpdated: nowIso });
+                                              setActiveHomeMenuId(null);
+                                            } catch(e) { console.error('Move customer error', e); }
+                                          }
+                                        }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium flex items-center gap-2">
+                                          <Trash2 className="w-4 h-4" /> Recycle
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
                         </div>
                       </div>
                     );
