@@ -516,6 +516,12 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
     return nameMatch || idMatch || designationMatch || branchMatch;
   });
 
+  const sortedStaff = [...filteredStaff].sort((a, b) => {
+    const branchA = (a.branch || a.branchName || '').toLowerCase();
+    const branchB = (b.branch || b.branchName || '').toLowerCase();
+    return branchA.localeCompare(branchB);
+  });
+
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden relative pb-[72px]">
       
@@ -561,13 +567,6 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                 className="w-full pl-10 pr-4 py-2.5 rounded-full border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
               />
             </div>
-            <button 
-              onClick={handleOpenAddForm}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-pink-500 to-purple-500 text-white px-4 py-2.5 rounded-full text-sm font-bold shadow-md shadow-purple-500/30 whitespace-nowrap"
-            >
-              <Plus size={18} />
-              <span>Add Staff</span>
-            </button>
           </div>
 
           {/* Desktop Table View and Mobile Cards below */}
@@ -599,13 +598,15 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
             <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
               <tr>
                 <th className="py-3 px-4 text-left">Name</th>
-                <th className="py-3 px-4 text-left">Branch</th>
-                <th className="py-3 px-4 text-left">ID</th>
-                <th className="py-3 px-4 text-left">Designation</th>
+                <th className="py-3 px-4 text-left border-l border-slate-200">Branch</th>
+                <th className="py-3 px-4 text-left border-l border-slate-200">ID</th>
+                <th className="py-3 px-4 text-left border-l border-slate-200">Phone Number</th>
+                <th className="py-3 px-4 text-left border-l border-slate-200">Designation</th>
+                <th className="py-3 px-4 text-left border-l border-slate-200 text-center">Attendance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredStaff.map((staff, index) => (
+              {sortedStaff.map((staff, index) => (
                 <tr key={index} className="hover:bg-slate-50 transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
@@ -630,21 +631,22 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                       <span className="font-bold text-slate-800 text-sm">{staff.name || staff.staffName}</span>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-sm text-brand-blue font-bold">
+                  <td className="py-3 px-4 text-sm text-brand-blue font-bold border-l border-slate-200">
                     {staff.branch || staff.branchName || staff.branchId}
                   </td>
-                  <td className="py-3 px-4 text-sm text-slate-800 font-bold">
+                  <td className="py-3 px-4 text-sm text-slate-800 font-bold border-l border-slate-200">
                     {staff.staffId || staff.id || staff.employeeId || staff.customId || staff.uid}
                   </td>
-                  <td className="py-3 px-4 text-sm text-slate-600">
-                    <div className="flex items-center justify-between">
-                      <span>{staff.designation || staff.role || staff.position || 'Staff'}</span>
-                      {!isMainBranch && (
-                        <button onClick={() => handleOpenEditForm(staff)} className="text-slate-400 hover:text-purple-600 p-1 transition-colors">
-                          <MoreVertical size={18} />
-                        </button>
-                      )}
-                    </div>
+                  <td className="py-3 px-4 text-sm font-bold text-slate-600 border-l border-slate-200">
+                    {staff.phone || staff.mobileNumber || staff.mobile || '--'}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-slate-600 border-l border-slate-200">
+                    {staff.designation || staff.role || staff.position || 'Staff'}
+                  </td>
+                  <td className="py-3 px-4 border-l border-slate-200 text-center">
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                      Present
+                    </span>
                   </td>
                 </tr>
               ))}
