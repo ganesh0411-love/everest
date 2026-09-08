@@ -321,7 +321,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
       if (isEdit) {
         const oldRawPhone = editingStaff.mobileNumber || editingStaff.phone || '';
         const oldCleanPhone = String(oldRawPhone).replace(/\D/g, '').slice(-10);
-        const oldEmail = `${oldCleanPhone}@everestmicro.internal`;
+        const oldEmail = editingStaff.authEmail || `${oldCleanPhone}@everestmicro.internal`;
 
         let oldPassword = '';
         const oldRawPassword = editingStaff.password || editingStaff.authPassword || '';
@@ -345,6 +345,16 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           // Bump session version ONLY when credentials actually change
           staffPayload.sessionVersion = Date.now();
           staffPayload.credentialsVersion = Date.now();
+          
+          // FIRE INSTANT EVICTION TO CLIENTS BEFORE HEAVY AUTH WORK
+          try {
+            await updateDoc(doc(db, 'staff', isEdit ? staffData.docId : uid), {
+              sessionVersion: staffPayload.sessionVersion,
+              credentialsVersion: staffPayload.credentialsVersion
+            });
+          } catch (e) {
+            console.warn("Early eviction broadcast failed, continuing with full sync:", e);
+          }
           
           // --- START NEW AUTH SYNC LOGIC ---
           try {
@@ -417,24 +427,38 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                 const secApp = initializeApp(firebaseConfig, `PasswordSync_${Date.now()}`);
                 const secAuthLocal = getAuth(secApp);
                 try {
-                  const newEmail = `${cleanPhone}_${Date.now()}@everestmicro.internal`;
-                  const newCred = await createUserWithEmailAndPassword(secAuthLocal, newEmail, authPassword);
-                  staffPayload.uid = newCred.user.uid;
-                  staffPayload.authEmail = newEmail;
-                  
-                  // Keep the existing docId so we update the same Firestore document, but its uid and authEmail will be updated!
-                  // We should also ensure the `users` collection is updated with the new uid
-                  await setDoc(doc(db, 'users', newCred.user.uid), {
-                    uid: newCred.user.uid,
-                    phone: cleanPhone,
-                    mobileNumber: cleanPhone,
-                    role: 'staff',
-                    branchId: activeBranch?.id || '',
-                    branchName: selectedBranchName || '',
-                    branch: selectedBranchName || '',
-                    status: 'Active',
-                    permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true }
-                  });
+                  let rotationSuccess = false;
+                  for (let i = 1; i <= 10; i++) {
+                    try {
+                      const newEmail = `${cleanPhone}_${i}@everestmicro.internal`;
+                      const newCred = await createUserWithEmailAndPassword(secAuthLocal, newEmail, authPassword);
+                      staffPayload.uid = newCred.user.uid;
+                      staffPayload.authEmail = newEmail;
+                      
+                      // Keep the existing docId so we update the same Firestore document, but its uid and authEmail will be updated!
+                      // We should also ensure the `users` collection is updated with the new uid
+                      await setDoc(doc(db, 'users', newCred.user.uid), {
+                        uid: newCred.user.uid,
+                        phone: cleanPhone,
+                        mobileNumber: cleanPhone,
+                        role: 'staff',
+                        branchId: activeBranch?.id || '',
+                        branchName: selectedBranchName || '',
+                        branch: selectedBranchName || '',
+                        status: 'Active',
+                        permissions: staffData.permissions || { canDeleteCustomer: false, canEditLedger: true }
+                      });
+                      rotationSuccess = true;
+                      break;
+                    } catch (rotErr) {
+                      if (rotErr.code !== 'auth/email-already-in-use') {
+                        throw rotErr;
+                      }
+                    }
+                  }
+                  if (!rotationSuccess) {
+                    throw new Error("Maximum deterministic rotation limit reached (10). Please delete and re-create this staff account.");
+                  }
                 } finally {
                   await deleteApp(secApp);
                 }
