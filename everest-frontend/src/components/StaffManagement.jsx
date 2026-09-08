@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, secondaryAuth } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, updateDoc, getDocs } from 'firebase/firestore';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { firebaseConfig } from '../firebase';
 import { ArrowLeft, Search, MoreVertical, Home, Users, Plus } from 'lucide-react';
@@ -215,15 +215,41 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
               canEditLedger: true
             }
           });
-        } catch (authError) {
-          console.error('CRITICAL: Firebase Auth User Creation Failed:', authError);
-          if (authError.code === 'auth/email-already-in-use') {
-            alert("This mobile number is already registered in Firebase Authentication. Please use a different number or clean the existing user from Firebase Console.");
-          } else {
-            alert(`Failed to create login account in Firebase Auth: [${authError.code || 'ERROR'}] ${authError.message}`);
+          } catch (authError) {
+            console.error('CRITICAL: Firebase Auth User Creation Failed:', authError);
+            if (authError.code === 'auth/email-already-in-use') {
+              console.log("Attempting to adopt purged Auth account...");
+              try {
+                const { signInWithEmailAndPassword } = await import('firebase/auth');
+                const existingCred = await signInWithEmailAndPassword(secondaryAuth, internalEmail, authPassword);
+                uid = existingCred.user.uid;
+                console.log("Successfully adopted existing Firebase Auth user:", uid);
+                await secondaryAuth.signOut();
+                
+                const selectedBranchName = (activeBranch?.name || staffData.branch || '').trim();
+                await setDoc(doc(db, 'users', uid), {
+                  uid: uid,
+                  phone: cleanPhone,
+                  role: 'staff',
+                  branchId: activeBranch.id || '',
+                  branchName: selectedBranchName,
+                  branch: selectedBranchName,
+                  status: 'Active',
+                  permissions: {
+                    canDeleteCustomer: false,
+                    canEditLedger: true
+                  }
+                });
+              } catch (adoptError) {
+                console.error("Adoption failed:", adoptError);
+                alert("This mobile number is already registered in Firebase Authentication with a DIFFERENT password. Please use the original password or clean up Firebase Console.");
+                return;
+              }
+            } else {
+              alert(`Failed to create login account in Firebase Auth: [${authError.code || 'ERROR'}] ${authError.message}`);
+              return;
+            }
           }
-          return;
-        }
       }
 
       const selectedBranchName = (activeBranch?.name || staffData.branch || '').trim();

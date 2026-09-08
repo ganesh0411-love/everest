@@ -13,6 +13,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
   
   // Refs for hidden file inputs
   const galleryInputRef = useRef(null);
@@ -96,11 +97,45 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
-      // Clean up the dummy state we pushed if we are unmounting without a pop event
-      // However, managing this perfectly can be tricky. A simple fallback is fine.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingStaff, staffCount]);
+
+  useEffect(() => {
+    const checkPhone = async () => {
+      if (formData.mobileNumber && formData.mobileNumber.length === 10) {
+        if (editingStaff && (editingStaff.mobileNumber === formData.mobileNumber || editingStaff.phone === formData.mobileNumber)) {
+          setPhoneError('');
+          return;
+        }
+        try {
+          const q = query(collection(db, 'staff'), where('phone', '==', formData.mobileNumber));
+          const snap = await getDocs(q);
+          
+          let duplicateActive = false;
+          snap.forEach(doc => {
+            const data = doc.data();
+            if (data.status !== 'Deleted' && data.status !== 'Recycled') {
+              duplicateActive = true;
+            }
+          });
+
+          if (duplicateActive) {
+            setPhoneError('This mobile number already exists.');
+          } else {
+            setPhoneError('');
+          }
+        } catch (err) {
+          console.error("Phone validation error", err);
+        }
+      } else {
+        setPhoneError('');
+      }
+    };
+    
+    const timeoutId = setTimeout(checkPhone, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.mobileNumber, editingStaff]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -333,7 +368,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
           <div>
             <label className="block text-sm font-bold text-slate-800 mb-1.5">Mobile Number</label>
             <div className="relative">
-              <Phone className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+              <Phone className={`absolute left-3.5 top-1/2 transform -translate-y-1/2 ${phoneError ? 'text-red-400' : 'text-slate-400'}`} size={18} />
               <input 
                 type="tel" 
                 name="mobileNumber"
@@ -343,9 +378,10 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
                 pattern="[0-9]*"
                 maxLength={10}
                 placeholder="Enter mobile number"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
+                className={`w-full pl-10 pr-4 py-3 rounded-xl border ${phoneError ? 'border-red-400 focus:ring-red-400' : 'border-slate-200 focus:ring-purple-400'} bg-white text-sm focus:outline-none focus:ring-2 transition-shadow`}
               />
             </div>
+            {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
           </div>
 
           {/* Staff ID */}
@@ -515,8 +551,8 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
         </button>
         <button 
           onClick={handleSubmit}
-          disabled={isSaving}
-          className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/40 transition-shadow disabled:opacity-50"
+          disabled={isSaving || phoneError}
+          className={`flex-1 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-shadow disabled:opacity-50 ${isSaving || phoneError ? 'bg-slate-300 text-slate-500' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-purple-500/30'}`}
         >
           {isSaving ? (
             <>
