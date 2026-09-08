@@ -92,9 +92,14 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
             <thead className="text-[10px] font-bold text-black uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="p-2 w-12 md:w-[5%] text-left md:pl-6">S.no</th>
-                <th className="p-2 w-24 md:w-[15%] text-left">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
-                <th className="p-2 text-left w-auto md:w-[60%]">CUSTOMER</th>
-                <th className="p-2 w-16 md:w-[20%] text-right md:pr-6">ACTIONS</th>
+                <th className="p-2 w-24 md:w-[10%] text-left">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
+                <th className="p-2 text-left w-auto md:w-[25%]">CUSTOMER</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[15%]">BRANCH</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[15%]">GROUP NAME</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[10%]">LOAN TYPE</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[10%]">LOAN AMOUNT</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[10%]">STATUS</th>
+                <th className="p-2 w-16 md:hidden text-right pr-2">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -136,7 +141,28 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       </div>
                     </div>
                   </td>
-                  <td className="p-2 flex items-center justify-center md:justify-end md:pr-6 relative">
+                  <td className="p-2 hidden md:table-cell text-sm font-bold text-brand-blue truncate">
+                    {app.branch || app.branchName || 'Main'}
+                  </td>
+                  <td className="p-2 hidden md:table-cell text-xs font-semibold text-slate-600 truncate">
+                    {app.groupName || app.centerName || 'Individual / N/A'}
+                  </td>
+                  <td className="p-2 hidden md:table-cell text-xs font-semibold text-slate-600 truncate">
+                    {app.loanType || app.scheme || 'N/A'}
+                  </td>
+                  <td className="p-2 hidden md:table-cell text-sm font-bold text-slate-800">
+                    ₹{Number(app.loanAmount || 0).toLocaleString('en-IN')}
+                  </td>
+                  <td className="p-2 hidden md:table-cell">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold border ${
+                      activeTab === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                      activeTab === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                      'bg-rose-50 text-rose-600 border-rose-100'
+                    }`}>
+                      {activeTab}
+                    </span>
+                  </td>
+                  <td className="p-2 flex items-center justify-center md:hidden relative">
                     
                     {/* Three-Dot Menu Button */}
                     <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
