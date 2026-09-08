@@ -1212,7 +1212,7 @@ function App() {
                             </div>
                           ) : (
                             approvedCustomers.map(customer => (
-                              <div key={`mobile-${customer.id}`} onClick={() => { setSelectedCustomer(customer); navigateToView('Customer Detail'); }} className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card cursor-pointer">
+                              <div key={`mobile-${customer.id}`} onClick={() => { if (!isMainBranchView) { setSelectedCustomer(customer); navigateToView('Customer Detail'); } }} className={`bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm flex justify-between items-center hover:bg-slate-50 transition-colors relative interactive-card ${!isMainBranchView ? 'cursor-pointer' : 'cursor-default'}`}>
                                 <div className="flex-1 min-w-0 flex items-center gap-3">
                                   <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
                                     <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
