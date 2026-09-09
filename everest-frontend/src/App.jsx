@@ -264,22 +264,12 @@ function App() {
       }
       try {
         let q;
-        if (userProfile.role === 'admin') {
+        if (userProfile.role === 'admin' || userProfile.role === 'staff') {
           if (activeBranch.id !== 'main') {
             q = query(collection(db, 'customers'), where('branchId', '==', activeBranch.id));
           } else {
             q = collection(db, 'customers');
           }
-        } else if (userProfile.role === 'staff') {
-          // Strict staff-level portfolio isolation checking both ID and name
-          const currentStaffId = userProfile.staffId || userProfile.employeeId || 'N/A';
-          q = query(
-            collection(db, 'customers'), 
-            or(
-              where('staffId', '==', currentStaffId),
-              where('assignedStaff', '==', userProfile.name)
-            )
-          );
         } else {
           // Customer role
           q = query(collection(db, 'customers'), where('phone', '==', user.phoneNumber));
