@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Plus } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Search, X } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import CreateCenterModal from './CreateCenterModal';
@@ -9,6 +9,8 @@ export default function CenterManagement({ userProfile, activeBranch }) {
   const [branches, setBranches] = useState([{ id: 'all', name: 'All Center' }]);
   const [activeBranchId, setActiveBranchId] = useState('all');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isMainBranch = activeBranch?.name?.toLowerCase().includes('main') || activeBranch?.id === 'main';
@@ -58,9 +60,23 @@ export default function CenterManagement({ userProfile, activeBranch }) {
   }, [branchCenters]);
 
   const filteredCenters = useMemo(() => {
-    if (activeFilter === 'All') return branchCenters;
-    return branchCenters.filter(c => c.status === activeFilter);
-  }, [branchCenters, activeFilter]);
+    let result = branchCenters;
+    if (activeFilter !== 'All') {
+      result = result.filter(c => c.status === activeFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(c => {
+        const vName = (c.village || c.villageName || '').toLowerCase();
+        const bName = (c.branchName || '').toLowerCase();
+        const lName = (c.leader || c.groupLeader || '').toLowerCase();
+        const gName = (c.group || c.groupName || '').toLowerCase();
+        const mCount = String(c.members || c.totalMembers || c.totalMember || 0);
+        return vName.includes(q) || bName.includes(q) || lName.includes(q) || gName.includes(q) || mCount.includes(q);
+      });
+    }
+    return result;
+  }, [branchCenters, activeFilter, searchQuery]);
 
   const toggleFilter = (filterName) => {
     if (activeFilter === filterName) {
@@ -137,6 +153,45 @@ export default function CenterManagement({ userProfile, activeBranch }) {
 
         {/* Row 2 (Mobile) / Right (Desktop): Dropdown + Button */}
         <div className="flex items-center gap-2 w-full md:w-auto mt-3 md:mt-0">
+          
+          {/* Expandable Search Bar (Desktop only) */}
+          <div className="hidden md:flex relative items-center">
+            <div className={`flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden transition-all duration-300 ease-in-out ${isSearchFocused || searchQuery ? 'w-64 ring-2 ring-blue-500/20 border-blue-500' : 'w-9 hover:bg-slate-50'}`}>
+              <div 
+                className="w-9 h-9 flex items-center justify-center shrink-0 text-slate-500 cursor-pointer"
+                onClick={() => {
+                  if (!isSearchFocused) {
+                    document.getElementById('center-search-input')?.focus();
+                  }
+                }}
+              >
+                <Search size={16} />
+              </div>
+              <input 
+                id="center-search-input"
+                type="text"
+                placeholder="Search centers, leader, village..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+                className="w-full h-9 bg-transparent border-none outline-none text-sm text-slate-700 pr-2 placeholder-slate-400"
+              />
+              {searchQuery && (
+                <div 
+                  className="w-8 h-9 flex items-center justify-center shrink-0 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // Prevent blur
+                    setSearchQuery('');
+                    document.getElementById('center-search-input')?.focus();
+                  }}
+                >
+                  <X size={14} />
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Dropdown / Static Text */}
           <div className="relative flex-1 md:w-auto md:flex-none">
             {(userProfile?.role?.toLowerCase() === 'staff' || !isMainBranch) ? (
@@ -190,17 +245,17 @@ export default function CenterManagement({ userProfile, activeBranch }) {
         <table className="w-full text-left border-collapse table-fixed md:table-auto md:min-w-[800px]">
           <thead>
             <tr className="bg-slate-50 md:bg-blue-600 text-slate-600 md:text-white border-b border-slate-200 md:border-blue-700 text-[10px] md:text-sm font-bold md:font-semibold md:tracking-wide whitespace-nowrap">
-              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16">#</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16 md:border-r md:border-white/30">#</th>
               {isMainBranch && (
-                <th className="hidden md:table-cell py-4 px-6 w-auto truncate border-l border-blue-500/30">Branch Name</th>
+                <th className="hidden md:table-cell py-4 px-6 w-auto truncate md:border-r md:border-white/30">Branch Name</th>
               )}
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-l border-blue-500/30">Village Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-l border-blue-500/30">
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-r md:border-white/30">Village Name</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-r md:border-white/30">
                 <span className={isMainBranch ? 'md:hidden' : ''}>Group Leader</span>
                 {isMainBranch && <span className="hidden md:inline">Leader</span>}
               </th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate md:border-l border-blue-500/30">Group Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap md:border-l border-blue-500/30">
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate md:border-r md:border-white/30">Group Name</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap md:border-r md:border-white/30">
                 <span className="md:hidden">Members</span>
                 {isMainBranch ? (
                   <span className="hidden md:inline">Members</span>
@@ -208,7 +263,7 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                   <span className="hidden md:inline">Total<br/>Member</span>
                 )}
               </th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto md:border-l border-blue-500/30">
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto">
                 <span className="hidden md:inline">Status</span>
               </th>
               <th className="hidden md:table-cell py-4 px-2 w-10 shrink-0 text-center"></th>
