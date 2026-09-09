@@ -149,7 +149,9 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                   className="appearance-none w-full bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 pl-3 md:pl-4 pr-8 md:pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-9 md:h-auto text-xs md:text-base"
                 >
                   {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
+                    <option key={b.id} value={b.id}>
+                      {b.id === 'all' ? `All Center (${centers.length})` : b.name}
+                    </option>
                   ))}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
