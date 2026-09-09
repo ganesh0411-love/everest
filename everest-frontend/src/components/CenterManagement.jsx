@@ -191,12 +191,22 @@ export default function CenterManagement({ userProfile, activeBranch }) {
           <thead>
             <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] md:text-sm font-bold md:font-semibold tracking-tight whitespace-nowrap">
               <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16">#</th>
+              {isMainBranch && (
+                <th className="hidden md:table-cell py-4 px-6 w-auto truncate">Branch Name</th>
+              )}
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate">Village Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate">Group Leader</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate">
+                <span className={isMainBranch ? 'md:hidden' : ''}>Group Leader</span>
+                {isMainBranch && <span className="hidden md:inline">Leader</span>}
+              </th>
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate">Group Name</th>
               <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap">
                 <span className="md:hidden">Members</span>
-                <span className="hidden md:inline">Total<br/>Member</span>
+                {isMainBranch ? (
+                  <span className="hidden md:inline">Members</span>
+                ) : (
+                  <span className="hidden md:inline">Total<br/>Member</span>
+                )}
               </th>
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto">
                 <span className="hidden md:inline">Status</span>
@@ -208,6 +218,9 @@ export default function CenterManagement({ userProfile, activeBranch }) {
             {filteredCenters.map((center, index) => (
               <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] md:text-sm">
                 <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-800 font-bold truncate">{index + 1}</td>
+                {isMainBranch && (
+                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 font-medium truncate">{center.branchName || 'N/A'}</td>
+                )}
                 <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 truncate">{center.village || center.villageName || 'N/A'}</td>
                 <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 truncate">{center.leader || center.groupLeader || 'N/A'}</td>
                 <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 truncate">
