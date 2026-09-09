@@ -177,7 +177,7 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                 <td className="py-4 px-6 text-slate-600">
                   <div className="max-w-[150px] leading-tight break-words">{center.group || center.groupName || 'N/A'}</div>
                 </td>
-                <td className="py-4 px-6 text-center text-slate-600">{center.members || center.totalMember || 0}</td>
+                <td className="py-4 px-6 text-center text-slate-600">{center.members || center.totalMembers || center.totalMember || 0}</td>
                 <td className="py-4 px-6">
                   {getStatusBadge(center.status)}
                 </td>
