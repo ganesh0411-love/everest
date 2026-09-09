@@ -1,10 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, X, Image as ImageIcon, Phone } from 'lucide-react';
+import { X, Image as ImageIcon, Phone } from 'lucide-react';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import AddCustomerModal from './AddCustomerModal';
+import CreateCenterModal from './CreateCenterModal';
 
 export default function CenterDetailsView({ center, customers, onBack, userProfile, activeBranch }) {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [addCustomerContext, setAddCustomerContext] = useState(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const totalMembers = Number(center?.totalMembers || center?.noOfCustomers || center?.members || 0);
   
@@ -51,20 +55,26 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
     return name.replace(/^(Mr\.|Mrs\.|Miss)\s*/i, '').trim();
   };
 
+  const handleDelete = async () => {
+    if (window.confirm("Are you sure you want to delete this center?")) {
+      try {
+        await updateDoc(doc(db, 'centers', center.id), { status: 'Deleted' });
+        onBack();
+      } catch (error) {
+        console.error("Error deleting center:", error);
+        alert("Failed to delete center.");
+      }
+    }
+  };
+
+  const visibleSlots = Math.min(totalMembers, centerCustomers.length + 1);
+
   return (
     <div className="flex flex-col h-full bg-slate-50 w-full overflow-x-hidden md:hidden">
-      {/* Top Navigation */}
-      <div className="flex items-center gap-3 p-3 bg-white border-b border-slate-200 shrink-0 sticky top-0 z-10">
-        <button onClick={onBack} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors">
-          <ArrowLeft size={20} className="text-slate-700" />
-        </button>
-        <h1 className="text-base font-bold text-slate-800">Centers</h1>
-      </div>
-
       <div className="flex-1 overflow-y-auto px-3 pb-8 space-y-4 pt-4">
         
         {/* 1. TOP SUMMARY HEADER */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex gap-3 relative overflow-hidden">
+        <div className="p-1 mb-2 flex gap-3 relative">
           {/* Left Side: Avatar */}
           <div className="shrink-0 w-24 h-28 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden relative shadow-sm">
             {center?.leaderPhoto ? (
@@ -96,10 +106,16 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
 
           {/* Right Action Buttons */}
           <div className="shrink-0 flex flex-col items-end pt-1">
-            <button className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm w-[64px]">
+            <button 
+              onClick={() => setIsEditOpen(true)}
+              className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm w-[64px]"
+            >
               EDIT
             </button>
-            <button className="bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1.5 w-[64px]">
+            <button 
+              onClick={handleDelete}
+              className="bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1.5 w-[64px]"
+            >
               DELETE
             </button>
           </div>
@@ -107,7 +123,7 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
 
         {/* 2. DYNAMIC MEMBER SLOT CARDS */}
         <div className="space-y-3">
-          {Array.from({ length: totalMembers }).map((_, idx) => {
+          {Array.from({ length: visibleSlots }).map((_, idx) => {
             const slotNumber = idx + 1;
             const customerInSlot = centerCustomers[idx]; // Match sequentially
             const paddedIdx = String(slotNumber).padStart(2, '0');
@@ -225,6 +241,16 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
           userProfile={userProfile} 
           activeBranch={activeBranch}
           initialData={addCustomerContext}
+        />
+      )}
+
+      {isEditOpen && (
+        <CreateCenterModal
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          userProfile={userProfile}
+          activeBranch={activeBranch}
+          editCenter={center}
         />
       )}
     </div>

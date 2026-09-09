@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Camera, Image as ImageIcon, Trash2, User } from 'lucide-react';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch }) {
+export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch, editCenter }) {
   const [formData, setFormData] = useState({
     leaderName: '',
     leaderId: '',
@@ -24,6 +24,26 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const actionSheetRef = useRef(null);
+
+  useEffect(() => {
+    if (editCenter && isOpen) {
+      setFormData({
+        leaderName: editCenter.leader || editCenter.leaderName || '',
+        leaderId: editCenter.leaderId || '',
+        centerName: editCenter.centerName || '',
+        groupName: editCenter.group || editCenter.groupName || '',
+        villageName: editCenter.village || editCenter.villageName || '',
+        branchName: editCenter.branchName || '',
+        branchId: editCenter.branchId || '',
+        staffName: editCenter.staffName || '',
+        location: editCenter.location || '',
+        totalMembers: editCenter.totalMembers || editCenter.noOfCustomers || ''
+      });
+      if (editCenter.leaderPhoto) {
+        setLeaderPhoto(editCenter.leaderPhoto);
+      }
+    }
+  }, [editCenter, isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -56,7 +76,7 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
       setLeaderPhoto(null);
       setShowPhotoActionSheet(false);
     }
-  }, [isOpen, userProfile, activeBranch]);
+  }, [editCenter, isOpen, userProfile, activeBranch]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -125,32 +145,42 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
       return;
     }
     
-    setIsSubmitting(true);
+    setIsLoading(true);
     try {
-      const payload = {
-        leader: formData.leaderName,
+      const centerData = {
+        leaderName: formData.leaderName,
         leaderId: formData.leaderId,
-        leaderPhoto: leaderPhoto || null,
         centerName: formData.centerName,
-        group: formData.groupName || 'N/A',
-        village: formData.villageName,
+        groupName: formData.groupName,
+        villageName: formData.villageName,
         branchName: formData.branchName,
         branchId: formData.branchId,
         staffName: formData.staffName,
-        createdByStaffId: userProfile?.id || '',
         location: formData.location,
-        status: 'Active',
         totalMembers: parseInt(formData.totalMembers) || 0,
-        createdAt: new Date().toISOString()
+        leaderPhoto,
+        updatedAt: new Date().toISOString()
       };
+
+      if (editCenter) {
+        await updateDoc(doc(db, 'centers', editCenter.id), centerData);
+        alert('Center updated successfully!');
+      } else {
+        await addDoc(collection(db, 'centers'), {
+          ...centerData,
+          status: 'Active',
+          createdAt: new Date().toISOString(),
+          createdByStaffId: userProfile?.id || 'Admin',
+        });
+        alert('Center created successfully!');
+      }
       
-      await addDoc(collection(db, 'centers'), payload);
-      setIsSubmitting(false);
+      setIsLoading(false);
       onClose();
     } catch (error) {
-      console.error("Error creating center:", error);
-      alert("Failed to create center: " + error.message);
-      setIsSubmitting(false);
+      console.error("Error saving center:", error);
+      alert("Failed to save center: " + error.message);
+      setIsLoading(false);
     }
   };
 
@@ -162,8 +192,8 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
         
         {/* Header (Pinned) */}
         <div className="flex shrink-0 items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
-          <h2 className="text-lg font-bold text-slate-800">Create New Center</h2>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors">
+          <h2 className="text-xl font-bold text-slate-800">{editCenter ? 'Edit Center' : 'Create New Center'}</h2>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -281,12 +311,20 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
 
           {/* Footer (Pinned) */}
           <div className="shrink-0 flex justify-end gap-3 px-5 py-3 border-t border-slate-100 bg-white">
-            <button type="button" onClick={onClose} className="px-5 py-1.5 text-sm h-9 rounded-lg border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-1.5 text-sm h-9 rounded-lg font-semibold shadow-sm transition-colors disabled:opacity-70">
-              {isSubmitting ? 'Saving...' : 'Submit'}
-            </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-2.5 px-6 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (editCenter ? 'Updating...' : 'Creating...') : (editCenter ? 'Update Center' : 'Create Center')}
+              </button>
           </div>
         </form>
       </div>
