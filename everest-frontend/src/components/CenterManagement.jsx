@@ -234,35 +234,64 @@ export default function CenterManagement({ userProfile, activeBranch }) {
         </div>
 
         {/* Row 2 (Mobile) / Right (Desktop): Dropdown + Button */}
-        <div className="flex items-center gap-2 w-full md:w-auto mt-3 md:mt-0">
+        <div className="flex items-center gap-1.5 md:gap-2 w-full md:w-auto mt-3 md:mt-0">
           
-          {/* Expandable Search Bar (Desktop only) */}
-          <div className="hidden md:flex relative items-center">
-            <div className={`flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden transition-all duration-300 ease-in-out ${isSearchFocused || searchQuery ? 'w-auto min-w-[280px] ring-2 ring-blue-500/20 border-blue-500' : 'w-9 hover:bg-slate-50'}`}>
+          {/* Dropdown / Static Text */}
+          <div className="relative shrink-0 md:flex-none">
+            {(userProfile?.role?.toLowerCase() === 'staff' || !isMainBranch) ? (
+              <div className="bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 px-3 md:px-4 rounded-lg shadow-sm h-9 md:h-auto text-xs md:text-base flex items-center whitespace-nowrap">
+                All Center
+              </div>
+            ) : (
+              <>
+                <select 
+                  value={activeBranchId}
+                  onChange={(e) => setActiveBranchId(e.target.value)}
+                  className="appearance-none bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 pl-2 md:pl-4 pr-6 md:pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-9 md:h-auto text-[11px] md:text-base"
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.id === 'all' ? `All Center (${centers.length})` : b.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 md:px-2 text-slate-500">
+                  <ChevronDown size={14} />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Search Bar */}
+          <div className="flex relative items-center flex-1 md:flex-none min-w-0">
+            <div className={`flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden transition-all duration-300 ease-in-out ${isSearchFocused || searchQuery ? 'w-full md:w-auto md:min-w-[280px] ring-2 ring-blue-500/20 border-blue-500' : 'w-full md:w-9 hover:bg-slate-50'}`}>
               <div 
-                className="w-9 h-9 flex items-center justify-center shrink-0 text-slate-500 cursor-pointer"
+                className="w-8 md:w-9 h-9 flex items-center justify-center shrink-0 text-slate-500 cursor-pointer"
                 onClick={() => {
                   if (!isSearchFocused) {
                     document.getElementById('center-search-input')?.focus();
                   }
                 }}
               >
-                <Search size={16} />
+                <Search size={14} className="md:w-4 md:h-4" />
               </div>
               <input 
                 id="center-search-input"
                 type="text"
-                placeholder="Search centers, leader, village..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
                 onBlur={() => setIsSearchFocused(false)}
-                className={`h-9 bg-transparent border-none outline-none text-sm text-slate-700 pr-2 placeholder-slate-400 ${isSearchFocused || searchQuery ? 'w-48' : 'w-full'}`}
+                className={`h-9 bg-transparent border-none outline-none text-[11px] md:text-sm text-slate-700 pr-1 md:pr-2 placeholder-slate-400 min-w-0 ${isSearchFocused || searchQuery ? 'w-full md:w-48' : 'w-full'}`}
               />
               {searchQuery && (
                 <div className="flex items-center shrink-0 bg-slate-50 border-l border-slate-200 h-9">
-                  <div className="px-2 text-[11px] font-medium text-slate-500">
+                  <div className="hidden md:block px-2 text-[11px] font-medium text-slate-500 whitespace-nowrap">
                     {totalMatches > 0 ? `${activeMatchIndex + 1} of ${totalMatches}` : '0 matches'}
+                  </div>
+                  <div className="block md:hidden px-1 text-[10px] font-medium text-slate-500 whitespace-nowrap">
+                    {totalMatches > 0 ? `${activeMatchIndex + 1}/${totalMatches}` : '0'}
                   </div>
                   <div className="flex items-center border-l border-slate-200 h-full">
                     <button 
@@ -274,9 +303,9 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                           document.getElementById(`search-match-${newIdx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
                       }}
-                      className="w-6 h-full flex items-center justify-center hover:bg-slate-200 text-slate-500 transition-colors"
+                      className="w-5 md:w-6 h-full flex items-center justify-center hover:bg-slate-200 text-slate-500 transition-colors"
                     >
-                      <ChevronUp size={14} />
+                      <ChevronUp size={12} className="md:w-3.5 md:h-3.5" />
                     </button>
                     <button 
                       onMouseDown={(e) => e.preventDefault()}
@@ -287,59 +316,33 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                           document.getElementById(`search-match-${newIdx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
                       }}
-                      className="w-6 h-full flex items-center justify-center border-l border-slate-200 hover:bg-slate-200 text-slate-500 transition-colors"
+                      className="w-5 md:w-6 h-full flex items-center justify-center border-l border-slate-200 hover:bg-slate-200 text-slate-500 transition-colors"
                     >
-                      <ChevronDown size={14} />
+                      <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
                     </button>
                   </div>
                   <div 
-                    className="w-8 h-full flex items-center justify-center hover:bg-red-50 text-slate-400 hover:text-red-500 cursor-pointer border-l border-slate-200 transition-colors"
+                    className="w-6 md:w-8 h-full flex items-center justify-center hover:bg-red-50 text-slate-400 hover:text-red-500 cursor-pointer border-l border-slate-200 transition-colors"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       setSearchQuery('');
                       document.getElementById('center-search-input')?.focus();
                     }}
                   >
-                    <X size={14} />
+                    <X size={12} className="md:w-3.5 md:h-3.5" />
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Dropdown / Static Text */}
-          <div className="relative flex-1 md:w-auto md:flex-none">
-            {(userProfile?.role?.toLowerCase() === 'staff' || !isMainBranch) ? (
-              <div className="w-full bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 px-3 md:px-4 rounded-lg shadow-sm h-9 md:h-auto text-xs md:text-base flex items-center">
-                All Center
-              </div>
-            ) : (
-              <>
-                <select 
-                  value={activeBranchId}
-                  onChange={(e) => setActiveBranchId(e.target.value)}
-                  className="appearance-none w-full bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 pl-3 md:pl-4 pr-8 md:pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-9 md:h-auto text-xs md:text-base"
-                >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.id === 'all' ? `All Center (${centers.length})` : b.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                  <ChevronDown size={14} />
-                </div>
-              </>
-            )}
-          </div>
-
           {/* Action Button */}
           {!isMainBranch && (
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="shrink-0 md:w-auto bg-blue-600 hover:bg-blue-700 transition-colors text-white font-medium px-3.5 md:px-5 py-1.5 md:py-2.5 rounded-lg flex items-center justify-center gap-1.5 md:gap-2 shadow-sm h-9 md:h-auto text-xs md:text-base"
+              className="shrink-0 bg-blue-600 hover:bg-blue-700 transition-colors text-white font-medium px-2.5 md:px-5 py-1.5 md:py-2.5 rounded-lg flex items-center justify-center gap-1 md:gap-2 shadow-sm h-9 md:h-auto text-[11px] md:text-base whitespace-nowrap"
             >
-              <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+              <Plus size={14} className="md:w-[18px] md:h-[18px]" />
               <span className="md:hidden">Create</span>
               <span className="hidden md:inline">Create Center</span>
             </button>
@@ -359,7 +362,7 @@ export default function CenterManagement({ userProfile, activeBranch }) {
       <div className="bg-white md:rounded-xl shadow-sm border-t border-b md:border border-slate-200 overflow-x-hidden md:overflow-x-auto w-full max-w-full">
         <table className="w-full text-left border-collapse table-fixed md:table-auto md:min-w-[800px]">
           <thead>
-            <tr className="bg-slate-50 md:bg-blue-600 text-slate-600 md:text-white border-b border-slate-200 md:border-blue-700 text-[10px] md:text-sm font-bold md:font-semibold md:tracking-wide whitespace-nowrap">
+            <tr className="bg-blue-600 text-white border-b border-blue-700 text-[10px] md:text-sm font-bold md:font-semibold md:tracking-wide whitespace-nowrap">
               <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16 md:border-r md:border-white/30">#</th>
               {isMainBranch ? (
                 <th className="hidden md:table-cell py-4 px-6 w-auto truncate md:border-r md:border-white/30">Branch Name</th>
@@ -379,36 +382,36 @@ export default function CenterManagement({ userProfile, activeBranch }) {
           <tbody>
             {filteredCenters.map((center, index) => (
               <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] md:text-sm">
-                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-800 font-bold truncate">{index + 1}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-gray-900 font-bold truncate">{index + 1}</td>
                 {isMainBranch ? (
-                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold">
-                    <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.branchName}>
+                  <td className="hidden md:table-cell py-4 px-6 text-gray-900 font-bold">
+                    <div className="truncate max-w-[140px] md:max-w-[180px] w-full block" title={center.branchName}>
                       {searchQuery.trim() ? highlightText(center.branchName || 'N/A', searchQuery, center._matches?.branchName?.startMatchIdx) : (center.branchName || 'N/A')}
                     </div>
                   </td>
                 ) : (
-                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold">
-                    <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.staffName || center.createdByStaffId}>
+                  <td className="hidden md:table-cell py-4 px-6 text-gray-900 font-bold">
+                    <div className="truncate max-w-[140px] md:max-w-[180px] w-full block" title={center.staffName || center.createdByStaffId}>
                       {searchQuery.trim() ? highlightText(center.staffName || center.createdByStaffId || 'N/A', searchQuery, center._matches?.staffName?.startMatchIdx) : (center.staffName || center.createdByStaffId || 'N/A')}
                     </div>
                   </td>
                 )}
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 md:text-gray-900 md:font-bold">
-                  <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.village || center.villageName}>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-gray-900 font-bold">
+                  <div className="truncate max-w-[140px] md:max-w-[180px] w-full block" title={center.village || center.villageName}>
                     {searchQuery.trim() ? highlightText(center.village || center.villageName || 'N/A', searchQuery, center._matches?.villageName?.startMatchIdx) : (center.village || center.villageName || 'N/A')}
                   </div>
                 </td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold">
-                  <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.leader || center.groupLeader}>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-gray-900 font-bold">
+                  <div className="truncate max-w-[140px] md:max-w-[180px] w-full block" title={center.leader || center.groupLeader}>
                     {searchQuery.trim() ? highlightText(center.leader || center.groupLeader || 'N/A', searchQuery, center._matches?.leader?.startMatchIdx) : (center.leader || center.groupLeader || 'N/A')}
                   </div>
                 </td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold">
-                  <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.group || center.groupName}>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-gray-900 font-bold">
+                  <div className="truncate max-w-[140px] md:max-w-[180px] w-full block" title={center.group || center.groupName}>
                     {searchQuery.trim() ? highlightText(center.group || center.groupName || 'N/A', searchQuery, center._matches?.groupName?.startMatchIdx) : (center.group || center.groupName || 'N/A')}
                   </div>
                 </td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-600 md:text-gray-900 md:font-bold truncate">
+                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-gray-900 font-bold truncate">
                   {searchQuery.trim() ? highlightText(center.members || center.totalMembers || center.totalMember || 0, searchQuery, center._matches?.members?.startMatchIdx) : (center.members || center.totalMembers || center.totalMember || 0)}
                 </td>
                 <td className="py-2 px-1 md:py-4 md:px-6">
