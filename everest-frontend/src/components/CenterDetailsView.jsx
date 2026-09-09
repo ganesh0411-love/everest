@@ -1,0 +1,232 @@
+import React, { useState, useMemo } from 'react';
+import { ArrowLeft, X, Image as ImageIcon, Phone } from 'lucide-react';
+import AddCustomerModal from './AddCustomerModal';
+
+export default function CenterDetailsView({ center, customers, onBack, userProfile, activeBranch }) {
+  const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [addCustomerContext, setAddCustomerContext] = useState(null);
+
+  const totalMembers = Number(center?.totalMembers || center?.noOfCustomers || center?.members || 0);
+  
+  // Filter customers matching this center
+  const centerCustomers = useMemo(() => {
+    return (customers || []).filter(
+      cust => cust.centerName?.trim().toLowerCase() === center?.centerName?.trim().toLowerCase() &&
+              (cust.branchName?.trim().toLowerCase() === center?.branchName?.trim().toLowerCase() || !cust.branchName)
+    );
+  }, [customers, center]);
+
+  const handleAddClick = () => {
+    setAddCustomerContext({
+      center: center?.village || center?.villageName || center?.centerName || '',
+      centerLeaderName: center?.leader || center?.leaderName || '',
+      leaderCustomerId: center?.leaderId || '',
+      groupName: center?.group || center?.groupName || '',
+      branch: center?.branchName || ''
+    });
+    setIsAddCustomerOpen(true);
+  };
+
+  const getAge = (dob) => {
+    if (!dob) return 'N/A';
+    let dobDate;
+    if (dob.includes('/')) {
+      const parts = dob.split('/');
+      if (parts[2].length === 4) dobDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    } else if (dob.includes('-') && dob.split('-')[0].length === 2) {
+      const parts = dob.split('-');
+      dobDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    } else {
+      dobDate = new Date(dob);
+    }
+    
+    if (isNaN(dobDate)) return 'N/A';
+    const diff_ms = Date.now() - dobDate.getTime();
+    const age_dt = new Date(diff_ms); 
+    return Math.abs(age_dt.getUTCFullYear() - 1970) + ' Yrs';
+  };
+
+  const formatName = (name) => {
+    if (!name) return '';
+    return name.replace(/^(Mr\.|Mrs\.|Miss)\s*/i, '').trim();
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 w-full overflow-x-hidden md:hidden">
+      {/* Top Navigation */}
+      <div className="flex items-center gap-3 p-3 bg-white border-b border-slate-200 shrink-0 sticky top-0 z-10">
+        <button onClick={onBack} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors">
+          <ArrowLeft size={20} className="text-slate-700" />
+        </button>
+        <h1 className="text-base font-bold text-slate-800">Centers</h1>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 pb-8 space-y-4 pt-4">
+        
+        {/* 1. TOP SUMMARY HEADER */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex gap-3 relative overflow-hidden">
+          {/* Left Side: Avatar */}
+          <div className="shrink-0 w-24 h-28 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden relative shadow-sm">
+            {center?.leaderPhoto ? (
+              <img src={center.leaderPhoto} alt="Leader" className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon className="text-slate-300" size={32} />
+            )}
+          </div>
+          
+          {/* Center Section: Metadata */}
+          <div className="flex-1 flex flex-col justify-center min-w-0">
+            <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[11px] sm:text-xs">
+              <span className="font-semibold text-slate-600">Leader Name</span>
+              <span className="font-bold text-slate-900 truncate">{center?.leader || center?.leaderName || '-'}</span>
+              
+              <span className="font-semibold text-slate-600">Customer ID</span>
+              <span className="font-bold text-slate-900 truncate">{center?.leaderId || '-'}</span>
+              
+              <span className="font-semibold text-slate-600">Center Name</span>
+              <span className="font-bold text-slate-900 truncate">{center?.centerName || '-'}</span>
+              
+              <span className="font-semibold text-slate-600">No.of . Customer</span>
+              <span className="font-bold text-slate-900 truncate">{totalMembers}</span>
+              
+              <span className="font-semibold text-slate-600">Loan Amount</span>
+              <span className="font-bold text-slate-900 truncate">-</span>
+            </div>
+          </div>
+
+          {/* Right Action Buttons */}
+          <div className="shrink-0 flex flex-col items-end pt-1">
+            <button className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm w-[64px]">
+              EDIT
+            </button>
+            <button className="bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1.5 w-[64px]">
+              DELETE
+            </button>
+          </div>
+        </div>
+
+        {/* 2. DYNAMIC MEMBER SLOT CARDS */}
+        <div className="space-y-3">
+          {Array.from({ length: totalMembers }).map((_, idx) => {
+            const slotNumber = idx + 1;
+            const customerInSlot = centerCustomers[idx]; // Match sequentially
+            const paddedIdx = String(slotNumber).padStart(2, '0');
+
+            if (customerInSlot) {
+              // FILLED SLOT STATE
+              return (
+                <div key={idx} className="bg-white rounded-xl shadow-sm border-2 border-black flex overflow-hidden relative min-h-[96px]">
+                  {/* Left Index Box */}
+                  <div className="w-14 sm:w-16 shrink-0 border-r-2 border-black flex items-center justify-center bg-slate-50">
+                    <span className="font-black text-2xl text-slate-900">{paddedIdx}</span>
+                  </div>
+                  
+                  {/* Main Details Area */}
+                  <div className="flex-1 p-2 sm:p-2.5 flex justify-between items-stretch gap-2 min-w-0">
+                    
+                    {/* Columns Wrapper */}
+                    <div className="flex-1 flex flex-col justify-between min-w-0">
+                      
+                      <div className="flex items-start">
+                        {/* Col 1 */}
+                        <div className="flex flex-col min-w-0 flex-1 pr-1.5 border-r border-slate-300">
+                          <span className="font-bold text-slate-900 text-xs sm:text-[13px] truncate">{formatName(customerInSlot.name || customerInSlot.customerName)}</span>
+                          <span className="font-semibold text-slate-700 text-[10px] sm:text-[11px] truncate">{customerInSlot.id || customerInSlot.customerId || '-'}</span>
+                          <span className="font-semibold text-slate-700 text-[10px] sm:text-[11px] truncate">{customerInSlot.dob || customerInSlot.dateOfBirth || '-'}</span>
+                        </div>
+                        {/* Col 2 */}
+                        <div className="flex flex-col min-w-0 pl-1.5 shrink-0 w-[45%]">
+                          <span className="font-bold text-slate-900 text-[10px] sm:text-[11px] truncate">{customerInSlot.gender || '-'}</span>
+                          <span className="font-semibold text-slate-900 text-[10px] sm:text-[11px] truncate">{customerInSlot.maritalStatus || '-'}</span>
+                          <span className="font-semibold text-slate-900 text-[10px] sm:text-[11px] truncate">{customerInSlot.age ? `${customerInSlot.age} Yrs` : getAge(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
+                        </div>
+                      </div>
+
+                      {/* Phone Link */}
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-100">
+                        {customerInSlot.phone ? (
+                          <a href={`tel:${customerInSlot.phone}`} className="inline-flex items-center gap-1 hover:bg-slate-50 px-1.5 py-0.5 rounded transition-colors group w-fit">
+                            <div className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0">
+                              <Phone size={10} className="fill-current" />
+                            </div>
+                            <span className="font-bold text-slate-900 text-xs tracking-wide">{customerInSlot.phone}</span>
+                          </a>
+                        ) : (
+                          <span className="font-bold text-slate-400 text-xs">-</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Side: Photo & Button */}
+                    <div className="shrink-0 flex flex-col items-center justify-between py-1 w-14 sm:w-16">
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shadow-sm">
+                         {customerInSlot.photoBase64 || customerInSlot.photoUrl || customerInSlot.image ? (
+                           <img src={customerInSlot.photoBase64 || customerInSlot.photoUrl || customerInSlot.image} alt="Customer" className="w-full h-full object-cover" />
+                         ) : (
+                           <ImageIcon className="text-slate-300" size={16} />
+                         )}
+                      </div>
+                      <button className="bg-purple-400 hover:bg-purple-500 active:bg-purple-600 text-white text-[9px] sm:text-[10px] font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1 w-full text-center tracking-wide">
+                        ADD
+                      </button>
+                    </div>
+
+                  </div>
+                  
+                  {/* Top Right Close */}
+                  <button className="absolute top-1.5 right-1.5 p-0.5 text-rose-500 hover:bg-rose-50 rounded transition-colors z-10 bg-white shadow-sm border border-rose-100">
+                    <X size={14} strokeWidth={2.5} />
+                  </button>
+                </div>
+              );
+            }
+
+            // EMPTY SLOT STATE
+            return (
+              <div key={idx} className="bg-white rounded-xl shadow-sm border-2 border-black flex overflow-hidden min-h-[96px] relative">
+                {/* Left Index Box */}
+                <div className="w-14 sm:w-16 shrink-0 border-r-2 border-black flex items-center justify-center bg-slate-50">
+                  <span className="font-black text-2xl text-slate-900">{paddedIdx}</span>
+                </div>
+                
+                {/* Main Area (Empty) */}
+                <div className="flex-1 flex flex-col items-center justify-center py-3 relative min-w-0">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-sky-50 border border-sky-200 flex items-center justify-center mb-1.5 shadow-sm relative overflow-hidden">
+                    <ImageIcon className="text-sky-200" size={24} />
+                    {/* Tiny decorative landscape curve inside sky box */}
+                    <div className="absolute bottom-0 left-0 right-0 h-4 bg-sky-100 rounded-b-lg border-t border-sky-200" style={{ clipPath: 'ellipse(70% 100% at 50% 100%)' }}></div>
+                  </div>
+                  <button onClick={handleAddClick} className="bg-purple-500 hover:bg-purple-600 active:bg-purple-700 text-white text-[10px] sm:text-xs font-bold py-1 px-4 sm:px-5 rounded-full transition-colors shadow-sm tracking-wide">
+                    ADD
+                  </button>
+                </div>
+                
+                {/* Top Right Close */}
+                <button className="absolute top-1.5 right-1.5 p-0.5 text-rose-500 hover:bg-rose-50 rounded transition-colors z-10 bg-white shadow-sm border border-rose-100">
+                  <X size={14} strokeWidth={2.5} />
+                </button>
+              </div>
+            );
+          })}
+          
+          {totalMembers === 0 && (
+            <div className="p-8 text-center text-slate-500 text-sm bg-white rounded-xl border border-slate-200 border-dashed">
+              Customer limit is set to 0. Please edit the center to assign slots.
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {isAddCustomerOpen && (
+        <AddCustomerModal 
+          isOpen={isAddCustomerOpen} 
+          onClose={() => setIsAddCustomerOpen(false)} 
+          userProfile={userProfile} 
+          activeBranch={activeBranch}
+          initialData={addCustomerContext}
+        />
+      )}
+    </div>
+  );
+}

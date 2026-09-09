@@ -4,7 +4,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import CreateCenterModal from './CreateCenterModal';
 
-export default function CenterManagement({ userProfile, activeBranch }) {
+export default function CenterManagement({ userProfile, activeBranch, navigateToView, setSelectedCenter }) {
   const [centers, setCenters] = useState([]);
   const [branches, setBranches] = useState([{ id: 'all', name: 'All Center' }]);
   const [activeBranchId, setActiveBranchId] = useState('all');
@@ -376,12 +376,21 @@ export default function CenterManagement({ userProfile, activeBranch }) {
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto border-r-0 md:border-r-0 box-border">
                 <span className="hidden md:inline">Status</span>
               </th>
-              <th className="hidden md:table-cell py-4 px-2 w-10 shrink-0 text-center border-r-0 md:border-r-0 box-border"></th>
+              <th className="py-4 px-2 w-10 shrink-0 text-center border-r-0 md:border-r-0 box-border"></th>
             </tr>
           </thead>
           <tbody>
             {filteredCenters.map((center, index) => (
-              <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] md:text-sm">
+              <tr 
+                key={center.id} 
+                className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] md:text-sm"
+                onClick={() => {
+                  if (setSelectedCenter && navigateToView) {
+                    setSelectedCenter(center);
+                    navigateToView('Center Detail');
+                  }
+                }}
+              >
                 <td className="py-2 px-1 md:py-4 md:px-6 text-center text-gray-900 font-bold truncate">{index + 1}</td>
                 {isMainBranch ? (
                   <td className="hidden md:table-cell py-4 px-6 text-gray-900 font-bold">
@@ -417,7 +426,7 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                 <td className="py-2 px-1 md:py-4 md:px-6">
                   {getStatusBadge(center.status)}
                 </td>
-                <td className="hidden md:table-cell py-4 px-2 w-10 text-center text-slate-400">
+                <td className="py-4 px-2 w-10 text-center text-slate-400">
                   <ChevronRight size={20} />
                 </td>
               </tr>

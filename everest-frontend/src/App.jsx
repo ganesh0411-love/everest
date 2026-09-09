@@ -20,6 +20,7 @@ import StaffManagement from './components/StaffManagement';
 import ApplicationStatus from './components/ApplicationStatus';
 import AddCustomerModal from './components/AddCustomerModal';
 import RecycleBinView from './components/RecycleBinView';
+import CenterDetailsView from './components/CenterDetailsView';
 import { App as CapacitorApp } from '@capacitor/app';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -323,6 +324,7 @@ function App() {
   const [currentView, setCurrentView] = useState('Home');
   const [viewHistory, setViewHistory] = useState(['Home']);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedCenter, setSelectedCenter] = useState(null);
   
   // 🛑 FIX: Force Home Page Default on fresh login/reload
   useEffect(() => {
@@ -486,6 +488,11 @@ function App() {
           if (actualView === 'Customer Detail') {
             setCurrentView('Customer');
             return ['Home', 'Customer'];
+          }
+
+          if (actualView === 'Center Detail') {
+            setCurrentView('Centers');
+            return ['Home', 'Centers'];
           }
 
           if (actualView !== 'Home') {
@@ -828,7 +835,8 @@ function App() {
     switch(currentView) {
       case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} activeBranch={activeBranch} /></div>;
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
-      case 'Centers': return <div className="flex-1 overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} /></div>;
+      case 'Centers': return <div className="flex-1 overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} /></div>;
+      case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} /></div>;
       case 'Dashboard Overview': return <div className="flex-1 overflow-y-auto"><DashboardOverview /></div>;
