@@ -28,9 +28,24 @@ export default function CenterManagement({ userProfile, activeBranch }) {
   }, []);
 
   const branchCenters = useMemo(() => {
-    if (activeBranchId === 'all') return centers;
-    return centers.filter(c => c.branchId === activeBranchId);
-  }, [centers, activeBranchId]);
+    let filtered = centers;
+    
+    if (userProfile?.role?.toLowerCase() === 'staff') {
+      filtered = filtered.filter(c => 
+        c.createdByStaffId === userProfile.id || 
+        c.staffName === userProfile.name
+      );
+    } else if (activeBranchId !== 'all') {
+      // Ensure we match either branchId or branchName
+      const selectedBranch = branches.find(b => b.id === activeBranchId);
+      filtered = filtered.filter(c => 
+        c.branchId === activeBranchId || 
+        (selectedBranch && c.branchName === selectedBranch.name)
+      );
+    }
+    
+    return filtered;
+  }, [centers, activeBranchId, userProfile, branches]);
 
   const counts = useMemo(() => {
     return {
@@ -120,31 +135,41 @@ export default function CenterManagement({ userProfile, activeBranch }) {
 
         {/* Row 2 (Mobile) / Right (Desktop): Dropdown + Button */}
         <div className="flex items-center gap-2 w-full md:w-auto mt-3 md:mt-0">
-          {/* Dropdown */}
+          {/* Dropdown / Static Text */}
           <div className="relative flex-1 md:w-auto md:flex-none">
-            <select 
-              value={activeBranchId}
-              onChange={(e) => setActiveBranchId(e.target.value)}
-              className="appearance-none w-full bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 pl-3 md:pl-4 pr-8 md:pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-9 md:h-auto text-xs md:text-base"
-            >
-              {branches.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-              <ChevronDown size={16} />
-            </div>
+            {userProfile?.role?.toLowerCase() === 'staff' ? (
+              <div className="w-full bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 px-3 md:px-4 rounded-lg shadow-sm h-9 md:h-auto text-xs md:text-base flex items-center">
+                All Center
+              </div>
+            ) : (
+              <>
+                <select 
+                  value={activeBranchId}
+                  onChange={(e) => setActiveBranchId(e.target.value)}
+                  className="appearance-none w-full bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 pl-3 md:pl-4 pr-8 md:pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-9 md:h-auto text-xs md:text-base"
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                  <ChevronDown size={16} />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Action Button */}
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="shrink-0 md:w-auto bg-blue-600 hover:bg-blue-700 transition-colors text-white font-medium px-3.5 md:px-5 py-1.5 md:py-2.5 rounded-lg flex items-center justify-center gap-1.5 md:gap-2 shadow-sm h-9 md:h-auto text-xs md:text-base"
-          >
-            <Plus size={16} className="md:w-[18px] md:h-[18px]" />
-            <span className="md:hidden">Create</span>
-            <span className="hidden md:inline">Create Center</span>
-          </button>
+          {((userProfile?.role?.toLowerCase() === 'staff') || (userProfile?.role?.toLowerCase() === 'admin' && activeBranchId !== 'all')) && (
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="shrink-0 md:w-auto bg-blue-600 hover:bg-blue-700 transition-colors text-white font-medium px-3.5 md:px-5 py-1.5 md:py-2.5 rounded-lg flex items-center justify-center gap-1.5 md:gap-2 shadow-sm h-9 md:h-auto text-xs md:text-base"
+            >
+              <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+              <span className="md:hidden">Create</span>
+              <span className="hidden md:inline">Create Center</span>
+            </button>
+          )}
         </div>
       </div>
 
