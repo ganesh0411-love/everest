@@ -1,33 +1,47 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Plus } from 'lucide-react';
-
-const initialCenters = [
-  { id: 1, village: 'Muthur Village', leader: 'Selvi R', group: 'Green Valley Group', members: 12, status: 'Active' },
-  { id: 2, village: 'Kallipatti Village', leader: 'Ramesh K', group: 'Sunrise Group', members: 15, status: 'Active' },
-  { id: 3, village: 'Pudur Village', leader: 'Lakshmi P', group: 'Hope Group', members: 10, status: 'Overdue' },
-  { id: 4, village: 'Velampatti Village', leader: 'Murugan S', group: 'Unity Group', members: 8, status: 'Closed' },
-  { id: 5, village: 'Sembatti Village', leader: 'Kavitha T', group: 'Future Group', members: 14, status: 'Overdue' },
-  { id: 6, village: 'Ammampatti Village', leader: 'Bala S', group: 'Happy Group', members: 9, status: 'Closed' },
-  { id: 7, village: 'Nallur Village', leader: 'Deepa M', group: 'Bright Group', members: 11, status: 'Active' },
-  { id: 8, village: 'Thirupathi Village', leader: 'Karthik V', group: 'Growth Group', members: 13, status: 'Overdue' },
-];
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function CenterManagement() {
-  const [centers, setCenters] = useState(initialCenters);
+  const [centers, setCenters] = useState([]);
+  const [branches, setBranches] = useState([{ id: 'all', name: 'All Branches / All Centers' }]);
+  const [activeBranchId, setActiveBranchId] = useState('all');
   const [activeFilter, setActiveFilter] = useState('All');
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'branches'), (snapshot) => {
+      const fetched = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+      setBranches([{ id: 'all', name: 'All Branches / All Centers' }, ...fetched]);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'centers'), (snapshot) => {
+      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCenters(fetched);
+    });
+    return () => unsub();
+  }, []);
+
+  const branchCenters = useMemo(() => {
+    if (activeBranchId === 'all') return centers;
+    return centers.filter(c => c.branchId === activeBranchId);
+  }, [centers, activeBranchId]);
 
   const counts = useMemo(() => {
     return {
-      Active: centers.filter(c => c.status === 'Active').length,
-      Overdue: centers.filter(c => c.status === 'Overdue').length,
-      Closed: centers.filter(c => c.status === 'Closed').length,
+      Active: branchCenters.filter(c => c.status === 'Active').length,
+      Overdue: branchCenters.filter(c => c.status === 'Overdue').length,
+      Closed: branchCenters.filter(c => c.status === 'Closed').length,
     };
-  }, [centers]);
+  }, [branchCenters]);
 
   const filteredCenters = useMemo(() => {
-    if (activeFilter === 'All') return centers;
-    return centers.filter(c => c.status === activeFilter);
-  }, [centers, activeFilter]);
+    if (activeFilter === 'All') return branchCenters;
+    return branchCenters.filter(c => c.status === activeFilter);
+  }, [branchCenters, activeFilter]);
 
   const toggleFilter = (filterName) => {
     if (activeFilter === filterName) {
@@ -61,24 +75,30 @@ export default function CenterManagement() {
           </div>
         );
       default:
-        return null;
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 text-slate-600 rounded-full text-sm font-medium border border-slate-200">
+            <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+            {status || 'Unknown'}
+          </div>
+        );
     }
   };
 
   return (
     <div className="p-4 md:p-6 w-full max-w-7xl mx-auto bg-slate-50 min-h-screen">
-      <div className="text-center mb-8 mt-2">
-        <h1 className="text-3xl font-bold text-slate-800 tracking-tight">CENTERS</h1>
-      </div>
-
       {/* Toolbar Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 mt-2">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Dropdown */}
           <div className="relative">
-            <select className="appearance-none bg-white border border-slate-200 text-slate-700 font-medium py-2 pl-4 pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-              <option>All Center</option>
-              <option>Main Branch</option>
+            <select 
+              value={activeBranchId}
+              onChange={(e) => setActiveBranchId(e.target.value)}
+              className="appearance-none bg-white border border-slate-200 text-slate-700 font-medium py-2 pl-4 pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
               <ChevronDown size={16} />
@@ -138,13 +158,13 @@ export default function CenterManagement() {
           <tbody>
             {filteredCenters.map((center, index) => (
               <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer">
-                <td className="py-4 px-6 text-center text-slate-800 font-bold">{center.id}</td>
-                <td className="py-4 px-6 text-slate-700">{center.village}</td>
-                <td className="py-4 px-6 text-slate-600">{center.leader}</td>
+                <td className="py-4 px-6 text-center text-slate-800 font-bold">{index + 1}</td>
+                <td className="py-4 px-6 text-slate-700">{center.village || center.villageName || 'N/A'}</td>
+                <td className="py-4 px-6 text-slate-600">{center.leader || center.groupLeader || 'N/A'}</td>
                 <td className="py-4 px-6 text-slate-600">
-                  <div className="max-w-[150px] leading-tight break-words">{center.group}</div>
+                  <div className="max-w-[150px] leading-tight break-words">{center.group || center.groupName || 'N/A'}</div>
                 </td>
-                <td className="py-4 px-6 text-center text-slate-600">{center.members}</td>
+                <td className="py-4 px-6 text-center text-slate-600">{center.members || center.totalMember || 0}</td>
                 <td className="py-4 px-6">
                   {getStatusBadge(center.status)}
                 </td>
@@ -156,7 +176,7 @@ export default function CenterManagement() {
             {filteredCenters.length === 0 && (
               <tr>
                 <td colSpan="7" className="py-8 text-center text-slate-500">
-                  No centers found matching this filter.
+                  No centers found. Click '+ Create Center' to add a new center.
                 </td>
               </tr>
             )}
