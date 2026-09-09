@@ -57,30 +57,30 @@ export default function CenterManagement({ userProfile, activeBranch }) {
     switch (status) {
       case 'Active':
         return (
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-sm font-medium border border-emerald-100">
-            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-            Active
+          <div className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-3 py-0.5 md:py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] md:text-sm font-semibold md:font-medium border border-emerald-100 w-fit whitespace-nowrap">
+            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 shrink-0"></div>
+            <span className="truncate">Active</span>
           </div>
         );
       case 'Overdue':
         return (
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-sm font-medium border border-amber-100">
-            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-            Overdue
+          <div className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-3 py-0.5 md:py-1 bg-amber-50 text-amber-600 rounded-full text-[9px] md:text-sm font-semibold md:font-medium border border-amber-100 w-fit whitespace-nowrap">
+            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-amber-500 shrink-0"></div>
+            <span className="truncate">Overdue</span>
           </div>
         );
       case 'Closed':
         return (
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-sm font-medium border border-rose-100">
-            <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-            Closed
+          <div className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-3 py-0.5 md:py-1 bg-rose-50 text-rose-600 rounded-full text-[9px] md:text-sm font-semibold md:font-medium border border-rose-100 w-fit whitespace-nowrap">
+            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-rose-500 shrink-0"></div>
+            <span className="truncate">Closed</span>
           </div>
         );
       default:
         return (
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 text-slate-600 rounded-full text-sm font-medium border border-slate-200">
-            <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-            {status || 'Unknown'}
+          <div className="flex items-center gap-1 md:gap-1.5 px-1.5 md:px-3 py-0.5 md:py-1 bg-slate-50 text-slate-600 rounded-full text-[9px] md:text-sm font-semibold md:font-medium border border-slate-200 w-fit whitespace-nowrap">
+            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-slate-400 shrink-0"></div>
+            <span className="truncate">{status || 'Unknown'}</span>
           </div>
         );
     }
@@ -155,40 +155,40 @@ export default function CenterManagement({ userProfile, activeBranch }) {
       />
 
       {/* Data Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[800px]">
+      <div className="bg-white md:rounded-xl shadow-sm border-t border-b md:border border-slate-200 overflow-x-hidden md:overflow-x-auto w-full max-w-full">
+        <table className="w-full text-left border-collapse table-fixed md:table-auto md:min-w-[800px]">
           <thead>
-            <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-sm font-semibold">
-              <th className="py-4 px-6 text-center w-16">#</th>
-              <th className="py-4 px-6">Village Name</th>
-              <th className="py-4 px-6">Group Leader</th>
-              <th className="py-4 px-6">Group Name</th>
-              <th className="py-4 px-6 text-center">Total<br/>Member</th>
-              <th className="py-4 px-6">Status</th>
-              <th className="py-4 px-6 w-16"></th>
+            <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] md:text-sm font-bold md:font-semibold tracking-tight whitespace-nowrap">
+              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16">#</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate">Village Name</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate">Group Leader</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate">Group Name</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto">Total<br/>Member</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto">Status</th>
+              <th className="hidden md:table-cell py-4 px-6 w-16"></th>
             </tr>
           </thead>
           <tbody>
             {filteredCenters.map((center, index) => (
-              <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer">
-                <td className="py-4 px-6 text-center text-slate-800 font-bold">{index + 1}</td>
-                <td className="py-4 px-6 text-slate-700">{center.village || center.villageName || 'N/A'}</td>
-                <td className="py-4 px-6 text-slate-600">{center.leader || center.groupLeader || 'N/A'}</td>
-                <td className="py-4 px-6 text-slate-600">
-                  <div className="max-w-[150px] leading-tight break-words">{center.group || center.groupName || 'N/A'}</div>
+              <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] md:text-sm">
+                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-800 font-bold truncate">{index + 1}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 truncate">{center.village || center.villageName || 'N/A'}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 truncate">{center.leader || center.groupLeader || 'N/A'}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 truncate">
+                  <div className="truncate md:max-w-[150px] md:break-words md:whitespace-normal leading-tight">{center.group || center.groupName || 'N/A'}</div>
                 </td>
-                <td className="py-4 px-6 text-center text-slate-600">{center.members || center.totalMembers || center.totalMember || 0}</td>
-                <td className="py-4 px-6">
+                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-600 truncate">{center.members || center.totalMembers || center.totalMember || 0}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6">
                   {getStatusBadge(center.status)}
                 </td>
-                <td className="py-4 px-6 text-slate-400">
+                <td className="hidden md:table-cell py-4 px-6 text-slate-400">
                   <ChevronRight size={20} />
                 </td>
               </tr>
             ))}
             {filteredCenters.length === 0 && (
               <tr>
-                <td colSpan="7" className="py-8 text-center text-slate-500">
+                <td colSpan="7" className="py-8 text-center text-slate-500 text-sm">
                   No centers found. Click '+ Create Center' to add a new center.
                 </td>
               </tr>
