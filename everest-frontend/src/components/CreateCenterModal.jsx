@@ -145,7 +145,7 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
       return;
     }
     
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
       const centerData = {
         leaderName: formData.leaderName,
@@ -175,12 +175,12 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
         alert('Center created successfully!');
       }
       
-      setIsLoading(false);
+      setIsSubmitting(false);
       onClose();
     } catch (error) {
       console.error("Error saving center:", error);
       alert("Failed to save center: " + error.message);
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -320,10 +320,10 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
               </button>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isSubmitting}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-2.5 px-6 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? (editCenter ? 'Updating...' : 'Creating...') : (editCenter ? 'Update Center' : 'Create Center')}
+                {isSubmitting ? (editCenter ? 'Updating...' : 'Creating...') : (editCenter ? 'Update Center' : 'Create Center')}
               </button>
           </div>
         </form>

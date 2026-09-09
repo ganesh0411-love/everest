@@ -26,7 +26,8 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
       centerLeaderName: center?.leader || center?.leaderName || '',
       leaderCustomerId: center?.leaderId || '',
       groupName: center?.group || center?.groupName || '',
-      branch: center?.branchName || ''
+      branch: center?.branchName || '',
+      centerLocationUrl: center?.locationUrl || center?.gpsLocation || center?.location || ''
     });
     setIsAddCustomerOpen(true);
   };
@@ -182,8 +183,14 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
                            <ImageIcon className="text-slate-300" size={16} />
                          )}
                       </div>
-                      <button className="bg-purple-400 hover:bg-purple-500 active:bg-purple-600 text-white text-[9px] sm:text-[10px] font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1 w-full text-center tracking-wide">
-                        ADD
+                      <button 
+                        onClick={() => {
+                          setAddCustomerContext(customerInSlot);
+                          setIsAddCustomerOpen(true);
+                        }}
+                        className="bg-purple-400 hover:bg-purple-500 active:bg-purple-600 text-white text-[9px] sm:text-[10px] font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1 w-full text-center tracking-wide"
+                      >
+                        EDIT
                       </button>
                     </div>
 
