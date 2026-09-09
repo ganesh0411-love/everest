@@ -56,6 +56,20 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
     return name.replace(/^(Mr\.|Mrs\.|Miss)\s*/i, '').trim();
   };
 
+  const formatDOB = (dob) => {
+    if (!dob) return '-';
+    // Handles both "YYYY-MM-DD" and existing standard date formats
+    const parts = dob.split(/[-/]/);
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // Format from YYYY-MM-DD to DD/MM/YYYY
+        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+      }
+      return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+    }
+    return dob;
+  };
+
   const handleDelete = async () => {
     if (window.confirm("Are you sure you want to delete this center?")) {
       try {
@@ -174,8 +188,8 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
                       {/* Col A */}
                       <div className="flex flex-col min-w-0 flex-1 pr-1">
                         <span className="font-bold text-black text-xs sm:text-[13px] truncate">{formatName(customerInSlot.name || customerInSlot.customerName)}</span>
-                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.id || customerInSlot.customerId || '-'}</span>
-                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.dob || customerInSlot.dateOfBirth || '-'}</span>
+                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.customerId || customerInSlot.emfId || customerInSlot.applicationNumber || '-'}</span>
+                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{formatDOB(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
                       </div>
                       
                       {/* Vertical Partition */}
