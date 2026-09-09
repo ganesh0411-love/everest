@@ -32,8 +32,8 @@ export default function CenterManagement({ userProfile, activeBranch }) {
     
     if (userProfile?.role?.toLowerCase() === 'staff') {
       filtered = filtered.filter(c => 
-        c.createdByStaffId === userProfile.id || 
-        c.staffName === userProfile.name
+        (c.staffName && userProfile?.name && c.staffName.toLowerCase() === userProfile.name.toLowerCase()) || 
+        (c.createdByStaffId && userProfile?.id && c.createdByStaffId === userProfile.id)
       );
     } else if (activeBranchId !== 'all') {
       // Ensure we match either branchId or branchName

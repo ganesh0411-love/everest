@@ -96,6 +96,7 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
         branchName: formData.branchName,
         branchId: formData.branchId,
         staffName: formData.staffName,
+        createdByStaffId: userProfile?.id || '',
         location: formData.location,
         status: 'Active',
         totalMembers: parseInt(formData.totalMembers) || 0,
