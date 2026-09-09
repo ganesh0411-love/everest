@@ -137,7 +137,7 @@ export default function CenterManagement({ userProfile, activeBranch }) {
         <div className="flex items-center gap-2 w-full md:w-auto mt-3 md:mt-0">
           {/* Dropdown / Static Text */}
           <div className="relative flex-1 md:w-auto md:flex-none">
-            {userProfile?.role?.toLowerCase() === 'staff' ? (
+            {(userProfile?.role?.toLowerCase() === 'staff' || activeBranch !== 'Main Branch') ? (
               <div className="w-full bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 px-3 md:px-4 rounded-lg shadow-sm h-9 md:h-auto text-xs md:text-base flex items-center">
                 All Center
               </div>
@@ -160,7 +160,7 @@ export default function CenterManagement({ userProfile, activeBranch }) {
           </div>
 
           {/* Action Button */}
-          {((userProfile?.role?.toLowerCase() === 'staff') || (userProfile?.role?.toLowerCase() === 'admin' && activeBranchId !== 'all')) && (
+          {activeBranch !== 'Main Branch' && (
             <button 
               onClick={() => setIsModalOpen(true)}
               className="shrink-0 md:w-auto bg-blue-600 hover:bg-blue-700 transition-colors text-white font-medium px-3.5 md:px-5 py-1.5 md:py-2.5 rounded-lg flex items-center justify-center gap-1.5 md:gap-2 shadow-sm h-9 md:h-auto text-xs md:text-base"
