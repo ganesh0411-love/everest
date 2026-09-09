@@ -2,17 +2,19 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Plus } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import CreateCenterModal from './CreateCenterModal';
 
-export default function CenterManagement() {
+export default function CenterManagement({ userProfile, activeBranch }) {
   const [centers, setCenters] = useState([]);
-  const [branches, setBranches] = useState([{ id: 'all', name: 'All Branches / All Centers' }]);
+  const [branches, setBranches] = useState([{ id: 'all', name: 'All Center' }]);
   const [activeBranchId, setActiveBranchId] = useState('all');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'branches'), (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
-      setBranches([{ id: 'all', name: 'All Branches / All Centers' }, ...fetched]);
+      setBranches([{ id: 'all', name: 'All Center' }, ...fetched]);
     });
     return () => unsub();
   }, []);
@@ -135,11 +137,22 @@ export default function CenterManagement() {
         </div>
 
         {/* Action Button */}
-        <button className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 transition-colors text-white font-medium px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm">
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 transition-colors text-white font-medium px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm"
+        >
           <Plus size={18} />
           Create Center
         </button>
       </div>
+
+      {/* Create Center Modal */}
+      <CreateCenterModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        userProfile={userProfile} 
+        activeBranch={activeBranch} 
+      />
 
       {/* Data Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">

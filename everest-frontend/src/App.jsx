@@ -828,7 +828,7 @@ function App() {
     switch(currentView) {
       case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} activeBranch={activeBranch} /></div>;
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
-      case 'Centers': return <div className="flex-1 overflow-y-auto"><CenterManagement /></div>;
+      case 'Centers': return <div className="flex-1 overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} /></div>;
       case 'Dashboard Overview': return <div className="flex-1 overflow-y-auto"><DashboardOverview /></div>;
