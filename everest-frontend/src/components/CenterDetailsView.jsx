@@ -36,6 +36,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
       slotIndex: slotNumber,
       center: center?.centerName || '',
       city: center?.villageName || center?.village || '',
+      district: center?.district || '',
       centerLeaderName: center?.leader || center?.leaderName || '',
       leaderCustomerId: center?.leaderId || '',
       groupName: center?.groupName || center?.group || '',
