@@ -297,21 +297,16 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
               </div>
             </div>
 
-            {/* Lower Section 2-Column Grid */}
             <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-4">
               <div className="space-y-0.5">
                 <label className="text-[11px] font-semibold text-gray-700">Group Name</label>
                 <input type="text" name="groupName" value={formData.groupName} onChange={handleChange} placeholder="e.g. Green Valley Group" className="w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 placeholder:font-normal" />
               </div>
               <div className="space-y-0.5">
-                <label className="text-[11px] font-semibold text-gray-700">Village Name <span className="text-rose-500">*</span></label>
+                <label className="text-[11px] font-semibold text-gray-700">Village / City <span className="text-rose-500">*</span></label>
                 <input type="text" name="villageName" value={formData.villageName} onChange={handleChange} required placeholder="e.g. Muthur" className="w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 placeholder:font-normal" />
               </div>
               
-              <div className="space-y-0.5">
-                <label className="text-[11px] font-semibold text-gray-700">City</label>
-                <input type="text" name="city" value={formData.city} onChange={handleChange} placeholder="e.g. Batlagundu" className="w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 placeholder:font-normal" />
-              </div>
               <div className="space-y-0.5">
                 <label className="text-[11px] font-semibold text-gray-700">District</label>
                 <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="e.g. Dindigul" className="w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 placeholder:font-normal" />
@@ -344,7 +339,7 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
                     )}
                     
                     {isAssignStaffOpen && (
-                      <div className="absolute top-full mt-1 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-40 overflow-y-auto">
+                      <div className="absolute bottom-full mb-1 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto origin-bottom">
                         {staffList.length > 0 ? staffList.map(staff => (
                           <div 
                             key={staff.id} 

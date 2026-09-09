@@ -5,10 +5,11 @@ import { db } from '../firebase';
 import AddCustomerModal from './AddCustomerModal';
 import CreateCenterModal from './CreateCenterModal';
 
-export default function CenterDetailsView({ center, customers, onBack, userProfile, activeBranch }) {
+export default function CenterDetailsView({ center, customers, userProfile, activeBranch, onBack }) {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [addCustomerContext, setAddCustomerContext] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const totalMembers = Number(center?.totalMembers || center?.noOfCustomers || center?.members || 0);
   
@@ -33,11 +34,15 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
   const handleAddClick = (slotNumber) => {
     setAddCustomerContext({
       slotIndex: slotNumber,
-      center: center?.village || center?.villageName || center?.centerName || '',
+      center: center?.centerName || '',
+      city: center?.villageName || center?.village || '',
       centerLeaderName: center?.leader || center?.leaderName || '',
       leaderCustomerId: center?.leaderId || '',
-      groupName: center?.group || center?.groupName || '',
-      branch: center?.branchName || '',
+      groupName: center?.groupName || center?.group || '',
+      branchName: center?.branchName || '',
+      branchId: center?.branchId || '',
+      staffName: center?.staffName || '',
+      staffId: center?.staffId || '',
       centerLocationUrl: center?.locationUrl || center?.gpsLocation || center?.location || ''
     });
     setIsAddCustomerOpen(true);
@@ -112,7 +117,7 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
       } else {
         await addDoc(collection(db, 'customers'), {
           ...payload,
-          status: 'Pending',
+          status: 'Draft',
           createdAt: new Date().toISOString()
         });
       }
@@ -120,6 +125,29 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
     } catch (error) {
       console.error("Error saving customer to center:", error);
       throw error;
+    }
+  };
+
+  const handleBatchPublish = async () => {
+    try {
+      setIsPublishing(true);
+      const draftCustomers = centerCustomers.filter(c => c.status === 'Draft');
+      if (draftCustomers.length === 0) {
+        alert("All customers are already published!");
+        return;
+      }
+      
+      await Promise.all(draftCustomers.map(async (c) => {
+        if (c.id) {
+          await updateDoc(doc(db, 'customers', c.id), { status: 'Pending' });
+        }
+      }));
+      
+    } catch (error) {
+      console.error("Error publishing customers:", error);
+      alert("Failed to publish customers. Please try again.");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -285,6 +313,18 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
               </div>
             );
           })}
+          
+          {centerCustomers.length === totalMembers && centerCustomers.some(c => c.status === 'Draft') && (
+            <div className="pt-2 pb-6 flex justify-center">
+              <button 
+                onClick={handleBatchPublish} 
+                disabled={isPublishing}
+                className="w-full sm:w-auto bg-[#10a37f] hover:bg-[#0e906f] text-white font-bold text-base py-3 px-8 rounded-xl shadow-lg shadow-[#10a37f]/30 transition-all flex items-center justify-center gap-2"
+              >
+                {isPublishing ? 'PUBLISHING...' : 'DONE'}
+              </button>
+            </div>
+          )}
           
           {totalMembers === 0 && (
             <div className="p-8 text-center text-slate-500 text-sm bg-white rounded-xl border border-slate-200 border-dashed">
