@@ -203,6 +203,7 @@ const solveTenureFromRepayFlat = (P, R, A, currN, unit) => {
   return currN;
 };
 
+// ─── Donut Chart ─────────────────────────────────────────────────────────────
 const DonutChart = ({ principal, interest, total, emi, isPaidTenureMode, interestPaid }) => {
   const SIZE = 200;
   const SW   = 32;
@@ -223,8 +224,8 @@ const DonutChart = ({ principal, interest, total, emi, isPaidTenureMode, interes
   const centerValue = isPaidTenureMode ? interestPaid : emi;
 
   return (
-    <div className="relative w-[75px] h-[75px] md:w-[200px] md:h-[200px]">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="w-full h-full">
+    <div style={{ position: 'relative', width: SIZE, height: SIZE }}>
+      <svg width={SIZE} height={SIZE}>
         <circle cx={CX} cy={CY} r={R} fill="none" stroke="#e0e0e0" strokeWidth={SW} />
         {sum > 0 && (
           <>
@@ -240,16 +241,37 @@ const DonutChart = ({ principal, interest, total, emi, isPaidTenureMode, interes
           </>
         )}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-0 md:gap-0.5">
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none', flexDirection: 'column', gap: 2,
+      }}>
         {isPaidTenureMode ? (
-          <div className="text-center leading-[1.1]">
-            <p className="m-0 text-[7px] md:text-[13px] font-black text-gray-500 tracking-widest uppercase font-sans">Interest</p>
-            <p className="m-0 text-[7px] md:text-[13px] font-black text-gray-500 tracking-widest uppercase font-sans">Paid</p>
+          <div style={{ textAlign: 'center', lineHeight: 1.1 }}>
+            <p style={{
+              margin: 0, fontSize: 13, fontWeight: 900, color: '#888',
+              letterSpacing: 1, textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
+            }}>
+              Interest
+            </p>
+            <p style={{
+              margin: 0, fontSize: 13, fontWeight: 900, color: '#888',
+              letterSpacing: 1, textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
+            }}>
+              Paid
+            </p>
           </div>
         ) : (
-          <p className="m-0 text-[8px] md:text-[14px] font-black text-gray-500 tracking-widest uppercase font-sans">EMI</p>
+          <p style={{
+            margin: 0, fontSize: 14, fontWeight: 900, color: '#888',
+            letterSpacing: 1, textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
+          }}>
+            EMI
+          </p>
         )}
-        <p className="m-0 text-[10px] md:text-[22px] font-black text-[#0A1F6E] tracking-tighter">
+        <p style={{
+          margin: 0, fontSize: 22, fontWeight: 900, color: '#0A1F6E',
+          fontFamily: "'Inter', 'Roboto', Arial, sans-serif", letterSpacing: '-0.3px',
+        }}>
           ₹ {Number(centerValue).toLocaleString('en-IN')}
         </p>
       </div>
@@ -310,23 +332,35 @@ const EMIIcon = () => (
   </svg>
 );
 
+// ─── Section Header ───────────────────────────────────────────────────────────
 const SectionLabel = ({ children }) => (
-  <p className="m-0 mb-1.5 md:mb-2 text-[10px] md:text-[11.5px] font-black text-[#1a1a1a] tracking-wider uppercase font-sans">
+  <p style={{
+    fontSize: 11.5, fontWeight: 900, color: '#1a1a1a', letterSpacing: 1.1,
+    marginBottom: 7, textTransform: 'uppercase', fontFamily: "'Inter', Arial, sans-serif",
+  }}>
     {children}
   </p>
 );
 
+// ─── Amount Row (donut breakdown) ─────────────────────────────────────────────
 const AmountRow = ({ label, amount, color, showDivider = true }) => (
-  <div className={`pb-0 md:pb-3 mb-0 md:mb-3 ${showDivider ? 'md:border-b border-[#e0e0e0]' : ''}`}>
-    <p className="m-0 mb-0.5 text-[9px] md:text-[12.5px] font-bold text-slate-800 tracking-tight leading-tight whitespace-nowrap">
+  <div style={{
+    paddingBottom: showDivider ? 11 : 0, marginBottom: showDivider ? 11 : 0,
+    borderBottom: showDivider ? '1px solid #e0e0e0' : 'none',
+  }}>
+    <p style={{
+      margin: '0 0 2px', fontSize: 12.5, fontWeight: 700, color: '#2a2a2a',
+      letterSpacing: 0.1, fontFamily: "'Inter', Arial, sans-serif",
+    }}>
       {label}
     </p>
-    <p className="m-0 mb-0.5 text-[11px] md:text-[19px] font-black leading-tight tracking-tighter whitespace-nowrap" style={{ color }}>
+    <p style={{
+      margin: '0 0 2px', fontSize: 19, fontWeight: 800, color,
+      fontFamily: "'Inter', 'Roboto', Arial, sans-serif", letterSpacing: '-0.3px',
+    }}>
       ₹ {Number(amount).toLocaleString('en-IN')}
     </p>
-    <div className="hidden md:block">
-      <ShrinkText text={toWords(amount)} maxSize={10.5} minSize={6.5} />
-    </div>
+    <ShrinkText text={toWords(amount)} maxSize={10.5} minSize={6.5} />
   </div>
 );
 
@@ -608,87 +642,132 @@ const EMICalculator = ({ onBack }) => {
     : inputs.tenureUnit === 'Months' ? 'Monthly' : inputs.tenureUnit === 'Years' ? 'Yearly' : inputs.tenureUnit === 'Weeks' ? 'Weekly' : 'Daily';
 
   return (
-    <div className="h-full max-h-[calc(100dvh-60px)] md:max-h-[calc(100vh-theme(spacing.20))] overflow-hidden flex flex-col md:grid md:grid-cols-12 md:gap-4 bg-white font-sans">
-      
-      {/* ── Left Column (Inputs) ─────────────────────────────────────────── */}
-      <div className="md:col-span-7 flex flex-col h-full overflow-hidden">
-        
-        {/* ── Header ───────────────────────────────────────────────── */}
-        <div className="relative flex items-center justify-center px-4 py-2 md:py-3 gap-2.5 md:gap-3 bg-[#eaf5f4] border-b border-[#d4edea] shrink-0 md:rounded-tl-xl md:rounded-tr-none">
-          <div className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center">
-            <EMIIcon />
-          </div>
-          <div 
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowModeMenu(!showModeMenu);
-            }}
-            className="flex items-center gap-1.5 cursor-pointer"
-          >
-            <h1 className="m-0 text-lg md:text-[26px] font-black text-[#0f172a] font-serif tracking-tight leading-none">
-              EMI Calculator
-            </h1>
-            <span className="text-[10px] md:text-[13px] text-slate-600 mt-1 md:mt-2">▼</span>
-          </div>
+    <div style={{
+      display: 'flex', flexDirection: 'column', minHeight: '100%',
+      background: '#ffffff', fontFamily: "'Inter', 'Roboto', Arial, sans-serif",
+    }}>
 
-          {showModeMenu && (
-            <div className="absolute top-[90%] left-1/2 -translate-x-1/2 bg-white border border-slate-200 rounded-lg shadow-lg z-10 overflow-hidden w-[220px] mt-1">
-              <div 
-                onClick={() => { handleModeChange('Flat'); setShowModeMenu(false); }}
-                className={`px-4 py-3 text-[13px] font-bold cursor-pointer border-b border-slate-100 ${calcMode === 'Flat' ? 'text-[#ff6b00] bg-[#fff5f0]' : 'text-slate-600 bg-white hover:bg-slate-50'}`}
-              >
-                Flat Rate (Simple)
-              </div>
-              <div 
-                onClick={() => { handleModeChange('Banking'); setShowModeMenu(false); }}
-                className={`px-4 py-3 text-[13px] font-bold cursor-pointer ${calcMode === 'Banking' ? 'text-[#ff6b00] bg-[#fff5f0]' : 'text-slate-600 bg-white hover:bg-slate-50'}`}
-              >
-                Reducing Balance (Banking)
-              </div>
-            </div>
-          )}
+      {/* ── Header ───────────────────────────────────────────────── */}
+      <div style={{
+        position: 'relative',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px 16px 12px', gap: 12, background: '#eaf5f4', borderBottom: '1px solid #d4edea'
+      }}>
+        <EMIIcon />
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowModeMenu(!showModeMenu);
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+        >
+          <h1 style={{
+            margin: 0, fontSize: 26, fontWeight: 900, color: '#0f172a',
+            fontFamily: 'Georgia, serif', letterSpacing: '-0.02em', lineHeight: 1,
+          }}>
+            EMI Calculator
+          </h1>
+          <span style={{ fontSize: 13, color: '#4a5568', marginTop: 4 }}>▼</span>
         </div>
 
-        {/* ── Cards Section (Inputs) ───────────────────────────────── */}
-        <div className="px-3 md:px-5 py-2 md:py-4 flex-1 flex flex-col gap-2 md:gap-3 overflow-y-auto md:overflow-hidden pb-16 md:pb-4">
-          
-          <SectionLabel>Loan &amp; Repay Amount</SectionLabel>
-          <div className="flex border-[1.5px] border-[#e2d9c8] rounded-xl overflow-hidden bg-[#fdf8f3] shrink-0 mb-1.5 md:mb-3">
-            {/* Loan Amount Input */}
-            <div className="flex-1 py-2 px-3 md:py-3 md:px-4">
-              <p className="m-0 mb-1 text-[9px] md:text-[10px] font-extrabold text-black tracking-widest uppercase">
-                LOAN AMOUNT
-              </p>
-              <div className="flex items-baseline">
-                <span className="text-sm md:text-[17px] font-black text-[#4a148c]">₹&nbsp;</span>
-                <CurrencyInput
-                  value={inputs.principal}
-                  onChange={(val) => handleEdit('principal', val)}
-                  color="#4a148c"
-                  fontSize={window.innerWidth < 768 ? 14 : 17}
-                />
-              </div>
+        {showModeMenu && (
+          <div style={{
+            position: 'absolute', top: '90%', left: '50%', transform: 'translateX(-50%)',
+            background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.12)', zIndex: 10, overflow: 'hidden',
+            width: 220, marginTop: 4
+          }}>
+            <div 
+              onClick={() => { handleModeChange('Flat'); setShowModeMenu(false); }}
+              style={{
+                padding: '14px 16px', fontSize: 13, fontWeight: 700, color: calcMode === 'Flat' ? '#ff6b00' : '#4a5568',
+                background: calcMode === 'Flat' ? '#fff5f0' : '#fff', cursor: 'pointer',
+                borderBottom: '1px solid #edf2f7', fontFamily: "'Inter', Arial, sans-serif"
+              }}
+            >
+              Flat Rate (Simple)
             </div>
-            <div className="w-[1.5px] bg-[#e2d9c8] my-2 md:my-2.5" />
-            {/* Repay Amount Input */}
-            <div className="flex-1 py-2 px-3 md:py-3 md:px-4">
-              <p className="m-0 mb-1 text-[9px] md:text-[10px] font-extrabold text-black tracking-widest uppercase">
-                REPAY AMOUNT
-              </p>
-              <div className="flex items-baseline">
-                <span className="text-sm md:text-[17px] font-black text-[#cc5200]">₹&nbsp;</span>
-                <CurrencyInput
-                  value={inputs.repay}
-                  onChange={(val) => handleEdit('repay', val)}
-                  color="#cc5200"
-                  fontSize={window.innerWidth < 768 ? 14 : 17}
-                />
-              </div>
+            <div 
+              onClick={() => { handleModeChange('Banking'); setShowModeMenu(false); }}
+              style={{
+                padding: '14px 16px', fontSize: 13, fontWeight: 700, color: calcMode === 'Banking' ? '#ff6b00' : '#4a5568',
+                background: calcMode === 'Banking' ? '#fff5f0' : '#fff', cursor: 'pointer', fontFamily: "'Inter', Arial, sans-serif"
+              }}
+            >
+              Reducing Balance (Banking)
             </div>
           </div>
+        )}
+      </div>
 
-          {/* Interest Rate Input */}
-          <SectionLabel>Interest Rate (%)</SectionLabel>
+      {/* ── Donut + Breakdown ─────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '18px 16px 8px', gap: 12 }}>
+        <div style={{ flexShrink: 0 }}>
+          <DonutChart 
+            principal={calcOutputs.principal} 
+            interest={calcOutputs.totalInt} 
+            total={calcOutputs.repay} 
+            emi={calcOutputs.emi} 
+            isPaidTenureMode={calcMode === 'Banking' && isPaidTenureActive}
+            interestPaid={calcOutputs.interestPaid || 0}
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <AmountRow label="Principal Amount" amount={calcOutputs.principal} color="#4a148c" />
+          <AmountRow 
+            label={(calcMode === 'Banking' && isPaidTenureActive) ? "Principal Paid" : "Total Interest"}   
+            amount={(calcMode === 'Banking' && isPaidTenureActive) ? calcOutputs.principalPaid : calcOutputs.totalInt}  
+            color="#990000" 
+          />
+          <AmountRow 
+            label={(calcMode === 'Banking' && isPaidTenureActive) ? "Total Outstanding Amount" : "Total Amount"}     
+            amount={(calcMode === 'Banking' && isPaidTenureActive) ? calcOutputs.outstandingAmount : calcOutputs.repay}  
+            color="#cc5200" 
+            showDivider={false} 
+          />
+        </div>
+      </div>
+
+      {/* ── Cards Section ─────────────────────────────────────────── */}
+      <div style={{ padding: '10px 18px 0', flex: 1 }}>
+        <SectionLabel>Loan &amp; Repay Amount</SectionLabel>
+        <div style={{
+          display: 'flex', border: '1.5px solid #e2d9c8', borderRadius: 14,
+          overflow: 'hidden', background: '#fdf8f3', marginBottom: 18,
+        }}>
+          {/* Loan Amount Input */}
+          <div style={{ flex: 1, padding: '13px 14px' }}>
+            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 800, color: '#000000', letterSpacing: 0.8 }}>
+              LOAN AMOUNT
+            </p>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 17, fontWeight: 900, color: '#4a148c' }}>₹&nbsp;</span>
+              <CurrencyInput
+                value={inputs.principal}
+                onChange={(val) => handleEdit('principal', val)}
+                color="#4a148c"
+              />
+            </div>
+          </div>
+          <div style={{ width: 1.5, background: '#e2d9c8', margin: '10px 0' }} />
+          {/* Repay Amount Input */}
+          <div style={{ flex: 1, padding: '13px 14px' }}>
+            <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 800, color: '#000000', letterSpacing: 0.8 }}>
+              REPAY AMOUNT
+            </p>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 17, fontWeight: 900, color: '#cc5200' }}>₹&nbsp;</span>
+              <CurrencyInput
+                value={inputs.repay}
+                onChange={(val) => handleEdit('repay', val)}
+                color="#cc5200"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Interest Rate Input */}
+        <SectionLabel>Interest Rate (%)</SectionLabel>
         {calcMode === 'Banking' ? (() => {
           const derivedFlatRateStr = (() => {
             if (paFocused) return inputs.flatRate;
@@ -1039,77 +1118,57 @@ const EMICalculator = ({ onBack }) => {
         )}
 
         {/* Monthly EMI Input */}
-        <div className="mt-auto text-center pb-1 pt-1 md:pt-4 shrink-0 border-t border-slate-100">
-          <div className="flex items-baseline justify-center flex-wrap">
-            <span className="text-xl md:text-[27px] font-black text-[#0A1F6E] tracking-tight">
+        <div style={{ textAlign: 'center', paddingBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 27, fontWeight: 900, color: '#0A1F6E',
+              fontFamily: "'Inter', 'Roboto', Arial, sans-serif", letterSpacing: '-0.5px'
+            }}>
               {emiLabel} EMI: ₹&nbsp;
             </span>
             <CurrencyInput
               value={inputs.emi}
               onChange={(val) => handleEdit('emi', val)}
               color="#0A1F6E"
-              fontSize={window.innerWidth < 768 ? 20 : 27}
+              fontSize={27}
               autoWidth={true}
               style={{ letterSpacing: '-0.5px' }}
             />
           </div>
           {/* In Words for EMI */}
-          <div className="hidden md:block">
-            <ShrinkText
-              text={toWords(calcOutputs.emi)}
-              maxSize={11} minSize={6.5}
-              style={{ textAlign: 'center', color: '#6b7280' }}
-            />
-          </div>
+          <ShrinkText
+            text={toWords(calcOutputs.emi)}
+            maxSize={11} minSize={6.5}
+            style={{ textAlign: 'center', color: '#6b7280' }}
+          />
           
-          <div className="flex justify-end mt-2 md:mt-4 gap-2 md:gap-3">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, gap: 10 }}>
             <button
               onClick={handleReset}
-              className="bg-slate-100 text-slate-700 text-[11px] md:text-[13px] font-bold border border-slate-300 rounded-md px-3 md:px-4 py-1.5 md:py-2 cursor-pointer font-sans"
+              style={{
+                background: '#f0f2f5', color: '#333', fontSize: 13, fontWeight: 700,
+                border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 16px',
+                cursor: 'pointer', fontFamily: "'Inter', Arial, sans-serif"
+              }}
             >
               Reset
             </button>
             <button
               onClick={handleCalculate}
-              className="bg-[#ff6b00] text-white text-[11px] md:text-[13px] font-bold border-none rounded-md px-3 md:px-4 py-1.5 md:py-2 cursor-pointer font-sans shadow-md"
+              style={{
+                background: '#ff6b00', color: '#fff', fontSize: 13, fontWeight: 700,
+                border: 'none', borderRadius: 6, padding: '8px 16px',
+                cursor: 'pointer', fontFamily: "'Inter', Arial, sans-serif",
+                boxShadow: '0 2px 4px rgba(255, 107, 0, 0.3)'
+              }}
             >
               Calculate
             </button>
           </div>
         </div>
       </div>
-    </div>
 
-    {/* ── Right Column (Outputs) ─────────────────────────────────────────── */}
-      <div className="md:col-span-5 flex flex-row md:flex-col justify-between md:justify-center items-center bg-slate-50 border-t md:border-l md:border-t-0 border-slate-200 shrink-0 h-[100px] md:h-full p-2 md:p-6 gap-2 md:gap-8 overflow-hidden md:rounded-tr-xl md:rounded-br-xl">
-        
-        <div className="flex-shrink-0">
-          <DonutChart 
-            principal={calcOutputs.principal} 
-            interest={calcOutputs.totalInt} 
-            total={calcOutputs.repay} 
-            emi={calcOutputs.emi} 
-            isPaidTenureMode={calcMode === 'Banking' && isPaidTenureActive}
-            interestPaid={calcOutputs.interestPaid || 0}
-          />
-        </div>
-
-        <div className="flex flex-row md:flex-col gap-2 md:gap-4 flex-1 w-full justify-around md:justify-start pt-1 md:pt-0">
-          <AmountRow label="Principal" amount={calcOutputs.principal} color="#4a148c" />
-          <AmountRow 
-            label={(calcMode === 'Banking' && isPaidTenureActive) ? "Prin. Paid" : "Interest"}   
-            amount={(calcMode === 'Banking' && isPaidTenureActive) ? calcOutputs.principalPaid : calcOutputs.totalInt}  
-            color="#990000" 
-          />
-          <AmountRow 
-            label={(calcMode === 'Banking' && isPaidTenureActive) ? "Outstanding" : "Total"}     
-            amount={(calcMode === 'Banking' && isPaidTenureActive) ? calcOutputs.outstandingAmount : calcOutputs.repay}  
-            color="#cc5200" 
-            showDivider={false} 
-          />
-        </div>
-      </div>
-
+      <div style={{ height: 24 }} />
     </div>
   );
 };
