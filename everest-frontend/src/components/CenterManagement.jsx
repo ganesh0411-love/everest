@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, ChevronDown, Plus, Search, X } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import CreateCenterModal from './CreateCenterModal';
@@ -11,9 +11,15 @@ export default function CenterManagement({ userProfile, activeBranch }) {
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [totalMatches, setTotalMatches] = useState(0);
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isMainBranch = activeBranch?.name?.toLowerCase().includes('main') || activeBranch?.id === 'main';
+
+  useEffect(() => {
+    setActiveMatchIndex(0);
+  }, [searchQuery]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'branches'), (snapshot) => {
@@ -39,8 +45,14 @@ export default function CenterManagement({ userProfile, activeBranch }) {
         (c.staffName && userProfile?.name && c.staffName.toLowerCase() === userProfile.name.toLowerCase()) || 
         (c.createdByStaffId && userProfile?.id && c.createdByStaffId === userProfile.id)
       );
+    } else if (!isMainBranch) {
+      // SUB-BRANCH VIEW (Admin or Sub-Admin)
+      filtered = filtered.filter(c => 
+        c.branchId === activeBranch?.id || 
+        c.branchName?.trim().toLowerCase() === activeBranch?.name?.trim().toLowerCase()
+      );
     } else if (activeBranchId !== 'all') {
-      // Ensure we match either branchId or branchName
+      // MAIN BRANCH VIEW with dropdown selected
       const selectedBranch = branches.find(b => b.id === activeBranchId);
       filtered = filtered.filter(c => 
         c.branchId === activeBranchId || 
@@ -49,7 +61,7 @@ export default function CenterManagement({ userProfile, activeBranch }) {
     }
     
     return filtered;
-  }, [centers, activeBranchId, userProfile, branches]);
+  }, [centers, activeBranchId, userProfile, branches, isMainBranch, activeBranch]);
 
   const counts = useMemo(() => {
     return {
@@ -59,24 +71,94 @@ export default function CenterManagement({ userProfile, activeBranch }) {
     };
   }, [branchCenters]);
 
-  const filteredCenters = useMemo(() => {
+  const { filteredCenters, matchCount } = useMemo(() => {
     let result = branchCenters;
+    let count = 0;
     if (activeFilter !== 'All') {
       result = result.filter(c => c.status === activeFilter);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
+      
+      // Filter rows
       result = result.filter(c => {
         const vName = (c.village || c.villageName || '').toLowerCase();
         const bName = (c.branchName || '').toLowerCase();
+        const sName = (c.staffName || c.createdByStaffId || '').toLowerCase();
         const lName = (c.leader || c.groupLeader || '').toLowerCase();
         const gName = (c.group || c.groupName || '').toLowerCase();
         const mCount = String(c.members || c.totalMembers || c.totalMember || 0);
-        return vName.includes(q) || bName.includes(q) || lName.includes(q) || gName.includes(q) || mCount.includes(q);
+        return vName.includes(q) || bName.includes(q) || sName.includes(q) || lName.includes(q) || gName.includes(q) || mCount.includes(q);
+      });
+      
+      // Count matches inside visible rows
+      result = result.map(c => {
+         const newC = { ...c, _matches: {} };
+         const fields = [
+           { key: 'staffName', val: (c.staffName || c.createdByStaffId || 'N/A') },
+           { key: 'branchName', val: (c.branchName || 'N/A') },
+           { key: 'villageName', val: (c.village || c.villageName || 'N/A') },
+           { key: 'leader', val: (c.leader || c.groupLeader || 'N/A') },
+           { key: 'groupName', val: (c.group || c.groupName || 'N/A') },
+           { key: 'members', val: String(c.members || c.totalMembers || c.totalMember || 0) }
+         ];
+         fields.forEach(f => {
+            const str = String(f.val);
+            const lowerStr = str.toLowerCase();
+            if (lowerStr.includes(q)) {
+               let occurrences = 0;
+               let idx = lowerStr.indexOf(q);
+               while (idx !== -1) {
+                  occurrences++;
+                  idx = lowerStr.indexOf(q, idx + q.length);
+               }
+               newC._matches[f.key] = { startMatchIdx: count, count: occurrences };
+               count += occurrences;
+            }
+         });
+         return newC;
       });
     }
-    return result;
+    return { filteredCenters: result, matchCount: count };
   }, [branchCenters, activeFilter, searchQuery]);
+
+  useEffect(() => {
+    setTotalMatches(matchCount);
+  }, [matchCount]);
+
+  const highlightText = (text, query, startMatchIdx) => {
+    if (!query.trim() || text == null || startMatchIdx === undefined) return text;
+    const str = String(text);
+    const lowerStr = str.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    
+    if (!lowerStr.includes(lowerQuery)) return str;
+    
+    const parts = [];
+    let currentIndex = 0;
+    let matchIdxOffset = 0;
+    
+    let idx = lowerStr.indexOf(lowerQuery);
+    while (idx !== -1) {
+      parts.push(str.slice(currentIndex, idx));
+      const globalIdx = startMatchIdx + matchIdxOffset;
+      const isActive = globalIdx === activeMatchIndex;
+      parts.push(
+        <span 
+          key={globalIdx}
+          id={`search-match-${globalIdx}`}
+          className={`rounded px-0.5 ${isActive ? 'bg-orange-400 font-bold text-white' : 'bg-amber-200 text-gray-900'}`}
+        >
+          {str.slice(idx, idx + query.length)}
+        </span>
+      );
+      currentIndex = idx + query.length;
+      matchIdxOffset++;
+      idx = lowerStr.indexOf(lowerQuery, currentIndex);
+    }
+    parts.push(str.slice(currentIndex));
+    return parts;
+  };
 
   const toggleFilter = (filterName) => {
     if (activeFilter === filterName) {
@@ -156,7 +238,7 @@ export default function CenterManagement({ userProfile, activeBranch }) {
           
           {/* Expandable Search Bar (Desktop only) */}
           <div className="hidden md:flex relative items-center">
-            <div className={`flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden transition-all duration-300 ease-in-out ${isSearchFocused || searchQuery ? 'w-64 ring-2 ring-blue-500/20 border-blue-500' : 'w-9 hover:bg-slate-50'}`}>
+            <div className={`flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden transition-all duration-300 ease-in-out ${isSearchFocused || searchQuery ? 'w-auto min-w-[280px] ring-2 ring-blue-500/20 border-blue-500' : 'w-9 hover:bg-slate-50'}`}>
               <div 
                 className="w-9 h-9 flex items-center justify-center shrink-0 text-slate-500 cursor-pointer"
                 onClick={() => {
@@ -175,18 +257,51 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
                 onBlur={() => setIsSearchFocused(false)}
-                className="w-full h-9 bg-transparent border-none outline-none text-sm text-slate-700 pr-2 placeholder-slate-400"
+                className={`h-9 bg-transparent border-none outline-none text-sm text-slate-700 pr-2 placeholder-slate-400 ${isSearchFocused || searchQuery ? 'w-48' : 'w-full'}`}
               />
               {searchQuery && (
-                <div 
-                  className="w-8 h-9 flex items-center justify-center shrink-0 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  onMouseDown={(e) => {
-                    e.preventDefault(); // Prevent blur
-                    setSearchQuery('');
-                    document.getElementById('center-search-input')?.focus();
-                  }}
-                >
-                  <X size={14} />
+                <div className="flex items-center shrink-0 bg-slate-50 border-l border-slate-200 h-9">
+                  <div className="px-2 text-[11px] font-medium text-slate-500">
+                    {totalMatches > 0 ? `${activeMatchIndex + 1} of ${totalMatches}` : '0 matches'}
+                  </div>
+                  <div className="flex items-center border-l border-slate-200 h-full">
+                    <button 
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (totalMatches > 0) {
+                          const newIdx = activeMatchIndex === 0 ? totalMatches - 1 : activeMatchIndex - 1;
+                          setActiveMatchIndex(newIdx);
+                          document.getElementById(`search-match-${newIdx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                      className="w-6 h-full flex items-center justify-center hover:bg-slate-200 text-slate-500 transition-colors"
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button 
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (totalMatches > 0) {
+                          const newIdx = activeMatchIndex === totalMatches - 1 ? 0 : activeMatchIndex + 1;
+                          setActiveMatchIndex(newIdx);
+                          document.getElementById(`search-match-${newIdx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                      className="w-6 h-full flex items-center justify-center border-l border-slate-200 hover:bg-slate-200 text-slate-500 transition-colors"
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                  <div 
+                    className="w-8 h-full flex items-center justify-center hover:bg-red-50 text-slate-400 hover:text-red-500 cursor-pointer border-l border-slate-200 transition-colors"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setSearchQuery('');
+                      document.getElementById('center-search-input')?.focus();
+                    }}
+                  >
+                    <X size={14} />
+                  </div>
                 </div>
               )}
             </div>
@@ -246,8 +361,10 @@ export default function CenterManagement({ userProfile, activeBranch }) {
           <thead>
             <tr className="bg-slate-50 md:bg-blue-600 text-slate-600 md:text-white border-b border-slate-200 md:border-blue-700 text-[10px] md:text-sm font-bold md:font-semibold md:tracking-wide whitespace-nowrap">
               <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16 md:border-r md:border-white/30">#</th>
-              {isMainBranch && (
+              {isMainBranch ? (
                 <th className="hidden md:table-cell py-4 px-6 w-auto truncate md:border-r md:border-white/30">Branch Name</th>
+              ) : (
+                <th className="hidden md:table-cell py-4 px-6 w-auto truncate md:border-r md:border-white/30">Staff Name</th>
               )}
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-r md:border-white/30">Village Name</th>
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-r md:border-white/30">
@@ -273,15 +390,29 @@ export default function CenterManagement({ userProfile, activeBranch }) {
             {filteredCenters.map((center, index) => (
               <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] md:text-sm">
                 <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-800 font-bold truncate">{index + 1}</td>
-                {isMainBranch && (
-                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">{center.branchName || 'N/A'}</td>
+                {isMainBranch ? (
+                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">
+                    {searchQuery.trim() ? highlightText(center.branchName || 'N/A', searchQuery, center._matches?.branchName?.startMatchIdx) : (center.branchName || 'N/A')}
+                  </td>
+                ) : (
+                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">
+                    {searchQuery.trim() ? highlightText(center.staffName || center.createdByStaffId || 'N/A', searchQuery, center._matches?.staffName?.startMatchIdx) : (center.staffName || center.createdByStaffId || 'N/A')}
+                  </td>
                 )}
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">{center.village || center.villageName || 'N/A'}</td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold truncate">{center.leader || center.groupLeader || 'N/A'}</td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold truncate">
-                  <div className="truncate md:max-w-[150px] md:break-words md:whitespace-normal leading-tight">{center.group || center.groupName || 'N/A'}</div>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">
+                  {searchQuery.trim() ? highlightText(center.village || center.villageName || 'N/A', searchQuery, center._matches?.villageName?.startMatchIdx) : (center.village || center.villageName || 'N/A')}
                 </td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-600 md:text-gray-900 md:font-bold truncate">{center.members || center.totalMembers || center.totalMember || 0}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold truncate">
+                  {searchQuery.trim() ? highlightText(center.leader || center.groupLeader || 'N/A', searchQuery, center._matches?.leader?.startMatchIdx) : (center.leader || center.groupLeader || 'N/A')}
+                </td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold truncate">
+                  <div className="truncate md:max-w-[150px] md:break-words md:whitespace-normal leading-tight">
+                    {searchQuery.trim() ? highlightText(center.group || center.groupName || 'N/A', searchQuery, center._matches?.groupName?.startMatchIdx) : (center.group || center.groupName || 'N/A')}
+                  </div>
+                </td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-600 md:text-gray-900 md:font-bold truncate">
+                  {searchQuery.trim() ? highlightText(center.members || center.totalMembers || center.totalMember || 0, searchQuery, center._matches?.members?.startMatchIdx) : (center.members || center.totalMembers || center.totalMember || 0)}
+                </td>
                 <td className="py-2 px-1 md:py-4 md:px-6">
                   {getStatusBadge(center.status)}
                 </td>
