@@ -26,57 +26,57 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
   const actionSheetRef = useRef(null);
 
   useEffect(() => {
-    if (editCenter && isOpen) {
-      setFormData({
-        leaderName: editCenter.leader || editCenter.leaderName || '',
-        leaderId: editCenter.leaderId || '',
-        centerName: editCenter.centerName || '',
-        groupName: editCenter.group || editCenter.groupName || '',
-        villageName: editCenter.village || editCenter.villageName || '',
-        branchName: editCenter.branchName || '',
-        branchId: editCenter.branchId || '',
-        staffName: editCenter.staffName || '',
-        location: editCenter.location || '',
-        totalMembers: editCenter.totalMembers || editCenter.noOfCustomers || ''
-      });
-      if (editCenter.leaderPhoto) {
-        setLeaderPhoto(editCenter.leaderPhoto);
-      }
-    }
-  }, [editCenter, isOpen]);
-
-  useEffect(() => {
     if (isOpen) {
-      // Auto-generate ID
-      const generatedId = `EMF${Math.floor(100000 + Math.random() * 900000)}`;
-      
-      // Determine Branch
-      let bName = '';
-      let bId = '';
-      if (userProfile?.role === 'staff') {
-        bName = userProfile.branchName || userProfile.branch || '';
-        bId = userProfile.branchId || '';
+      if (editCenter) {
+        setFormData({
+          leaderName: editCenter.leaderName || editCenter.leader || '',
+          leaderId: editCenter.leaderCustomerId || editCenter.customerId || editCenter.leaderId || '',
+          centerName: editCenter.centerName || '',
+          groupName: editCenter.groupName || editCenter.group || '',
+          villageName: editCenter.villageName || editCenter.village || '',
+          branchName: editCenter.branchName || '',
+          branchId: editCenter.branchId || '',
+          staffName: editCenter.staffName || '',
+          location: editCenter.locationUrl || editCenter.gpsLocation || editCenter.location || '',
+          totalMembers: editCenter.noOfCustomers || editCenter.totalMembers || editCenter.members || ''
+        });
+        if (editCenter.leaderPhoto) {
+          setLeaderPhoto(editCenter.leaderPhoto);
+        } else {
+          setLeaderPhoto(null);
+        }
       } else {
-        bName = activeBranch?.name || '';
-        bId = activeBranch?.id || '';
-      }
+        // Auto-generate ID
+        const generatedId = `EMF${Math.floor(100000 + Math.random() * 900000)}`;
+        
+        // Determine Branch
+        let bName = '';
+        let bId = '';
+        if (userProfile?.role === 'staff') {
+          bName = userProfile.branchName || userProfile.branch || '';
+          bId = userProfile.branchId || '';
+        } else {
+          bName = activeBranch?.name || '';
+          bId = activeBranch?.id || '';
+        }
 
-      setFormData({
-        leaderName: '',
-        leaderId: generatedId,
-        centerName: '',
-        groupName: '',
-        villageName: '',
-        branchName: bName === 'Main Branch' || bName === 'All Center' ? '' : bName,
-        branchId: bId === 'main' || bId === 'all' ? '' : bId,
-        staffName: userProfile?.name || userProfile?.staffName || '',
-        location: '',
-        totalMembers: ''
-      });
-      setLeaderPhoto(null);
+        setFormData({
+          leaderName: '',
+          leaderId: generatedId,
+          centerName: '',
+          groupName: '',
+          villageName: '',
+          branchName: bName === 'Main Branch' || bName === 'All Center' ? '' : bName,
+          branchId: bId === 'main' || bId === 'all' ? '' : bId,
+          staffName: userProfile?.name || userProfile?.staffName || '',
+          location: '',
+          totalMembers: ''
+        });
+        setLeaderPhoto(null);
+      }
       setShowPhotoActionSheet(false);
     }
-  }, [editCenter, isOpen, userProfile, activeBranch]);
+  }, [isOpen, editCenter, userProfile, activeBranch]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {

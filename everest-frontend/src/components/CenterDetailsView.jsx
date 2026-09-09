@@ -132,63 +132,62 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
             if (customerInSlot) {
               // FILLED SLOT STATE
               return (
-                <div key={idx} className="bg-white rounded-xl shadow-sm border-2 border-black flex overflow-hidden relative min-h-[96px]">
+                <div key={idx} className="border-2 border-black rounded-2xl flex overflow-hidden relative bg-white p-2 min-h-[100px] mb-3">
                   {/* Left Index Box */}
-                  <div className="w-14 sm:w-16 shrink-0 border-r-2 border-black flex items-center justify-center bg-slate-50">
-                    <span className="font-black text-2xl text-slate-900">{paddedIdx}</span>
+                  <div className="w-14 sm:w-16 shrink-0 border-r-2 border-black flex items-center justify-center bg-transparent">
+                    <span className="font-black text-2xl text-black">{paddedIdx}</span>
                   </div>
                   
                   {/* Main Details Area */}
-                  <div className="flex-1 p-2 sm:p-2.5 flex justify-between items-stretch gap-2 min-w-0">
+                  <div className="flex-1 pl-2 sm:pl-3 flex flex-col justify-between min-w-0 pr-8">
                     
-                    {/* Columns Wrapper */}
-                    <div className="flex-1 flex flex-col justify-between min-w-0">
+                    <div className="flex items-start">
+                      {/* Col A */}
+                      <div className="flex flex-col min-w-0 flex-1 pr-1">
+                        <span className="font-bold text-black text-xs sm:text-[13px] truncate">{formatName(customerInSlot.name || customerInSlot.customerName)}</span>
+                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.id || customerInSlot.customerId || '-'}</span>
+                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.dob || customerInSlot.dateOfBirth || '-'}</span>
+                      </div>
                       
-                      <div className="flex items-start">
-                        {/* Col 1 */}
-                        <div className="flex flex-col min-w-0 flex-1 pr-1.5 border-r border-slate-300">
-                          <span className="font-bold text-slate-900 text-xs sm:text-[13px] truncate">{formatName(customerInSlot.name || customerInSlot.customerName)}</span>
-                          <span className="font-semibold text-slate-700 text-[10px] sm:text-[11px] truncate">{customerInSlot.id || customerInSlot.customerId || '-'}</span>
-                          <span className="font-semibold text-slate-700 text-[10px] sm:text-[11px] truncate">{customerInSlot.dob || customerInSlot.dateOfBirth || '-'}</span>
-                        </div>
-                        {/* Col 2 */}
-                        <div className="flex flex-col min-w-0 pl-1.5 shrink-0 w-[45%]">
-                          <span className="font-bold text-slate-900 text-[10px] sm:text-[11px] truncate">{customerInSlot.gender || '-'}</span>
-                          <span className="font-semibold text-slate-900 text-[10px] sm:text-[11px] truncate">{customerInSlot.maritalStatus || '-'}</span>
-                          <span className="font-semibold text-slate-900 text-[10px] sm:text-[11px] truncate">{customerInSlot.age ? `${customerInSlot.age} Yrs` : getAge(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
-                        </div>
+                      {/* Vertical Partition */}
+                      <div className="w-px bg-black mx-1 sm:mx-2 self-stretch"></div>
+                      
+                      {/* Col B */}
+                      <div className="flex flex-col min-w-0 flex-1 pl-1 shrink-0">
+                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.gender || '-'}</span>
+                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.maritalStatus || '-'}</span>
+                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.age ? `${customerInSlot.age} Yrs` : getAge(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
                       </div>
 
-                      {/* Phone Link */}
-                      <div className="mt-1.5 pt-1.5 border-t border-slate-100">
-                        {customerInSlot.phone ? (
-                          <a href={`tel:${customerInSlot.phone}`} className="inline-flex items-center gap-1 hover:bg-slate-50 px-1.5 py-0.5 rounded transition-colors group w-fit">
-                            <div className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0">
-                              <Phone size={10} className="fill-current" />
-                            </div>
-                            <span className="font-bold text-slate-900 text-xs tracking-wide">{customerInSlot.phone}</span>
-                          </a>
-                        ) : (
-                          <span className="font-bold text-slate-400 text-xs">-</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right Side: Photo & Button */}
-                    <div className="shrink-0 flex flex-col items-center justify-between py-1 w-14 sm:w-16">
-                      <div className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shadow-sm">
+                      {/* Photo Preview */}
+                      <div className="w-14 h-14 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 ml-1">
                          {customerInSlot.photoBase64 || customerInSlot.photoUrl || customerInSlot.image ? (
                            <img src={customerInSlot.photoBase64 || customerInSlot.photoUrl || customerInSlot.image} alt="Customer" className="w-full h-full object-cover" />
                          ) : (
                            <ImageIcon className="text-slate-300" size={16} />
                          )}
                       </div>
+                    </div>
+
+                    {/* Bottom Row: Phone & EDIT Button */}
+                    <div className="flex items-center justify-between mt-1 pt-1">
+                      {customerInSlot.phone ? (
+                        <a href={`tel:${customerInSlot.phone}`} className="inline-flex items-center gap-1 hover:bg-slate-50 transition-colors w-fit">
+                          <div className="w-4 h-4 text-green-500 flex items-center justify-center shrink-0">
+                            <Phone size={14} className="fill-current" />
+                          </div>
+                          <span className="font-semibold text-black text-xs tracking-wide">{customerInSlot.phone}</span>
+                        </a>
+                      ) : (
+                        <span className="font-semibold text-slate-400 text-xs italic">No Phone</span>
+                      )}
+                      
                       <button 
                         onClick={() => {
                           setAddCustomerContext(customerInSlot);
                           setIsAddCustomerOpen(true);
                         }}
-                        className="bg-purple-400 hover:bg-purple-500 active:bg-purple-600 text-white text-[9px] sm:text-[10px] font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1 w-full text-center tracking-wide"
+                        className="bg-[#c276f0] hover:bg-purple-500 active:bg-purple-600 text-white text-[10px] font-bold px-4 py-1 rounded-full transition-colors shadow-sm ml-2"
                       >
                         EDIT
                       </button>
@@ -197,8 +196,8 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
                   </div>
                   
                   {/* Top Right Close */}
-                  <button className="absolute top-1.5 right-1.5 p-0.5 text-rose-500 hover:bg-rose-50 rounded transition-colors z-10 bg-white shadow-sm border border-rose-100">
-                    <X size={14} strokeWidth={2.5} />
+                  <button className="absolute top-2 right-2 text-red-500 font-bold hover:bg-red-50 rounded-full p-0.5 transition-colors z-10">
+                    <X size={16} strokeWidth={3} />
                   </button>
                 </div>
               );
@@ -206,27 +205,27 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
 
             // EMPTY SLOT STATE
             return (
-              <div key={idx} className="bg-white rounded-xl shadow-sm border-2 border-black flex overflow-hidden min-h-[96px] relative">
+              <div key={idx} className="border-2 border-black rounded-2xl flex overflow-hidden min-h-[100px] relative bg-white p-2 mb-3">
                 {/* Left Index Box */}
-                <div className="w-14 sm:w-16 shrink-0 border-r-2 border-black flex items-center justify-center bg-slate-50">
-                  <span className="font-black text-2xl text-slate-900">{paddedIdx}</span>
+                <div className="w-14 sm:w-16 shrink-0 border-r-2 border-black flex items-center justify-center bg-transparent">
+                  <span className="font-black text-2xl text-black">{paddedIdx}</span>
                 </div>
                 
                 {/* Main Area (Empty) */}
-                <div className="flex-1 flex flex-col items-center justify-center py-3 relative min-w-0">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-sky-50 border border-sky-200 flex items-center justify-center mb-1.5 shadow-sm relative overflow-hidden">
+                <div className="flex-1 flex flex-col items-center justify-center py-2 relative min-w-0 pr-8">
+                  <div className="w-14 h-14 rounded-xl bg-sky-50 flex items-center justify-center mb-1 relative overflow-hidden">
                     <ImageIcon className="text-sky-200" size={24} />
                     {/* Tiny decorative landscape curve inside sky box */}
-                    <div className="absolute bottom-0 left-0 right-0 h-4 bg-sky-100 rounded-b-lg border-t border-sky-200" style={{ clipPath: 'ellipse(70% 100% at 50% 100%)' }}></div>
+                    <div className="absolute bottom-0 left-0 right-0 h-4 bg-lime-500/20 rounded-b-xl border-t border-sky-200" style={{ clipPath: 'ellipse(70% 100% at 50% 100%)' }}></div>
                   </div>
-                  <button onClick={handleAddClick} className="bg-purple-500 hover:bg-purple-600 active:bg-purple-700 text-white text-[10px] sm:text-xs font-bold py-1 px-4 sm:px-5 rounded-full transition-colors shadow-sm tracking-wide">
+                  <button onClick={handleAddClick} className="bg-[#c276f0] hover:bg-purple-500 active:bg-purple-600 text-white text-[10px] font-bold py-1 px-5 rounded-full transition-colors shadow-sm tracking-wide">
                     ADD
                   </button>
                 </div>
                 
                 {/* Top Right Close */}
-                <button className="absolute top-1.5 right-1.5 p-0.5 text-rose-500 hover:bg-rose-50 rounded transition-colors z-10 bg-white shadow-sm border border-rose-100">
-                  <X size={14} strokeWidth={2.5} />
+                <button className="absolute top-2 right-2 text-red-500 font-bold hover:bg-red-50 rounded-full p-0.5 transition-colors z-10">
+                  <X size={16} strokeWidth={3} />
                 </button>
               </div>
             );
