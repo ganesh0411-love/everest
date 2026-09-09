@@ -189,18 +189,18 @@ export default function CenterManagement({ userProfile, activeBranch }) {
       <div className="bg-white md:rounded-xl shadow-sm border-t border-b md:border border-slate-200 overflow-x-hidden md:overflow-x-auto w-full max-w-full">
         <table className="w-full text-left border-collapse table-fixed md:table-auto md:min-w-[800px]">
           <thead>
-            <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-[10px] md:text-sm font-bold md:font-semibold tracking-tight whitespace-nowrap">
+            <tr className="bg-slate-50 md:bg-blue-600 text-slate-600 md:text-white border-b border-slate-200 md:border-blue-700 text-[10px] md:text-sm font-bold md:font-semibold md:tracking-wide whitespace-nowrap">
               <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16">#</th>
               {isMainBranch && (
-                <th className="hidden md:table-cell py-4 px-6 w-auto truncate">Branch Name</th>
+                <th className="hidden md:table-cell py-4 px-6 w-auto truncate border-l border-blue-500/30">Branch Name</th>
               )}
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate">Village Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate">
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-l border-blue-500/30">Village Name</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-l border-blue-500/30">
                 <span className={isMainBranch ? 'md:hidden' : ''}>Group Leader</span>
                 {isMainBranch && <span className="hidden md:inline">Leader</span>}
               </th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate">Group Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap">
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate md:border-l border-blue-500/30">Group Name</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap md:border-l border-blue-500/30">
                 <span className="md:hidden">Members</span>
                 {isMainBranch ? (
                   <span className="hidden md:inline">Members</span>
@@ -208,10 +208,10 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                   <span className="hidden md:inline">Total<br/>Member</span>
                 )}
               </th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto">
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto md:border-l border-blue-500/30">
                 <span className="hidden md:inline">Status</span>
               </th>
-              <th className="hidden md:table-cell py-4 px-6 w-16"></th>
+              <th className="hidden md:table-cell py-4 px-2 w-10 shrink-0 text-center"></th>
             </tr>
           </thead>
           <tbody>
@@ -219,18 +219,18 @@ export default function CenterManagement({ userProfile, activeBranch }) {
               <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] md:text-sm">
                 <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-800 font-bold truncate">{index + 1}</td>
                 {isMainBranch && (
-                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 font-medium truncate">{center.branchName || 'N/A'}</td>
+                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">{center.branchName || 'N/A'}</td>
                 )}
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 truncate">{center.village || center.villageName || 'N/A'}</td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 truncate">{center.leader || center.groupLeader || 'N/A'}</td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 truncate">
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">{center.village || center.villageName || 'N/A'}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold truncate">{center.leader || center.groupLeader || 'N/A'}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold truncate">
                   <div className="truncate md:max-w-[150px] md:break-words md:whitespace-normal leading-tight">{center.group || center.groupName || 'N/A'}</div>
                 </td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-600 truncate">{center.members || center.totalMembers || center.totalMember || 0}</td>
+                <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-600 md:text-gray-900 md:font-bold truncate">{center.members || center.totalMembers || center.totalMember || 0}</td>
                 <td className="py-2 px-1 md:py-4 md:px-6">
                   {getStatusBadge(center.status)}
                 </td>
-                <td className="hidden md:table-cell py-4 px-6 text-slate-400">
+                <td className="hidden md:table-cell py-4 px-2 w-10 text-center text-slate-400">
                   <ChevronRight size={20} />
                 </td>
               </tr>
