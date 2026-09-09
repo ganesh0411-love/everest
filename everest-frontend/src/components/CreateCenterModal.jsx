@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Camera, Image as ImageIcon, Trash2, User } from 'lucide-react';
-import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch, editCenter }) {
@@ -13,13 +13,18 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
     branchName: '',
     branchId: '',
     staffName: '',
+    staffId: '',
     location: '',
-    totalMembers: ''
+    totalMembers: '',
+    city: '',
+    district: ''
   });
   const [leaderPhoto, setLeaderPhoto] = useState(null);
   const [showPhotoActionSheet, setShowPhotoActionSheet] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [staffList, setStaffList] = useState([]);
+  const [isAssignStaffOpen, setIsAssignStaffOpen] = useState(false);
   
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -37,8 +42,11 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
           branchName: editCenter.branchName || '',
           branchId: editCenter.branchId || '',
           staffName: editCenter.staffName || '',
+          staffId: editCenter.staffId || '',
           location: editCenter.locationUrl || editCenter.gpsLocation || editCenter.location || '',
-          totalMembers: editCenter.noOfCustomers || editCenter.totalMembers || editCenter.members || ''
+          totalMembers: editCenter.noOfCustomers || editCenter.totalMembers || editCenter.members || '',
+          city: editCenter.city || '',
+          district: editCenter.district || ''
         });
         if (editCenter.leaderPhoto) {
           setLeaderPhoto(editCenter.leaderPhoto);
@@ -68,15 +76,30 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
           villageName: '',
           branchName: bName === 'Main Branch' || bName === 'All Center' ? '' : bName,
           branchId: bId === 'main' || bId === 'all' ? '' : bId,
-          staffName: userProfile?.name || userProfile?.staffName || '',
+          staffName: userProfile?.role === 'staff' ? (userProfile?.name || userProfile?.staffName || '') : '',
+          staffId: userProfile?.role === 'staff' ? (userProfile?.id || userProfile?.staffId || '') : '',
           location: '',
-          totalMembers: ''
+          totalMembers: '',
+          city: '',
+          district: ''
         });
         setLeaderPhoto(null);
       }
       setShowPhotoActionSheet(false);
     }
   }, [isOpen, editCenter, userProfile, activeBranch]);
+
+  useEffect(() => {
+    if (isOpen && userProfile?.role === 'admin') {
+      const q = activeBranch?.id && activeBranch.id !== 'main' 
+        ? query(collection(db, 'staff'), where('branchId', '==', activeBranch.id))
+        : collection(db, 'staff');
+      const unsub = onSnapshot(q, (snap) => {
+        setStaffList(snap.docs.map(d => ({id: d.id, ...d.data()})));
+      });
+      return () => unsub();
+    }
+  }, [isOpen, userProfile, activeBranch]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -156,8 +179,11 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
         branchName: formData.branchName,
         branchId: formData.branchId,
         staffName: formData.staffName,
+        staffId: formData.staffId,
         location: formData.location,
         totalMembers: parseInt(formData.totalMembers) || 0,
+        city: formData.city,
+        district: formData.district,
         leaderPhoto,
         updatedAt: new Date().toISOString()
       };
@@ -283,6 +309,15 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
               </div>
               
               <div className="space-y-0.5">
+                <label className="text-[11px] font-semibold text-gray-700">City</label>
+                <input type="text" name="city" value={formData.city} onChange={handleChange} placeholder="e.g. Batlagundu" className="w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 placeholder:font-normal" />
+              </div>
+              <div className="space-y-0.5">
+                <label className="text-[11px] font-semibold text-gray-700">District</label>
+                <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="e.g. Dindigul" className="w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 placeholder:font-normal" />
+              </div>
+
+              <div className="space-y-0.5">
                 <label className="text-[11px] font-semibold text-gray-700">Number of Customers</label>
                 <input type="number" name="totalMembers" value={formData.totalMembers} onChange={handleChange} placeholder="e.g. 10" className="w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 placeholder:font-normal" />
               </div>
@@ -291,9 +326,45 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
                 <input type="text" name="branchName" value={formData.branchName} onChange={handleChange} placeholder="Branch" className={`w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border transition-all placeholder:text-gray-400 placeholder:font-normal ${userProfile?.role === 'staff' ? 'bg-gray-100 border-gray-300 outline-none' : 'bg-slate-50 border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`} readOnly={userProfile?.role === 'staff'} />
               </div>
 
-              <div className="space-y-0.5">
-                <label className="text-[11px] font-semibold text-gray-700">Staff Name</label>
-                <input type="text" name="staffName" value={formData.staffName} onChange={handleChange} placeholder="Staff" className={`w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border transition-all placeholder:text-gray-400 placeholder:font-normal ${userProfile?.role === 'staff' ? 'bg-gray-100 border-gray-300 outline-none' : 'bg-slate-50 border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`} readOnly={userProfile?.role === 'staff'} />
+              <div className="space-y-0.5 relative">
+                <label className="text-[11px] font-semibold text-gray-700">Staff Assigned</label>
+                {userProfile?.role === 'admin' ? (
+                  <div className="h-8 flex items-center">
+                    {formData.staffName ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-900">{formData.staffName}</span>
+                        <button type="button" onClick={() => setIsAssignStaffOpen(!isAssignStaffOpen)} className="text-[10px] text-blue-600 font-semibold hover:underline bg-blue-50 px-2 py-0.5 rounded">
+                          Edit / Reassign
+                        </button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => setIsAssignStaffOpen(!isAssignStaffOpen)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                        <User size={14} /> Assign Staff
+                      </button>
+                    )}
+                    
+                    {isAssignStaffOpen && (
+                      <div className="absolute top-full mt-1 left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-40 overflow-y-auto">
+                        {staffList.length > 0 ? staffList.map(staff => (
+                          <div 
+                            key={staff.id} 
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, staffName: staff.name, staffId: staff.id }));
+                              setIsAssignStaffOpen(false);
+                            }}
+                            className="px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 last:border-0"
+                          >
+                            {staff.name}
+                          </div>
+                        )) : (
+                          <div className="px-3 py-2 text-xs text-gray-500 italic">No staff found in this branch</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <input type="text" name="staffName" value={formData.staffName} onChange={handleChange} placeholder="Staff" className="w-full px-2.5 py-1 text-xs font-semibold text-gray-900 h-8 rounded-lg border bg-gray-100 border-gray-300 outline-none transition-all placeholder:text-gray-400 placeholder:font-normal" readOnly />
+                )}
               </div>
               <div className="space-y-0.5">
                 <label className="text-[11px] font-semibold text-gray-700">GPS Location</label>

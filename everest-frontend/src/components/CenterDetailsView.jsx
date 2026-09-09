@@ -12,16 +12,27 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
 
   const totalMembers = Number(center?.totalMembers || center?.noOfCustomers || center?.members || 0);
   
-  // Filter customers matching this center
+  // Filter and strictly sort customers matching this center
   const centerCustomers = useMemo(() => {
-    return (customers || []).filter(
+    const filtered = (customers || []).filter(
       cust => cust.centerName?.trim().toLowerCase() === center?.centerName?.trim().toLowerCase() &&
               (cust.branchName?.trim().toLowerCase() === center?.branchName?.trim().toLowerCase() || !cust.branchName)
     );
+    
+    // Strict ascending sort by slotIndex, falling back to creation time
+    return filtered.sort((a, b) => {
+      if (a.slotIndex !== undefined && b.slotIndex !== undefined) {
+        return a.slotIndex - b.slotIndex;
+      }
+      if (a.slotIndex !== undefined) return -1;
+      if (b.slotIndex !== undefined) return 1;
+      return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    });
   }, [customers, center]);
 
-  const handleAddClick = () => {
+  const handleAddClick = (slotNumber) => {
     setAddCustomerContext({
+      slotIndex: slotNumber,
       center: center?.village || center?.villageName || center?.centerName || '',
       centerLeaderName: center?.leader || center?.leaderName || '',
       leaderCustomerId: center?.leaderId || '',
@@ -89,7 +100,8 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
         centerName: center.centerName || '',
         centerId: center.id || '',
         branchName: center.branchName || '',
-        branchId: center.branchId || ''
+        branchId: center.branchId || '',
+        slotIndex: addCustomerContext?.slotIndex || customerData.slotIndex || centerCustomers.length + 1
       };
 
       if (customerData.id && centerCustomers.find(c => c.id === customerData.id)) {
@@ -261,7 +273,7 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
                     {/* Tiny decorative landscape curve inside sky box */}
                     <div className="absolute bottom-0 left-0 right-0 h-4 bg-lime-500/20 rounded-b-xl border-t border-sky-200" style={{ clipPath: 'ellipse(70% 100% at 50% 100%)' }}></div>
                   </div>
-                  <button onClick={handleAddClick} className="bg-[#c276f0] hover:bg-purple-500 active:bg-purple-600 text-white text-[10px] font-bold py-1 px-5 rounded-full transition-colors shadow-sm tracking-wide">
+                  <button onClick={() => handleAddClick(slotNumber)} className="bg-[#c276f0] hover:bg-purple-500 active:bg-purple-600 text-white text-[10px] font-bold py-1 px-5 rounded-full transition-colors shadow-sm tracking-wide">
                     ADD
                   </button>
                 </div>
