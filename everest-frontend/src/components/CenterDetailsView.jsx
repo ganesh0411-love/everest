@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Image as ImageIcon, Phone } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
 import AddCustomerModal from './AddCustomerModal';
 import CreateCenterModal from './CreateCenterModal';
@@ -65,6 +65,35 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
         console.error("Error deleting center:", error);
         alert("Failed to delete center.");
       }
+    }
+  };
+
+  const handleAddCustomer = async (customerData) => {
+    try {
+      const payload = {
+        ...customerData,
+        centerName: center.centerName || '',
+        centerId: center.id || '',
+        branchName: center.branchName || '',
+        branchId: center.branchId || ''
+      };
+
+      if (customerData.id && centerCustomers.find(c => c.id === customerData.id)) {
+        await updateDoc(doc(db, 'customers', customerData.id), {
+          ...payload,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        await addDoc(collection(db, 'customers'), {
+          ...payload,
+          status: 'Pending',
+          createdAt: new Date().toISOString()
+        });
+      }
+      setIsAddCustomerOpen(false);
+    } catch (error) {
+      console.error("Error saving customer to center:", error);
+      throw error;
     }
   };
 
@@ -247,6 +276,7 @@ export default function CenterDetailsView({ center, customers, onBack, userProfi
           userProfile={userProfile} 
           activeBranch={activeBranch}
           initialData={addCustomerContext}
+          onAddCustomer={handleAddCustomer}
         />
       )}
 
