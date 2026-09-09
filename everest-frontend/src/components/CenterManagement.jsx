@@ -367,19 +367,9 @@ export default function CenterManagement({ userProfile, activeBranch }) {
                 <th className="hidden md:table-cell py-4 px-6 w-auto truncate md:border-r md:border-white/30">Staff Name</th>
               )}
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-r md:border-white/30">Village Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-r md:border-white/30">
-                <span className={isMainBranch ? 'md:hidden' : ''}>Group Leader</span>
-                {isMainBranch && <span className="hidden md:inline">Leader</span>}
-              </th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate md:border-r md:border-white/30">Leader</th>
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate md:border-r md:border-white/30">Group Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap md:border-r md:border-white/30">
-                <span className="md:hidden">Members</span>
-                {isMainBranch ? (
-                  <span className="hidden md:inline">Members</span>
-                ) : (
-                  <span className="hidden md:inline">Total<br/>Member</span>
-                )}
-              </th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap md:border-r md:border-white/30">Members</th>
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto">
                 <span className="hidden md:inline">Status</span>
               </th>
@@ -391,22 +381,30 @@ export default function CenterManagement({ userProfile, activeBranch }) {
               <tr key={center.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] md:text-sm">
                 <td className="py-2 px-1 md:py-4 md:px-6 text-center text-slate-800 font-bold truncate">{index + 1}</td>
                 {isMainBranch ? (
-                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">
-                    {searchQuery.trim() ? highlightText(center.branchName || 'N/A', searchQuery, center._matches?.branchName?.startMatchIdx) : (center.branchName || 'N/A')}
+                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold">
+                    <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.branchName}>
+                      {searchQuery.trim() ? highlightText(center.branchName || 'N/A', searchQuery, center._matches?.branchName?.startMatchIdx) : (center.branchName || 'N/A')}
+                    </div>
                   </td>
                 ) : (
-                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">
-                    {searchQuery.trim() ? highlightText(center.staffName || center.createdByStaffId || 'N/A', searchQuery, center._matches?.staffName?.startMatchIdx) : (center.staffName || center.createdByStaffId || 'N/A')}
+                  <td className="hidden md:table-cell py-4 px-6 text-slate-700 md:text-gray-900 md:font-bold">
+                    <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.staffName || center.createdByStaffId}>
+                      {searchQuery.trim() ? highlightText(center.staffName || center.createdByStaffId || 'N/A', searchQuery, center._matches?.staffName?.startMatchIdx) : (center.staffName || center.createdByStaffId || 'N/A')}
+                    </div>
                   </td>
                 )}
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 md:text-gray-900 md:font-bold truncate">
-                  {searchQuery.trim() ? highlightText(center.village || center.villageName || 'N/A', searchQuery, center._matches?.villageName?.startMatchIdx) : (center.village || center.villageName || 'N/A')}
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-700 md:text-gray-900 md:font-bold">
+                  <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.village || center.villageName}>
+                    {searchQuery.trim() ? highlightText(center.village || center.villageName || 'N/A', searchQuery, center._matches?.villageName?.startMatchIdx) : (center.village || center.villageName || 'N/A')}
+                  </div>
                 </td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold truncate">
-                  {searchQuery.trim() ? highlightText(center.leader || center.groupLeader || 'N/A', searchQuery, center._matches?.leader?.startMatchIdx) : (center.leader || center.groupLeader || 'N/A')}
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold">
+                  <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.leader || center.groupLeader}>
+                    {searchQuery.trim() ? highlightText(center.leader || center.groupLeader || 'N/A', searchQuery, center._matches?.leader?.startMatchIdx) : (center.leader || center.groupLeader || 'N/A')}
+                  </div>
                 </td>
-                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold truncate">
-                  <div className="truncate md:max-w-[150px] md:break-words md:whitespace-normal leading-tight">
+                <td className="py-2 px-1 md:py-4 md:px-6 text-slate-600 md:text-gray-900 md:font-bold">
+                  <div className="truncate max-w-[140px] md:max-w-[180px] block" title={center.group || center.groupName}>
                     {searchQuery.trim() ? highlightText(center.group || center.groupName || 'N/A', searchQuery, center._matches?.groupName?.startMatchIdx) : (center.group || center.groupName || 'N/A')}
                   </div>
                 </td>
