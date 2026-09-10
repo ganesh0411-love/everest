@@ -163,7 +163,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-50 w-full overflow-hidden md:hidden">
       {/* 1. TOP SUMMARY HEADER (FROZEN) */}
-      <div className="shrink-0 p-1 flex gap-3 relative pt-4 px-3 bg-slate-50 z-10 border-b border-slate-200 pb-3 shadow-sm">
+      <div className="shrink-0 z-40 sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-1 flex gap-3 relative pt-4 px-3 pb-3 shadow-sm">
           {/* Left Side: Avatar */}
           <div className="shrink-0 w-24 h-28 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden relative shadow-sm">
             {center?.leaderPhoto ? (
@@ -211,7 +211,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
         </div>
 
       {/* 2. DYNAMIC MEMBER SLOT CARDS (SCROLLABLE) */}
-      <div className="flex-1 overflow-y-auto px-3 pb-24 pt-3">
+      <div className="flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-3 py-2 pb-32">
         <div className="space-y-3">
           {Array.from({ length: visibleSlots }).map((_, idx) => {
             const slotNumber = idx + 1;
@@ -238,6 +238,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                         <span className="font-bold text-black text-xs sm:text-[13px] truncate">{formatName(customerInSlot.name || customerInSlot.customerName)}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.customerId || customerInSlot.emfId || customerInSlot.applicationNumber || '-'}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{formatDOB(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
+                        <span className="text-[11px] font-semibold text-gray-700 truncate">{customerInSlot.branchName || center?.branchName || '-'}</span>
                       </div>
                       
                       {/* Vertical Partition */}
@@ -248,6 +249,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.gender || '-'}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.maritalStatus || '-'}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.age ? `${customerInSlot.age} Yrs` : getAge(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
+                        <span className="text-[11px] font-semibold text-gray-700 truncate">{customerInSlot.staffName || center?.staffName ? `Staff: ${customerInSlot.staffName || center?.staffName}` : '-'}</span>
                       </div>
 
                       {/* Photo Preview */}
