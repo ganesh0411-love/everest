@@ -49,7 +49,7 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
       localApp.centerStaffName ||
       '';
 
-    const staffId = localApp.staffId || localApp.staff?.id || '';
+    const staffId = parentCenter?.staffId || localApp.staffId || localApp.staff?.id || '';
 
     if (!staffName && !staffId) {
       setResolvedStaffProfile(null);
@@ -677,7 +677,7 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
                 <div className="grid grid-cols-[140px_10px_1fr] items-center">
                   <span className="font-semibold text-gray-700">Staff ID</span>
                   <span>:</span>
-                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.staffId || resolvedStaffProfile?.customId || resolvedStaffProfile?.employeeId || localApp.staffId || 'N/A'}</span>
+                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.staffId || resolvedStaffProfile?.customId || resolvedStaffProfile?.employeeId || parentCenter?.staffId || localApp.staffId || 'N/A'}</span>
                 </div>
                 <div className="grid grid-cols-[140px_10px_1fr] items-center">
                   <span className="font-semibold text-gray-700">Staff Name</span>
