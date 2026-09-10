@@ -218,7 +218,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
               <span className="font-bold text-slate-900 truncate">{totalMembers}</span>
               
               <span className="font-semibold text-slate-600">Loan Amount</span>
-              <span className="font-bold text-slate-900 truncate">{displayLoanAmount}</span>
+              <span className="text-emerald-600 font-bold text-sm tracking-tight truncate">{displayLoanAmount}</span>
             </div>
           </div>
 
@@ -292,27 +292,42 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                     </div>
 
                     {/* Bottom Row: Phone & EDIT Button */}
-                    <div className="flex items-center justify-between mt-1 pt-1">
+                    <div className="flex items-center justify-between mt-1 pt-1 gap-2 overflow-hidden">
                       {customerInSlot.phone ? (
-                        <a href={`tel:${customerInSlot.phone}`} className="inline-flex items-center gap-1 hover:bg-slate-50 transition-colors w-fit">
+                        <a href={`tel:${customerInSlot.phone}`} className="inline-flex items-center gap-1 hover:bg-slate-50 transition-colors shrink-0">
                           <div className="w-4 h-4 text-green-500 flex items-center justify-center shrink-0">
                             <Phone size={14} className="fill-current" />
                           </div>
                           <span className="font-semibold text-black text-xs tracking-wide">{customerInSlot.phone}</span>
                         </a>
                       ) : (
-                        <span className="font-semibold text-slate-400 text-xs italic">No Phone</span>
+                        <span className="font-semibold text-slate-400 text-xs italic shrink-0">No Phone</span>
                       )}
                       
-                      <button 
-                        onClick={() => {
-                          setAddCustomerContext(customerInSlot);
-                          setIsAddCustomerOpen(true);
-                        }}
-                        className="bg-[#c276f0] hover:bg-purple-500 active:bg-purple-600 text-white text-[10px] font-bold px-4 py-1 rounded-full transition-colors shadow-sm ml-2"
-                      >
-                        EDIT
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0 ml-auto">
+                        {(() => {
+                          const statusStr = (customerInSlot.status || '').toLowerCase();
+                          let badgeProps = { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300', label: 'PENDING' };
+                          if (statusStr === 'approved') badgeProps = { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300', label: 'APPROVED' };
+                          else if (statusStr === 'rejected') badgeProps = { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-300', label: 'REJECTED' };
+                          
+                          return (
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase shrink-0 ${badgeProps.bg} ${badgeProps.text} ${badgeProps.border} border`}>
+                              {badgeProps.label}
+                            </span>
+                          );
+                        })()}
+
+                        <button 
+                          onClick={() => {
+                            setAddCustomerContext(customerInSlot);
+                            setIsAddCustomerOpen(true);
+                          }}
+                          className="bg-[#c276f0] hover:bg-purple-500 active:bg-purple-600 text-white text-[10px] font-bold px-4 py-1 rounded-full transition-colors shadow-sm shrink-0"
+                        >
+                          EDIT
+                        </button>
+                      </div>
                     </div>
 
                   </div>
