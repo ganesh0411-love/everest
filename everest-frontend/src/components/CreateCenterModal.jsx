@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Camera, Image as ImageIcon, Trash2, User } from 'lucide-react';
-import { addDoc, collection, doc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch, editCenter, onSuccess }) {
@@ -190,6 +190,22 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
 
       if (editCenter) {
         await updateDoc(doc(db, 'centers', editCenter.id), centerData);
+        
+        // Cascade staff update to all customers in this center
+        try {
+          const q = query(collection(db, 'customers'), where('centerName', '==', editCenter.centerName));
+          const snapshot = await getDocs(q);
+          const updatePromises = snapshot.docs.map(docSnap => 
+            updateDoc(doc(db, 'customers', docSnap.id), {
+              staffName: centerData.staffName,
+              staffId: centerData.staffId
+            })
+          );
+          await Promise.all(updatePromises);
+        } catch (cascadeError) {
+          console.error("Error cascading staff update to customers:", cascadeError);
+        }
+
         alert('Center updated successfully!');
         if (onSuccess) onSuccess(centerData);
       } else {

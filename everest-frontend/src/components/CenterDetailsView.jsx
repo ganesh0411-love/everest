@@ -238,7 +238,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                         <span className="font-bold text-black text-xs sm:text-[13px] truncate">{formatName(customerInSlot.name || customerInSlot.customerName)}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.customerId || customerInSlot.emfId || customerInSlot.applicationNumber || '-'}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{formatDOB(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
-                        <span className="font-bold text-sky-600 text-[10px] sm:text-[11px] truncate">{customerInSlot.staffName || center?.staffName || '-'}</span>
+                        <span className="font-bold text-sky-600 text-[10px] sm:text-[11px] truncate">{center?.staffName || customerInSlot.staffName || '-'}</span>
                       </div>
                       
                       {/* Vertical Partition */}
