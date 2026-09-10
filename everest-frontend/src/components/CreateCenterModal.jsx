@@ -3,7 +3,7 @@ import { X, MapPin, Camera, Image as ImageIcon, Trash2, User } from 'lucide-reac
 import { addDoc, collection, doc, updateDoc, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch, editCenter, onSuccess }) {
+export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch, editCenter, currentFilledCapacity, onSuccess }) {
   const [formData, setFormData] = useState({
     leaderName: '',
     leaderId: '',
@@ -25,6 +25,7 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [staffList, setStaffList] = useState([]);
   const [isAssignStaffOpen, setIsAssignStaffOpen] = useState(false);
+  const [showCapacityWarning, setShowCapacityWarning] = useState(false);
   
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -168,6 +169,16 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
       return;
     }
     
+    const newCapacity = parseInt(formData.totalMembers) || 0;
+    if (editCenter && typeof currentFilledCapacity === 'number' && newCapacity < currentFilledCapacity) {
+      setShowCapacityWarning(true);
+      return;
+    }
+
+    await processSubmit(newCapacity);
+  };
+
+  const processSubmit = async (capacityToSave) => {
     setIsSubmitting(true);
     try {
       const centerData = {
@@ -181,7 +192,7 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
         staffName: formData.staffName,
         staffId: formData.staffId,
         location: formData.location,
-        totalMembers: parseInt(formData.totalMembers) || 0,
+        totalMembers: capacityToSave,
         city: formData.city,
         district: formData.district,
         leaderPhoto,
@@ -206,7 +217,6 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
           console.error("Error cascading staff update to customers:", cascadeError);
         }
 
-        alert('Center updated successfully!');
         if (onSuccess) onSuccess(centerData);
       } else {
         await addDoc(collection(db, 'centers'), {
@@ -215,7 +225,6 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
           createdAt: new Date().toISOString(),
           createdByStaffId: userProfile?.id || 'Admin',
         });
-        alert('Center created successfully!');
       }
       
       setIsSubmitting(false);
@@ -411,6 +420,39 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
           </div>
         </form>
       </div>
+
+      {showCapacityWarning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+           <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+              <h3 className="text-lg font-bold text-slate-800 mb-2">Capacity Conflict</h3>
+              <p className="text-slate-600 text-[14px] mb-6">
+                You reduced the capacity to {formData.totalMembers}, but {currentFilledCapacity} members are already onboarded. Would you like to remove an excess member or keep capacity at {currentFilledCapacity}?
+              </p>
+              <div className="flex flex-col gap-3">
+                 <button 
+                   type="button"
+                   onClick={() => {
+                     setShowCapacityWarning(false);
+                     onClose(); // Option A: dismiss edit modal to let them use the cross icon
+                   }}
+                   className="w-full py-3.5 border-2 border-red-500 text-red-500 rounded-xl font-bold hover:bg-red-50 transition-colors"
+                 >
+                   Remove a Member
+                 </button>
+                 <button 
+                   type="button"
+                   onClick={() => {
+                     setShowCapacityWarning(false);
+                     processSubmit(currentFilledCapacity); // Option B: automatic revert & save
+                   }}
+                   className="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 shadow-md transition-colors"
+                 >
+                   Keep as {currentFilledCapacity}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

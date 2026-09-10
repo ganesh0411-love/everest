@@ -37,6 +37,35 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
     });
   }, [customers, center]);
 
+  const totalCenterLoanAmount = useMemo(() => {
+    return centerCustomers.reduce((sum, cust) => {
+      const amt = Number(cust.loanAmount || cust.appliedAmount || cust.amount || 0);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+  }, [centerCustomers]);
+
+  const displayLoanAmount = totalCenterLoanAmount > 0 
+    ? `₹${totalCenterLoanAmount.toLocaleString('en-IN')}` 
+    : '-';
+
+  const handleRemoveMember = async (customer) => {
+    if (window.confirm(`Are you sure you want to remove ${customer.firstName || customer.name || 'this member'} from this center?`)) {
+      try {
+        await updateDoc(doc(db, 'customers', customer.id), {
+          centerName: '',
+          groupId: '',
+          groupName: '',
+          status: 'Draft',
+          updatedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error("Error removing member:", error);
+        alert("Failed to remove member");
+      }
+    }
+  };
+
+
   const handleAddClick = (slotNumber) => {
     setAddCustomerContext({
       slotIndex: slotNumber,
@@ -189,7 +218,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
               <span className="font-bold text-slate-900 truncate">{totalMembers}</span>
               
               <span className="font-semibold text-slate-600">Loan Amount</span>
-              <span className="font-bold text-slate-900 truncate">-</span>
+              <span className="font-bold text-slate-900 truncate">{displayLoanAmount}</span>
             </div>
           </div>
 
@@ -199,7 +228,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
               onClick={() => setIsEditOpen(true)}
               className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm w-[64px]"
             >
-              EDIT
+              UPDATE
             </button>
             <button 
               onClick={handleDelete}
@@ -289,7 +318,10 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                   </div>
                   
                   {/* Top Right Close */}
-                  <button className="absolute top-2 right-2 text-red-500 font-bold hover:bg-red-50 rounded-full p-0.5 transition-colors z-10">
+                  <button 
+                    onClick={() => handleRemoveMember(customerInSlot)}
+                    className="absolute top-2 right-2 text-red-500 font-bold hover:bg-red-50 rounded-full p-0.5 transition-colors z-10"
+                  >
                     <X size={16} strokeWidth={3} />
                   </button>
                 </div>
@@ -363,6 +395,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
           userProfile={userProfile}
           activeBranch={activeBranch}
           editCenter={center}
+          currentFilledCapacity={centerCustomers.length}
           onSuccess={(updatedData) => {
              if (onCenterUpdate) onCenterUpdate(updatedData);
              setIsEditOpen(false);
