@@ -34,7 +34,10 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
          (!localApp.branchName || !c.branchName || c.branchName?.trim().toLowerCase() === localApp.branchName?.trim().toLowerCase())
   ) : null;
 
-  const totalMembersCount = parentCenter?.noOfCustomers || parentCenter?.totalMembers || localApp.totalMembers || '5';
+  const isCenterCustomer = Boolean(localApp.centerName && localApp.centerName.trim() !== '' && localApp.centerName !== 'N/A');
+  const displayTotalMembers = isCenterCustomer 
+    ? (parentCenter?.noOfCustomers || parentCenter?.totalMembers || localApp.totalMembers || '-') 
+    : '-';
 
   useEffect(() => {
     const staffName = parentCenter?.staffName || 
@@ -596,7 +599,7 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Total Member</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{totalMembersCount}</span>
+                <span className="pt-[1px]">{displayTotalMembers}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-center">
@@ -670,46 +673,27 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
               {showStaffDropdown && (
                  <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowStaffDropdown(false)} />
               )}
-              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff ID</span>
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{localApp.staffId || localApp.staffCode || 'N/A'}</span>
-              </div>
-              
-              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff ID</span>
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{resolvedStaffProfile?.staffId || resolvedStaffProfile?.employeeId || resolvedStaffProfile?.customId || 'N/A'}</span>
-              </div>
-              
-              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10 mt-3">
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff Name</span>
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{resolvedStaffProfile?.name || resolvedStaffProfile?.displayName || 'N/A'}</span>
-              </div>
-              
-              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10 mt-3">
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Designation</span>
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{resolvedStaffProfile?.designation || resolvedStaffProfile?.jobRole || resolvedStaffProfile?.subRole || 'Collection Agent'}</span>
-              </div>
-              
-              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10 mt-3">
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Contact No</span>
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{resolvedStaffProfile?.phone || resolvedStaffProfile?.contactNumber || 'N/A'}</span>
-              </div>
-
-              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Designation</span>
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{localApp.staffDesignation || localApp.designation || 'N/A'}</span>
-              </div>
-
-              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Contact Number</span>
-                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{localApp.staffContact || localApp.contactNumber || 'N/A'}</span>
+              <div className="space-y-3 py-2 text-sm">
+                <div className="grid grid-cols-[140px_10px_1fr] items-center">
+                  <span className="font-semibold text-gray-700">Staff ID</span>
+                  <span>:</span>
+                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.staffId || resolvedStaffProfile?.customId || resolvedStaffProfile?.employeeId || localApp.staffId || 'N/A'}</span>
+                </div>
+                <div className="grid grid-cols-[140px_10px_1fr] items-center">
+                  <span className="font-semibold text-gray-700">Staff Name</span>
+                  <span>:</span>
+                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.name || resolvedStaffProfile?.displayName || localApp.staffName || localApp.assignedStaff || 'N/A'}</span>
+                </div>
+                <div className="grid grid-cols-[140px_10px_1fr] items-center">
+                  <span className="font-semibold text-gray-700">Designation</span>
+                  <span>:</span>
+                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.designation || localApp.staffDesignation || 'Collection Agent'}</span>
+                </div>
+                <div className="grid grid-cols-[140px_10px_1fr] items-center">
+                  <span className="font-semibold text-gray-700">Contact No</span>
+                  <span>:</span>
+                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.phone || resolvedStaffProfile?.contactNo || localApp.staffContact || 'N/A'}</span>
+                </div>
               </div>
             </div>
           </div>
