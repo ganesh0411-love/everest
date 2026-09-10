@@ -238,7 +238,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                         <span className="font-bold text-black text-xs sm:text-[13px] truncate">{formatName(customerInSlot.name || customerInSlot.customerName)}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.customerId || customerInSlot.emfId || customerInSlot.applicationNumber || '-'}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{formatDOB(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
-                        <span className="text-[11px] font-semibold text-gray-700 truncate">{customerInSlot.branchName || center?.branchName || '-'}</span>
+                        <span className="font-bold text-sky-600 text-[10px] sm:text-[11px] truncate">{customerInSlot.staffName || center?.staffName || '-'}</span>
                       </div>
                       
                       {/* Vertical Partition */}
@@ -249,7 +249,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.gender || '-'}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.maritalStatus || '-'}</span>
                         <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.age ? `${customerInSlot.age} Yrs` : getAge(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
-                        <span className="text-[11px] font-semibold text-gray-700 truncate">{customerInSlot.staffName || center?.staffName ? `Staff: ${customerInSlot.staffName || center?.staffName}` : '-'}</span>
+                        <span className="font-bold text-sky-600 text-[10px] sm:text-[11px] truncate">{customerInSlot.branchName || center?.branchName || '-'}</span>
                       </div>
 
                       {/* Photo Preview */}
