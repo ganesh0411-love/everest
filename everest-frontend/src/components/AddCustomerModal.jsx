@@ -25,15 +25,6 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   const [branch, setBranch] = useState(initialData?.branch || activeBranch.name);
   const fileInputRef = useRef(null);
 
-  // Auto-populate leader data when customerId matches leader's ID
-  useEffect(() => {
-    if (customerId && initialData?.leaderCustomerId && customerId.trim().toLowerCase() === initialData.leaderCustomerId.trim().toLowerCase()) {
-      if (!customerName) setCustomerName(initialData.centerLeaderName || '');
-      if (!customerLocationUrl) setCustomerLocationUrl(initialData.centerLocationUrl || '');
-      if (!city) setCity(initialData.city || '');
-      if (!district) setDistrict(initialData.district || '');
-    }
-  }, [customerId, initialData, customerName, customerLocationUrl, city, district]);
 
   useEffect(() => {
     const handleInput = (e) => {
@@ -207,6 +198,16 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   const [isFetchingCustomerLocation, setIsFetchingCustomerLocation] = useState(false);
   const [centerLocationUrl, setCenterLocationUrl] = useState(initialData?.centerLocationUrl || '');
   const [isFetchingCenterLocation, setIsFetchingCenterLocation] = useState(false);
+
+  // Auto-populate leader data when customerId matches leader's ID
+  useEffect(() => {
+    if (customerId && initialData?.leaderCustomerId && customerId.trim().toLowerCase() === initialData.leaderCustomerId.trim().toLowerCase()) {
+      if (!customerName) setCustomerName(initialData.centerLeaderName || '');
+      if (!customerLocationUrl) setCustomerLocationUrl(initialData.centerLocationUrl || '');
+      if (!city) setCity(initialData.city || '');
+      if (!district) setDistrict(initialData.district || '');
+    }
+  }, [customerId, initialData, customerName, customerLocationUrl, city, district]);
   
   const handlePincodeChange = (index, val) => {
     if (!/^\d*$/.test(val)) return;
