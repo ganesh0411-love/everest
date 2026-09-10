@@ -279,6 +279,15 @@ function App() {
           const fetched = [];
           querySnapshot.forEach((docSnap) => {
             const data = docSnap.data();
+            // Data Sanitization Patch: Clean corrupted staffName
+            if (data.staffName === 'Unassigned' || data.staffName === 'Staff Unassigned') {
+               const validStaff = data.assignedStaff || data.createdByStaffName || data.centerStaffName || (data.staff && data.staff.name);
+               if (validStaff && validStaff !== 'Unassigned' && validStaff !== 'Staff Unassigned') {
+                 data.staffName = validStaff;
+               } else {
+                 data.staffName = ''; // clear corrupted value
+               }
+            }
             fetched.push({ ...data, id: docSnap.id });
           });
           setCustomers(fetched);
@@ -1468,6 +1477,7 @@ function App() {
                     const customerToSave = { 
                       ...newCustomer, 
                       lastUpdated: nowIso,
+                      staffName: newCustomer.staffName || newCustomer.assignedStaff || userProfile?.name || userProfile?.staffName || userProfile?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : ''),
                       staffId: newCustomer.staffId || userProfile?.staffId || userProfile?.employeeId || '',
                       assignedStaff: newCustomer.assignedStaff || userProfile?.name || userProfile?.staffName || userProfile?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : ''),
                       staffDesignation: newCustomer.staffDesignation || userProfile?.designation || userProfile?.jobRole || userProfile?.subRole || userProfile?.title || 'Collection Agent',

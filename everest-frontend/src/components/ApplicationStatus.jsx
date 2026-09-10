@@ -34,17 +34,21 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   }, []);
 
   const resolveCustomerStaff = (customer, centersList) => {
-    // Case 1: Individual Customer or Direct Staff Assignment already exists
-    // (Do NOT wipe or overwrite valid staff already tied to this record!)
-    if (
-      customer.staffName && 
-      customer.staffName !== 'Unassigned' && 
-      customer.staffName !== 'Staff Unassigned'
-    ) {
-      return customer.staffName;
+    // 1. Audit all possible field aliases used across forms:
+    const directStaff = 
+      (typeof customer.staffName === 'string' && customer.staffName !== 'Staff Unassigned' && customer.staffName !== 'Unassigned' && customer.staffName.trim()) ? customer.staffName :
+      (typeof customer.assignedStaff === 'string' && customer.assignedStaff.trim()) ? customer.assignedStaff :
+      customer.staff?.name ||
+      customer.assignedStaff?.name ||
+      customer.createdByStaffName ||
+      customer.centerStaffName ||
+      null;
+
+    if (directStaff) {
+      return directStaff;
     }
 
-    // Case 2: Customer belongs to a Center and lacks staff -> Inherit from Center
+    // 2. Customer belongs to a Center and lacks direct staff -> Inherit from Center
     if (customer.centerName && customer.centerName.trim() !== '') {
       const parentCenter = centersList?.find(
         c => c.centerName?.trim().toLowerCase() === customer.centerName?.trim().toLowerCase() &&
@@ -56,8 +60,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       }
     }
 
-    // Case 3: Truly unassigned
-    return customer.staffName || 'Staff Unassigned';
+    // 3. Truly unassigned
+    return 'Unassigned';
   };
 
   const [touchStart, setTouchStart] = useState(null);
@@ -182,9 +186,11 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                 <tr>
                   <td colSpan="4" className="p-6 text-center text-slate-500 text-sm">No applications in this status.</td>
                 </tr>
-              ) : currentApps.map((app, index) => (
+              ) : currentApps.map((app, index) => {
+                console.log("Customer Record in AppStatus:", app);
+                return (
                 <tr 
-                  key={app.id} 
+                  key={app.id || index} 
                   className={`border-b border-slate-100 hover:bg-slate-50 transition-colors w-full`}
                 >
                   <td className="p-2 font-bold text-slate-800 text-sm text-left md:pl-6">{index + 1}</td>
@@ -353,7 +359,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                   </td>
 
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
