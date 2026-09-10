@@ -5,6 +5,8 @@ import AddCustomerModal from './AddCustomerModal';
 import ApprovalDetailsModal from './ApprovalDetailsModal';
 import OfflineImage from './OfflineImage';
 import { Eye } from 'lucide-react';
+import { collection, query, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
@@ -19,6 +21,31 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const [pdfAutoMode, setPdfAutoMode] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedPendingApp, setSelectedPendingApp] = useState(null);
+  const [centers, setCenters] = useState([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'centers'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedCenters = [];
+      snapshot.forEach(doc => loadedCenters.push({ id: doc.id, ...doc.data() }));
+      setCenters(loadedCenters);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const resolveCustomerStaff = (customer, centersList) => {
+    if (customer.staffName && customer.staffName !== 'Unassigned' && customer.staffName !== 'Staff Unassigned') {
+      return customer.staffName;
+    }
+    const parentCenter = centersList?.find(
+      c => c.centerName?.trim().toLowerCase() === customer.centerName?.trim().toLowerCase() &&
+           (!customer.branchName || !c.branchName || c.branchName?.trim().toLowerCase() === customer.branchName?.trim().toLowerCase())
+    );
+    if (parentCenter?.staffName) {
+      return parentCenter.staffName;
+    }
+    return 'Unassigned';
+  };
 
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
@@ -166,7 +193,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       <div className="truncate flex flex-col">
                         <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate md:hidden">
-                          {isMainBranch ? (app.branch || app.branchName || 'Main') : `Staff: ${app.staffName || app.assignedStaff || app.createdByStaffName || app.centerStaffName || 'Unassigned'}`}
+                          {isMainBranch ? (app.branch || app.branchName || 'Main') : `Staff: ${resolveCustomerStaff(app, centers)}`}
                         </div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate hidden md:block">
                           ID: {app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}
