@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Image as ImageIcon, Phone } from 'lucide-react';
+import { X, Image as ImageIcon, Phone, Star } from 'lucide-react';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
 import AddCustomerModal from './AddCustomerModal';
@@ -20,8 +20,14 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
               (cust.branchName?.trim().toLowerCase() === center?.branchName?.trim().toLowerCase() || !cust.branchName)
     );
     
-    // Strict ascending sort by slotIndex, falling back to creation time
+    // Strict ascending sort by slotIndex, falling back to creation time, with Leader forcibly prioritized
     return filtered.sort((a, b) => {
+      const isALeader = a.customerId === (center?.leaderId || center?.leaderCustomerId) || a.customerName?.trim().toLowerCase() === (center?.leader || center?.leaderName)?.trim().toLowerCase();
+      const isBLeader = b.customerId === (center?.leaderId || center?.leaderCustomerId) || b.customerName?.trim().toLowerCase() === (center?.leader || center?.leaderName)?.trim().toLowerCase();
+
+      if (isALeader && !isBLeader) return -1;
+      if (!isALeader && isBLeader) return 1;
+
       if (a.slotIndex !== undefined && b.slotIndex !== undefined) {
         return a.slotIndex - b.slotIndex;
       }
@@ -155,11 +161,9 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
   const visibleSlots = Math.min(totalMembers, centerCustomers.length + 1);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 w-full overflow-x-hidden md:hidden">
-      <div className="flex-1 overflow-y-auto px-3 pb-8 space-y-4 pt-4">
-        
-        {/* 1. TOP SUMMARY HEADER */}
-        <div className="p-1 mb-2 flex gap-3 relative">
+    <div className="flex flex-col h-[100dvh] bg-slate-50 w-full overflow-hidden md:hidden">
+      {/* 1. TOP SUMMARY HEADER (FROZEN) */}
+      <div className="shrink-0 p-1 flex gap-3 relative pt-4 px-3 bg-slate-50 z-10 border-b border-slate-200 pb-3 shadow-sm">
           {/* Left Side: Avatar */}
           <div className="shrink-0 w-24 h-28 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center overflow-hidden relative shadow-sm">
             {center?.leaderPhoto ? (
@@ -206,20 +210,23 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
           </div>
         </div>
 
-        {/* 2. DYNAMIC MEMBER SLOT CARDS */}
+      {/* 2. DYNAMIC MEMBER SLOT CARDS (SCROLLABLE) */}
+      <div className="flex-1 overflow-y-auto px-3 pb-24 pt-3">
         <div className="space-y-3">
           {Array.from({ length: visibleSlots }).map((_, idx) => {
             const slotNumber = idx + 1;
             const customerInSlot = centerCustomers[idx]; // Match sequentially
             const paddedIdx = String(slotNumber).padStart(2, '0');
+            const isLeaderSlot = idx === 0;
 
             if (customerInSlot) {
               // FILLED SLOT STATE
               return (
-                <div key={idx} className="border-2 border-black rounded-2xl flex overflow-hidden relative bg-white p-2 min-h-[100px] mb-3">
+                <div key={idx} className={`border-2 rounded-2xl flex overflow-hidden relative p-2 min-h-[100px] mb-3 ${isLeaderSlot ? 'border-amber-400 bg-amber-50/50 shadow-md shadow-amber-100' : 'border-black bg-white'}`}>
                   {/* Left Index Box */}
-                  <div className="w-14 sm:w-16 shrink-0 border-r-2 border-black flex items-center justify-center bg-transparent">
-                    <span className="font-black text-2xl text-black">{paddedIdx}</span>
+                  <div className={`w-14 sm:w-16 shrink-0 border-r-2 flex flex-col items-center justify-center bg-transparent gap-1 ${isLeaderSlot ? 'border-amber-400' : 'border-black'}`}>
+                    {isLeaderSlot && <Star size={14} className="text-amber-500 fill-amber-500" />}
+                    <span className={`font-black text-2xl ${isLeaderSlot ? 'text-amber-500' : 'text-black'}`}>{paddedIdx}</span>
                   </div>
                   
                   {/* Main Details Area */}
@@ -289,10 +296,11 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
 
             // EMPTY SLOT STATE
             return (
-              <div key={idx} className="border-2 border-black rounded-2xl flex overflow-hidden min-h-[100px] relative bg-white p-2 mb-3">
+              <div key={idx} className={`border-2 rounded-2xl flex overflow-hidden min-h-[100px] relative p-2 mb-3 ${isLeaderSlot ? 'border-amber-400 bg-amber-50/50 shadow-md shadow-amber-100' : 'border-black bg-white'}`}>
                 {/* Left Index Box */}
-                <div className="w-14 sm:w-16 shrink-0 border-r-2 border-black flex items-center justify-center bg-transparent">
-                  <span className="font-black text-2xl text-black">{paddedIdx}</span>
+                <div className={`w-14 sm:w-16 shrink-0 border-r-2 flex flex-col items-center justify-center bg-transparent gap-1 ${isLeaderSlot ? 'border-amber-400' : 'border-black'}`}>
+                  {isLeaderSlot && <Star size={14} className="text-amber-500 fill-amber-500" />}
+                  <span className={`font-black text-2xl ${isLeaderSlot ? 'text-amber-500' : 'text-black'}`}>{paddedIdx}</span>
                 </div>
                 
                 {/* Main Area (Empty) */}
@@ -333,7 +341,6 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
             </div>
           )}
         </div>
-
       </div>
 
       {isAddCustomerOpen && (

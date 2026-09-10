@@ -17,7 +17,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   const [appDate, setAppDate] = useState(initialData?.appDate || new Date().toISOString().split('T')[0]);
   const [appDay, setAppDay] = useState(initialData?.appDay || '');
   const [appNumber] = useState(initialData?.appNumber || Math.floor(1000000000 + Math.random() * 9000000000));
-  const [customerId] = useState(initialData?.customerId || initialData?.applicationNumber || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
+  const [customerId, setCustomerId] = useState(initialData?.customerId || initialData?.applicationNumber || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
   const [centerLeaderName, setCenterLeaderName] = useState(initialData?.centerLeaderName || '');
   const [leaderCustomerId, setLeaderCustomerId] = useState(initialData?.leaderCustomerId || '');
   const [groupName, setGroupName] = useState(initialData?.groupName || '');
@@ -676,7 +676,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Customer ID</label>
-              <input type="text" readOnly value={customerId} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 outline-none font-medium" />
+              <input type="text" value={customerId} onChange={e => setCustomerId(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl text-slate-700 outline-none font-medium focus:border-brand-blue transition-colors" placeholder="e.g. EMF123456" />
             </div>
 
             <div>
