@@ -34,17 +34,30 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   }, []);
 
   const resolveCustomerStaff = (customer, centersList) => {
-    if (customer.staffName && customer.staffName !== 'Unassigned' && customer.staffName !== 'Staff Unassigned') {
+    // Case 1: Individual Customer or Direct Staff Assignment already exists
+    // (Do NOT wipe or overwrite valid staff already tied to this record!)
+    if (
+      customer.staffName && 
+      customer.staffName !== 'Unassigned' && 
+      customer.staffName !== 'Staff Unassigned'
+    ) {
       return customer.staffName;
     }
-    const parentCenter = centersList?.find(
-      c => c.centerName?.trim().toLowerCase() === customer.centerName?.trim().toLowerCase() &&
-           (!customer.branchName || !c.branchName || c.branchName?.trim().toLowerCase() === customer.branchName?.trim().toLowerCase())
-    );
-    if (parentCenter?.staffName) {
-      return parentCenter.staffName;
+
+    // Case 2: Customer belongs to a Center and lacks staff -> Inherit from Center
+    if (customer.centerName && customer.centerName.trim() !== '') {
+      const parentCenter = centersList?.find(
+        c => c.centerName?.trim().toLowerCase() === customer.centerName?.trim().toLowerCase() &&
+             (!customer.branchName || !c.branchName || c.branchName?.trim().toLowerCase() === customer.branchName?.trim().toLowerCase())
+      );
+
+      if (parentCenter?.staffName) {
+        return parentCenter.staffName;
+      }
     }
-    return 'Unassigned';
+
+    // Case 3: Truly unassigned
+    return customer.staffName || 'Staff Unassigned';
   };
 
   const [touchStart, setTouchStart] = useState(null);
