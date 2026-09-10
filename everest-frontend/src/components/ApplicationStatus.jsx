@@ -34,7 +34,18 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   }, []);
 
   const resolveCustomerStaff = (customer, centersList) => {
-    // 1. Audit all possible field aliases used across forms:
+    // 1. IF CUSTOMER BELONGS TO A CENTER: Master Center staff ALWAYS wins!
+    if (customer.centerName && customer.centerName.trim() !== '') {
+      const parentCenter = centersList?.find(
+        c => c.centerName?.trim().toLowerCase() === customer.centerName?.trim().toLowerCase() &&
+             (!customer.branchName || !c.branchName || c.branchName?.trim().toLowerCase() === customer.branchName?.trim().toLowerCase())
+      );
+      if (parentCenter?.staffName) {
+        return parentCenter.staffName;
+      }
+    }
+
+    // 2. ONLY FOR INDIVIDUAL CUSTOMERS (No Center): Read their direct assigned staff
     const directStaff = 
       (typeof customer.staffName === 'string' && customer.staffName !== 'Staff Unassigned' && customer.staffName !== 'Unassigned' && customer.staffName.trim()) ? customer.staffName :
       (typeof customer.assignedStaff === 'string' && customer.assignedStaff.trim()) ? customer.assignedStaff :
@@ -44,24 +55,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       customer.centerStaffName ||
       null;
 
-    if (directStaff) {
-      return directStaff;
-    }
-
-    // 2. Customer belongs to a Center and lacks direct staff -> Inherit from Center
-    if (customer.centerName && customer.centerName.trim() !== '') {
-      const parentCenter = centersList?.find(
-        c => c.centerName?.trim().toLowerCase() === customer.centerName?.trim().toLowerCase() &&
-             (!customer.branchName || !c.branchName || c.branchName?.trim().toLowerCase() === customer.branchName?.trim().toLowerCase())
-      );
-
-      if (parentCenter?.staffName) {
-        return parentCenter.staffName;
-      }
-    }
-
-    // 3. Truly unassigned
-    return 'Unassigned';
+    return directStaff || 'Staff Unassigned';
   };
 
   const [touchStart, setTouchStart] = useState(null);
@@ -411,6 +405,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
       {selectedPendingApp && (
         <ApprovalDetailsModal
           application={selectedPendingApp}
+          centers={centers}
           isReadOnly={isMainBranch}
           onClose={() => setSelectedPendingApp(null)}
           onApprove={(id, popupData) => {

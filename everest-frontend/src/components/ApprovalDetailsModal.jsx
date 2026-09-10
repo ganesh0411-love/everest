@@ -7,11 +7,12 @@ import OfflineImage from './OfflineImage';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
-const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onStayPending, isReadOnly, onDelete }) => {
+const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReject, onStayPending, isReadOnly, onDelete }) => {
   const [activeView, setActiveView] = useState('main'); // 'main' | 'centerDetails'
   const [toastMsg, setToastMsg] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [isNomineeOk, setIsNomineeOk] = useState(false);
+  const [resolvedStaffProfile, setResolvedStaffProfile] = useState(null);
 
   // Admin Staff Assignment State
   const [showStaffDropdown, setShowStaffDropdown] = useState(false);
@@ -27,6 +28,82 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
   useEffect(() => {
     setLocalApp(application);
   }, [application]);
+
+  const parentCenter = localApp.centerName ? centers?.find(
+    c => c.centerName?.trim().toLowerCase() === localApp.centerName?.trim().toLowerCase() &&
+         (!localApp.branchName || !c.branchName || c.branchName?.trim().toLowerCase() === localApp.branchName?.trim().toLowerCase())
+  ) : null;
+
+  const totalMembersCount = parentCenter?.noOfCustomers || parentCenter?.totalMembers || localApp.totalMembers || '5';
+
+  useEffect(() => {
+    const staffName = parentCenter?.staffName || 
+      (typeof localApp.staffName === 'string' && localApp.staffName !== 'Staff Unassigned' && localApp.staffName !== 'Unassigned' && localApp.staffName.trim() ? localApp.staffName : null) ||
+      (typeof localApp.assignedStaff === 'string' && localApp.assignedStaff.trim() ? localApp.assignedStaff : null) ||
+      localApp.staff?.name ||
+      localApp.assignedStaff?.name ||
+      localApp.createdByStaffName ||
+      localApp.centerStaffName ||
+      '';
+
+    const staffId = localApp.staffId || localApp.staff?.id || '';
+
+    if (!staffName && !staffId) {
+      setResolvedStaffProfile(null);
+      return;
+    }
+
+    const fetchStaffProfile = async () => {
+      try {
+        const staffRef = collection(db, 'staff');
+        
+        let foundProfile = null;
+        if (staffId) {
+          const qId = query(staffRef, where('staffId', '==', staffId));
+          const snap = await getDocs(qId);
+          if (!snap.empty) {
+             foundProfile = snap.docs[0].data();
+          } else {
+             const qId2 = query(staffRef, where('employeeId', '==', staffId));
+             const snap2 = await getDocs(qId2);
+             if (!snap2.empty) foundProfile = snap2.docs[0].data();
+          }
+        }
+        
+        if (!foundProfile && staffName) {
+          const qName = query(staffRef, where('name', '==', staffName));
+          const snap = await getDocs(qName);
+          if (!snap.empty) {
+             foundProfile = snap.docs[0].data();
+          } else {
+             const qDisplayName = query(staffRef, where('displayName', '==', staffName));
+             const snap2 = await getDocs(qDisplayName);
+             if (!snap2.empty) foundProfile = snap2.docs[0].data();
+          }
+        }
+
+        if (foundProfile) {
+          setResolvedStaffProfile(foundProfile);
+        } else {
+          setResolvedStaffProfile({
+             name: staffName || 'Unassigned',
+             staffId: staffId || 'N/A',
+             designation: localApp.staffDesignation || 'Collection Agent',
+             phone: localApp.staffContact || 'N/A'
+          });
+        }
+      } catch(err) {
+        console.error("Error fetching staff profile", err);
+        setResolvedStaffProfile({
+           name: staffName || 'Unassigned',
+           staffId: staffId || 'N/A',
+           designation: localApp.staffDesignation || 'Collection Agent',
+           phone: localApp.staffContact || 'N/A'
+        });
+      }
+    };
+    fetchStaffProfile();
+  }, [localApp, parentCenter?.staffName]);
 
   useEffect(() => {
     if (canAssignStaff && showStaffDropdown && staffList.length === 0) {
@@ -283,7 +360,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
     {
       id: 'staff',
       title: 'Staff',
-      subtitle: `Staff Name : ${application.assignedStaff || application.staffName || 'N/A'}`,
+      subtitle: `Staff Name : ${resolvedStaffProfile?.name || resolvedStaffProfile?.displayName || 'N/A'}`,
       icon: <User size={20} className="text-rose-500" />,
       bg: 'bg-rose-100',
     },
@@ -519,7 +596,7 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Total Member</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">NIL</span>
+                <span className="pt-[1px]">{totalMembersCount}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-center">
@@ -600,9 +677,27 @@ const ApprovalDetailsModal = ({ application, onClose, onApprove, onReject, onSta
               </div>
               
               <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff ID</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{resolvedStaffProfile?.staffId || resolvedStaffProfile?.employeeId || resolvedStaffProfile?.customId || 'N/A'}</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10 mt-3">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Staff Name</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{localApp.assignedStaff || localApp.staffName || 'N/A'}</span>
+                <span className="pt-[1px]">{resolvedStaffProfile?.name || resolvedStaffProfile?.displayName || 'N/A'}</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10 mt-3">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Designation</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{resolvedStaffProfile?.designation || resolvedStaffProfile?.jobRole || resolvedStaffProfile?.subRole || 'Collection Agent'}</span>
+              </div>
+              
+              <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10 mt-3">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Contact No</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">{resolvedStaffProfile?.phone || resolvedStaffProfile?.contactNumber || 'N/A'}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start relative z-10">
