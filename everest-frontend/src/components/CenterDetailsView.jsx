@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import AddCustomerModal from './AddCustomerModal';
 import CreateCenterModal from './CreateCenterModal';
 
-export default function CenterDetailsView({ center, customers, userProfile, activeBranch, onBack }) {
+export default function CenterDetailsView({ center, customers, userProfile, activeBranch, onBack, onCenterUpdate }) {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [addCustomerContext, setAddCustomerContext] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -361,6 +361,10 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
           userProfile={userProfile}
           activeBranch={activeBranch}
           editCenter={center}
+          onSuccess={(updatedData) => {
+             if (onCenterUpdate) onCenterUpdate(updatedData);
+             setIsEditOpen(false);
+          }}
         />
       )}
     </div>

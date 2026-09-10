@@ -3,7 +3,7 @@ import { X, MapPin, Camera, Image as ImageIcon, Trash2, User } from 'lucide-reac
 import { addDoc, collection, doc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch, editCenter }) {
+export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch, editCenter, onSuccess }) {
   const [formData, setFormData] = useState({
     leaderName: '',
     leaderId: '',
@@ -191,6 +191,7 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
       if (editCenter) {
         await updateDoc(doc(db, 'centers', editCenter.id), centerData);
         alert('Center updated successfully!');
+        if (onSuccess) onSuccess(centerData);
       } else {
         await addDoc(collection(db, 'centers'), {
           ...centerData,
