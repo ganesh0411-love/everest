@@ -291,40 +291,41 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                       </div>
                     </div>
 
-                    {/* Bottom Row: Phone & EDIT Button */}
-                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100 pr-1">
-                      <div className="flex items-center gap-2 flex-wrap min-w-0">
-                        {customerInSlot.phone ? (
-                          <a href={`tel:${customerInSlot.phone}`} className="inline-flex items-center gap-1 hover:bg-slate-50 transition-colors shrink-0">
-                            <div className="w-4 h-4 text-green-500 flex items-center justify-center shrink-0">
-                              <Phone size={14} className="fill-current" />
-                            </div>
-                            <span className="font-semibold text-black text-xs tracking-wide truncate">{customerInSlot.phone}</span>
-                          </a>
-                        ) : (
-                          <span className="font-semibold text-slate-400 text-xs italic shrink-0">No Phone</span>
-                        )}
-                        
-                        {(() => {
-                          const statusStr = (customerInSlot.status || '').toLowerCase();
-                          let badgeProps = { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300', label: 'PENDING' };
-                          if (statusStr === 'approved') badgeProps = { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300', label: 'APPROVED' };
-                          else if (statusStr === 'rejected') badgeProps = { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-300', label: 'REJECTED' };
-                          
-                          return (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase shrink-0 ${badgeProps.bg} ${badgeProps.text} ${badgeProps.border} border`}>
-                              {badgeProps.label}
-                            </span>
-                          );
-                        })()}
+                    {/* Bottom Action Strip: Strictly Single Line, Zero Wrap */}
+                    <div className="flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t border-gray-100 w-full flex-nowrap min-w-0">
+                      
+                      {/* 1. Phone Number (Compact with Left Alignment) */}
+                      <div className="flex items-center gap-1 shrink min-w-0">
+                        <span className="text-emerald-700 text-xs shrink-0">📞</span>
+                        <span className="text-xs font-semibold text-gray-800 truncate tracking-tight">
+                          {customerInSlot.phone || '9876543210'}
+                        </span>
                       </div>
 
+                      {/* 2. Fixed-Width Centered Status Badge Slot (Prevents Layout Shifts) */}
+                      <div className="w-[74px] shrink-0 flex items-center justify-center">
+                        {customerInSlot.status?.toLowerCase() === 'approved' ? (
+                          <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full whitespace-nowrap">
+                            APPROVED
+                          </span>
+                        ) : customerInSlot.status?.toLowerCase() === 'rejected' ? (
+                          <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-rose-50 text-rose-700 border border-rose-300 rounded-full whitespace-nowrap">
+                            REJECTED
+                          </span>
+                        ) : (
+                          <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-amber-50 text-amber-800 border border-amber-300 rounded-full whitespace-nowrap">
+                            PENDING
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 3. Action Button (Anchored to the Right) */}
                       <button 
                         onClick={() => {
                           setAddCustomerContext(customerInSlot);
                           setIsAddCustomerOpen(true);
                         }}
-                        className="bg-[#c276f0] hover:bg-purple-500 active:bg-purple-600 text-white text-[10px] font-bold px-3 py-1 rounded-full transition-colors shadow-sm shrink-0 ml-1"
+                        className="shrink-0 bg-purple-600 hover:bg-purple-700 active:scale-95 transition-transform text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-sm whitespace-nowrap"
                       >
                         EDIT
                       </button>
