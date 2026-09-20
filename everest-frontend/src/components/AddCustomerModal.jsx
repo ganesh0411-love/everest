@@ -18,14 +18,12 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   const [appDay, setAppDay] = useState(initialData?.appDay || '');
   const [appNumber] = useState(initialData?.appNumber || Math.floor(1000000000 + Math.random() * 9000000000));
   const [customerId, setCustomerId] = useState(initialData?.customerId || initialData?.applicationNumber || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
-  const [centerLeaderName, setCenterLeaderName] = useState(initialData?.centerLeaderName || '');
+  const [centerLeaderName, setCenterLeaderName] = useState(initialData?.centerLeaderName || initialData?.leaderName || '');
   const [leaderCustomerId, setLeaderCustomerId] = useState(initialData?.leaderCustomerId || '');
   const [groupName, setGroupName] = useState(initialData?.groupName || '');
   const [photo, setPhoto] = useState(initialData?.image || null);
   const [branch, setBranch] = useState(initialData?.branch || activeBranch.name);
   const fileInputRef = useRef(null);
-
-
   useEffect(() => {
     const handleInput = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
@@ -91,9 +89,21 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   };
 
   // 2. Core Identity & Contact
-  const [center, setCenter] = useState(initialData?.center || '');
-  const [city, setCity] = useState(initialData?.city || '');
+  const [center, setCenter] = useState(initialData?.center || initialData?.centerName || '');
+  const [city, setCity] = useState(initialData?.city || initialData?.villageCity || '');
   const [district, setDistrict] = useState(initialData?.district || '');
+
+  // Sync reactive customer object updates
+  useEffect(() => {
+    if (initialData) {
+      setCenterLeaderName(initialData.centerLeaderName || initialData.leaderName || '');
+      setLeaderCustomerId(initialData.leaderCustomerId || '');
+      setGroupName(initialData.groupName || '');
+      setCenter(initialData.center || initialData.centerName || '');
+      setCity(initialData.city || initialData.villageCity || '');
+      setDistrict(initialData.district || '');
+    }
+  }, [initialData]);
   const [nameTitle, setNameTitle] = useState(initialData?.nameTitle || 'Mrs.');
   const [customerName, setCustomerName] = useState(initialData?.customerName || '');
   const [phone, setPhone] = useState(initialData?.phone || '');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Camera, Image as ImageIcon, Trash2, User } from 'lucide-react';
-import { addDoc, collection, doc, updateDoc, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { addDoc, collection, doc, updateDoc, query, where, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export default function CreateCenterModal({ isOpen, onClose, userProfile, activeBranch, editCenter, currentFilledCapacity, onSuccess }) {
@@ -213,20 +213,25 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
           snap1.docs.forEach(d => customerDocs.set(d.id, d));
           snap2.docs.forEach(d => customerDocs.set(d.id, d));
           
-          const updatePromises = Array.from(customerDocs.values()).map(docSnap => 
-            updateDoc(doc(db, 'customers', docSnap.id), {
-              centerId: editCenter.id,
-              centerName: centerData.centerName,
-              leaderName: centerData.leaderName,
-              groupName: centerData.groupName,
-              villageCity: centerData.villageName,
-              district: centerData.district,
-              branchName: centerData.branchName,
-              staffName: centerData.staffName,
-              staffId: centerData.staffId
-            })
-          );
-          await Promise.all(updatePromises);
+          const batch = writeBatch(db);
+          const cascadedChildPayload = {
+            centerId: editCenter.id,
+            centerName: centerData.centerName,
+            leaderName: centerData.leaderName,
+            leaderCustomerId: centerData.leaderId,
+            groupName: centerData.groupName,
+            villageCity: centerData.villageName,
+            district: centerData.district,
+            branchName: centerData.branchName,
+            staffName: centerData.staffName,
+            staffId: centerData.staffId
+          };
+          
+          Array.from(customerDocs.values()).forEach(docSnap => {
+            batch.update(docSnap.ref, cascadedChildPayload);
+          });
+          
+          await batch.commit();
         } catch (cascadeError) {
           console.error("Error cascading center updates to customers:", cascadeError);
         }
