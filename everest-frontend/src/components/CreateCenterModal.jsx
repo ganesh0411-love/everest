@@ -202,19 +202,33 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
       if (editCenter) {
         await updateDoc(doc(db, 'centers', editCenter.id), centerData);
         
-        // Cascade staff update to all customers in this center
+        // Cascade updates to all child customer documents
         try {
-          const q = query(collection(db, 'customers'), where('centerName', '==', editCenter.centerName));
-          const snapshot = await getDocs(q);
-          const updatePromises = snapshot.docs.map(docSnap => 
+          const q1 = query(collection(db, 'customers'), where('centerId', '==', editCenter.id));
+          const q2 = query(collection(db, 'customers'), where('centerName', '==', editCenter.centerName || ''));
+          
+          const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+          const customerDocs = new Map();
+          
+          snap1.docs.forEach(d => customerDocs.set(d.id, d));
+          snap2.docs.forEach(d => customerDocs.set(d.id, d));
+          
+          const updatePromises = Array.from(customerDocs.values()).map(docSnap => 
             updateDoc(doc(db, 'customers', docSnap.id), {
+              centerId: editCenter.id,
+              centerName: centerData.centerName,
+              leaderName: centerData.leaderName,
+              groupName: centerData.groupName,
+              villageCity: centerData.villageName,
+              district: centerData.district,
+              branchName: centerData.branchName,
               staffName: centerData.staffName,
               staffId: centerData.staffId
             })
           );
           await Promise.all(updatePromises);
         } catch (cascadeError) {
-          console.error("Error cascading staff update to customers:", cascadeError);
+          console.error("Error cascading center updates to customers:", cascadeError);
         }
 
         if (onSuccess) onSuccess(centerData);

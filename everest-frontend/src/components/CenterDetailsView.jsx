@@ -15,10 +15,13 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
   
   // Filter and strictly sort customers matching this center
   const centerCustomers = useMemo(() => {
-    const filtered = (customers || []).filter(
-      cust => cust.centerName?.trim().toLowerCase() === center?.centerName?.trim().toLowerCase() &&
-              (cust.branchName?.trim().toLowerCase() === center?.branchName?.trim().toLowerCase() || !cust.branchName)
-    );
+    const filtered = (customers || []).filter(cust => {
+      if (cust.centerId && center?.id) {
+        return cust.centerId === center.id;
+      }
+      return cust.centerName?.trim().toLowerCase() === center?.centerName?.trim().toLowerCase() &&
+             (cust.branchName?.trim().toLowerCase() === center?.branchName?.trim().toLowerCase() || !cust.branchName);
+    });
     
     // Strict ascending sort by slotIndex, falling back to creation time, with Leader forcibly prioritized
     return filtered.sort((a, b) => {
