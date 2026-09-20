@@ -18,7 +18,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   const [appDay, setAppDay] = useState(initialData?.appDay || '');
   const [appNumber] = useState(initialData?.appNumber || Math.floor(1000000000 + Math.random() * 9000000000));
   const [customerId, setCustomerId] = useState(initialData?.customerId || initialData?.applicationNumber || `EMF${String(Math.floor(Math.random() * 10000000)).padStart(7, '0')}`);
-  const [centerLeaderName, setCenterLeaderName] = useState(initialData?.centerLeaderName || initialData?.leaderName || '');
+  const [centerLeaderName, setCenterLeaderName] = useState(initialData?.leaderName || initialData?.centerLeaderName || initialData?.groupLeader || '');
   const [leaderCustomerId, setLeaderCustomerId] = useState(initialData?.leaderCustomerId || '');
   const [groupName, setGroupName] = useState(initialData?.groupName || '');
   const [photo, setPhoto] = useState(initialData?.image || null);
@@ -96,11 +96,11 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   // Sync reactive customer object updates
   useEffect(() => {
     if (initialData) {
-      setCenterLeaderName(initialData.centerLeaderName || initialData.leaderName || '');
+      setCenterLeaderName(initialData.leaderName || initialData.centerLeaderName || initialData.groupLeader || '');
       setLeaderCustomerId(initialData.leaderCustomerId || '');
       setGroupName(initialData.groupName || '');
       setCenter(initialData.center || initialData.centerName || '');
-      setCity(initialData.city || initialData.villageCity || '');
+      setCity(initialData.villageName || initialData.villageCity || initialData.area || initialData.location || initialData.city || '');
       setDistrict(initialData.district || '');
     }
   }, [initialData]);

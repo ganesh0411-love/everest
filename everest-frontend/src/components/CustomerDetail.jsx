@@ -572,7 +572,7 @@ const CustomerDetail = ({ customer, onBack }) => {
               
               <div className="w-[85%] h-[1.5px] bg-gradient-to-r from-transparent via-emerald-300 to-transparent mb-1 shadow-[0_0_15px_rgba(110,231,183,1)] relative z-10"></div>
               
-              <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center min-h-[15px] sm:min-h-[16.5px]">{customer.center || customer.area || '\u00A0'}</p>
+              <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center min-h-[15px] sm:min-h-[16.5px]">{customer.villageName || customer.villageCity || customer.area || customer.location || customer.center || '\u00A0'}</p>
             </div>
             
             <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Next Due : {nextFormattedDueDate}</p>
@@ -619,7 +619,7 @@ const CustomerDetail = ({ customer, onBack }) => {
             
             <div className="flex flex-col flex-1 pr-2">
               <h2 className="text-2xl font-bold text-white tracking-tight leading-tight">{formatName(customer.name)}</h2>
-              <p className="text-emerald-100 text-sm font-medium tracking-wide mt-0.5">{customer.center || customer.area || '\u00A0'}</p>
+              <p className="text-emerald-100 text-sm font-medium tracking-wide mt-0.5">{customer.villageName || customer.villageCity || customer.area || customer.location || customer.center || '\u00A0'}</p>
               
               <div className="flex items-center gap-2 mt-2">
                 <a href={`tel:${customer.phone || customer.mobile || ''}`} className="bg-white/20 hover:bg-white/30 border border-[#4ade80]/40 p-2 rounded-lg transition-colors flex items-center justify-center">

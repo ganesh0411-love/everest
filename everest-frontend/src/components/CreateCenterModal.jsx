@@ -204,34 +204,42 @@ export default function CreateCenterModal({ isOpen, onClose, userProfile, active
         
         // Cascade updates to all child customer documents
         try {
-          const q1 = query(collection(db, 'customers'), where('centerId', '==', editCenter.id));
-          const q2 = query(collection(db, 'customers'), where('centerName', '==', editCenter.centerName || ''));
-          
-          const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-          const customerDocs = new Map();
-          
-          snap1.docs.forEach(d => customerDocs.set(d.id, d));
-          snap2.docs.forEach(d => customerDocs.set(d.id, d));
+          const customersRef = collection(db, 'customers');
+          const allCustomersSnap = await getDocs(customersRef);
           
           const batch = writeBatch(db);
-          const cascadedChildPayload = {
-            centerId: editCenter.id,
-            centerName: centerData.centerName,
-            leaderName: centerData.leaderName,
-            leaderCustomerId: centerData.leaderId,
-            groupName: centerData.groupName,
-            villageCity: centerData.villageName,
-            district: centerData.district,
-            branchName: centerData.branchName,
-            staffName: centerData.staffName,
-            staffId: centerData.staffId
-          };
+          let updateCount = 0;
           
-          Array.from(customerDocs.values()).forEach(docSnap => {
-            batch.update(docSnap.ref, cascadedChildPayload);
+          allCustomersSnap.forEach((docSnap) => {
+            const data = docSnap.data();
+            const matchesCenter = 
+              (data.centerId && data.centerId === editCenter.id) ||
+              (data.centerName && editCenter.centerName && data.centerName.trim().toLowerCase() === editCenter.centerName.trim().toLowerCase());
+
+            if (matchesCenter) {
+              batch.update(docSnap.ref, {
+                centerId: editCenter.id,
+                centerName: centerData.centerName,
+                leaderName: centerData.leaderName,
+                centerLeaderName: centerData.leaderName,
+                groupLeader: centerData.leaderName,
+                leaderCustomerId: centerData.leaderId || data.leaderCustomerId || '',
+                groupName: centerData.groupName || data.groupName || '',
+                villageCity: centerData.villageName || centerData.villageCity || centerData.area || data.villageCity || '',
+                villageName: centerData.villageName || centerData.villageCity || centerData.area || data.villageName || '',
+                area: centerData.villageName || centerData.villageCity || centerData.area || data.area || '',
+                district: centerData.district || data.district || '',
+                branchName: centerData.branchName,
+                staffName: centerData.staffName,
+                staffId: centerData.staffId
+              });
+              updateCount++;
+            }
           });
           
-          await batch.commit();
+          if (updateCount > 0) {
+            await batch.commit();
+          }
         } catch (cascadeError) {
           console.error("Error cascading center updates to customers:", cascadeError);
         }

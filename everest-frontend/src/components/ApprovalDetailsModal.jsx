@@ -39,6 +39,32 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
     ? (parentCenter?.noOfCustomers || parentCenter?.totalMembers || localApp.totalMembers || '-') 
     : '-';
 
+  const resolvedLeaderName = React.useMemo(() => {
+    if (localApp.centerId || localApp.centerName) {
+      const parent = centers?.find(c => 
+        (localApp.centerId && c.id === localApp.centerId) ||
+        (c.centerName && localApp.centerName && c.centerName.trim().toLowerCase() === localApp.centerName.trim().toLowerCase())
+      );
+      if (parent?.leaderName) {
+        return parent.leaderName;
+      }
+    }
+    return localApp.centerLeaderName || localApp.leaderName || '--';
+  }, [localApp, centers]);
+
+  const resolvedLeaderCustomerId = React.useMemo(() => {
+    if (localApp.centerId || localApp.centerName) {
+      const parent = centers?.find(c => 
+        (localApp.centerId && c.id === localApp.centerId) ||
+        (c.centerName && localApp.centerName && c.centerName.trim().toLowerCase() === localApp.centerName.trim().toLowerCase())
+      );
+      if (parent?.leaderId || parent?.leaderCustomerId) {
+        return parent.leaderId || parent.leaderCustomerId;
+      }
+    }
+    return localApp.leaderCustomerId || '--';
+  }, [localApp, centers]);
+
   useEffect(() => {
     const staffName = parentCenter?.staffName || 
       (typeof localApp.staffName === 'string' && localApp.staffName !== 'Staff Unassigned' && localApp.staffName !== 'Unassigned' && localApp.staffName.trim() ? localApp.staffName : null) ||
@@ -575,13 +601,13 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Group Leader</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.centerLeaderName || '--'}</span>
+                <span className="pt-[1px]">{resolvedLeaderName}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>ID</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">{application.leaderCustomerId || '--'}</span>
+                <span className="pt-[1px]">{resolvedLeaderCustomerId}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
