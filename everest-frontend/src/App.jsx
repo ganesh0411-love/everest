@@ -1127,7 +1127,7 @@ function App() {
                                 {isOdFilterActive ? (
                                   <tr className="bg-rose-50/50 border-b border-rose-100 text-rose-700 text-[11px] uppercase tracking-wider">
                                     <th className="p-3 font-semibold">Customer</th>
-                                    <th className="p-3 font-semibold border-l border-rose-100">Branch</th>
+                                    <th className="p-3 font-semibold border-l border-rose-100">{isMainBranchView ? 'Branch' : 'Last Paid'}</th>
                                     <th className="p-3 font-semibold border-l border-rose-100 text-center">Pending Dues</th>
                                     <th className="p-3 font-semibold border-l border-rose-100 text-right">Loan Amount</th>
                                     <th className="p-3 font-semibold border-l border-rose-100 text-right">Paid</th>
@@ -1137,7 +1137,7 @@ function App() {
                                 ) : (
                                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
                                     <th className="p-3 font-semibold">Customer</th>
-                                    <th className="p-3 font-semibold border-l border-slate-200">Branch</th>
+                                    <th className="p-3 font-semibold border-l border-slate-200">{isMainBranchView ? 'Branch' : 'Loan Date'}</th>
                                     <th className="p-3 font-semibold border-l border-slate-200">Assigned Staff</th>
                                     <th className="p-3 font-semibold border-l border-slate-200">Loan Type</th>
                                     <th className="p-3 font-semibold border-l border-slate-200 text-right">Loan Amount</th>
@@ -1172,7 +1172,18 @@ function App() {
                                       {isOdFilterActive ? (
                                         <>
                                           <td className="p-3 border-l border-rose-100 text-sm font-medium text-slate-700 whitespace-nowrap bg-rose-50/10">
-                                            {customer.branch || customer.branchName || 'Main Branch'}
+                                            {isMainBranchView ? (
+                                              customer.branch || customer.branchName || 'Main Branch'
+                                            ) : (
+                                              <span className="text-slate-600 font-normal">
+                                                {(() => {
+                                                  const validInsts = (customer.installments || []).filter(i => i.status !== 'BOUNCED');
+                                                  if (validInsts.length === 0) return 'No Payments';
+                                                  validInsts.sort((a, b) => new Date(b.date) - new Date(a.date));
+                                                  return formatDate(validInsts[0].date);
+                                                })()}
+                                              </span>
+                                            )}
                                           </td>
                                           <td className="p-3 border-l border-rose-100 text-sm font-bold text-slate-700 text-center whitespace-nowrap bg-rose-50/10">
                                             {customer.dynamicPendingDues > 0 ? (
@@ -1199,7 +1210,11 @@ function App() {
                                       ) : (
                                         <>
                                           <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
-                                            {customer.branch || customer.branchName || 'Main Branch'}
+                                            {isMainBranchView ? (
+                                              customer.branch || customer.branchName || 'Main Branch'
+                                            ) : (
+                                              <span className="text-slate-600 font-normal">{formatDate(customer.date || customer.createdAt)}</span>
+                                            )}
                                           </td>
                                           <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
                                             {customer.assignedStaff || customer.staffName || customer.staff || '--'}
