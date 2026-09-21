@@ -80,34 +80,6 @@ const CustomerDetail = ({ customer, onBack }) => {
   }, [installments, customer]);
 
   useEffect(() => {
-    const getNumberSuffix = (num) => {
-      const j = num % 10, k = num % 100;
-      if (j === 1 && k !== 11) return num + "st";
-      if (j === 2 && k !== 12) return num + "nd";
-      if (j === 3 && k !== 13) return num + "rd";
-      return num + "th";
-    };
-
-    const recalculateInstallments = (insts) => {
-      let updated = [...insts];
-      updated.sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
-      let paidCount = 0;
-      return updated.map(inst => {
-        let currentStatus = inst.status;
-        if (parseFloat(inst.amount) > 0) currentStatus = 'PAID';
-        else if (parseFloat(inst.amount) === 0 && currentStatus === 'PAID') currentStatus = 'BOUNCED';
-
-        let newNumber = inst.number;
-        if (currentStatus === 'PAID') {
-          paidCount++;
-          newNumber = paidCount + getNumberSuffix(paidCount);
-        } else if (currentStatus === 'BOUNCED') {
-          newNumber = (paidCount + 1) + getNumberSuffix(paidCount + 1);
-        }
-        return { ...inst, status: currentStatus, number: newNumber };
-      });
-    };
-
     const handleClickOutside = (event) => {
       if (phoneMenuRef.current && !phoneMenuRef.current.contains(event.target)) {
         setShowPhoneMenu(false);
@@ -158,6 +130,34 @@ const CustomerDetail = ({ customer, onBack }) => {
       return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
     }
     return new Date(dStr);
+  };
+
+  const getNumberSuffix = (num) => {
+    const j = num % 10, k = num % 100;
+    if (j === 1 && k !== 11) return num + "st";
+    if (j === 2 && k !== 12) return num + "nd";
+    if (j === 3 && k !== 13) return num + "rd";
+    return num + "th";
+  };
+
+  const recalculateInstallments = (insts) => {
+    let updated = [...insts];
+    updated.sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
+    let paidCount = 0;
+    return updated.map(inst => {
+      let currentStatus = inst.status;
+      if (parseFloat(inst.amount) > 0) currentStatus = 'PAID';
+      else if (parseFloat(inst.amount) === 0 && currentStatus === 'PAID') currentStatus = 'BOUNCED';
+
+      let newNumber = inst.number;
+      if (currentStatus === 'PAID') {
+        paidCount++;
+        newNumber = paidCount + getNumberSuffix(paidCount);
+      } else if (currentStatus === 'BOUNCED') {
+        newNumber = (paidCount + 1) + getNumberSuffix(paidCount + 1);
+      }
+      return { ...inst, status: currentStatus, number: newNumber };
+    });
   };
 
   const nonBouncedInstallments = installments.filter(inst => inst.status !== 'BOUNCED');
