@@ -6,7 +6,7 @@ import EmptyState from './components/EmptyState';
 import FloatingActionButton from './components/FloatingActionButton';
 import Footer from './components/Footer';
 import { 
-  CheckCircle2, LayoutGrid, CalendarClock, TrendingUp, 
+  CheckCircle2, LayoutGrid, CalendarClock, TrendingUp, Activity,
   Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownLeft, ArrowDownAZ,
   Banknote, User, Sprout, CalendarDays, Search, Filter, Coins, Receipt, ClockAlert
 } from 'lucide-react';
@@ -461,23 +461,27 @@ function App() {
   // Filter, Sort, and Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState('Active');
   const [activeSort, setActiveSort] = useState('Recent');
   const [isOdFilterActive, setIsOdFilterActive] = useState(false);
+  const [activeCustomDate, setActiveCustomDate] = useState(null);
   
   // Temp state for the modal before applying
-  const [tempCategory, setTempCategory] = useState('All');
+  const [tempCategory, setTempCategory] = useState('Active');
   const [tempSort, setTempSort] = useState('Recent');
   const [activeBranchFilter, setActiveBranchFilter] = useState('All');
   const [tempBranchFilter, setTempBranchFilter] = useState('All');
+  const [tempCustomDate, setTempCustomDate] = useState(null);
 
   // Automatically reset all filter selections whenever the user switches activeBranch
   useEffect(() => {
-    setActiveCategory('All');
+    setActiveCategory('Active');
     setActiveSort('Recent');
     setActiveBranchFilter('All');
-    setTempCategory('All');
+    setActiveCustomDate(null);
+    setTempCategory('Active');
     setTempBranchFilter('All');
+    setTempCustomDate(null);
     setSearchQuery('');
     setIsOdFilterActive(false);
   }, [activeBranch?.id, activeBranch?.name]);
@@ -599,6 +603,7 @@ function App() {
     setTempCategory(activeCategory);
     setTempSort(activeSort);
     setTempBranchFilter(activeBranchFilter);
+    setTempCustomDate(activeCustomDate);
     setIsFilterOpen(true);
   };
 
@@ -606,13 +611,15 @@ function App() {
     setActiveCategory(tempCategory);
     setActiveSort(tempSort);
     setActiveBranchFilter(tempBranchFilter);
+    setActiveCustomDate(tempCustomDate);
     setIsFilterOpen(false);
   };
 
   const clearFilter = () => {
-    setActiveCategory('All');
+    setActiveCategory('Active');
     setActiveSort('Recent');
     setActiveBranchFilter('All');
+    setActiveCustomDate(null);
     setIsOdFilterActive(false);
     setIsFilterOpen(false);
   };
@@ -638,6 +645,7 @@ function App() {
       
       let overdueAmount = 0;
       let expectedInstallmentsCount = 0;
+      let scheduledDates = [];
 
       if (rawDueDate && planCount > 0) {
         const baseDateObj = parseDate(rawDueDate);
@@ -648,8 +656,8 @@ function App() {
           else scheduledDateObj.setDate(scheduledDateObj.getDate() + (idx * 7));
           scheduledDateObj.setHours(0,0,0,0);
           
+          scheduledDates.push(scheduledDateObj.getTime());
           if (scheduledDateObj < today) expectedInstallmentsCount++;
-          else break;
         }
         const expectedPaid = Math.min(repay, expectedInstallmentsCount * emiAmount);
         overdueAmount = Math.max(0, expectedPaid - sub);
@@ -661,7 +669,8 @@ function App() {
         dynamicOutstanding: Math.max(0, repay - sub),
         dynamicTotalPaid: sub,
         dynamicOverdue: overdueAmount,
-        dynamicPendingDues: pendingDues
+        dynamicPendingDues: pendingDues,
+        scheduledDates
       };
     });
     
@@ -674,6 +683,25 @@ function App() {
           (c.loanType || '').toLowerCase().includes(activeCategory.toLowerCase()) ||
           (c.loanType || '').toLowerCase().includes(matchType.toLowerCase())
         );
+      } else if (activeCategory === 'Active') {
+        filtered = filtered.filter(c => (c.dynamicOutstanding > 0 && c.status !== 'SETTLED' && c.status !== 'Settled'));
+      } else if (activeCategory === 'Settled') {
+        filtered = filtered.filter(c => (c.dynamicOutstanding <= 0 || c.status === 'SETTLED' || c.status === 'Settled'));
+      } else if (activeCategory === 'Due Date') {
+        const targetTime = today.getTime();
+        filtered = filtered.filter(c => c.scheduledDates?.includes(targetTime));
+      } else if (activeCategory === 'Upcoming') {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const targetTime = tomorrow.getTime();
+        filtered = filtered.filter(c => c.scheduledDates?.includes(targetTime));
+      } else if (activeCategory === 'Custom') {
+        if (activeCustomDate) {
+          const target = new Date(activeCustomDate);
+          target.setHours(0,0,0,0);
+          const targetTime = target.getTime();
+          filtered = filtered.filter(c => c.scheduledDates?.includes(targetTime));
+        }
       } else {
         filtered = filtered.filter(c => c.category === activeCategory);
       }
@@ -741,13 +769,13 @@ function App() {
     filtered.sort((a, b) => {
       switch (activeSort) {
         case 'Recent':
-          return new Date(b.lastUpdated || b.date) - new Date(a.lastUpdated || a.date);
+          return parseGlobalDate(b.date || b.createdAt).getTime() - parseGlobalDate(a.date || a.createdAt).getTime();
         case 'Oldest':
-          return new Date(a.date) - new Date(b.date);
+          return parseGlobalDate(a.date || a.createdAt).getTime() - parseGlobalDate(b.date || b.createdAt).getTime();
         case 'Highest Amount':
-          return b.loanAmount - a.loanAmount;
+          return (parseFloat(b.loanAmount) || 0) - (parseFloat(a.loanAmount) || 0);
         case 'Least Amount':
-          return a.loanAmount - b.loanAmount;
+          return (parseFloat(a.loanAmount) || 0) - (parseFloat(b.loanAmount) || 0);
         case 'By Name':
           const cleanNameA = String(a.name || '').replace(/^(Mr|Mrs|Miss|Ms)\.?\s+/i, '').trim().toLowerCase();
           const cleanNameB = String(b.name || '').replace(/^(Mr|Mrs|Miss|Ms)\.?\s+/i, '').trim().toLowerCase();
@@ -1465,9 +1493,11 @@ function App() {
                         <div className="flex flex-wrap gap-2">
                           {[
                             { name: 'All', icon: LayoutGrid, color: 'text-blue-500' },
-                            { name: 'Settled', icon: CheckCircle2, color: 'text-emerald-500' },
+                            { name: 'Active', icon: Activity, color: 'text-emerald-500' },
+                            { name: 'Settled', icon: CheckCircle2, color: 'text-slate-500' },
                             { name: 'Due Date', icon: CalendarClock, color: 'text-amber-500' },
                             { name: 'Upcoming', icon: TrendingUp, color: 'text-purple-500' },
+                            { name: 'Custom', icon: CalendarDays, color: 'text-indigo-500' },
                             { name: 'Microfinance', icon: Banknote, color: 'text-teal-500' },
                             { name: 'Personal Loan', icon: User, color: 'text-rose-500' },
                             { name: 'Agri Loan', icon: Sprout, color: 'text-green-500' },
@@ -1477,14 +1507,25 @@ function App() {
                             const Icon = cat.icon;
                             const isActive = tempCategory === cat.name;
                             return (
-                              <button 
-                                key={cat.name}
-                                onClick={() => setTempCategory(cat.name)}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${isActive ? 'bg-brand-blue text-white border-brand-blue shadow-md shadow-blue-500/20' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
-                              >
-                                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : cat.color}`} />
-                                {cat.name}
-                              </button>
+                              <React.Fragment key={cat.name}>
+                                <button 
+                                  onClick={() => setTempCategory(cat.name)}
+                                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${isActive ? 'bg-brand-blue text-white border-brand-blue shadow-md shadow-blue-500/20' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : cat.color}`} />
+                                  {cat.name}
+                                </button>
+                                {cat.name === 'Custom' && isActive && (
+                                  <div className="flex items-center">
+                                    <input 
+                                      type="date"
+                                      value={tempCustomDate || ''}
+                                      onChange={(e) => setTempCustomDate(e.target.value)}
+                                      className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                                    />
+                                  </div>
+                                )}
+                              </React.Fragment>
                             );
                           })}
                         </div>
