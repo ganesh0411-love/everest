@@ -403,215 +403,207 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
 
       </div>
       {/* ========================================================================= */}
-      {/* 2. DESKTOP VIEW (Visible on >= 1024px, 2-Column Landscape Layout)        */}
+      {/* 2. DESKTOP VIEW (Visible on >= 1024px, Single Column Layout)        */}
       {/* ========================================================================= */}
-      <div className="hidden lg:block w-full min-h-screen bg-gray-50/50 p-8">
-        <div className="max-w-7xl mx-auto flex flex-row gap-8 items-start">
-          
-          {/* LEFT COLUMN: Sticky Leader & Center Details Sidebar */}
-          <div className="w-[320px] shrink-0 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 sticky top-6">
-            <div className="flex items-start justify-between gap-4 mb-6">
-              <img 
-                src={center?.leaderPhoto || center?.leaderPhotoUrl || '/placeholder-leader.png'} 
-                alt={center?.leader || center?.leaderName || 'Leader'} 
-                className="w-24 h-24 rounded-xl object-cover border border-gray-200 shadow-sm"
-                onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Leader'; }}
-              />
-              <div className="flex flex-col gap-2 shrink-0">
-                <button 
-                  onClick={() => setIsEditOpen(true)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-6 py-2 rounded-full uppercase tracking-wider shadow-sm transition-colors"
-                >
-                  EDIT
-                </button>
-                <button 
-                  onClick={handleDelete}
-                  className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-6 py-2 rounded-full uppercase tracking-wider shadow-sm transition-colors"
-                >
-                  DELETE
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="font-semibold text-gray-500">Leader Name</span>
-                <span className="font-bold text-gray-900">{center?.leader || center?.leaderName || '-'}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="font-semibold text-gray-500">Customer ID</span>
-                <span className="font-bold text-gray-900">{center?.leaderId || center?.leaderCustomerId || '-'}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="font-semibold text-gray-500">Center / Area</span>
-                <span className="font-bold text-gray-900 text-right max-w-[150px] truncate">{center?.centerName || '-'} / {center?.villageCity || center?.villageName || center?.area || '-'}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="font-semibold text-gray-500">Group Name</span>
-                <span className="font-bold text-gray-900 text-right truncate max-w-[150px]">{center?.groupName || '-'}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="font-semibold text-gray-500">Staff Assigned</span>
-                <span className="font-bold text-gray-900">{center?.staffName || '-'}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="font-semibold text-gray-500">Branch</span>
-                <span className="font-bold text-gray-900">{center?.branchName || '-'}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="font-semibold text-gray-500">No. of Customer</span>
-                <span className="font-bold text-gray-900">{totalMembers || center?.noOfCustomers || 0}</span>
-              </div>
-              <div className="flex justify-between pt-1">
-                <span className="font-semibold text-gray-500">Loan Amount</span>
-                <span className="font-bold text-emerald-600 text-base">{displayLoanAmount || '-'}</span>
-              </div>
+      <div className="hidden lg:flex max-w-7xl mx-auto gap-8 p-6 items-start h-[calc(100vh-80px)] overflow-hidden">
+        
+        {/* LEFT COLUMN: Sticky Leader & Center Details Sidebar */}
+        <div className="w-[340px] shrink-0 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 sticky top-0">
+          <div className="flex items-start justify-between gap-4 mb-6">
+            <img 
+              src={center?.leaderPhoto || center?.leaderPhotoUrl || '/placeholder-leader.png'} 
+              alt={center?.leader || center?.leaderName || 'Leader'} 
+              className="w-24 h-24 rounded-xl object-cover border border-gray-200 shadow-sm"
+              onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Leader'; }}
+            />
+            <div className="flex flex-col gap-2 shrink-0">
+              <button 
+                onClick={() => setIsEditOpen(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-6 py-2 rounded-full uppercase tracking-wider shadow-sm transition-colors"
+              >
+                EDIT
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-6 py-2 rounded-full uppercase tracking-wider shadow-sm transition-colors"
+              >
+                DELETE
+              </button>
             </div>
           </div>
 
-          {/* VERTICAL DIVIDER */}
-          <div className="w-[1px] bg-gray-200 self-stretch min-h-[650px]" />
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="font-semibold text-gray-500">Leader Name</span>
+              <span className="font-bold text-gray-900">{center?.leader || center?.leaderName || '-'}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="font-semibold text-gray-500">Customer ID</span>
+              <span className="font-bold text-gray-900">{center?.leaderId || center?.leaderCustomerId || '-'}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="font-semibold text-gray-500">Center / Area</span>
+              <span className="font-bold text-gray-900 text-right max-w-[150px] truncate">{center?.centerName || '-'}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="font-semibold text-gray-500">Group Name</span>
+              <span className="font-bold text-gray-900 text-right truncate max-w-[150px]">{center?.groupName || '-'}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="font-semibold text-gray-500">Staff Assigned</span>
+              <span className="font-bold text-gray-900">{center?.staffName || '-'}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="font-semibold text-gray-500">Branch</span>
+              <span className="font-bold text-gray-900">{center?.branchName || '-'}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="font-semibold text-gray-500">No. of Customer</span>
+              <span className="font-bold text-gray-900">{totalMembers || center?.noOfCustomers || 0}</span>
+            </div>
+            <div className="flex justify-between pt-1">
+              <span className="font-semibold text-gray-500">Loan Amount</span>
+              <span className="font-bold text-emerald-600 text-base">{displayLoanAmount || '-'}</span>
+            </div>
+          </div>
+        </div>
 
-          {/* RIGHT COLUMN: 2-Column Slot Cards Grid */}
-          <div className="flex-1 w-full">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-              {Array.from({ length: visibleSlots }).map((_, idx) => {
-                const customer = centerCustomers?.[idx];
-                const slotNumber = String(idx + 1).padStart(2, '0');
+        {/* VERTICAL DIVIDER */}
+        <div className="w-[1px] bg-gray-200 self-stretch" />
 
-                if (!customer) {
-                  return (
-                    <div key={idx} className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col justify-between min-h-[160px] relative hover:shadow-md transition-shadow">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xl font-extrabold text-gray-800">{slotNumber}</span>
-                        <div className="w-12 h-10 bg-sky-50 rounded-lg flex items-center justify-center border border-sky-100">
-                          <span className="text-sky-300 text-xl">🖼️</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-center mt-auto">
-                        <button 
-                          onClick={() => handleAddClick(idx + 1)}
-                          className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-8 py-2 rounded-full shadow-sm active:scale-95 transition-transform"
-                        >
-                          ADD
-                        </button>
-                      </div>
+        {/* RIGHT PANEL: Scrollable Full-Width Single-Column Cards */}
+        <div className="flex-1 h-full overflow-y-auto pr-2 flex flex-col gap-4 pb-20">
+          {Array.from({ length: visibleSlots }).map((_, idx) => {
+            const customer = centerCustomers?.[idx];
+            const slotNumber = String(idx + 1).padStart(2, '0');
+
+            if (!customer) {
+              return (
+                <div key={idx} className="w-full bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col justify-between min-h-[160px] relative hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl font-extrabold text-gray-800">{slotNumber}</span>
+                    <div className="w-12 h-10 bg-sky-50 rounded-lg flex items-center justify-center border border-sky-100">
+                      <span className="text-sky-300 text-xl">🖼️</span>
                     </div>
-                  );
-                }
-
-                return (
-                  <div 
-                    key={customer.id || idx} 
-                    className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm relative flex flex-col justify-between hover:shadow-md transition-shadow min-h-[160px]"
-                  >
-                    {/* Top-Right Soft Delete Button (Cleanly Positioned at Corner) */}
+                  </div>
+                  <div className="flex justify-center mt-auto">
                     <button 
-                      onClick={() => handleRemoveMember(customer)}
-                      className="absolute top-2.5 right-2.5 text-rose-500 hover:text-rose-700 font-bold text-sm w-6 h-6 flex items-center justify-center rounded-full hover:bg-rose-50 transition-colors z-10"
-                      title="Remove member"
+                      onClick={() => handleAddClick(idx + 1)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-8 py-2 rounded-full shadow-sm active:scale-95 transition-transform"
                     >
-                      ✕
+                      ADD
                     </button>
+                  </div>
+                </div>
+              );
+            }
 
-                    {/* Main Card Data Row: 4 Logical Columns */}
-                    <div className="flex items-start gap-3 w-full pr-7">
-                      
-                      {/* Zone 1: Slot Number */}
-                      <div className="shrink-0 w-8 pt-1">
-                        <span className="text-xl font-extrabold text-gray-800">{slotNumber}</span>
+            return (
+              <div 
+                key={customer.id || idx} 
+                className="w-full bg-white rounded-2xl p-4 border border-gray-200 shadow-sm relative flex flex-col justify-between hover:shadow-md transition-shadow"
+              >
+                {/* Top-Right Soft Delete Icon */}
+                <button 
+                  onClick={() => handleRemoveMember(customer)}
+                  className="absolute top-3 right-3 text-rose-500 hover:text-rose-700 font-bold text-sm w-7 h-7 flex items-center justify-center rounded-full hover:bg-rose-50 transition-colors z-10"
+                  title="Remove member"
+                >
+                  ✕
+                </button>
+
+                {/* Spacious Horizontal Grid for Customer Data */}
+                <div className="flex items-center gap-6 w-full pr-10">
+                  
+                  {/* Slot Index */}
+                  <div className="shrink-0 w-10 text-center">
+                    <span className="text-2xl font-black text-gray-800">{slotNumber}</span>
+                  </div>
+
+                  {/* Column 1: Identity */}
+                  <div className="w-48 shrink-0 border-r border-gray-100 pr-4">
+                    <h4 className="font-bold text-gray-900 text-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                      {customer.name || customer.customerName}
+                    </h4>
+                    <p className="text-xs font-semibold text-gray-500 mt-0.5">{customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}</p>
+                    <p className="text-xs text-purple-700 font-bold mt-1">{customer.staffName || center?.staffName || '-'}</p>
+                  </div>
+
+                  {/* Column 2: Personal Details */}
+                  <div className="w-44 shrink-0 border-r border-gray-100 pr-4 text-xs text-gray-600 space-y-1">
+                    <p className="font-medium text-gray-800">{customer.gender || 'Female'}</p>
+                    <p>{customer.maritalStatus || 'Married'}</p>
+                    <p className="text-gray-500 font-semibold">{formatDOB(customer.dob || customer.dateOfBirth) || 'DOB'} • {customer.age ? `${customer.age} Yrs` : (getAge(customer.dob || customer.dateOfBirth) ? `${getAge(customer.dob || customer.dateOfBirth)} Yrs` : '-')}</p>
+                  </div>
+
+                  {/* Column 3: Location */}
+                  <div className="flex-1 min-w-0 text-xs text-gray-600">
+                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Location</span>
+                    <span className="text-gray-800 font-semibold text-sm truncate block" title={customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || '-'}>
+                      {customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || '-'}
+                    </span>
+                  </div>
+
+                  {/* Column 4: Photo Thumbnail */}
+                  <div className="shrink-0">
+                    {customer.photoUrl || customer.photoBase64 || customer.image || customer.photo ? (
+                      <img 
+                        src={customer.photoUrl || customer.photoBase64 || customer.image || customer.photo} 
+                        alt={customer.name} 
+                        className="w-14 h-14 rounded-xl object-cover border border-gray-200 shadow-sm"
+                        onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=User'; }}
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-xl">
+                        👤
                       </div>
+                    )}
+                  </div>
 
-                      {/* Zone 2: Primary Identification (Left of Vertical Line) */}
-                      <div className="flex-1 min-w-0 pr-3 border-r border-gray-200">
-                        <h4 className="font-bold text-gray-900 text-sm whitespace-nowrap overflow-hidden text-ellipsis">
-                          {customer.name || customer.customerName || 'Customer Name'}
-                        </h4>
-                        <p className="text-xs font-semibold text-gray-500 mt-0.5">
-                          {customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}
-                        </p>
-                        <p className="text-xs text-gray-600 mt-0.5">
-                          {formatDOB(customer.dob || customer.dateOfBirth)}
-                        </p>
-                        <p className="text-xs text-purple-700 font-semibold mt-1">
-                          {customer.staffName || center?.staffName || 'Staff Assigned'}
-                        </p>
-                      </div>
+                </div>
 
-                      {/* Zone 3: Demographic & Location Data (Right of Vertical Line) */}
-                      <div className="flex-1 min-w-0 px-3 flex flex-col justify-start text-xs text-gray-600 space-y-0.5">
-                        <span className="font-medium text-gray-800">{customer.gender || 'Female'}</span>
-                        <span>{customer.maritalStatus || 'Married'}</span>
-                        <span className="font-semibold text-gray-700">{customer.age ? `${customer.age} Yrs` : (getAge(customer.dob || customer.dateOfBirth) ? `${getAge(customer.dob || customer.dateOfBirth)} Yrs` : '-')}</span>
-                        <span className="text-sky-700 font-medium whitespace-nowrap overflow-hidden text-ellipsis" title={customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || 'Batlagundu'}>
-                          {customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || 'Batlagundu'}
-                        </span>
-                      </div>
-
-                      {/* Zone 4: Customer Photo Frame */}
-                      <div className="shrink-0 pt-1">
-                        {customer.photoUrl || customer.photoBase64 || customer.image || customer.photo ? (
-                          <img 
-                            src={customer.photoUrl || customer.photoBase64 || customer.image || customer.photo} 
-                            alt={customer.name} 
-                            className="w-12 h-14 rounded-xl object-cover border border-gray-200 shadow-sm"
-                            onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=User'; }}
-                          />
-                        ) : (
-                          <div className="w-12 h-14 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-lg">
-                            👤
-                          </div>
-                        )}
-                      </div>
-
-                    </div>
-
-                    {/* Bottom Action Strip: Phone, Status Badge, Edit Button */}
-                    <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-gray-100 flex-nowrap w-full">
-                      <span className="text-xs font-semibold text-gray-800 shrink-0">
-                        📞 {customer.phone || customer.mobileNumber || customer.mobile || 'N/A'}
-                      </span>
-                      
-                      <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border shrink-0 uppercase tracking-wider ${
+                {/* Bottom Action Bar */}
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100 w-full">
+                  <span className="text-xs font-semibold text-gray-800">📞 {customer.phone || customer.mobileNumber || customer.mobile || '-'}</span>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-0.5 text-[10px] font-bold rounded-full border uppercase ${
                         (customer.status || '').toLowerCase() === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' :
                         (customer.status || '').toLowerCase() === 'rejected' ? 'bg-rose-50 text-rose-700 border-rose-300' :
                         (customer.status || '').toLowerCase() === 'draft' ? 'bg-slate-100 text-slate-700 border-slate-300' :
                         'bg-amber-50 text-amber-800 border-amber-300'
-                      }`}>
-                        {customer.status || 'PENDING'}
-                      </span>
-
-                      <button 
-                        onClick={() => {
-                          setAddCustomerContext(customer);
-                          setIsAddCustomerOpen(true);
-                        }}
-                        className="shrink-0 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold px-3.5 py-1 rounded-full shadow-sm transition-all"
-                      >
-                        EDIT
-                      </button>
-                    </div>
+                    }`}>
+                      {customer.status || 'DRAFT'}
+                    </span>
+                    <button 
+                      onClick={() => {
+                        setAddCustomerContext(customer);
+                        setIsAddCustomerOpen(true);
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold px-4 py-1 rounded-full shadow-sm transition-all"
+                    >
+                      EDIT
+                    </button>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* DONE / PUBLISH BUTTON */}
-            {centerCustomers?.length === totalMembers && centerCustomers.some(c => c.status === 'Draft') && (
-              <div className="pt-8 pb-6 flex justify-center">
-                <button 
-                  onClick={handleBatchPublish}
-                  disabled={isPublishing}
-                  className="bg-[#10a37f] hover:bg-[#0e906f] text-white font-bold text-base py-3 px-10 rounded-xl shadow-lg transition-all"
-                >
-                  {isPublishing ? 'PUBLISHING...' : 'DONE'}
-                </button>
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })}
+
+          {/* DONE / PUBLISH BUTTON */}
+          {centerCustomers?.length === totalMembers && centerCustomers.some(c => c.status === 'Draft') && (
+            <div className="pt-8 pb-6 flex justify-center">
+              <button 
+                onClick={handleBatchPublish}
+                disabled={isPublishing}
+                className="bg-[#10a37f] hover:bg-[#0e906f] text-white font-bold text-base py-3 px-10 rounded-xl shadow-lg transition-all"
+              >
+                {isPublishing ? 'PUBLISHING...' : 'DONE'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
+      
       {isAddCustomerOpen && (
         <AddCustomerModal 
           isOpen={isAddCustomerOpen} 
