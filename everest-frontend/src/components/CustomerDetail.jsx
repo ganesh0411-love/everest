@@ -176,7 +176,14 @@ const CustomerDetail = ({ customer, onBack }) => {
   const uniqueNumbers = Object.keys(sumByNumber);
   const fullySettledCount = uniqueNumbers.filter(num => sumByNumber[num] >= emiAmount).length;
 
-  const lastValidInst = nonBouncedInstallments.length > 0 ? nonBouncedInstallments[nonBouncedInstallments.length - 1] : null;
+  const sortedValidInsts = [...nonBouncedInstallments].sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
+  const lastValidInst = sortedValidInsts.length > 0 ? sortedValidInsts[sortedValidInsts.length - 1] : null;
+  
+  const closedDateStr = (netBalance <= 0 && lastValidInst) ? lastValidInst.date : null;
+  const closedDateObj = closedDateStr ? parseDate(closedDateStr) : null;
+  const closedDateFormatted = closedDateObj ? `${String(closedDateObj.getDate()).padStart(2, '0')}-${String(closedDateObj.getMonth() + 1).padStart(2, '0')}-${closedDateObj.getFullYear()}` : '';
+  const closedWeekday = closedDateObj ? closedDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() : '';
+
   const totalPaidForLastNumber = lastValidInst ? sumByNumber[lastValidInst.number] : 0;
   
   const isLastPending = lastValidInst && totalPaidForLastNumber < emiAmount;
@@ -635,8 +642,12 @@ const CustomerDetail = ({ customer, onBack }) => {
               <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center min-h-[15px] sm:min-h-[16.5px]">{customer.villageName || customer.villageCity || customer.area || customer.location || customer.center || '\u00A0'}</p>
             </div>
             
-            {(!customer?.loanType || customer.loanType.toLowerCase() !== 'daily') && (
-              <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Next Due : {nextFormattedDueDate}</p>
+            {netBalance <= 0 ? (
+              <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>CLOSED ON: {closedDateFormatted} {closedWeekday && <span className="opacity-90">({closedWeekday})</span>}</p>
+            ) : (
+              (!customer?.loanType || customer.loanType.toLowerCase() !== 'daily') && (
+                <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Next Due : {nextFormattedDueDate}</p>
+              )
             )}
           </div>
 
@@ -722,14 +733,24 @@ const CustomerDetail = ({ customer, onBack }) => {
             </div>
             
             {/* Sleek Next Due Text Indicator */}
-            {(!customer?.loanType || customer.loanType.toLowerCase() !== 'daily') && (
+            {netBalance <= 0 ? (
               <div className="flex justify-center items-center text-[12px] font-black text-emerald-50 uppercase tracking-widest mt-1">
-                 <span className="mr-2 text-emerald-200">NEXT DUE:</span>
+                 <span className="mr-2 text-emerald-200">CLOSED ON:</span>
                  <span className="text-[14px] text-white drop-shadow-md tracking-wider">
-                   {nextFormattedDueDate} 
-                   {nextFormattedWeekday && <span className="ml-1.5 text-[11px] text-emerald-100 opacity-90">({nextFormattedWeekday})</span>}
+                   {closedDateFormatted}
+                   {closedWeekday && <span className="ml-1.5 text-[11px] text-emerald-100 opacity-90">({closedWeekday})</span>}
                  </span>
               </div>
+            ) : (
+              (!customer?.loanType || customer.loanType.toLowerCase() !== 'daily') && (
+                <div className="flex justify-center items-center text-[12px] font-black text-emerald-50 uppercase tracking-widest mt-1">
+                   <span className="mr-2 text-emerald-200">NEXT DUE:</span>
+                   <span className="text-[14px] text-white drop-shadow-md tracking-wider">
+                     {nextFormattedDueDate} 
+                     {nextFormattedWeekday && <span className="ml-1.5 text-[11px] text-emerald-100 opacity-90">({nextFormattedWeekday})</span>}
+                   </span>
+                </div>
+              )
             )}
           </div>
           {/* Top-Right Loan Summary */}
