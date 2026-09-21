@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Image as ImageIcon, Phone, Star } from 'lucide-react';
-import { doc, updateDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import AddCustomerModal from './AddCustomerModal';
 import CreateCenterModal from './CreateCenterModal';
@@ -226,11 +226,13 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
         return;
       }
       
-      await Promise.all(draftCustomers.map(async (c) => {
+      const batch = writeBatch(db);
+      draftCustomers.forEach(c => {
         if (c.id) {
-          await updateDoc(doc(db, 'customers', c.id), { status: 'Pending' });
+          batch.update(doc(db, 'customers', c.id), { status: 'Pending' });
         }
-      }));
+      });
+      await batch.commit();
       
     } catch (error) {
       console.error("Error publishing customers:", error);

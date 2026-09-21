@@ -101,6 +101,18 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const tabs = isStaff ? staffTabs : adminTabs;
 
   const currentApps = applications.filter(app => {
+    if (isStaff && app.status === 'Draft' && (app.centerId || app.groupName || app.centerName || app.center)) {
+      const centerExists = centers.some(c => 
+        (app.centerId && c.id === app.centerId) || 
+        (app.groupName && c.centerName === app.groupName) || 
+        (app.centerName && c.centerName === app.centerName) ||
+        (app.center && c.centerName === app.center)
+      );
+      if (!centerExists) {
+        return false;
+      }
+    }
+
     if (activeTab === 'Approved_Rejected') {
       return app.status === 'Approved' || app.status === 'Rejected';
     }
@@ -180,7 +192,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                 <th className="p-2 w-12 md:w-[5%] text-left md:pl-6">S.no</th>
                 <th className="p-2 w-24 md:w-[10%] text-left">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
                 <th className="p-2 text-left w-auto md:w-[20%]">CUSTOMER</th>
-                <th className="p-2 text-left hidden md:table-cell md:w-[15%]">BRANCH</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[15%]">AREA / CENTER</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[15%]">GROUP NAME</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[12%]">LOAN TYPE</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[11%]">LOAN AMOUNT</th>
@@ -219,7 +231,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       <div className="truncate flex flex-col">
                         <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate md:hidden">
-                          {isMainBranch ? (app.branch || app.branchName || 'Main') : `Staff: ${resolveCustomerStaff(app, centers)}`}
+                          {isMainBranch ? (app.area || app.villageCity || app.city || app.centerName || app.center || app.groupName || 'N/A') : `Staff: ${resolveCustomerStaff(app, centers)}`}
                         </div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate hidden md:block">
                           ID: {app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}
@@ -227,8 +239,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       </div>
                     </div>
                   </td>
-                  <td className="p-2 hidden md:table-cell text-sm font-bold text-brand-blue truncate">
-                    {app.branch || app.branchName || 'Main'}
+                  <td className="p-2 hidden md:table-cell text-sm font-bold text-brand-blue truncate" title={app.area || app.villageCity || app.city || app.centerName || app.center || app.groupName || 'N/A'}>
+                    {app.area || app.villageCity || app.city || app.centerName || app.center || app.groupName || 'N/A'}
                   </td>
                   <td className="p-2 hidden md:table-cell text-xs font-semibold text-slate-600 truncate">
                     {app.groupName || app.centerName || 'Individual / N/A'}
