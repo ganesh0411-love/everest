@@ -7,7 +7,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
 import { uploadImageToStorage } from '../utils/storageUpload';
 
-const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
+const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = { id: 'main', name: 'Main Branch' }, isStaff }) => {
   const [step, setStep] = useState('form'); // 'form', 'confirm', 'success'
   const [showPdf, setShowPdf] = useState(false);
   const [pdfAutoMode, setPdfAutoMode] = useState(null);
@@ -474,7 +474,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
         applicationNumber: customerId,
         name: `${nameTitle} ${customerName}`,
         date: appDate,
-        status: initialData?.status || 'Pending',
+        status: initialData?.status || (isStaff ? 'Draft' : 'Pending'),
         loanAmount: parseFloat(loanAmount) || 0,
         repayAmount: parseFloat(repayAmount) || 0,
         disbursedAmount: parseFloat(disbursedAmount) || 0,
@@ -565,7 +565,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
             application={{
               id: customerId,
               customerName: `${nameTitle} ${customerName}`,
-              status: initialData?.status || 'Pending',
+              status: initialData?.status || (isStaff ? 'Draft' : 'Pending'),
               customerStatus: customerStatus,
               appDate: appDate,
               appDay: appDay,

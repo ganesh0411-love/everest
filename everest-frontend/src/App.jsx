@@ -948,6 +948,7 @@ function App() {
                 } catch(e) { console.error('Update full customer error', e); }
               }}
               activeBranch={activeBranch}
+              isStaff={userProfile?.role === 'staff'}
             />
           </div>
         );
@@ -1603,6 +1604,7 @@ function App() {
                 <AddCustomerModal 
                   onClose={() => setIsAddCustomerOpen(false)} 
                   activeBranch={activeBranch}
+                  isStaff={userProfile?.role === 'staff'}
                   onAddCustomer={async (newCustomer) => {
                     const nowIso = new Date().toISOString();
                     const customerToSave = { 

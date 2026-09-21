@@ -11,9 +11,9 @@ import { db } from '../firebase';
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
 
-const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer, activeBranch }) => {
+const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer, activeBranch, isStaff }) => {
   const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
-  const [activeTab, setActiveTab] = useState('Pending');
+  const [activeTab, setActiveTab] = useState(isStaff ? 'Draft' : 'Pending');
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [fullscreenImage, setFullscreenImage] = useState(null);
@@ -86,13 +86,26 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
     }
   };
 
-  const tabs = [
+  const adminTabs = [
     { id: 'Pending', label: 'Pending', activeClass: 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' },
     { id: 'Approved', label: 'Approved', activeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm' },
     { id: 'Rejected', label: 'Rejected', activeClass: 'bg-rose-50 text-rose-700 border border-rose-200 shadow-sm' }
   ];
 
-  const currentApps = applications.filter(app => app.status === activeTab);
+  const staffTabs = [
+    { id: 'Draft', label: 'Drafts', activeClass: 'bg-slate-50 text-slate-700 border border-slate-200 shadow-sm' },
+    { id: 'Pending', label: 'Pending', activeClass: 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' },
+    { id: 'Approved_Rejected', label: 'Approved / Rejected', activeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm' }
+  ];
+
+  const tabs = isStaff ? staffTabs : adminTabs;
+
+  const currentApps = applications.filter(app => {
+    if (activeTab === 'Approved_Rejected') {
+      return app.status === 'Approved' || app.status === 'Rejected';
+    }
+    return app.status === activeTab;
+  });
 
   const toggleMenu = (id, e) => {
     e.stopPropagation();
@@ -233,8 +246,57 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                         activeTab === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                         'bg-rose-50 text-rose-600 border-rose-100'
                       }`}>
-                        {activeTab}
+                        {app.status === 'Draft' ? 'DRAFT' : activeTab === 'Approved_Rejected' ? app.status.toUpperCase() : activeTab.toUpperCase()}
                       </span>
+                    ) : isStaff ? (
+                      <div className="flex items-center gap-2">
+                        {(app.status === 'Pending' || app.status === 'Approved' || app.status === 'Rejected') ? (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold border ${
+                            app.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                            app.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                            'bg-rose-50 text-rose-600 border-rose-100'
+                          }`}>
+                            {app.status.toUpperCase()}
+                          </span>
+                        ) : null}
+                        {app.status === 'Draft' && (
+                          <div className="flex gap-2 items-center">
+                            <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
+                            </button>
+                            {activeMenuId === app.id && (
+                              <div 
+                                className="absolute right-0 top-10 w-56 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button 
+                                  onClick={() => { updateStatus(app.id, 'Pending'); }}
+                                  className="w-full text-left px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 flex items-center gap-3 border-b border-slate-50"
+                                >
+                                  <span>🚀</span> Submit for Approval
+                                </button>
+                                <button 
+                                  onClick={() => { setIsEditing(app); setActiveMenuId(null); }}
+                                  className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                                >
+                                  <span>✏️</span> Edit Details
+                                </button>
+                                <button 
+                                  onClick={() => { setActivePdfApp(app); setActiveMenuId(null); }}
+                                  className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                                >
+                                  <span>📄</span> View PDF
+                                </button>
+                                <button onClick={() => deleteApp(app.id)} className="w-full text-left px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3">
+                                  <span>🗑️</span> Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         {activeTab === 'Pending' && (
@@ -289,6 +351,64 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       >
                         <Eye size={20} />
                       </button>
+                    ) : isStaff ? (
+                      <div className="flex gap-1.5 items-center relative">
+                        {app.status === 'Draft' && (
+                          <>
+                            <button onClick={(e) => toggleMenu(app.id, e)} className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
+                            </button>
+                            {activeMenuId === app.id && (
+                              <div 
+                                className="absolute right-8 top-8 w-56 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button 
+                                  onClick={() => { updateStatus(app.id, 'Pending'); setActiveMenuId(null); }}
+                                  className="w-full text-left px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 flex items-center gap-3 border-b border-slate-50"
+                                >
+                                  <span>🚀</span> Submit for Approval
+                                </button>
+                                <button 
+                                  onClick={() => { setIsEditing(app); setActiveMenuId(null); }}
+                                  className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                                >
+                                  <span>✏️</span> Edit Details
+                                </button>
+                                <button 
+                                  onClick={() => { setActivePdfApp(app); setActiveMenuId(null); }}
+                                  className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                                >
+                                  <span>📄</span> View PDF
+                                </button>
+                                <button 
+                                  onClick={() => deleteApp(app.id)} 
+                                  className="w-full text-left px-4 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3"
+                                >
+                                  <span>🗑️</span> Delete
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {app.status === 'Pending' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border bg-amber-50 text-amber-600 border-amber-100">
+                            PENDING
+                          </span>
+                        )}
+                        {app.status === 'Approved' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border bg-emerald-50 text-emerald-600 border-emerald-100">
+                            APPROVED
+                          </span>
+                        )}
+                        {app.status === 'Rejected' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border bg-rose-50 text-rose-600 border-rose-100">
+                            REJECTED
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <div className="flex gap-1.5 items-center relative">
                         {/* Green Checkmark for Pending Apps */}
@@ -313,29 +433,19 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                             onClick={(e) => e.stopPropagation()}
                           >
                             <button 
-                              onClick={() => {
-                                setIsEditing(app);
-                                setActiveMenuId(null);
-                              }}
+                              onClick={() => { setIsEditing(app); setActiveMenuId(null); }}
                               className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
                             >
                               <span>✏️</span> Edit Details
                             </button>
                             <button 
-                              onClick={() => {
-                                setActivePdfApp(app);
-                                setActiveMenuId(null);
-                              }}
+                              onClick={() => { setActivePdfApp(app); setActiveMenuId(null); }}
                               className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
                             >
                               <span>📄</span> View PDF
                             </button>
                             <button 
-                              onClick={() => {
-                                setPdfAutoMode('share');
-                                setActivePdfApp(app);
-                                setActiveMenuId(null);
-                              }}
+                              onClick={() => { setPdfAutoMode('share'); setActivePdfApp(app); setActiveMenuId(null); }}
                               className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
                             >
                               <span>🔗</span> Share
@@ -351,8 +461,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       </div>
                     )}
                   </td>
-
-                </tr>
+                  </tr>
                 );
               })}
             </tbody>
