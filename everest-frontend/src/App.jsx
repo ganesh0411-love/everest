@@ -948,7 +948,7 @@ function App() {
               </main>
             ) : (
               <>
-                <div className={`flex-shrink-0 z-30 bg-[#f8fafc] pb-2 ${(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? 'md:hidden' : ''}`}>
+                <div className={`flex-shrink-0 z-30 bg-[#f8fafc] pb-2 ${(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? 'md:hidden' : 'lg:hidden'}`}>
                   <div className={(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? '' : 'lg:hidden'}>
                     <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
                   </div>
@@ -982,7 +982,7 @@ function App() {
 
                     return (
                       <div className="p-2 space-y-2 pb-24">
-                        <div className={`px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider ${isMainBranchView ? 'md:hidden' : ''}`}>
+                        <div className={`px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider ${isMainBranchView ? 'md:hidden' : 'lg:hidden'}`}>
                           Entries: {approvedCustomers.length}
                         </div>
                         
@@ -1073,9 +1073,8 @@ function App() {
                               </div>
                             </div>
 
-                        {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
-                        {isMainBranchView && (
-                          <div className="hidden md:block">
+                        {/* DESKTOP TABLE VIEW (ALL BRANCHES, DESKTOP ONLY) */}
+                        <div className="hidden lg:block">
                             {/* 2. SEARCH BAR & FILTER ROW */}
                             <div className="flex items-center gap-3 mb-3">
                               <div className="relative flex-1">
@@ -1145,7 +1144,11 @@ function App() {
                                   </tr>
                                 ) : (
                                   approvedCustomers.map(customer => (
-                                    <tr key={`desktop-${customer.id}`} className="hover:bg-slate-50 transition-colors">
+                                    <tr 
+                                      key={`desktop-${customer.id}`} 
+                                      onClick={() => { if (!isMainBranchView) { setSelectedCustomer(customer); navigateToView('Customer Detail'); } }}
+                                      className={`hover:bg-slate-50 transition-colors ${!isMainBranchView ? 'cursor-pointer' : ''}`}
+                                    >
                                       <td className="p-3 flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
                                           <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
@@ -1210,11 +1213,10 @@ function App() {
                               </tbody>
                             </table>
                           </div>
-                          </div>
-                        )}
+                        </div>
                         
-                        {/* STANDARD CARD VIEW (Hidden on desktop if Main Branch is active) */}
-                        <div className={isMainBranchView ? "md:hidden space-y-2" : "space-y-2"}>
+                        {/* STANDARD CARD VIEW (MOBILE/TABLET ONLY) */}
+                        <div className={isMainBranchView ? "md:hidden space-y-2" : "lg:hidden space-y-2"}>
                           {approvedCustomers.length === 0 ? (
                             <div className="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-lg shadow-sm">
                               {isOdFilterActive ? 'No customers currently have overdue payments.' : 'No customers match your search or filter criteria'}
