@@ -716,7 +716,15 @@ function App() {
         const amountMatch = String(c?.loanAmount || c?.principalAmount || '').toLowerCase().includes(q);
         const outMatch = String(c?.outstandingAmount || c?.balance || c?.repayAmount || c?.dynamicOutstanding || '').toLowerCase().includes(q);
         
-        return nameMatch || appNumMatch || phoneMatch || idMatch || branchMatch || staffMatch || loanTypeMatch || amountMatch || outMatch;
+        const out = c.dynamicOutstanding !== undefined ? c.dynamicOutstanding : (c.repayAmount || 0);
+        const od = c.dynamicOverdue || 0;
+        const pending = c.dynamicPendingDues || 0;
+        let statusStr = "live";
+        if (out <= 0) statusStr = "settled";
+        else if (od > 0 || pending > 0) statusStr = "od";
+        const statusMatch = statusStr.includes(q);
+
+        return nameMatch || appNumMatch || phoneMatch || idMatch || branchMatch || staffMatch || loanTypeMatch || amountMatch || outMatch || statusMatch;
       });
     }
 
@@ -1176,6 +1184,7 @@ function App() {
                                     <th className="p-3 font-semibold border-l border-slate-200">Loan Type</th>
                                     <th className="p-3 font-semibold border-l border-slate-200 text-right">Loan Amount</th>
                                     <th className="p-3 font-semibold border-l border-slate-200 text-right">Outstanding</th>
+                                    <th className="p-3 font-semibold border-l border-slate-200 text-center">Status</th>
                                   </tr>
                                 )}
                               </thead>
@@ -1267,6 +1276,20 @@ function App() {
                                           </td>
                                           <td className="p-3 border-l border-slate-200 text-sm font-bold text-red-600 whitespace-nowrap text-right">
                                             ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
+                                          </td>
+                                          <td className="p-3 border-l border-slate-200 whitespace-nowrap text-center">
+                                            {(() => {
+                                              const out = customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding : (customer.repayAmount || 0);
+                                              const od = customer.dynamicOverdue || 0;
+                                              const pending = customer.dynamicPendingDues || 0;
+                                              if (out <= 0) {
+                                                return <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200 tracking-wider uppercase">SETTLED</span>;
+                                              } else if (od > 0 || pending > 0) {
+                                                return <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-200 tracking-wider uppercase">OD</span>;
+                                              } else {
+                                                return <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200 tracking-wider uppercase">LIVE</span>;
+                                              }
+                                            })()}
                                           </td>
                                         </>
                                       )}
