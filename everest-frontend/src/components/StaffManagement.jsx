@@ -37,6 +37,14 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   // State for Add/Edit Form
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [activeDropdown, setActiveDropdown] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdown(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
 
   const [staffList, setStaffList] = useState([]);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -613,6 +621,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                 <th className="py-3 px-4 text-left border-l border-slate-200">Phone Number</th>
                 <th className="py-3 px-4 text-left border-l border-slate-200">Designation</th>
                 <th className="py-3 px-4 text-left border-l border-slate-200 text-center">Duty Tracking</th>
+                {!isMainBranch && <th className="py-3 px-2 text-center border-l border-slate-200 w-12"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -671,6 +680,37 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                       </button>
                     </div>
                   </td>
+                  {!isMainBranch && (
+                    <td className="py-3 px-2 text-center border-l border-slate-200 relative">
+                      <div className="inline-block text-left" onClick={(e) => e.stopPropagation()}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveDropdown(activeDropdown === index ? null : index);
+                          }}
+                          className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none"
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+                        
+                        {activeDropdown === index && (
+                          <div className="absolute right-8 top-1/2 -translate-y-1/2 w-36 bg-white rounded-md shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-slate-100 ring-1 ring-black ring-opacity-5 z-[100]">
+                            <div className="py-1">
+                              <button
+                                onClick={() => {
+                                  setActiveDropdown(null);
+                                  handleOpenEditForm(staff);
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-brand-blue font-semibold transition-colors flex items-center gap-2"
+                              >
+                                Edit Staff
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

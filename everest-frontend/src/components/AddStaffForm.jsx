@@ -267,174 +267,193 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-white overflow-hidden z-[100]">
+    <div className="fixed inset-0 md:absolute md:inset-0 flex flex-col bg-white md:bg-slate-900/40 md:p-6 md:items-center md:justify-center overflow-hidden z-[100] md:backdrop-blur-sm">
       
-      {/* STATIC TOP SECTION: Header */}
-      <div className="shrink-0 flex flex-col z-20">
-        {/* Curved Gradient Header */}
-        <div className="bg-gradient-to-br from-purple-500 to-blue-500 pb-6 md:pb-12 pt-6 px-4 relative z-0">
-          <div className="flex items-center justify-between mb-2 md:mb-4 mt-2">
-            <button 
-              onClick={handleSafeBack}
-              className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-purple-600 shadow-sm shrink-0"
-            >
-              <ChevronLeft size={24} strokeWidth={2.5} className="-ml-0.5" />
-            </button>
-            <div className="text-center flex-1 px-2 pr-10">
-              <h1 className="text-xl font-bold text-white tracking-wide">{editingStaff ? 'Edit Staff' : 'Add Staff'}</h1>
-              <p className="text-white/80 text-xs mt-1">{editingStaff ? 'Update staff details' : 'Create a new staff account'}</p>
-            </div>
-            {/* Delete button removed from header as per request */}
-          </div>
-        </div>
-      </div>
+      {/* Container for Desktop Modal */}
+      <div className="flex flex-col w-full h-full md:h-auto md:max-h-full md:max-w-2xl md:bg-white md:rounded-[24px] md:shadow-2xl overflow-hidden relative">
 
-      {/* SCROLLABLE FORM AREA */}
-      <div className="flex-1 bg-white rounded-t-[1.5rem] md:rounded-t-[2.5rem] -mt-4 md:-mt-8 z-10 flex flex-col shadow-[0_-4px_10px_rgba(0,0,0,0.05)] overflow-hidden">
-        <div className="flex-1 overflow-y-auto px-6 pt-5 md:pt-8 pb-28 space-y-5">
-          
-          {/* Profile Photo */}
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-2">Profile Photo</label>
-            <div 
-              onClick={() => !isUploadingPhoto && setShowPhotoSheet(true)}
-              className={`border-2 border-dashed border-purple-200 rounded-2xl bg-purple-50/50 flex flex-col items-center justify-center ${isUploadingPhoto ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-purple-50'} transition-colors w-full max-w-[200px] mx-auto overflow-hidden relative aspect-square`}
-            >
-              {isUploadingPhoto ? (
-                <div className="flex flex-col items-center justify-center p-6 space-y-3">
-                  <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
-                  <span className="text-purple-600 font-bold text-sm">Processing...</span>
-                </div>
-              ) : formData.photoPreview ? (
-                <img src={formData.photoPreview} alt="Profile preview" className="w-full h-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center p-6">
-                  <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-purple-600 mb-3">
-                    <Camera size={20} />
-                  </div>
-                  <span className="text-purple-700 font-bold text-sm">Tap to Upload</span>
-                  <span className="text-slate-400 text-xs mt-1">JPG, PNG up to 5MB</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Hidden inputs for photo actions */}
-          <input 
-            type="file" 
-            accept="image/png, image/jpeg" 
-            className="hidden" 
-            ref={galleryInputRef} 
-            onChange={handlePhotoUpload} 
-          />
-          <input 
-            type="file" 
-            accept="image/*" 
-            capture="environment" 
-            className="hidden" 
-            ref={cameraInputRef} 
-            onChange={handlePhotoUpload} 
-          />
-
-          {/* Name & DOB (2-Column Layout) */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">Name</label>
-              <div className="relative">
-                <User className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="text" 
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="Enter staff name"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
-                />
+        {/* STATIC TOP SECTION: Mobile Header */}
+        <div className="shrink-0 flex flex-col z-20 md:hidden">
+          {/* Curved Gradient Header */}
+          <div className="bg-gradient-to-br from-purple-500 to-blue-500 pb-6 pt-6 px-4 relative z-0">
+            <div className="flex items-center justify-between mb-2 mt-2">
+              <button 
+                onClick={handleSafeBack}
+                className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-purple-600 shadow-sm shrink-0"
+              >
+                <ChevronLeft size={24} strokeWidth={2.5} className="-ml-0.5" />
+              </button>
+              <div className="text-center flex-1 px-2 pr-10">
+                <h1 className="text-xl font-bold text-white tracking-wide">{editingStaff ? 'Edit Staff' : 'Add Staff'}</h1>
+                <p className="text-white/80 text-xs mt-1">{editingStaff ? 'Update staff details' : 'Create a new staff account'}</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Desktop Header */}
+        <div className="hidden md:flex shrink-0 items-center justify-between px-8 py-5 border-b border-slate-100 bg-white z-20">
+          <h1 className="text-[22px] font-black text-slate-800 tracking-tight">{editingStaff ? 'Edit Profile' : 'Add Staff'}</h1>
+          <button 
+            onClick={handleSafeBack}
+            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors focus:outline-none"
+          >
+            <X size={24} strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {/* SCROLLABLE FORM AREA */}
+        <div className="flex-1 bg-white rounded-t-[1.5rem] md:rounded-none -mt-4 md:mt-0 z-10 flex flex-col shadow-[0_-4px_10px_rgba(0,0,0,0.05)] md:shadow-none overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 pt-5 md:pt-6 pb-28 md:pb-6 space-y-5">
+          
+          {/* Top Section: Photo + Name/DOB */}
+          <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-6">
+            {/* Profile Photo */}
+            <div className="shrink-0 w-full md:w-auto">
+              <label className="block text-sm font-bold text-slate-800 mb-2 md:hidden">Profile Photo</label>
+              <div 
+                onClick={() => !isUploadingPhoto && setShowPhotoSheet(true)}
+                className={`border-2 border-dashed border-purple-200 rounded-2xl bg-purple-50/50 flex flex-col items-center justify-center ${isUploadingPhoto ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-purple-50'} transition-colors mx-auto overflow-hidden relative aspect-square w-full max-w-[200px] md:w-28 md:h-28 md:max-w-none md:mx-0 md:rounded-full`}
+              >
+                {isUploadingPhoto ? (
+                  <div className="flex flex-col items-center justify-center p-6 space-y-3">
+                    <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                    <span className="text-purple-600 font-bold text-sm md:hidden">Processing...</span>
+                  </div>
+                ) : formData.photoPreview ? (
+                  <img src={formData.photoPreview} alt="Profile preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center p-6 md:p-2 text-center">
+                    <div className="w-12 h-12 md:w-8 md:h-8 bg-white rounded-full shadow-sm flex items-center justify-center text-purple-600 mb-3 md:mb-1 mx-auto">
+                      <Camera size={20} className="md:w-4 md:h-4" />
+                    </div>
+                    <span className="text-purple-700 font-bold text-sm md:text-xs md:leading-tight">Upload</span>
+                    <span className="text-slate-400 text-xs mt-1 md:hidden">JPG, PNG up to 5MB</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Hidden inputs for photo actions */}
+            <input 
+              type="file" 
+              accept="image/png, image/jpeg" 
+              className="hidden" 
+              ref={galleryInputRef} 
+              onChange={handlePhotoUpload} 
+            />
+            <input 
+              type="file" 
+              accept="image/*" 
+              capture="environment" 
+              className="hidden" 
+              ref={cameraInputRef} 
+              onChange={handlePhotoUpload} 
+            />
+
+            {/* Name & DOB (2-Column Layout) */}
+            <div className="flex-1 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">Name</label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Enter staff name"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">DOB</label>
+                <div className="relative">
+                  <input 
+                    type="date" 
+                    name="dob"
+                    value={formData.dob}
+                    onChange={handleDobChange}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow text-slate-700 appearance-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2-Column Details Grid (Desktop) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-4">
+            {/* Mobile Number (Strict 10-digit validation) */}
             <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">DOB</label>
+              <label className="block text-sm font-bold text-slate-800 mb-1.5">Mobile Number</label>
+              <div className="relative">
+                <Phone className={`absolute left-3.5 top-1/2 transform -translate-y-1/2 ${phoneError ? 'text-red-400' : 'text-slate-400'}`} size={18} />
+                <input 
+                  type="tel" 
+                  name="mobileNumber"
+                  value={formData.mobileNumber}
+                  onChange={handlePhoneChange}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={10}
+                  placeholder="Enter mobile number"
+                  className={`w-full pl-10 pr-4 py-3 rounded-xl border ${phoneError ? 'border-red-400 focus:ring-red-400' : 'border-slate-200 focus:ring-purple-400'} bg-white text-sm focus:outline-none focus:ring-2 transition-shadow`}
+                />
+              </div>
+              {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
+            </div>
+
+            {/* Staff ID */}
+            <div>
+              <label className="block text-sm font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                Staff ID 
+                <span className="text-slate-400 border border-slate-300 rounded-full w-4 h-4 flex items-center justify-center text-[10px] italic">i</span>
+              </label>
+              <div className="relative">
+                <Hash className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text" 
+                  name="id"
+                  value={formData.id}
+                  onChange={handleInputChange}
+                  placeholder="Enter staff ID"
+                  className="w-full pl-10 pr-16 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow font-medium text-slate-700"
+                />
+                <button className="absolute right-4 top-1/2 transform -translate-y-1/2 text-purple-600 text-xs font-bold flex items-center gap-1">
+                  <span>✏️</span> Edit
+                </button>
+              </div>
+            </div>
+
+            {/* Joining Date */}
+            <div>
+              <label className="block text-sm font-bold text-slate-800 mb-1.5">Joining Date</label>
               <div className="relative">
                 <input 
                   type="date" 
-                  name="dob"
-                  value={formData.dob}
-                  onChange={handleDobChange}
+                  name="joiningDate"
+                  value={formData.joiningDate}
+                  onChange={handleInputChange}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow text-slate-700 appearance-none"
                 />
               </div>
             </div>
-          </div>
 
-          {/* Mobile Number (Strict 10-digit validation) */}
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">Mobile Number</label>
-            <div className="relative">
-              <Phone className={`absolute left-3.5 top-1/2 transform -translate-y-1/2 ${phoneError ? 'text-red-400' : 'text-slate-400'}`} size={18} />
-              <input 
-                type="tel" 
-                name="mobileNumber"
-                value={formData.mobileNumber}
-                onChange={handlePhoneChange}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={10}
-                placeholder="Enter mobile number"
-                className={`w-full pl-10 pr-4 py-3 rounded-xl border ${phoneError ? 'border-red-400 focus:ring-red-400' : 'border-slate-200 focus:ring-purple-400'} bg-white text-sm focus:outline-none focus:ring-2 transition-shadow`}
-              />
-            </div>
-            {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
-          </div>
-
-          {/* Staff ID */}
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
-              Staff ID 
-              <span className="text-slate-400 border border-slate-300 rounded-full w-4 h-4 flex items-center justify-center text-[10px] italic">i</span>
-            </label>
-            <div className="relative">
-              <Hash className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                name="id"
-                value={formData.id}
-                onChange={handleInputChange}
-                placeholder="Enter staff ID"
-                className="w-full pl-10 pr-16 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow font-medium text-slate-700"
-              />
-              <button className="absolute right-4 top-1/2 transform -translate-y-1/2 text-purple-600 text-xs font-bold flex items-center gap-1">
-                <span>✏️</span> Edit
-              </button>
-            </div>
-          </div>
-
-          {/* Joining Date */}
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">Joining Date</label>
-            <div className="relative">
-              <input 
-                type="date" 
-                name="joiningDate"
-                value={formData.joiningDate}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow text-slate-700 appearance-none"
-              />
-            </div>
-          </div>
-
-          {/* Designation */}
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">Designation</label>
-            <div className="relative">
-              <Briefcase className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                name="designation"
-                value={formData.designation}
-                onChange={handleInputChange}
-                placeholder="Enter designation"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
-              />
+            {/* Designation */}
+            <div>
+              <label className="block text-sm font-bold text-slate-800 mb-1.5">Designation</label>
+              <div className="relative">
+                <Briefcase className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text" 
+                  name="designation"
+                  value={formData.designation}
+                  onChange={handleInputChange}
+                  placeholder="Enter designation"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
+                />
+              </div>
             </div>
           </div>
 
@@ -565,6 +584,7 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
             </>
           )}
         </button>
+      </div>
       </div>
 
       {/* PHOTO ACTION BOTTOMSHEET */}
