@@ -111,7 +111,7 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
         const vName = (c.village || c.villageName || '').toLowerCase();
         const bName = (c.branchName || '').toLowerCase();
         const sName = (c.staffName || c.createdByStaffId || '').toLowerCase();
-        const lName = (c.leader || c.groupLeader || '').toLowerCase();
+        const lName = (c.leaderName || c.leader || c.groupLeader || '').toLowerCase();
         const gName = (c.group || c.groupName || '').toLowerCase();
         const mCount = String(c.members || c.totalMembers || c.totalMember || 0);
         return vName.includes(q) || bName.includes(q) || sName.includes(q) || lName.includes(q) || gName.includes(q) || mCount.includes(q);
@@ -124,7 +124,7 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
            { key: 'staffName', val: (c.staffName || c.createdByStaffId || 'N/A') },
            { key: 'branchName', val: (c.branchName || 'N/A') },
            { key: 'villageName', val: (c.village || c.villageName || 'N/A') },
-           { key: 'leader', val: (c.leader || c.groupLeader || 'N/A') },
+           { key: 'leader', val: (c.leaderName || c.leader || c.groupLeader || 'N/A') },
            { key: 'groupName', val: (c.group || c.groupName || 'N/A') },
            { key: 'members', val: String(c.members || c.totalMembers || c.totalMember || 0) }
          ];
@@ -495,8 +495,8 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
                   </div>
                 </td>
                 <td className="py-2 px-1 md:py-4 md:px-6 text-gray-900 font-bold">
-                  <div className="truncate max-w-[140px] md:max-w-[180px] w-full block" title={center.leader || center.groupLeader}>
-                    {searchQuery.trim() ? highlightText(center.leader || center.groupLeader || 'N/A', searchQuery, center._matches?.leader?.startMatchIdx) : (center.leader || center.groupLeader || 'N/A')}
+                  <div className="truncate max-w-[140px] md:max-w-[180px] w-full block" title={center.leaderName || center.leader || center.groupLeader}>
+                    {searchQuery.trim() ? highlightText(center.leaderName || center.leader || center.groupLeader || 'N/A', searchQuery, center._matches?.leader?.startMatchIdx) : (center.leaderName || center.leader || center.groupLeader || 'N/A')}
                   </div>
                 </td>
                 <td className="py-2 px-1 md:py-4 md:px-6 text-gray-900 font-bold">
