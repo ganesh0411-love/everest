@@ -42,6 +42,32 @@ import EditBranchModal from './components/EditBranchModal';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
+const parseGlobalDate = (dStr) => {
+  if (!dStr) return new Date();
+  
+  // Handle Firebase Timestamps
+  if (dStr && typeof dStr.toDate === 'function') {
+    return dStr.toDate();
+  }
+  if (dStr && typeof dStr === 'object' && dStr.seconds !== undefined) {
+    return new Date(dStr.seconds * 1000);
+  }
+
+  if (typeof dStr === 'string') {
+    if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
+      const parts = dStr.split('-');
+      const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
+      return new Date(`${year}-${parts[1]}-${parts[0]}`);
+    }
+    if (dStr.includes('/') && dStr.split('/')[0].length === 2) {
+      const parts = dStr.split('/');
+      const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
+      return new Date(`${year}-${parts[1]}-${parts[0]}`);
+    }
+  }
+  return new Date(dStr);
+};
+
 function App() {
   const [activeBranch, setActiveBranch] = useState({ id: 'main', name: 'Main Branch' });
   const [branches, setBranches] = useState([{ id: 'main', name: 'Main Branch' }]);
@@ -768,31 +794,7 @@ function App() {
     };
   }, [processedCustomers, isOdFilterActive]);
 
-  const parseGlobalDate = (dStr) => {
-    if (!dStr) return new Date();
-    
-    // Handle Firebase Timestamps
-    if (dStr && typeof dStr.toDate === 'function') {
-      return dStr.toDate();
-    }
-    if (dStr && typeof dStr === 'object' && dStr.seconds !== undefined) {
-      return new Date(dStr.seconds * 1000);
-    }
 
-    if (typeof dStr === 'string') {
-      if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
-        const parts = dStr.split('-');
-        const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
-        return new Date(`${year}-${parts[1]}-${parts[0]}`);
-      }
-      if (dStr.includes('/') && dStr.split('/')[0].length === 2) {
-        const parts = dStr.split('/');
-        const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
-        return new Date(`${year}-${parts[1]}-${parts[0]}`);
-      }
-    }
-    return new Date(dStr);
-  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
