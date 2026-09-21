@@ -699,6 +699,16 @@ function App() {
       });
     }
 
+    if (userProfile?.role === 'staff') {
+      const loggedInStaffName = (userProfile?.name || userProfile?.staffName || userProfile?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : '')).toLowerCase().trim();
+      if (loggedInStaffName) {
+        filtered = filtered.filter(c => {
+          const assignedStaff = String(c?.assignedStaffName || c?.staffName || c?.assignedStaff || c?.staff || '').toLowerCase().trim();
+          return assignedStaff === loggedInStaffName;
+        });
+      }
+    }
+
     filtered.sort((a, b) => {
       switch (activeSort) {
         case 'Recent':
@@ -719,7 +729,7 @@ function App() {
     });
 
     return filtered;
-  }, [activeCategory, activeSort, customers, searchQuery, activeBranch, activeBranchFilter]);
+  }, [activeCategory, activeSort, customers, searchQuery, activeBranch, activeBranchFilter, userProfile]);
 
   // Aggregate Financials (Dynamic Based on UI Stream)
   const { totalLoan, totalOutstanding } = useMemo(() => {
