@@ -409,7 +409,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
         <div className="max-w-7xl mx-auto flex flex-row gap-8 items-start">
           
           {/* LEFT COLUMN: Sticky Leader & Center Details Sidebar */}
-          <div className="w-[360px] shrink-0 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 sticky top-6">
+          <div className="w-[320px] shrink-0 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 sticky top-6">
             <div className="flex items-start justify-between gap-4 mb-6">
               <img 
                 src={center?.leaderPhoto || center?.leaderPhotoUrl || '/placeholder-leader.png'} 
@@ -443,8 +443,20 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                 <span className="font-bold text-gray-900">{center?.leaderId || center?.leaderCustomerId || '-'}</span>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="font-semibold text-gray-500">Center Name</span>
-                <span className="font-bold text-gray-900">{center?.centerName || '-'}</span>
+                <span className="font-semibold text-gray-500">Center / Area</span>
+                <span className="font-bold text-gray-900 text-right max-w-[150px] truncate">{center?.centerName || '-'} / {center?.villageCity || center?.villageName || center?.area || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="font-semibold text-gray-500">Group Name</span>
+                <span className="font-bold text-gray-900 text-right truncate max-w-[150px]">{center?.groupName || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="font-semibold text-gray-500">Staff Assigned</span>
+                <span className="font-bold text-gray-900">{center?.staffName || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="font-semibold text-gray-500">Branch</span>
+                <span className="font-bold text-gray-900">{center?.branchName || '-'}</span>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2">
                 <span className="font-semibold text-gray-500">No. of Customer</span>
@@ -462,8 +474,8 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
 
           {/* RIGHT COLUMN: 2-Column Slot Cards Grid */}
           <div className="flex-1 w-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: totalMembers || 5 }).map((_, idx) => {
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {Array.from({ length: visibleSlots }).map((_, idx) => {
                 const customer = centerCustomers?.[idx];
                 const slotNumber = String(idx + 1).padStart(2, '0');
 
@@ -492,28 +504,40 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                   <div key={customer.id || idx} className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm relative flex flex-col justify-between">
                     <button 
                       onClick={() => handleRemoveMember(customer)}
-                      className="absolute top-3 right-3 text-rose-500 hover:text-rose-700 font-bold text-base p-1"
+                      className="absolute top-3 right-3 text-rose-500 hover:text-rose-700 font-bold text-base p-1 z-10"
                       title="Remove member"
                     >
                       ✕
                     </button>
 
-                    <div className="flex gap-3">
-                      <span className="text-xl font-extrabold text-gray-800 shrink-0 w-8">{slotNumber}</span>
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl font-extrabold text-gray-800 shrink-0 w-8 pt-1">{slotNumber}</span>
                       
-                      <div className="flex-1 min-w-0 pr-6 border-r border-gray-100">
-                        <h4 className="font-bold text-gray-900 text-sm truncate">{customer.name || customer.customerName}</h4>
-                        <p className="text-[11px] text-gray-500">{customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}</p>
-                        <p className="text-[11px] text-gray-500">{formatDOB(customer.dob || customer.dateOfBirth)} • {customer.age || getAge(customer.dob || customer.dateOfBirth) || '-'} Yrs</p>
-                        <p className="text-[11px] text-purple-700 font-semibold">{customer.staffName || center?.staffName || '-'}</p>
+                      {/* Left Data Section */}
+                      <div className="flex-1 min-w-0 border-r border-gray-100 pr-3">
+                        <h4 className="font-bold text-gray-900 text-sm truncate" title={customer.name || customer.customerName}>{customer.name || customer.customerName}</h4>
+                        <p className="text-[11px] text-gray-500 truncate" title={customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}>{customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}</p>
+                        <p className="text-[11px] text-gray-500 truncate">{formatDOB(customer.dob || customer.dateOfBirth)} • {customer.age || getAge(customer.dob || customer.dateOfBirth) || '-'} Yrs</p>
+                        <p className="text-[11px] text-purple-700 font-semibold truncate" title={customer.staffName || center?.staffName || '-'}>{customer.staffName || center?.staffName || '-'}</p>
                       </div>
 
-                      <div className="w-24 shrink-0 flex flex-col items-center justify-center text-right text-xs">
-                        <p className="text-gray-700 font-medium">{customer.gender || 'Female'}</p>
-                        <p className="text-gray-500">{customer.maritalStatus || 'Married'}</p>
-                        <p className="text-gray-500 text-[11px] truncate">{customer.village || customer.villageName || customer.area || center?.villageName || 'Batlagundu'}</p>
+                      {/* Right Data Section */}
+                      <div className="flex-1 min-w-0 flex flex-col pl-1 text-[11px] text-gray-600">
+                        <div className="flex justify-between items-center w-full h-[20px] mb-0.5">
+                           <span className="truncate pr-4 font-medium" title={customer.gender || 'Female'}>{customer.gender || 'Female'}</span>
+                        </div>
+                        <div className="flex justify-between items-center w-full h-[16px] mb-0.5">
+                           <span className="truncate pr-4" title={customer.maritalStatus || 'Married'}>{customer.maritalStatus || 'Married'}</span>
+                        </div>
+                        <div className="flex justify-between items-center w-full h-[16px] mb-0.5">
+                           <span className="truncate pr-4" title={customer.village || customer.villageName || customer.area || center?.villageName || 'Batlagundu'}>{customer.village || customer.villageName || customer.area || center?.villageName || 'Batlagundu'}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Avatar */}
+                      <div className="shrink-0 w-12 flex flex-col items-center">
                         {(customer.photoBase64 || customer.photoUrl || customer.image || customer.photo) && (
-                          <img src={customer.photoBase64 || customer.photoUrl || customer.image || customer.photo} alt={customer.name} className="w-10 h-10 rounded-full object-cover mt-1 border" />
+                          <img src={customer.photoBase64 || customer.photoUrl || customer.image || customer.photo} alt={customer.name} className="w-10 h-10 rounded-full object-cover border" />
                         )}
                       </div>
                     </div>
@@ -533,7 +557,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                           setAddCustomerContext(customer);
                           setIsAddCustomerOpen(true);
                         }}
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-3 py-1 rounded-full whitespace-nowrap"
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-4 py-1 rounded-full whitespace-nowrap"
                       >
                         EDIT
                       </button>
