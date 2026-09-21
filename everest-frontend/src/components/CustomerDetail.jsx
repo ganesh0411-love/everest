@@ -80,6 +80,34 @@ const CustomerDetail = ({ customer, onBack }) => {
   }, [installments, customer]);
 
   useEffect(() => {
+    const getNumberSuffix = (num) => {
+      const j = num % 10, k = num % 100;
+      if (j === 1 && k !== 11) return num + "st";
+      if (j === 2 && k !== 12) return num + "nd";
+      if (j === 3 && k !== 13) return num + "rd";
+      return num + "th";
+    };
+
+    const recalculateInstallments = (insts) => {
+      let updated = [...insts];
+      updated.sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
+      let paidCount = 0;
+      return updated.map(inst => {
+        let currentStatus = inst.status;
+        if (parseFloat(inst.amount) > 0) currentStatus = 'PAID';
+        else if (parseFloat(inst.amount) === 0 && currentStatus === 'PAID') currentStatus = 'BOUNCED';
+
+        let newNumber = inst.number;
+        if (currentStatus === 'PAID') {
+          paidCount++;
+          newNumber = paidCount + getNumberSuffix(paidCount);
+        } else if (currentStatus === 'BOUNCED') {
+          newNumber = (paidCount + 1) + getNumberSuffix(paidCount + 1);
+        }
+        return { ...inst, status: currentStatus, number: newNumber };
+      });
+    };
+
     const handleClickOutside = (event) => {
       if (phoneMenuRef.current && !phoneMenuRef.current.contains(event.target)) {
         setShowPhoneMenu(false);
@@ -309,7 +337,24 @@ const CustomerDetail = ({ customer, onBack }) => {
     const yyyy = today.getFullYear();
     const todayFormatted = `${dd}-${mm}-${yyyy}`;
 
-    setCollectionDate(isLastPending ? todayFormatted : nextFormattedDueDate);
+    let defaultDate = isLastPending ? todayFormatted : nextFormattedDueDate;
+
+    if (customer?.loanType && customer.loanType.toLowerCase() === 'daily') {
+      const insts = Array.isArray(customer?.installments) ? customer.installments : [];
+      if (insts.length > 0) {
+        const sortedInsts = [...insts].sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
+        const lastInst = sortedInsts[sortedInsts.length - 1];
+        if (lastInst && lastInst.date) {
+          const lastDateObj = parseDate(lastInst.date);
+          if (!isNaN(lastDateObj.getTime())) {
+            lastDateObj.setDate(lastDateObj.getDate() + 1);
+            defaultDate = `${String(lastDateObj.getDate()).padStart(2, '0')}-${String(lastDateObj.getMonth() + 1).padStart(2, '0')}-${lastDateObj.getFullYear()}`;
+          }
+        }
+      }
+    }
+
+    setCollectionDate(defaultDate);
     setIsManualEntryMode(false);
     setIsDenominationMode(false);
     setIsUpiPhotoSelectionMode(false);
@@ -368,7 +413,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       denomCounts: denomCounts
     };
     
-    const updatedInstallments = [...installments, newInstallment];
+    let updatedInstallments = [...installments, newInstallment];
+    updatedInstallments = recalculateInstallments(updatedInstallments);
     setInstallments(updatedInstallments);
     setShowCollectionModal(false);
 
@@ -401,7 +447,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
     };
     
-    const updatedInstallments = [...installments, newInstallment];
+    let updatedInstallments = [...installments, newInstallment];
+    updatedInstallments = recalculateInstallments(updatedInstallments);
     setInstallments(updatedInstallments);
     setShowCollectionModal(false);
 
@@ -434,7 +481,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
     };
     
-    const updatedInstallments = [...installments, newInstallment];
+    let updatedInstallments = [...installments, newInstallment];
+    updatedInstallments = recalculateInstallments(updatedInstallments);
     setInstallments(updatedInstallments);
     setShowCollectionModal(false);
 
@@ -472,11 +520,12 @@ const CustomerDetail = ({ customer, onBack }) => {
   const handleSaveTransaction = async () => {
     if (!selectedTransaction) return;
     try {
-      const updatedInstallments = installments.map(inst => 
+      let updatedInstallments = installments.map(inst => 
         inst.id === selectedTransaction.id 
           ? { ...inst, date: transactionEditData.date, number: transactionEditData.number, amount: parseFloat(transactionEditData.amount) || 0 } 
           : inst
       );
+      updatedInstallments = recalculateInstallments(updatedInstallments);
       setInstallments(updatedInstallments);
       const customerRef = doc(db, 'customers', customer.id);
       await updateDoc(customerRef, { 
@@ -575,7 +624,9 @@ const CustomerDetail = ({ customer, onBack }) => {
               <p className="text-emerald-50 text-[10px] sm:text-[11px] font-medium relative z-10 tracking-wide text-center min-h-[15px] sm:min-h-[16.5px]">{customer.villageName || customer.villageCity || customer.area || customer.location || customer.center || '\u00A0'}</p>
             </div>
             
-            <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Next Due : {nextFormattedDueDate}</p>
+            {(!customer?.loanType || customer.loanType.toLowerCase() !== 'daily') && (
+              <p className="text-[13px] sm:text-[15px] font-bold text-white mt-3.5 tracking-wider text-center whitespace-nowrap" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1)' }}>Next Due : {nextFormattedDueDate}</p>
+            )}
           </div>
 
           {/* Right: MapPin, Settings & Outstanding Amount */}
@@ -660,13 +711,15 @@ const CustomerDetail = ({ customer, onBack }) => {
             </div>
             
             {/* Sleek Next Due Text Indicator */}
-            <div className="flex justify-center items-center text-[12px] font-black text-emerald-50 uppercase tracking-widest mt-1">
-               <span className="mr-2 text-emerald-200">NEXT DUE:</span>
-               <span className="text-[14px] text-white drop-shadow-md tracking-wider">
-                 {nextFormattedDueDate} 
-                 {nextFormattedWeekday && <span className="ml-1.5 text-[11px] text-emerald-100 opacity-90">({nextFormattedWeekday})</span>}
-               </span>
-            </div>
+            {(!customer?.loanType || customer.loanType.toLowerCase() !== 'daily') && (
+              <div className="flex justify-center items-center text-[12px] font-black text-emerald-50 uppercase tracking-widest mt-1">
+                 <span className="mr-2 text-emerald-200">NEXT DUE:</span>
+                 <span className="text-[14px] text-white drop-shadow-md tracking-wider">
+                   {nextFormattedDueDate} 
+                   {nextFormattedWeekday && <span className="ml-1.5 text-[11px] text-emerald-100 opacity-90">({nextFormattedWeekday})</span>}
+                 </span>
+              </div>
+            )}
           </div>
           {/* Top-Right Loan Summary */}
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[1.5rem] p-4 flex flex-col justify-center w-[240px] flex-none shadow-[0_8px_30px_rgba(0,0,0,0.12)] h-[116px]">
