@@ -53,8 +53,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
 
   // 1. Resolve selected branch directly from global state / storage:
   const resolvedBranch = (
-    activeBranch || 
-    (typeof activeBranch === 'string' ? activeBranch : '') ||
+    (typeof activeBranch === 'string' ? activeBranch : (activeBranch?.name || activeBranch?.branchName || '')) ||
     localStorage.getItem('selectedBranch') || 
     localStorage.getItem('activeBranch') || 
     userProfile?.branch || 
