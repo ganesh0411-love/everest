@@ -134,27 +134,34 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const getNumberSuffix = (num) => {
     const j = num % 10, k = num % 100;
-    if (j === 1 && k !== 11) return num + "st";
-    if (j === 2 && k !== 12) return num + "nd";
-    if (j === 3 && k !== 13) return num + "rd";
-    return num + "th";
+    if (j === 1 && k !== 11) return "st";
+    if (j === 2 && k !== 12) return "nd";
+    if (j === 3 && k !== 13) return "rd";
+    return "th";
   };
 
   const recalculateInstallments = (insts) => {
     let updated = [...insts];
     updated.sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
-    let paidCount = 0;
+    let cumulativePaid = 0;
+    let fallbackCount = 0;
+    
     return updated.map(inst => {
       let currentStatus = inst.status;
-      if (parseFloat(inst.amount) > 0) currentStatus = 'PAID';
-      else if (parseFloat(inst.amount) === 0 && currentStatus === 'PAID') currentStatus = 'BOUNCED';
+      const amt = parseFloat(inst.amount) || 0;
+      
+      if (amt > 0) currentStatus = 'PAID';
+      else if (amt === 0 && currentStatus === 'PAID') currentStatus = 'BOUNCED';
 
       let newNumber = inst.number;
       if (currentStatus === 'PAID') {
-        paidCount++;
-        newNumber = paidCount + getNumberSuffix(paidCount);
+        fallbackCount++;
+        const cycleIndex = emiAmount > 0 ? Math.floor(cumulativePaid / emiAmount) + 1 : fallbackCount;
+        newNumber = cycleIndex + getNumberSuffix(cycleIndex);
+        cumulativePaid += amt;
       } else if (currentStatus === 'BOUNCED') {
-        newNumber = (paidCount + 1) + getNumberSuffix(paidCount + 1);
+        const cycleIndex = emiAmount > 0 ? Math.floor(cumulativePaid / emiAmount) + 1 : fallbackCount + 1;
+        newNumber = cycleIndex + getNumberSuffix(cycleIndex);
       }
       return { ...inst, status: currentStatus, number: newNumber };
     });
@@ -331,6 +338,10 @@ const CustomerDetail = ({ customer, onBack }) => {
   };
 
   const handleOpenCollectionModal = () => {
+    if (netBalance <= 0) {
+      alert(`This loan account is already closed and fully settled. Further entries cannot be recorded.`);
+      return;
+    }
     const today = new Date();
     const dd = String(today.getDate()).padStart(2, '0');
     const mm = String(today.getMonth() + 1).padStart(2, '0');
