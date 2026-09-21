@@ -288,11 +288,11 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
 
           <button 
             onClick={() => setActiveFilter('Deleted')}
-            className={`px-2.5 md:px-4 py-1.5 rounded-full text-[10px] md:text-xs font-bold transition-all ${
+            className={`hidden lg:block px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
               activeFilter === 'Deleted' ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            • <span className="hidden md:inline">Deleted</span><span className="md:hidden">DEL</span> ({counts.Deleted})
+            • Deleted ({counts.Deleted})
           </button>
         </div>
 
@@ -511,9 +511,8 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
                   <div className="flex items-center gap-1.5 md:gap-2">
                     {!((activeFilter === 'Deleted' || center.status === 'Deleted' || center.isDeleted) && !isMainBranch) && getStatusBadge(center.status || (center.isDeleted ? 'Deleted' : ''))}
                     {center.recentlyRestored && (
-                      <span className="inline-flex items-center px-1.5 md:px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">
-                        <span className="hidden md:inline">Recently Restored</span>
-                        <span className="md:hidden">REST</span>
+                      <span className="hidden lg:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">
+                        Recently Restored
                       </span>
                     )}
                   </div>
