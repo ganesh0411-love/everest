@@ -949,7 +949,9 @@ function App() {
             ) : (
               <>
                 <div className={`flex-shrink-0 z-30 bg-[#f8fafc] pb-2 ${(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? 'md:hidden' : ''}`}>
-                  <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
+                  <div className={(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? '' : 'lg:hidden'}>
+                    <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
+                  </div>
                   <SearchBar 
                     onFilterClick={openFilter} 
                     value={searchQuery}
@@ -984,13 +986,10 @@ function App() {
                           Entries: {approvedCustomers.length}
                         </div>
                         
-                        {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
-                        {isMainBranchView && (
-                          <div className="hidden md:block">
-                            {/* COMPACT 4-CARD SUMMARY METRICS BAR WITH CUSTOM ICONS */}
-                            <div className="hidden md:grid grid-cols-4 gap-3 mb-4">
-                              {/* Card 1: Loan Amount */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+                        {/* COMPACT 4-CARD SUMMARY METRICS BAR WITH CUSTOM ICONS (ALL BRANCHES, DESKTOP ONLY) */}
+                        <div className="hidden lg:grid grid-cols-4 gap-3 mb-4">
+                          {/* Card 1: Loan Amount */}
+                          <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
                                 <div className="w-11 h-11 flex items-center justify-center shrink-0">
                                   <img 
                                     src={loanAmountIcon} 
@@ -1074,6 +1073,9 @@ function App() {
                               </div>
                             </div>
 
+                        {/* DESKTOP MAIN BRANCH TABLE VIEW (READ-ONLY) */}
+                        {isMainBranchView && (
+                          <div className="hidden md:block">
                             {/* 2. SEARCH BAR & FILTER ROW */}
                             <div className="flex items-center gap-3 mb-3">
                               <div className="relative flex-1">
