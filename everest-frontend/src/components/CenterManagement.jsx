@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronRight, ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import CreateCenterModal from './CreateCenterModal';
 
@@ -8,6 +8,7 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
   const [centers, setCenters] = useState([]);
   const [branches, setBranches] = useState([{ id: 'all', name: 'All Center' }]);
   const [activeBranchId, setActiveBranchId] = useState('all');
+  const [activeStaffId, setActiveStaffId] = useState('all');
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -16,6 +17,20 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isMainBranch = activeBranch?.name?.toLowerCase().includes('main') || activeBranch?.id === 'main';
+
+  const staffList = useMemo(() => {
+    if (isMainBranch || userProfile?.role?.toLowerCase() === 'staff') return [];
+    const subBranchCenters = centers.filter(c => 
+      c.branchId === activeBranch?.id || 
+      c.branchName?.trim().toLowerCase() === activeBranch?.name?.trim().toLowerCase()
+    );
+    const staffSet = new Set();
+    subBranchCenters.forEach(c => {
+      const s = c.staffName || c.createdByStaffId;
+      if (s && c.status !== 'Deleted' && !c.isDeleted) staffSet.add(s);
+    });
+    return Array.from(staffSet).map(s => ({ id: s, name: s }));
+  }, [centers, isMainBranch, activeBranch, userProfile]);
 
   useEffect(() => {
     setActiveMatchIndex(0);
@@ -238,10 +253,31 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
           
           {/* Dropdown / Static Text */}
           <div className="relative shrink-0 md:flex-none">
-            {(userProfile?.role?.toLowerCase() === 'staff' || !isMainBranch) ? (
+            {userProfile?.role?.toLowerCase() === 'staff' ? (
               <div className="bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 px-3 md:px-4 rounded-lg shadow-sm h-9 md:h-auto text-xs md:text-base flex items-center whitespace-nowrap">
-                All Center
+                All Center ({branchCenters.filter(c => c.status !== 'Deleted' && !c.isDeleted).length})
               </div>
+            ) : !isMainBranch ? (
+              <>
+                <select 
+                  value={activeStaffId}
+                  onChange={(e) => setActiveStaffId(e.target.value)}
+                  className="appearance-none bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 pl-2 md:pl-4 pr-6 md:pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-9 md:h-auto text-[11px] md:text-base"
+                >
+                  <option value="all">
+                    All Center ({centers.filter(c => 
+                      (c.branchId === activeBranch?.id || c.branchName?.trim().toLowerCase() === activeBranch?.name?.trim().toLowerCase()) && 
+                      c.status !== 'Deleted' && !c.isDeleted
+                    ).length})
+                  </option>
+                  {staffList.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 md:px-2 text-slate-500">
+                  <ChevronDown size={14} />
+                </div>
+              </>
             ) : (
               <>
                 <select 
@@ -251,7 +287,7 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
                 >
                   {branches.map(b => (
                     <option key={b.id} value={b.id}>
-                      {b.id === 'all' ? `All Center (${centers.length})` : b.name}
+                      {b.id === 'all' ? `All Center (${centers.filter(c => c.status !== 'Deleted' && !c.isDeleted).length})` : b.name}
                     </option>
                   ))}
                 </select>
@@ -376,7 +412,7 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto border-r-0 md:border-r-0 box-border">
                 <span className="hidden md:inline">Status</span>
               </th>
-              <th className="py-4 px-2 w-16 shrink-0 text-center border-r-0 md:border-r-0 box-border"></th>
+              <th className="py-4 px-2 w-24 shrink-0 text-center border-r-0 md:border-r-0 box-border"></th>
             </tr>
           </thead>
           <tbody>
