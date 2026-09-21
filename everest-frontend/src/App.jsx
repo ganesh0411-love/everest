@@ -1181,7 +1181,7 @@ function App() {
                                     <th className="p-3 font-semibold">Customer</th>
                                     <th className="p-3 font-semibold border-l border-slate-200">{isMainBranchView ? 'Branch' : 'Loan Date'}</th>
                                     <th className="p-3 font-semibold border-l border-slate-200">Assigned Staff</th>
-                                    <th className="p-3 font-semibold border-l border-slate-200">Loan Type</th>
+                                    <th className="p-3 font-semibold border-l border-slate-200 text-center">Loan Type</th>
                                     <th className="p-3 font-semibold border-l border-slate-200 text-right">Loan Amount</th>
                                     <th className="p-3 font-semibold border-l border-slate-200 text-right">Outstanding</th>
                                     <th className="p-3 font-semibold border-l border-slate-200 text-center">Status</th>
@@ -1266,7 +1266,7 @@ function App() {
                                           <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
                                             {customer.assignedStaff || customer.staffName || customer.staff || '--'}
                                           </td>
-                                          <td className="p-3 border-l border-slate-200 whitespace-nowrap">
+                                          <td className="p-3 border-l border-slate-200 whitespace-nowrap text-center">
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
                                               {customer.loanType || customer.category || customer.type || 'N/A'}
                                             </span>
@@ -1283,11 +1283,11 @@ function App() {
                                               const od = customer.dynamicOverdue || 0;
                                               const pending = customer.dynamicPendingDues || 0;
                                               if (out <= 0) {
-                                                return <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200 tracking-wider uppercase">SETTLED</span>;
+                                                return <span className="text-xs font-bold text-orange-600 tracking-wider uppercase">SETTLED</span>;
                                               } else if (od > 0 || pending > 0) {
-                                                return <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-50 text-rose-600 border border-rose-200 tracking-wider uppercase">OD</span>;
+                                                return <span className="text-xs font-bold text-red-600 tracking-wider uppercase">OVERDUE</span>;
                                               } else {
-                                                return <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-600 border border-emerald-200 tracking-wider uppercase">LIVE</span>;
+                                                return <span className="text-xs font-bold text-emerald-600 tracking-wider uppercase">LIVE</span>;
                                               }
                                             })()}
                                           </td>
