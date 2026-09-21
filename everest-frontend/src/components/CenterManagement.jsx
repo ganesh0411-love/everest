@@ -66,6 +66,11 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
         c.branchId === activeBranch?.id || 
         c.branchName?.trim().toLowerCase() === activeBranch?.name?.trim().toLowerCase()
       );
+      if (activeStaffId && activeStaffId !== 'all') {
+        filtered = filtered.filter(c => 
+          (c.staffName || c.assignedStaff || '').toLowerCase() === activeStaffId.toLowerCase()
+        );
+      }
     } else if (activeBranchId !== 'all') {
       // MAIN BRANCH VIEW with dropdown selected
       const selectedBranch = branches.find(b => b.id === activeBranchId);
@@ -76,21 +81,27 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
     }
     
     return filtered;
-  }, [centers, activeBranchId, userProfile, branches, isMainBranch, activeBranch]);
+  }, [centers, activeBranchId, activeStaffId, userProfile, branches, isMainBranch, activeBranch]);
 
   const counts = useMemo(() => {
     return {
-      Active: branchCenters.filter(c => c.status === 'Active').length,
-      Overdue: branchCenters.filter(c => c.status === 'Overdue').length,
-      Closed: branchCenters.filter(c => c.status === 'Closed').length,
+      Active: branchCenters.filter(c => c.status === 'Active' && !c.isDeleted).length,
+      Overdue: branchCenters.filter(c => c.status === 'Overdue' && !c.isDeleted).length,
+      Closed: branchCenters.filter(c => c.status === 'Closed' && !c.isDeleted).length,
+      Deleted: branchCenters.filter(c => c.status === 'Deleted' || c.isDeleted).length,
     };
   }, [branchCenters]);
 
   const { filteredCenters, matchCount } = useMemo(() => {
     let result = branchCenters;
     let count = 0;
-    if (activeFilter !== 'All') {
-      result = result.filter(c => c.status === activeFilter);
+    if (activeFilter === 'Deleted') {
+      result = result.filter(c => c.status === 'Deleted' || c.isDeleted);
+    } else if (activeFilter !== 'All') {
+      result = result.filter(c => c.status === activeFilter && c.status !== 'Deleted' && !c.isDeleted);
+    } else {
+      // Default 'All' view -> filter out deleted
+      result = result.filter(c => c.status !== 'Deleted' && !c.isDeleted);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -216,6 +227,34 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
     }
   };
 
+  const handleRestoreCenter = async (e, center) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to restore the center "${center.villageName || center.village || 'Unknown'}"?`)) {
+      try {
+        await updateDoc(doc(db, 'centers', center.id), {
+          status: center.previousStatus || 'Active',
+          isDeleted: false,
+          recentlyRestored: true
+        });
+      } catch (err) {
+        console.error("Error restoring center:", err);
+        alert("Failed to restore center.");
+      }
+    }
+  };
+
+  const handlePermanentDelete = async (e, center) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to permanently delete this center? This action cannot be undone.`)) {
+      try {
+        await deleteDoc(doc(db, 'centers', center.id));
+      } catch (err) {
+        console.error("Error deleting center permanently:", err);
+        alert("Failed to permanently delete center.");
+      }
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 w-full max-w-7xl mx-auto bg-slate-50 min-h-screen">
       {/* Toolbar Controls */}
@@ -245,6 +284,15 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
           >
             <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-rose-500 shrink-0"></div>
             <span className="text-slate-700 font-medium text-[11px] md:text-sm whitespace-nowrap">Closed <span className="text-slate-500 font-normal">({counts.Closed})</span></span>
+          </button>
+
+          <button 
+            onClick={() => setActiveFilter('Deleted')}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+              activeFilter === 'Deleted' ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            • Deleted ({counts.Deleted})
           </button>
         </div>
 
@@ -469,15 +517,24 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
                     )}
                   </div>
                 </td>
-                <td className="py-4 px-2 w-16 text-center text-slate-400" onClick={(e) => e.stopPropagation()}>
+                <td className="py-4 px-2 w-24 text-center text-slate-400" onClick={(e) => e.stopPropagation()}>
                   {(activeFilter === 'Deleted' || center.status === 'Deleted' || center.isDeleted) && !isMainBranch ? (
-                    <button
-                      onClick={(e) => handleRestoreCenter(e, center)}
-                      className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-1.5 px-2 rounded-lg transition-colors flex flex-col items-center justify-center border border-emerald-200 shadow-sm mx-auto"
-                      title="Restore Center"
-                    >
-                      <span className="text-[9px] font-extrabold uppercase whitespace-nowrap">RESTORE</span>
-                    </button>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={(e) => handleRestoreCenter(e, center)}
+                        className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-1.5 px-2 rounded-lg transition-colors flex flex-col items-center justify-center border border-emerald-200 shadow-sm"
+                        title="Restore Center"
+                      >
+                        <span className="text-[9px] font-extrabold uppercase whitespace-nowrap">RESTORE</span>
+                      </button>
+                      <button
+                        onClick={(e) => handlePermanentDelete(e, center)}
+                        className="bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 py-1.5 px-2 rounded-lg transition-colors flex flex-col items-center justify-center border border-red-200 shadow-sm"
+                        title="Permanently Delete"
+                      >
+                        <X size={14} className="md:w-[14px] md:h-[14px]" />
+                      </button>
+                    </div>
                   ) : (
                     <ChevronRight size={20} className="mx-auto" />
                   )}
