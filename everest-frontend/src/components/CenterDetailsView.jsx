@@ -51,11 +51,18 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
     ? `₹${totalCenterLoanAmount.toLocaleString('en-IN')}` 
     : '-';
 
+  const safeBranchName = typeof activeBranch === 'string' ? activeBranch : (center?.branchName || '');
+  const safeUserRole = typeof userProfile?.role === 'string' ? userProfile.role : '';
+
   const isMainBranch = Boolean(
-    (userProfile?.role === 'admin' || userProfile?.role === 'Admin') && 
-    (activeBranch?.toLowerCase().includes('main') || userProfile?.branchType === 'main' || !activeBranch)
+    safeUserRole.toLowerCase() === 'admin' && 
+    (safeBranchName.toLowerCase().includes('main') || userProfile?.branchType === 'main' || !safeBranchName)
   );
   const canManageCenter = !isMainBranch;
+
+  const safeCenter = center || {};
+  const safeCustomers = Array.isArray(centerCustomers) ? centerCustomers : [];
+  const targetCapacity = Number(safeCenter.totalMembers || safeCenter.noOfCustomers || safeCenter.members || 5);
 
   const handleRemoveMember = async (customer) => {
     if (window.confirm(`Are you sure you want to remove ${customer.firstName || customer.name || 'this member'} from this center?`)) {
@@ -584,7 +591,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
         </div>
       </div>
 
-      {isAddCustomerOpen && (
+      {Boolean(isAddCustomerOpen) && (
         <AddCustomerModal 
           isOpen={isAddCustomerOpen} 
           onClose={() => setIsAddCustomerOpen(false)} 
@@ -595,7 +602,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
         />
       )}
 
-      {isEditOpen && (
+      {Boolean(isEditOpen) && (
         <CreateCenterModal
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
