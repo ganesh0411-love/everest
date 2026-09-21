@@ -51,10 +51,35 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
     ? `₹${totalCenterLoanAmount.toLocaleString('en-IN')}` 
     : '-';
 
-  const currentBranch = (typeof activeBranch === 'string' ? activeBranch : (userProfile?.branch || userProfile?.branchName || '')).trim().toLowerCase();
-  const currentUserRole = (typeof userProfile?.role === 'string' ? userProfile.role : (userProfile?.role || '')).trim().toLowerCase();
+  // 1. Resolve selected branch directly from global state / storage:
+  const resolvedBranch = (
+    activeBranch || 
+    (typeof activeBranch === 'string' ? activeBranch : '') ||
+    localStorage.getItem('selectedBranch') || 
+    localStorage.getItem('activeBranch') || 
+    userProfile?.branch || 
+    userProfile?.branchName || 
+    userProfile?.branchType ||
+    ''
+  ).trim().toLowerCase();
 
-  const isMainBranchAdmin = currentUserRole === 'admin' && (currentBranch === 'main' || currentBranch.includes('main branch') || currentBranch === 'all' || !currentBranch);
+  const resolvedRole = (
+    userProfile?.role || 
+    localStorage.getItem('userRole') || 
+    'admin'
+  ).trim().toLowerCase();
+
+  // 2. Strict check for Main Branch Admin:
+  const isMainBranchAdmin = Boolean(
+    resolvedRole === 'admin' && (
+      resolvedBranch === 'main branch' ||
+      resolvedBranch.includes('main') ||
+      resolvedBranch === 'all' ||
+      resolvedBranch === ''
+    )
+  );
+
+  // 3. Write-action gate:
   const canManageCenter = !isMainBranchAdmin;
 
   const safeCenter = center || {};
