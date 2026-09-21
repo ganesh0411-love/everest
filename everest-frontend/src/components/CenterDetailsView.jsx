@@ -51,6 +51,12 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
     ? `₹${totalCenterLoanAmount.toLocaleString('en-IN')}` 
     : '-';
 
+  const isMainBranch = Boolean(
+    (userProfile?.role === 'admin' || userProfile?.role === 'Admin') && 
+    (activeBranch?.toLowerCase().includes('main') || userProfile?.branchType === 'main' || !activeBranch)
+  );
+  const canManageCenter = !isMainBranch;
+
   const handleRemoveMember = async (customer) => {
     if (window.confirm(`Are you sure you want to remove ${customer.firstName || customer.name || 'this member'} from this center?`)) {
       try {
@@ -230,103 +236,107 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
           </div>
 
           {/* Right Action Buttons */}
-          <div className="shrink-0 flex flex-col items-end pt-1">
-            <button 
-              onClick={() => setIsEditOpen(true)}
-              className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm w-[64px]"
-            >
-              UPDATE
-            </button>
-            <button 
-              onClick={handleDelete}
-              className="bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1.5 w-[64px]"
-            >
-              DELETE
-            </button>
-          </div>
+          {canManageCenter && (
+            <div className="shrink-0 flex flex-col items-end pt-1">
+              <button 
+                onClick={() => setIsEditOpen(true)}
+                className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm w-[64px]"
+              >
+                UPDATE
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full transition-colors shadow-sm mt-1.5 w-[64px]"
+              >
+                DELETE
+              </button>
+            </div>
+          )}
         </div>
 
       {/* 2. DYNAMIC MEMBER SLOT CARDS (SCROLLABLE) */}
       <div className="flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-3 py-2 pb-40">
         <div className="space-y-3">
-          {Array.from({ length: visibleSlots }).map((_, idx) => {
+          {(centerCustomers || []).map((customerInSlot, idx) => {
             const slotNumber = idx + 1;
-            const customerInSlot = centerCustomers[idx]; // Match sequentially
             const paddedIdx = String(slotNumber).padStart(2, '0');
             const isLeaderSlot = idx === 0;
 
-            if (customerInSlot) {
-              // FILLED SLOT STATE
-              return (
-                <div key={idx} className={`border-2 rounded-2xl flex overflow-hidden relative p-2 min-h-[100px] mb-3 ${isLeaderSlot ? 'border-amber-400 bg-amber-50/50 shadow-md shadow-amber-100' : 'border-black bg-white'}`}>
-                  {/* Left Index Box */}
-                  <div className={`w-14 sm:w-16 shrink-0 border-r-2 flex flex-col items-center justify-center bg-transparent gap-1 ${isLeaderSlot ? 'border-amber-400' : 'border-black'}`}>
-                    {isLeaderSlot && <Star size={14} className="text-amber-500 fill-amber-500" />}
-                    <span className={`font-black text-2xl ${isLeaderSlot ? 'text-amber-500' : 'text-black'}`}>{paddedIdx}</span>
-                  </div>
+            return (
+              <div key={idx} className={`border-2 rounded-2xl flex overflow-hidden relative p-2 min-h-[100px] mb-3 ${isLeaderSlot ? 'border-amber-400 bg-amber-50/50 shadow-md shadow-amber-100' : 'border-black bg-white'}`}>
+                {/* Left Index Box */}
+                <div className={`w-14 sm:w-16 shrink-0 border-r-2 flex flex-col items-center justify-center bg-transparent gap-1 ${isLeaderSlot ? 'border-amber-400' : 'border-black'}`}>
+                  {isLeaderSlot && <Star size={14} className="text-amber-500 fill-amber-500" />}
+                  <span className={`font-black text-2xl ${isLeaderSlot ? 'text-amber-500' : 'text-black'}`}>{paddedIdx}</span>
+                </div>
+                
+                {/* Main Details Area */}
+                <div className="flex-1 pl-2 sm:pl-3 flex flex-col justify-between min-w-0 pr-8">
                   
-                  {/* Main Details Area */}
-                  <div className="flex-1 pl-2 sm:pl-3 flex flex-col justify-between min-w-0 pr-8">
+                  <div className="flex items-start">
+                    {/* Col A */}
+                    <div className="flex flex-col min-w-0 flex-1 pr-1">
+                      <span className="font-bold text-black text-xs sm:text-[13px] truncate">{customerInSlot.name || customerInSlot.customerName || '-'}</span>
+                      <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.customerId || customerInSlot.emfId || customerInSlot.applicationNumber || '-'}</span>
+                      <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.dob || customerInSlot.dateOfBirth ? customerInSlot.dob || customerInSlot.dateOfBirth : 'DOB'}</span>
+                      <span className="font-bold text-sky-600 text-[10px] sm:text-[11px] truncate">{center?.staffName || customerInSlot.staffName || '-'}</span>
+                    </div>
                     
-                    <div className="flex items-start">
-                      {/* Col A */}
-                      <div className="flex flex-col min-w-0 flex-1 pr-1">
-                        <span className="font-bold text-black text-xs sm:text-[13px] truncate">{formatName(customerInSlot.name || customerInSlot.customerName)}</span>
-                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.customerId || customerInSlot.emfId || customerInSlot.applicationNumber || '-'}</span>
-                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{formatDOB(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
-                        <span className="font-bold text-sky-600 text-[10px] sm:text-[11px] truncate">{center?.staffName || customerInSlot.staffName || '-'}</span>
-                      </div>
-                      
-                      {/* Vertical Partition */}
-                      <div className="w-px bg-black mx-1 sm:mx-2 self-stretch"></div>
-                      
-                      {/* Col B */}
-                      <div className="flex flex-col min-w-0 flex-1 pl-1 shrink-0">
-                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.gender || '-'}</span>
-                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.maritalStatus || '-'}</span>
-                        <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.age ? `${customerInSlot.age} Yrs` : getAge(customerInSlot.dob || customerInSlot.dateOfBirth)}</span>
-                        <span className="font-bold text-sky-600 text-[10px] sm:text-[11px] truncate">{customerInSlot.branchName || center?.branchName || '-'}</span>
-                      </div>
-
-                      {/* Photo Preview */}
-                      <div className="w-14 h-14 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 ml-1">
-                         {customerInSlot.photoBase64 || customerInSlot.photoUrl || customerInSlot.image ? (
-                           <img src={customerInSlot.photoBase64 || customerInSlot.photoUrl || customerInSlot.image} alt="Customer" className="w-full h-full object-cover" />
-                         ) : (
-                           <ImageIcon className="text-slate-300" size={16} />
-                         )}
-                      </div>
+                    {/* Vertical Partition */}
+                    <div className="w-px bg-black mx-1 sm:mx-2 self-stretch"></div>
+                    
+                    {/* Col B */}
+                    <div className="flex flex-col min-w-0 flex-1 pl-1 shrink-0">
+                      <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.gender || '-'}</span>
+                      <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.maritalStatus || '-'}</span>
+                      <span className="font-bold text-black text-[10px] sm:text-[11px] truncate">{customerInSlot.age ? `${customerInSlot.age} Yrs` : (customerInSlot.dob ? 'Yrs' : '-')}</span>
+                      <span className="font-bold text-sky-600 text-[10px] sm:text-[11px] truncate">{customerInSlot.branchName || center?.branchName || '-'}</span>
                     </div>
 
-                    {/* Bottom Action Strip: Strictly Single Line, Zero Wrap */}
-                    <div className="flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t border-gray-100 w-full flex-nowrap min-w-0">
-                      
-                      {/* 1. Phone Number (Compact with Left Alignment) */}
-                      <div className="flex items-center gap-1 shrink min-w-0">
-                        <span className="text-emerald-700 text-xs shrink-0">📞</span>
-                        <span className="text-xs font-semibold text-gray-800 truncate tracking-tight">
-                          {customerInSlot.phone || '9876543210'}
+                    {/* Photo Preview */}
+                    <div className="w-14 h-14 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 ml-1">
+                       {customerInSlot.photoBase64 || customerInSlot.photoUrl || customerInSlot.image ? (
+                         <img src={customerInSlot.photoBase64 || customerInSlot.photoUrl || customerInSlot.image} alt="Customer" className="w-full h-full object-cover" />
+                       ) : (
+                         <ImageIcon className="text-slate-300" size={16} />
+                       )}
+                    </div>
+                  </div>
+
+                  {/* Bottom Action Strip: Strictly Single Line, Zero Wrap */}
+                  <div className="flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t border-gray-100 w-full flex-nowrap min-w-0">
+                    
+                    {/* 1. Phone Number (Compact with Left Alignment) */}
+                    <div className="flex items-center gap-1 shrink min-w-0">
+                      <span className="text-emerald-700 text-xs shrink-0">📞</span>
+                      <span className="text-xs font-semibold text-gray-800 truncate tracking-tight">
+                        {customerInSlot.phone || customerInSlot.mobileNumber || '-'}
+                      </span>
+                    </div>
+
+                    {/* 2. Fixed-Width Centered Status Badge Slot (Prevents Layout Shifts) */}
+                    <div className="w-[74px] shrink-0 flex items-center justify-center">
+                      {customerInSlot.status?.toLowerCase() === 'approved' ? (
+                        <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full whitespace-nowrap">
+                          APPROVED
                         </span>
-                      </div>
+                      ) : customerInSlot.status?.toLowerCase() === 'rejected' ? (
+                        <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-rose-50 text-rose-700 border border-rose-300 rounded-full whitespace-nowrap">
+                          REJECTED
+                        </span>
+                      ) : customerInSlot.status?.toLowerCase() === 'draft' ? (
+                        <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-slate-100 text-slate-700 border border-slate-300 rounded-full whitespace-nowrap">
+                          DRAFT
+                        </span>
+                      ) : (
+                        <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-amber-50 text-amber-800 border border-amber-300 rounded-full whitespace-nowrap">
+                          PENDING
+                        </span>
+                      )}
+                    </div>
 
-                      {/* 2. Fixed-Width Centered Status Badge Slot (Prevents Layout Shifts) */}
-                      <div className="w-[74px] shrink-0 flex items-center justify-center">
-                        {customerInSlot.status?.toLowerCase() === 'approved' ? (
-                          <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full whitespace-nowrap">
-                            APPROVED
-                          </span>
-                        ) : customerInSlot.status?.toLowerCase() === 'rejected' ? (
-                          <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-rose-50 text-rose-700 border border-rose-300 rounded-full whitespace-nowrap">
-                            REJECTED
-                          </span>
-                        ) : (
-                          <span className="w-full text-center py-0.5 text-[9px] font-extrabold uppercase bg-amber-50 text-amber-800 border border-amber-300 rounded-full whitespace-nowrap">
-                            PENDING
-                          </span>
-                        )}
-                      </div>
-
-                      {/* 3. Action Button (Anchored to the Right) */}
+                    {/* 3. Action Button (Anchored to the Right) */}
+                    {canManageCenter && (
                       <button 
                         onClick={() => {
                           setAddCustomerContext(customerInSlot);
@@ -336,51 +346,36 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                       >
                         EDIT
                       </button>
-                    </div>
-
+                    )}
                   </div>
-                  
-                  {/* Top Right Close */}
+
+                </div>
+                
+                {/* Top Right Close */}
+                {canManageCenter && (
                   <button 
                     onClick={() => handleRemoveMember(customerInSlot)}
                     className="absolute top-2 right-2 text-red-500 font-bold hover:bg-red-50 rounded-full p-0.5 transition-colors z-10"
                   >
                     <X size={16} strokeWidth={3} />
                   </button>
-                </div>
-              );
-            }
-
-            // EMPTY SLOT STATE
-            return (
-              <div key={idx} className={`border-2 rounded-2xl flex overflow-hidden min-h-[100px] relative p-2 mb-3 ${isLeaderSlot ? 'border-amber-400 bg-amber-50/50 shadow-md shadow-amber-100' : 'border-black bg-white'}`}>
-                {/* Left Index Box */}
-                <div className={`w-14 sm:w-16 shrink-0 border-r-2 flex flex-col items-center justify-center bg-transparent gap-1 ${isLeaderSlot ? 'border-amber-400' : 'border-black'}`}>
-                  {isLeaderSlot && <Star size={14} className="text-amber-500 fill-amber-500" />}
-                  <span className={`font-black text-2xl ${isLeaderSlot ? 'text-amber-500' : 'text-black'}`}>{paddedIdx}</span>
-                </div>
-                
-                {/* Main Area (Empty) */}
-                <div className="flex-1 flex flex-col items-center justify-center py-2 relative min-w-0 pr-8">
-                  <div className="w-14 h-14 rounded-xl bg-sky-50 flex items-center justify-center mb-1 relative overflow-hidden">
-                    <ImageIcon className="text-sky-200" size={24} />
-                    {/* Tiny decorative landscape curve inside sky box */}
-                    <div className="absolute bottom-0 left-0 right-0 h-4 bg-lime-500/20 rounded-b-xl border-t border-sky-200" style={{ clipPath: 'ellipse(70% 100% at 50% 100%)' }}></div>
-                  </div>
-                  <button onClick={() => handleAddClick(slotNumber)} className="bg-[#c276f0] hover:bg-purple-500 active:bg-purple-600 text-white text-[10px] font-bold py-1 px-5 rounded-full transition-colors shadow-sm tracking-wide">
-                    ADD
-                  </button>
-                </div>
-                
-                {/* Top Right Close */}
-                <button className="absolute top-2 right-2 text-red-500 font-bold hover:bg-red-50 rounded-full p-0.5 transition-colors z-10">
-                  <X size={16} strokeWidth={3} />
-                </button>
+                )}
               </div>
             );
           })}
           
-          {centerCustomers.length === totalMembers && centerCustomers.some(c => c.status === 'Draft') && (
+          {canManageCenter && (centerCustomers?.length || 0) < totalMembers && (
+            <div className="flex justify-center pt-2 pb-4">
+              <button 
+                onClick={() => handleAddClick((centerCustomers?.length || 0) + 1)}
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-6 py-2.5 rounded-full shadow-sm active:scale-95 transition-all"
+              >
+                <span className="text-base">+</span> ADD CUSTOMER ({(centerCustomers?.length || 0)} / {totalMembers})
+              </button>
+            </div>
+          )}
+          
+          {canManageCenter && centerCustomers.length === totalMembers && centerCustomers.some(c => c.status === 'Draft') && (
             <div className="pt-2 pb-6 flex justify-center">
               <button 
                 onClick={handleBatchPublish} 
@@ -416,20 +411,22 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
               className="w-24 h-24 rounded-xl object-cover border border-gray-200 shadow-sm"
               onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Leader'; }}
             />
-            <div className="flex flex-col gap-2 shrink-0">
-              <button 
-                onClick={() => setIsEditOpen(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-6 py-2 rounded-full uppercase tracking-wider shadow-sm transition-colors"
-              >
-                EDIT
-              </button>
-              <button 
-                onClick={handleDelete}
-                className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-6 py-2 rounded-full uppercase tracking-wider shadow-sm transition-colors"
-              >
-                DELETE
-              </button>
-            </div>
+            {canManageCenter && (
+              <div className="flex flex-col gap-2 shrink-0">
+                <button 
+                  onClick={() => setIsEditOpen(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-6 py-2 rounded-full uppercase tracking-wider shadow-sm transition-colors"
+                >
+                  EDIT
+                </button>
+                <button 
+                  onClick={handleDelete}
+                  className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-6 py-2 rounded-full uppercase tracking-wider shadow-sm transition-colors"
+                >
+                  DELETE
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 text-sm">
@@ -482,13 +479,15 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                 className="w-full bg-white rounded-2xl p-4 border border-gray-200 shadow-sm relative flex flex-col justify-between hover:shadow-md transition-shadow"
               >
                 {/* 1. Corner Soft-Delete Button */}
-                <button 
-                  onClick={() => handleRemoveMember(customer)}
-                  className="absolute top-3 right-3 text-rose-500 hover:text-rose-700 font-bold text-sm w-7 h-7 flex items-center justify-center rounded-full hover:bg-rose-50 transition-colors z-10"
-                  title="Remove member"
-                >
-                  ✕
-                </button>
+                {canManageCenter && (
+                  <button 
+                    onClick={() => handleRemoveMember(customer)}
+                    className="absolute top-3 right-3 text-rose-500 hover:text-rose-700 font-bold text-sm w-7 h-7 flex items-center justify-center rounded-full hover:bg-rose-50 transition-colors z-10"
+                    title="Remove member"
+                  >
+                    ✕
+                  </button>
+                )}
 
                 <div className="flex items-center gap-4 w-full pr-8">
                   {/* Slot Index */}
@@ -541,15 +540,17 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                     }`}>
                       {customer.status || 'DRAFT'}
                     </span>
-                    <button 
-                      onClick={() => {
-                        setAddCustomerContext(customer);
-                        setIsAddCustomerOpen(true);
-                      }}
-                      className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-1 rounded-full shadow-sm"
-                    >
-                      EDIT
-                    </button>
+                    {canManageCenter && (
+                      <button 
+                        onClick={() => {
+                          setAddCustomerContext(customer);
+                          setIsAddCustomerOpen(true);
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-1 rounded-full shadow-sm"
+                      >
+                        EDIT
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -557,7 +558,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
           })}
 
           {/* ADD CUSTOMER BUTTON (Only if under capacity) */}
-          {(centerCustomers?.length || 0) < totalMembers && (
+          {canManageCenter && (centerCustomers?.length || 0) < totalMembers && (
             <div className="flex justify-center pt-2">
               <button 
                 onClick={() => handleAddClick((centerCustomers?.length || 0) + 1)}
@@ -569,7 +570,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
           )}
 
           {/* DONE / PUBLISH BUTTON */}
-          {centerCustomers?.length === totalMembers && centerCustomers.some(c => c.status === 'Draft') && (
+          {canManageCenter && centerCustomers?.length === totalMembers && centerCustomers.some(c => c.status === 'Draft') && (
             <div className="pt-8 pb-6 flex justify-center">
               <button 
                 onClick={handleBatchPublish}
