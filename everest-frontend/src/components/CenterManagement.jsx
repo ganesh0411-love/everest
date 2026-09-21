@@ -457,10 +457,10 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate border-r border-white/40 md:border-white/30 box-border">Leader</th>
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate border-r border-white/40 md:border-white/30 box-border">Group Name</th>
               <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap border-r-0 md:border-r md:border-white/30 box-border">Members</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto border-r-0 md:border-r-0 box-border">
+              <th className="hidden lg:table-cell py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto border-r-0 md:border-r-0 box-border">
                 <span className="hidden md:inline">Status</span>
               </th>
-              <th className="py-4 px-2 w-24 shrink-0 text-center border-r-0 md:border-r-0 box-border"></th>
+              <th className="hidden lg:table-cell py-4 px-2 w-24 shrink-0 text-center border-r-0 md:border-r-0 box-border"></th>
             </tr>
           </thead>
           <tbody>
@@ -507,7 +507,7 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
                 <td className="py-2 px-1 md:py-4 md:px-6 text-center text-gray-900 font-bold truncate">
                   {searchQuery.trim() ? highlightText(center.members || center.totalMembers || center.totalMember || 0, searchQuery, center._matches?.members?.startMatchIdx) : (center.members || center.totalMembers || center.totalMember || 0)}
                 </td>
-                <td className="py-2 px-1 md:py-4 md:px-6">
+                <td className="hidden lg:table-cell py-2 px-1 md:py-4 md:px-6">
                   <div className="flex items-center gap-1.5 md:gap-2">
                     {!((activeFilter === 'Deleted' || center.status === 'Deleted' || center.isDeleted) && !isMainBranch) && getStatusBadge(center.status || (center.isDeleted ? 'Deleted' : ''))}
                     {center.recentlyRestored && (
@@ -517,7 +517,7 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
                     )}
                   </div>
                 </td>
-                <td className="py-4 px-2 w-24 text-center text-slate-400" onClick={(e) => e.stopPropagation()}>
+                <td className="hidden lg:table-cell py-4 px-2 w-24 text-center text-slate-400" onClick={(e) => e.stopPropagation()}>
                   {(activeFilter === 'Deleted' || center.status === 'Deleted' || center.isDeleted) && !isMainBranch ? (
                     <div className="flex items-center justify-center gap-1.5">
                       <button
