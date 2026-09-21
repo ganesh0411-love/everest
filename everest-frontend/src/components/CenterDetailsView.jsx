@@ -473,37 +473,15 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
 
         {/* RIGHT PANEL: Scrollable Full-Width Single-Column Cards */}
         <div className="flex-1 h-full overflow-y-auto pr-2 flex flex-col gap-4 pb-20">
-          {Array.from({ length: visibleSlots }).map((_, idx) => {
-            const customer = centerCustomers?.[idx];
+          {(centerCustomers || []).map((customer, idx) => {
             const slotNumber = String(idx + 1).padStart(2, '0');
-
-            if (!customer) {
-              return (
-                <div key={idx} className="w-full bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col justify-between min-h-[160px] relative hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-extrabold text-gray-800">{slotNumber}</span>
-                    <div className="w-12 h-10 bg-sky-50 rounded-lg flex items-center justify-center border border-sky-100">
-                      <span className="text-sky-300 text-xl">🖼️</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-center mt-auto">
-                    <button 
-                      onClick={() => handleAddClick(idx + 1)}
-                      className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-8 py-2 rounded-full shadow-sm active:scale-95 transition-transform"
-                    >
-                      ADD
-                    </button>
-                  </div>
-                </div>
-              );
-            }
 
             return (
               <div 
                 key={customer.id || idx} 
                 className="w-full bg-white rounded-2xl p-4 border border-gray-200 shadow-sm relative flex flex-col justify-between hover:shadow-md transition-shadow"
               >
-                {/* Top-Right Soft Delete Icon */}
+                {/* 1. Corner Soft-Delete Button */}
                 <button 
                   onClick={() => handleRemoveMember(customer)}
                   className="absolute top-3 right-3 text-rose-500 hover:text-rose-700 font-bold text-sm w-7 h-7 flex items-center justify-center rounded-full hover:bg-rose-50 transition-colors z-10"
@@ -512,40 +490,30 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                   ✕
                 </button>
 
-                {/* Spacious Horizontal Grid for Customer Data */}
-                <div className="flex items-center gap-6 w-full pr-10">
-                  
+                <div className="flex items-center gap-4 w-full pr-8">
                   {/* Slot Index */}
-                  <div className="shrink-0 w-10 text-center">
-                    <span className="text-2xl font-black text-gray-800">{slotNumber}</span>
+                  <div className="shrink-0 w-8 text-center">
+                    <span className="text-xl font-extrabold text-gray-800">{slotNumber}</span>
                   </div>
 
-                  {/* Column 1: Identity */}
-                  <div className="w-48 shrink-0 border-r border-gray-100 pr-4">
-                    <h4 className="font-bold text-gray-900 text-sm whitespace-nowrap overflow-hidden text-ellipsis">
-                      {customer.name || customer.customerName}
-                    </h4>
-                    <p className="text-xs font-semibold text-gray-500 mt-0.5">{customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}</p>
-                    <p className="text-xs text-purple-700 font-bold mt-1">{customer.staffName || center?.staffName || '-'}</p>
+                  {/* Left Column: 4 items */}
+                  <div className="w-48 shrink-0 pr-3 border-r border-gray-200 space-y-1 text-xs">
+                    <h4 className="font-bold text-gray-900 text-sm truncate">{customer.name || customer.customerName}</h4>
+                    <p className="font-semibold text-gray-500">{customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}</p>
+                    <p className="text-gray-600">{formatDOB(customer.dob || customer.dateOfBirth) || 'DOB'}</p>
+                    <p className="text-purple-700 font-bold">{customer.staffName || center?.staffName || '-'}</p>
                   </div>
 
-                  {/* Column 2: Personal Details */}
-                  <div className="w-44 shrink-0 border-r border-gray-100 pr-4 text-xs text-gray-600 space-y-1">
-                    <p className="font-medium text-gray-800">{customer.gender || 'Female'}</p>
+                  {/* Right Column: 4 items (Parallel Alignment) */}
+                  <div className="w-44 shrink-0 pl-2 space-y-1 text-xs text-gray-700">
+                    <p className="font-semibold text-gray-800">{customer.gender || 'Female'}</p>
                     <p>{customer.maritalStatus || 'Married'}</p>
-                    <p className="text-gray-500 font-semibold">{formatDOB(customer.dob || customer.dateOfBirth) || 'DOB'} • {customer.age ? `${customer.age} Yrs` : (getAge(customer.dob || customer.dateOfBirth) ? `${getAge(customer.dob || customer.dateOfBirth)} Yrs` : '-')}</p>
+                    <p className="text-gray-600 font-semibold">{customer.age ? `${customer.age} Yrs` : (getAge(customer.dob || customer.dateOfBirth) ? `${getAge(customer.dob || customer.dateOfBirth)} Yrs` : '-')}</p>
+                    <p className="text-sky-700 font-bold truncate">{customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || '-'}</p>
                   </div>
 
-                  {/* Column 3: Location */}
-                  <div className="flex-1 min-w-0 text-xs text-gray-600">
-                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Location</span>
-                    <span className="text-gray-800 font-semibold text-sm truncate block" title={customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || '-'}>
-                      {customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || '-'}
-                    </span>
-                  </div>
-
-                  {/* Column 4: Photo Thumbnail */}
-                  <div className="shrink-0">
+                  {/* Customer Photo Frame: Clean, No LOCA artifacts */}
+                  <div className="ml-auto shrink-0">
                     {customer.photoUrl || customer.photoBase64 || customer.image || customer.photo ? (
                       <img 
                         src={customer.photoUrl || customer.photoBase64 || customer.image || customer.photo} 
@@ -559,7 +527,6 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                       </div>
                     )}
                   </div>
-
                 </div>
 
                 {/* Bottom Action Bar */}
@@ -579,7 +546,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                         setAddCustomerContext(customer);
                         setIsAddCustomerOpen(true);
                       }}
-                      className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold px-4 py-1 rounded-full shadow-sm transition-all"
+                      className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-1 rounded-full shadow-sm"
                     >
                       EDIT
                     </button>
@@ -588,6 +555,18 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
               </div>
             );
           })}
+
+          {/* ADD CUSTOMER BUTTON (Only if under capacity) */}
+          {(centerCustomers?.length || 0) < totalMembers && (
+            <div className="flex justify-center pt-2">
+              <button 
+                onClick={() => handleAddClick((centerCustomers?.length || 0) + 1)}
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-6 py-2.5 rounded-full shadow-sm active:scale-95 transition-all"
+              >
+                <span className="text-base">+</span> ADD CUSTOMER ({(centerCustomers?.length || 0)} / {totalMembers})
+              </button>
+            </div>
+          )}
 
           {/* DONE / PUBLISH BUTTON */}
           {centerCustomers?.length === totalMembers && centerCustomers.some(c => c.status === 'Draft') && (
@@ -603,7 +582,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
           )}
         </div>
       </div>
-      
+
       {isAddCustomerOpen && (
         <AddCustomerModal 
           isOpen={isAddCustomerOpen} 
