@@ -770,23 +770,41 @@ function App() {
 
   const parseGlobalDate = (dStr) => {
     if (!dStr) return new Date();
-    if (typeof dStr === 'string' && dStr.includes('-') && dStr.split('-')[0].length === 2) {
-      const parts = dStr.split('-');
-      if (parts[2].length === 2) parts[2] = '20' + parts[2];
-      return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    
+    // Handle Firebase Timestamps
+    if (dStr && typeof dStr.toDate === 'function') {
+      return dStr.toDate();
     }
-    if (typeof dStr === 'string' && dStr.includes('/') && dStr.split('/')[0].length === 2) {
-      const parts = dStr.split('/');
-      if (parts[2].length === 2) parts[2] = '20' + parts[2];
-      return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    if (dStr && typeof dStr === 'object' && dStr.seconds !== undefined) {
+      return new Date(dStr.seconds * 1000);
+    }
+
+    if (typeof dStr === 'string') {
+      if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
+        const parts = dStr.split('-');
+        const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
+        return new Date(`${year}-${parts[1]}-${parts[0]}`);
+      }
+      if (dStr.includes('/') && dStr.split('/')[0].length === 2) {
+        const parts = dStr.split('/');
+        const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
+        return new Date(`${year}-${parts[1]}-${parts[0]}`);
+      }
     }
     return new Date(dStr);
   };
 
   const formatDate = (dateString) => {
-    const d = parseGlobalDate(dateString);
-    if (isNaN(d)) return dateString;
-    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+    if (!dateString) return '-';
+    try {
+      const d = parseGlobalDate(dateString);
+      if (isNaN(d.getTime())) {
+        return typeof dateString === 'string' ? dateString : '-';
+      }
+      return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+    } catch (e) {
+      return '-';
+    }
   };
 
   const formatName = (name) => {
@@ -796,9 +814,10 @@ function App() {
 
   const timeAgo = (dateString, updateTimestamp) => {
     if (!dateString) return '';
-    const now = new Date();
-    const dateToUse = updateTimestamp ? parseGlobalDate(updateTimestamp) : parseGlobalDate(dateString);
-    if (isNaN(dateToUse)) return dateString;
+    try {
+      const now = new Date();
+      const dateToUse = updateTimestamp ? parseGlobalDate(updateTimestamp) : parseGlobalDate(dateString);
+      if (isNaN(dateToUse.getTime())) return typeof dateString === 'string' ? dateString : '';
 
     const diffInSeconds = Math.floor((now - dateToUse) / 1000);
     
@@ -821,6 +840,9 @@ function App() {
     }
     const years = Math.floor(diffInSeconds / 31536000);
     return `${years} year${years !== 1 ? 's' : ''} ago`;
+    } catch (e) {
+      return typeof dateString === 'string' ? dateString : '';
+    }
   };
 
   const handleBranchSwitch = (newBranch) => {
@@ -1187,10 +1209,14 @@ function App() {
                                             ) : (
                                               <span className="text-slate-600 font-normal">
                                                 {(() => {
-                                                  const validInsts = (customer.installments || []).filter(i => i.status !== 'BOUNCED');
+                                                  const validInsts = (customer.installments || []).filter(i => i?.status !== 'BOUNCED' && i?.date);
                                                   if (validInsts.length === 0) return 'No Payments';
-                                                  validInsts.sort((a, b) => parseGlobalDate(b.date).getTime() - parseGlobalDate(a.date).getTime());
-                                                  return formatDate(validInsts[0].date);
+                                                  validInsts.sort((a, b) => {
+                                                    const timeA = parseGlobalDate(a.date).getTime();
+                                                    const timeB = parseGlobalDate(b.date).getTime();
+                                                    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+                                                  });
+                                                  return formatDate(validInsts[0]?.date);
                                                 })()}
                                               </span>
                                             )}
