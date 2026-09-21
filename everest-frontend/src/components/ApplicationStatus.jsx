@@ -101,14 +101,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const tabs = isStaff ? staffTabs : adminTabs;
 
   const currentApps = applications.filter(app => {
-    if (isStaff && app.status === 'Draft' && (app.centerId || app.groupName || app.centerName || app.center)) {
-      const centerExists = centers.some(c => 
-        (app.centerId && c.id === app.centerId) || 
-        (app.groupName && c.centerName === app.groupName) || 
-        (app.centerName && c.centerName === app.centerName) ||
-        (app.center && c.centerName === app.center)
-      );
-      if (!centerExists) {
+    if (isStaff && app.status === 'Draft') {
+      if (app.centerId || app.groupName || app.centerName || app.center) {
         return false;
       }
     }
@@ -157,7 +151,14 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
         
         <div className="flex gap-2">
           {tabs.map(tab => {
-            const count = applications.filter(a => a.status === tab.id).length;
+            let count = 0;
+            if (tab.id === 'Draft' && isStaff) {
+              count = applications.filter(a => a.status === 'Draft' && !a.centerId && !a.groupName && !a.centerName && !a.center).length;
+            } else if (tab.id === 'Approved_Rejected') {
+              count = applications.filter(a => a.status === 'Approved' || a.status === 'Rejected').length;
+            } else {
+              count = applications.filter(a => a.status === tab.id).length;
+            }
             const isActive = activeTab === tab.id;
             
             return (
@@ -192,10 +193,12 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                 <th className="p-2 w-12 md:w-[5%] text-left md:pl-6">S.no</th>
                 <th className="p-2 w-24 md:w-[10%] text-left">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
                 <th className="p-2 text-left w-auto md:w-[20%]">CUSTOMER</th>
-                <th className="p-2 text-left hidden md:table-cell md:w-[15%]">AREA / CENTER</th>
+                <th className="p-2 text-left hidden md:table-cell md:w-[15%]">
+                  {isStaff ? 'AREA / CENTER' : (isMainBranch ? 'BRANCH' : 'STAFF NAME')}
+                </th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[15%]">GROUP NAME</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[12%]">LOAN TYPE</th>
-                <th className="p-2 text-left hidden md:table-cell md:w-[11%]">LOAN AMOUNT</th>
+                <th className="p-2 text-right hidden md:table-cell md:w-[11%] pr-4">LOAN AMOUNT</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[12%]">{isMainBranch ? 'STATUS' : 'ACTIONS'}</th>
                 <th className="p-2 w-16 md:hidden text-right pr-2">ACTIONS</th>
               </tr>
@@ -231,7 +234,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       <div className="truncate flex flex-col">
                         <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate md:hidden">
-                          {isMainBranch ? (app.area || app.villageCity || app.city || app.centerName || app.center || app.groupName || 'N/A') : `Staff: ${resolveCustomerStaff(app, centers)}`}
+                          {isStaff ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : `Staff: ${app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'}`)}
                         </div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate hidden md:block">
                           ID: {app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}
@@ -239,8 +242,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       </div>
                     </div>
                   </td>
-                  <td className="p-2 hidden md:table-cell text-sm font-bold text-brand-blue truncate" title={app.area || app.villageCity || app.city || app.centerName || app.center || app.groupName || 'N/A'}>
-                    {app.area || app.villageCity || app.city || app.centerName || app.center || app.groupName || 'N/A'}
+                  <td className="p-2 hidden md:table-cell text-sm font-bold text-brand-blue truncate" title={isStaff ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : (app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'))}>
+                    {isStaff ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : (app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'))}
                   </td>
                   <td className="p-2 hidden md:table-cell text-xs font-semibold text-slate-600 truncate">
                     {app.groupName || app.centerName || 'Individual / N/A'}
