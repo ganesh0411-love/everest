@@ -51,14 +51,11 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
     ? `₹${totalCenterLoanAmount.toLocaleString('en-IN')}` 
     : '-';
 
-  const safeBranchName = typeof activeBranch === 'string' ? activeBranch : (center?.branchName || '');
-  const safeUserRole = typeof userProfile?.role === 'string' ? userProfile.role : '';
+  const currentBranch = (typeof activeBranch === 'string' ? activeBranch : (userProfile?.branch || userProfile?.branchName || '')).trim().toLowerCase();
+  const currentUserRole = (typeof userProfile?.role === 'string' ? userProfile.role : (userProfile?.role || '')).trim().toLowerCase();
 
-  const isMainBranch = Boolean(
-    safeUserRole.toLowerCase() === 'admin' && 
-    (safeBranchName.toLowerCase().includes('main') || userProfile?.branchType === 'main' || !safeBranchName)
-  );
-  const canManageCenter = !isMainBranch;
+  const isMainBranchAdmin = currentUserRole === 'admin' && (currentBranch === 'main' || currentBranch.includes('main branch') || currentBranch === 'all' || !currentBranch);
+  const canManageCenter = !isMainBranchAdmin;
 
   const safeCenter = center || {};
   const safeCustomers = Array.isArray(centerCustomers) ? centerCustomers : [];
