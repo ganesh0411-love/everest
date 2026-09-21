@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Image as ImageIcon, Phone, Star } from 'lucide-react';
-import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import AddCustomerModal from './AddCustomerModal';
 import CreateCenterModal from './CreateCenterModal';
@@ -160,13 +160,29 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
   };
 
   const handleDelete = async () => {
-    if (window.confirm("Are you sure you want to delete this center?")) {
-      try {
-        await updateDoc(doc(db, 'centers', center.id), { status: 'Deleted' });
-        onBack();
-      } catch (error) {
-        console.error("Error deleting center:", error);
-        alert("Failed to delete center.");
+    if (center.status === 'Deleted' || center.isDeleted) {
+      if (window.confirm("Permanently delete this center from the database? This cannot be undone.")) {
+        try {
+          await deleteDoc(doc(db, 'centers', center.id));
+          onBack();
+        } catch (error) {
+          console.error("Error deleting center permanently:", error);
+          alert("Failed to permanently delete center.");
+        }
+      }
+    } else {
+      if (window.confirm("Are you sure you want to delete this center?")) {
+        try {
+          await updateDoc(doc(db, 'centers', center.id), { 
+            status: 'Deleted',
+            isDeleted: true,
+            recentlyRestored: false 
+          });
+          onBack();
+        } catch (error) {
+          console.error("Error deleting center:", error);
+          alert("Failed to delete center.");
+        }
       }
     }
   };
