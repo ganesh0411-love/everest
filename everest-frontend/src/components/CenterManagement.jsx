@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronRight, ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import CreateCenterModal from './CreateCenterModal';
 
@@ -376,7 +376,7 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
               <th className="py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto border-r-0 md:border-r-0 box-border">
                 <span className="hidden md:inline">Status</span>
               </th>
-              <th className="py-4 px-2 w-10 shrink-0 text-center border-r-0 md:border-r-0 box-border"></th>
+              <th className="py-4 px-2 w-16 shrink-0 text-center border-r-0 md:border-r-0 box-border"></th>
             </tr>
           </thead>
           <tbody>
@@ -424,10 +424,27 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
                   {searchQuery.trim() ? highlightText(center.members || center.totalMembers || center.totalMember || 0, searchQuery, center._matches?.members?.startMatchIdx) : (center.members || center.totalMembers || center.totalMember || 0)}
                 </td>
                 <td className="py-2 px-1 md:py-4 md:px-6">
-                  {getStatusBadge(center.status)}
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(center.status || (center.isDeleted ? 'Deleted' : ''))}
+                    {center.recentlyRestored && (
+                      <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">
+                        Recently Restored
+                      </span>
+                    )}
+                  </div>
                 </td>
-                <td className="py-4 px-2 w-10 text-center text-slate-400">
-                  <ChevronRight size={20} />
+                <td className="py-4 px-2 w-16 text-center text-slate-400" onClick={(e) => e.stopPropagation()}>
+                  {(activeFilter === 'Deleted' || center.status === 'Deleted' || center.isDeleted) && !isMainBranch ? (
+                    <button
+                      onClick={(e) => handleRestoreCenter(e, center)}
+                      className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-1.5 px-2 rounded-lg transition-colors flex flex-col items-center justify-center border border-emerald-200 shadow-sm mx-auto"
+                      title="Restore Center"
+                    >
+                      <span className="text-[9px] font-extrabold uppercase whitespace-nowrap">RESTORE</span>
+                    </button>
+                  ) : (
+                    <ChevronRight size={20} className="mx-auto" />
+                  )}
                 </td>
               </tr>
             ))}
