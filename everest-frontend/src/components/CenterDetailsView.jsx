@@ -474,14 +474,14 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
 
           {/* RIGHT COLUMN: 2-Column Slot Cards Grid */}
           <div className="flex-1 w-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
               {Array.from({ length: visibleSlots }).map((_, idx) => {
                 const customer = centerCustomers?.[idx];
                 const slotNumber = String(idx + 1).padStart(2, '0');
 
                 if (!customer) {
                   return (
-                    <div key={idx} className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col justify-between h-[160px] relative">
+                    <div key={idx} className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col justify-between min-h-[160px] relative hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between">
                         <span className="text-xl font-extrabold text-gray-800">{slotNumber}</span>
                         <div className="w-12 h-10 bg-sky-50 rounded-lg flex items-center justify-center border border-sky-100">
@@ -501,63 +501,92 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
                 }
 
                 return (
-                  <div key={customer.id || idx} className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm relative flex flex-col justify-between">
+                  <div 
+                    key={customer.id || idx} 
+                    className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm relative flex flex-col justify-between hover:shadow-md transition-shadow min-h-[160px]"
+                  >
+                    {/* Top-Right Soft Delete Button (Cleanly Positioned at Corner) */}
                     <button 
                       onClick={() => handleRemoveMember(customer)}
-                      className="absolute top-3 right-3 text-rose-500 hover:text-rose-700 font-bold text-base p-1 z-10"
+                      className="absolute top-2.5 right-2.5 text-rose-500 hover:text-rose-700 font-bold text-sm w-6 h-6 flex items-center justify-center rounded-full hover:bg-rose-50 transition-colors z-10"
                       title="Remove member"
                     >
                       ✕
                     </button>
 
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl font-extrabold text-gray-800 shrink-0 w-8 pt-1">{slotNumber}</span>
+                    {/* Main Card Data Row: 4 Logical Columns */}
+                    <div className="flex items-start gap-3 w-full pr-7">
                       
-                      {/* Left Data Section */}
-                      <div className="flex-1 min-w-0 border-r border-gray-100 pr-3">
-                        <h4 className="font-bold text-gray-900 text-sm truncate" title={customer.name || customer.customerName}>{customer.name || customer.customerName}</h4>
-                        <p className="text-[11px] text-gray-500 truncate" title={customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}>{customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}</p>
-                        <p className="text-[11px] text-gray-500 truncate">{formatDOB(customer.dob || customer.dateOfBirth)} • {customer.age || getAge(customer.dob || customer.dateOfBirth) || '-'} Yrs</p>
-                        <p className="text-[11px] text-purple-700 font-semibold truncate" title={customer.staffName || center?.staffName || '-'}>{customer.staffName || center?.staffName || '-'}</p>
+                      {/* Zone 1: Slot Number */}
+                      <div className="shrink-0 w-8 pt-1">
+                        <span className="text-xl font-extrabold text-gray-800">{slotNumber}</span>
                       </div>
 
-                      {/* Right Data Section */}
-                      <div className="flex-1 min-w-0 flex flex-col pl-1 text-[11px] text-gray-600">
-                        <div className="flex justify-between items-center w-full h-[20px] mb-0.5">
-                           <span className="truncate pr-4 font-medium" title={customer.gender || 'Female'}>{customer.gender || 'Female'}</span>
-                        </div>
-                        <div className="flex justify-between items-center w-full h-[16px] mb-0.5">
-                           <span className="truncate pr-4" title={customer.maritalStatus || 'Married'}>{customer.maritalStatus || 'Married'}</span>
-                        </div>
-                        <div className="flex justify-between items-center w-full h-[16px] mb-0.5">
-                           <span className="truncate pr-4" title={customer.village || customer.villageName || customer.area || center?.villageName || 'Batlagundu'}>{customer.village || customer.villageName || customer.area || center?.villageName || 'Batlagundu'}</span>
-                        </div>
+                      {/* Zone 2: Primary Identification (Left of Vertical Line) */}
+                      <div className="flex-1 min-w-0 pr-3 border-r border-gray-200">
+                        <h4 className="font-bold text-gray-900 text-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                          {customer.name || customer.customerName || 'Customer Name'}
+                        </h4>
+                        <p className="text-xs font-semibold text-gray-500 mt-0.5">
+                          {customer.customerId || customer.customId || customer.applicationNumber || 'EMF-'}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          {formatDOB(customer.dob || customer.dateOfBirth)}
+                        </p>
+                        <p className="text-xs text-purple-700 font-semibold mt-1">
+                          {customer.staffName || center?.staffName || 'Staff Assigned'}
+                        </p>
                       </div>
-                      
-                      {/* Avatar */}
-                      <div className="shrink-0 w-12 flex flex-col items-center">
-                        {(customer.photoBase64 || customer.photoUrl || customer.image || customer.photo) && (
-                          <img src={customer.photoBase64 || customer.photoUrl || customer.image || customer.photo} alt={customer.name} className="w-10 h-10 rounded-full object-cover border" />
+
+                      {/* Zone 3: Demographic & Location Data (Right of Vertical Line) */}
+                      <div className="flex-1 min-w-0 px-3 flex flex-col justify-start text-xs text-gray-600 space-y-0.5">
+                        <span className="font-medium text-gray-800">{customer.gender || 'Female'}</span>
+                        <span>{customer.maritalStatus || 'Married'}</span>
+                        <span className="font-semibold text-gray-700">{customer.age ? `${customer.age} Yrs` : (getAge(customer.dob || customer.dateOfBirth) ? `${getAge(customer.dob || customer.dateOfBirth)} Yrs` : '-')}</span>
+                        <span className="text-sky-700 font-medium whitespace-nowrap overflow-hidden text-ellipsis" title={customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || 'Batlagundu'}>
+                          {customer.villageCity || customer.villageName || customer.village || customer.area || center?.villageName || 'Batlagundu'}
+                        </span>
+                      </div>
+
+                      {/* Zone 4: Customer Photo Frame */}
+                      <div className="shrink-0 pt-1">
+                        {customer.photoUrl || customer.photoBase64 || customer.image || customer.photo ? (
+                          <img 
+                            src={customer.photoUrl || customer.photoBase64 || customer.image || customer.photo} 
+                            alt={customer.name} 
+                            className="w-12 h-14 rounded-xl object-cover border border-gray-200 shadow-sm"
+                            onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=User'; }}
+                          />
+                        ) : (
+                          <div className="w-12 h-14 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-lg">
+                            👤
+                          </div>
                         )}
                       </div>
+
                     </div>
 
-                    {/* Inline Bottom Bar */}
-                    <div className="flex items-center justify-between gap-1.5 mt-3 pt-2 border-t border-gray-100 flex-nowrap">
-                      <span className="text-xs font-semibold text-gray-800 truncate">📞 {customer.phone || customer.mobile || customer.mobileNumber}</span>
-                      <span className={`px-2 py-0.5 text-[9px] font-extrabold rounded-full border ${
-                        customer.status?.toLowerCase() === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' :
-                        customer.status?.toLowerCase() === 'rejected' ? 'bg-rose-50 text-rose-700 border-rose-300' :
+                    {/* Bottom Action Strip: Phone, Status Badge, Edit Button */}
+                    <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-gray-100 flex-nowrap w-full">
+                      <span className="text-xs font-semibold text-gray-800 shrink-0">
+                        📞 {customer.phone || customer.mobileNumber || customer.mobile || 'N/A'}
+                      </span>
+                      
+                      <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border shrink-0 uppercase tracking-wider ${
+                        (customer.status || '').toLowerCase() === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' :
+                        (customer.status || '').toLowerCase() === 'rejected' ? 'bg-rose-50 text-rose-700 border-rose-300' :
+                        (customer.status || '').toLowerCase() === 'draft' ? 'bg-slate-100 text-slate-700 border-slate-300' :
                         'bg-amber-50 text-amber-800 border-amber-300'
                       }`}>
-                        {(customer.status || 'PENDING').toUpperCase()}
+                        {customer.status || 'PENDING'}
                       </span>
+
                       <button 
                         onClick={() => {
                           setAddCustomerContext(customer);
                           setIsAddCustomerOpen(true);
                         }}
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-4 py-1 rounded-full whitespace-nowrap"
+                        className="shrink-0 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold px-3.5 py-1 rounded-full shadow-sm transition-all"
                       >
                         EDIT
                       </button>
