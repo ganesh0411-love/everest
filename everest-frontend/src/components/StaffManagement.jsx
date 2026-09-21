@@ -523,7 +523,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   });
 
   return (
-    <div className={`flex flex-col h-full bg-white overflow-hidden relative ${isMainBranch ? '' : 'pb-[72px]'}`}>
+    <div className="flex flex-col h-full bg-white overflow-hidden relative">
       
       {showAddForm && (
         <AddStaffForm 
@@ -556,17 +556,27 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
 
         {/* Action Bar (Pulled up over the curve on mobile, flat on desktop) */}
         <div className="bg-white rounded-t-[2.5rem] md:rounded-none -mt-8 md:mt-0 pt-8 md:pt-4 px-5 md:px-6 pb-4 z-10 shadow-[0_4px_10px_rgba(0,0,0,0.03)] md:shadow-none md:border-b md:border-slate-200 relative">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search by name, ID or designation..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-full border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
+                className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 rounded-full border border-slate-200 bg-white text-[13px] sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-shadow"
               />
             </div>
+            
+            {!isMainBranch && (
+              <button 
+                onClick={handleOpenAddForm}
+                className="flex items-center gap-1 sm:gap-1.5 shrink-0 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-full font-bold text-[12px] sm:text-sm shadow-sm transition-colors"
+              >
+                <Plus size={16} strokeWidth={2.5} />
+                <span>Add Staff</span>
+              </button>
+            )}
           </div>
 
           {/* Desktop Table View and Mobile Cards below */}
@@ -695,16 +705,16 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                   <span className="text-xs text-brand-blue font-semibold">{staff.branch || staff.branchName || staff.branchId}</span>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className="text-xs font-bold text-slate-700">{staff.staffId || staff.id || staff.employeeId || staff.customId || staff.uid}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-500">{staff.designation || staff.role || staff.position || 'Staff'}</span>
-                  {!isMainBranch && (
-                    <button onClick={() => handleOpenEditForm(staff)} className="text-slate-400 hover:text-purple-600 p-1 transition-colors">
-                      <MoreVertical size={16} />
-                    </button>
-                  )}
+              <div className="flex items-center gap-1 sm:gap-2">
+                <div className="flex flex-col items-end">
+                  <span className="text-[13px] font-black text-slate-800">{staff.staffId || staff.id || staff.employeeId || staff.customId || staff.uid}</span>
+                  <span className="text-[10px] font-medium text-slate-500">{staff.designation || staff.role || staff.position || 'Staff'}</span>
                 </div>
+                {!isMainBranch && (
+                  <button onClick={() => handleOpenEditForm(staff)} className="text-slate-400 hover:text-purple-600 p-1 sm:p-1.5 transition-colors">
+                    <MoreVertical size={18} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -736,35 +746,6 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         )}
       </div>
 
-      {/* Custom Bottom Navigation Bar (Fixed at bottom, Mobile Only) */}
-      {!isMainBranch && (
-        <div className="md:hidden absolute bottom-0 left-0 w-full h-[72px] bg-white border-t border-slate-100 flex justify-around items-center px-6 pb-safe z-50">
-          
-          <button 
-            onClick={() => setCurrentView && setCurrentView('Home')}
-            className="flex flex-col items-center justify-center gap-1 w-16 text-slate-400 hover:text-purple-600 transition-colors"
-          >
-            <Home size={26} strokeWidth={2.5} />
-            <span className="text-[10px] font-semibold">Home</span>
-          </button>
-
-          <button 
-            onClick={handleOpenAddForm}
-            className="relative -top-5 w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-purple-500/40 hover:scale-105 transition-transform"
-          >
-            <Plus size={32} strokeWidth={2.5} />
-          </button>
-
-          <button 
-            onClick={() => setCurrentView && setCurrentView('Centers')}
-            className="flex flex-col items-center justify-center gap-1 w-16 text-purple-700 transition-colors"
-          >
-            <Users size={28} strokeWidth={2.5} fill="currentColor" />
-            <span className="text-[10px] font-bold text-purple-800">Groups</span>
-          </button>
-
-        </div>
-      )}
     </div>
   );
 };
