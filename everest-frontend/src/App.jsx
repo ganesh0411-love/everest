@@ -596,12 +596,7 @@ function App() {
     const today = new Date();
     today.setHours(0,0,0,0);
     const parseDate = (dStr) => {
-      if (!dStr) return new Date();
-      if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
-        const parts = dStr.split('-');
-        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      }
-      return new Date(dStr);
+      return parseGlobalDate(dStr);
     };
 
     let filtered = customers.map(c => {
@@ -773,8 +768,23 @@ function App() {
     };
   }, [processedCustomers, isOdFilterActive]);
 
+  const parseGlobalDate = (dStr) => {
+    if (!dStr) return new Date();
+    if (typeof dStr === 'string' && dStr.includes('-') && dStr.split('-')[0].length === 2) {
+      const parts = dStr.split('-');
+      if (parts[2].length === 2) parts[2] = '20' + parts[2];
+      return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    }
+    if (typeof dStr === 'string' && dStr.includes('/') && dStr.split('/')[0].length === 2) {
+      const parts = dStr.split('/');
+      if (parts[2].length === 2) parts[2] = '20' + parts[2];
+      return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    }
+    return new Date(dStr);
+  };
+
   const formatDate = (dateString) => {
-    const d = new Date(dateString);
+    const d = parseGlobalDate(dateString);
     if (isNaN(d)) return dateString;
     return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
   };
@@ -787,7 +797,7 @@ function App() {
   const timeAgo = (dateString, updateTimestamp) => {
     if (!dateString) return '';
     const now = new Date();
-    const dateToUse = updateTimestamp ? new Date(updateTimestamp) : new Date(dateString);
+    const dateToUse = updateTimestamp ? parseGlobalDate(updateTimestamp) : parseGlobalDate(dateString);
     if (isNaN(dateToUse)) return dateString;
 
     const diffInSeconds = Math.floor((now - dateToUse) / 1000);
@@ -1179,7 +1189,7 @@ function App() {
                                                 {(() => {
                                                   const validInsts = (customer.installments || []).filter(i => i.status !== 'BOUNCED');
                                                   if (validInsts.length === 0) return 'No Payments';
-                                                  validInsts.sort((a, b) => new Date(b.date) - new Date(a.date));
+                                                  validInsts.sort((a, b) => parseGlobalDate(b.date).getTime() - parseGlobalDate(a.date).getTime());
                                                   return formatDate(validInsts[0].date);
                                                 })()}
                                               </span>
@@ -1213,7 +1223,7 @@ function App() {
                                             {isMainBranchView ? (
                                               customer.branch || customer.branchName || 'Main Branch'
                                             ) : (
-                                              <span className="text-slate-600 font-normal">{formatDate(customer.date || customer.createdAt)}</span>
+                                              <span className="text-slate-600 font-normal">{formatDate(customer.disbursedAt || customer.loanApprovedDate || customer.approvalDate || customer.loanDate || customer.date || customer.createdAt)}</span>
                                             )}
                                           </td>
                                           <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
