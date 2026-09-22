@@ -11,9 +11,14 @@ import { db } from '../firebase';
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
 
-const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer, activeBranch, isStaff }) => {
+const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer, activeBranch, isStaff, userProfile }) => {
   const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
-  const [activeTab, setActiveTab] = useState(isStaff ? 'Draft' : 'Pending');
+  
+  const isStaffMode = userProfile 
+    ? (userProfile.role !== 'admin' && userProfile?.permissions?.applicationStatusRole !== 'Admin')
+    : isStaff;
+
+  const [activeTab, setActiveTab] = useState(isStaffMode ? 'Draft' : 'Pending');
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [fullscreenImage, setFullscreenImage] = useState(null);
@@ -98,10 +103,10 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
     { id: 'Approved_Rejected', label: 'Approved / Rejected', activeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm' }
   ];
 
-  const tabs = isStaff ? staffTabs : adminTabs;
+  const tabs = isStaffMode ? staffTabs : adminTabs;
 
   const currentApps = applications.filter(app => {
-    if (isStaff && app.status === 'Draft') {
+    if (isStaffMode && app.status === 'Draft') {
       if (app.centerId || app.groupName || app.centerName || app.center) {
         return false;
       }
@@ -152,7 +157,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
         <div className="flex gap-2">
           {tabs.map(tab => {
             let count = 0;
-            if (tab.id === 'Draft' && isStaff) {
+            if (tab.id === 'Draft' && isStaffMode) {
               count = applications.filter(a => a.status === 'Draft' && !a.centerId && !a.groupName && !a.centerName && !a.center).length;
             } else if (tab.id === 'Approved_Rejected') {
               count = applications.filter(a => a.status === 'Approved' || a.status === 'Rejected').length;
@@ -194,7 +199,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                 <th className="p-2 w-24 md:w-[10%] text-left">{activeTab === 'Approved' ? 'Appr. Date' : 'Apply Date'}</th>
                 <th className="p-2 text-left w-auto md:w-[20%]">CUSTOMER</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[15%]">
-                  {isStaff ? 'AREA / CENTER' : (isMainBranch ? 'BRANCH' : 'STAFF NAME')}
+                  {isStaffMode ? 'AREA / CENTER' : (isMainBranch ? 'BRANCH' : 'STAFF NAME')}
                 </th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[15%]">GROUP NAME</th>
                 <th className="p-2 text-left hidden md:table-cell md:w-[12%]">LOAN TYPE</th>
@@ -234,7 +239,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       <div className="truncate flex flex-col">
                         <div className="font-bold text-slate-800 text-sm truncate">{app.customerName}</div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate md:hidden">
-                          {isStaff ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : `Staff: ${app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'}`)}
+                          {isStaffMode ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : `Staff: ${app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'}`)}
                         </div>
                         <div className="text-[11px] font-semibold text-slate-500 mt-0.5 tracking-tight truncate hidden md:block">
                           ID: {app.customerId?.startsWith('EMF') ? app.customerId : (app.applicationNumber?.startsWith('EMF') ? app.applicationNumber : (app.id && app.id.startsWith('EMF') ? app.id : 'EMF-PENDING'))}
@@ -242,8 +247,8 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       </div>
                     </div>
                   </td>
-                  <td className="p-2 hidden md:table-cell text-sm font-bold text-brand-blue truncate" title={isStaff ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : (app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'))}>
-                    {isStaff ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : (app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'))}
+                  <td className="p-2 hidden md:table-cell text-sm font-bold text-brand-blue truncate" title={isStaffMode ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : (app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'))}>
+                    {isStaffMode ? (app.centerArea || app.center_area || app.area || app.centerName || app.center || 'N/A') : (isMainBranch ? (app.branch || app.branchName || 'Main') : (app.staffName || app.createdByName || app.assignedStaff || resolveCustomerStaff(app, centers) || 'N/A'))}
                   </td>
                   <td className="p-2 hidden md:table-cell text-xs font-semibold text-slate-600 truncate">
                     {app.groupName || app.centerName || 'Individual / N/A'}
@@ -263,7 +268,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       }`}>
                         {app.status === 'Draft' ? 'DRAFT' : activeTab === 'Approved_Rejected' ? app.status.toUpperCase() : activeTab.toUpperCase()}
                       </span>
-                    ) : isStaff ? (
+                    ) : isStaffMode ? (
                       <div className="flex items-center gap-2">
                         {(app.status === 'Pending' || app.status === 'Approved' || app.status === 'Rejected') ? (
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold border ${
@@ -366,7 +371,7 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                       >
                         <Eye size={20} />
                       </button>
-                    ) : isStaff ? (
+                    ) : isStaffMode ? (
                       <div className="flex gap-1.5 items-center relative">
                         {app.status === 'Draft' && (
                           <>

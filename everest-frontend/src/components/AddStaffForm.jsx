@@ -8,7 +8,7 @@ import {
   Briefcase, Lock, Eye, EyeOff, Phone, MapPin, Shield, Check, X, Image as ImageIcon, AlertTriangle
 } from 'lucide-react';
 
-const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCount = 0 }) => {
+const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCount = 0, canEditPermissions = false }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -527,19 +527,21 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
           </div>
 
           {/* Permissions */}
-          <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">Permissions</label>
-            <div 
-              className="relative cursor-pointer group"
-              onClick={() => setIsPermissionsModalOpen(true)}
-            >
-              <Shield className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 group-hover:text-purple-500 transition-colors" size={18} />
-              <div className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all flex items-center group-hover:border-purple-300">
-                <span className="text-slate-700 font-medium">Click to Configure Permissions</span>
+          {canEditPermissions && (
+            <div>
+              <label className="block text-sm font-bold text-slate-800 mb-1.5">Permissions</label>
+              <div 
+                className="relative cursor-pointer group"
+                onClick={() => setIsPermissionsModalOpen(true)}
+              >
+                <Shield className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 group-hover:text-purple-500 transition-colors" size={18} />
+                <div className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all flex items-center group-hover:border-purple-300">
+                  <span className="text-slate-700 font-medium">Click to Configure Permissions</span>
+                </div>
+                <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 font-bold group-hover:text-purple-500 transition-colors">&gt;</span>
               </div>
-              <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 font-bold group-hover:text-purple-500 transition-colors">&gt;</span>
             </div>
-          </div>
+          )}
 
           {/* RELOCATED: Delete Staff Button (Visible only in Edit Mode) */}
           {editingStaff && (
@@ -585,6 +587,15 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
           )}
         </button>
       </div>
+      
+      <StaffPermissionsModal 
+        isOpen={isPermissionsModalOpen}
+        onClose={() => setIsPermissionsModalOpen(false)}
+        initialPermissions={formData.permissions}
+        onSave={(newPerms) => {
+          setFormData(prev => ({ ...prev, permissions: newPerms }));
+        }}
+      />
       </div>
 
       {/* PHOTO ACTION BOTTOMSHEET */}
@@ -668,15 +679,6 @@ const AddStaffForm = ({ onBack, onSubmit, editingStaff = null, onDelete, staffCo
           </div>
         </div>
       )}
-
-      <StaffPermissionsModal 
-        isOpen={isPermissionsModalOpen}
-        onClose={() => setIsPermissionsModalOpen(false)}
-        initialPermissions={formData.permissions}
-        onSave={(newPerms) => {
-          setFormData(prev => ({ ...prev, permissions: newPerms }));
-        }}
-      />
     </div>
   );
 };

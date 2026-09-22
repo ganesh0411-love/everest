@@ -30,7 +30,7 @@ const dummyData = [
   { id: 'EMP007', name: 'Vijay Das', designation: 'Field Officer', status: 'Active', avatarColor: 'bg-indigo-100' },
 ];
 
-const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
+const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
   
@@ -484,6 +484,14 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
       
       // CRITICAL FIX: Use uid for new documents, docId for existing documents to prevent overwriting
       await setDoc(doc(db, 'staff', isEdit ? staffData.docId : uid), staffPayload);
+
+      // ALSO sync the users collection to ensure updated permissions are loaded correctly on next login
+      if (staffPayload.uid) {
+        await setDoc(doc(db, 'users', staffPayload.uid), {
+          permissions: staffPayload.permissions || { canDeleteCustomer: false, canEditLedger: true }
+        }, { merge: true });
+      }
+
       setShowAddForm(false);
       
     } catch (error) {
@@ -540,6 +548,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           onDelete={handleDeleteStaff}
           editingStaff={editingStaff}
           staffCount={staffList.length}
+          canEditPermissions={userProfile?.role === 'admin' || userProfile?.permissions?.staffManagementRole === 'Admin'}
         />
       )}
       

@@ -53,7 +53,17 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     { name: 'Customer KYC Update', icon: '🛡️' },
     { name: 'Application Status', icon: '📝' },
     { name: 'Recycle Bin', icon: '🗑️' }
-  ];
+  ].filter(item => {
+    const permissions = userProfile?.permissions || {};
+    const isAdmin = userProfile?.role === 'admin';
+
+    if (item.name === 'Centers') return isAdmin || permissions.centerManagement === true;
+    if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
+    if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
+    if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
+
+    return true;
+  });
 
   const getDisplayBranch = () => {
     if (userProfile?.role === 'staff') {

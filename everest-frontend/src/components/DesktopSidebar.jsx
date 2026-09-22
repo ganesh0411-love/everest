@@ -15,7 +15,7 @@ import {
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 
-const DesktopSidebar = ({ currentView, setCurrentView }) => {
+const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to logout?")) {
       try {
@@ -37,7 +37,17 @@ const DesktopSidebar = ({ currentView, setCurrentView }) => {
     { name: 'Application Status', view: 'Application Status', icon: ClipboardList },
     { name: 'Customer KYC Update', view: 'Customer KYC Update', icon: ShieldCheck },
     { name: 'Recycle Bin', view: 'Recycle Bin', icon: Trash2 },
-  ];
+  ].filter(item => {
+    const permissions = userProfile?.permissions || {};
+    const isAdmin = userProfile?.role === 'admin';
+
+    if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
+    if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
+    if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
+    if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
+
+    return true;
+  });
 
   return (
     <div className="hidden md:flex flex-col h-full w-72 lg:w-80 bg-white/95 shadow-[4px_0_24px_rgba(0,0,0,0.05)] border-r border-slate-200 z-40 overflow-hidden">

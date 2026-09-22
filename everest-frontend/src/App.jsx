@@ -239,11 +239,12 @@ function App() {
           localStorage.removeItem('everest_user_profile');
           window.location.reload();
         } else {
-          // Sync branch rename cascade in real-time
+          // Sync branch rename cascade & permissions in real-time
           if (
             staffData.branch !== userProfile?.branch || 
             staffData.branchName !== userProfile?.branchName ||
-            staffData.branchId !== userProfile?.branchId
+            staffData.branchId !== userProfile?.branchId ||
+            JSON.stringify(staffData.permissions) !== JSON.stringify(userProfile?.permissions)
           ) {
             setUserProfile(prev => {
               if (!prev) return prev;
@@ -252,7 +253,8 @@ function App() {
                 ...staffData, 
                 branch: staffData.branch, 
                 branchName: staffData.branchName, 
-                branchId: staffData.branchId 
+                branchId: staffData.branchId,
+                permissions: staffData.permissions || prev.permissions
               };
               localStorage.setItem('everest_user_profile', JSON.stringify(newProfile));
               return newProfile;
@@ -917,7 +919,7 @@ function App() {
       case 'Centers': return <div className="flex-1 overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
-      case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} /></div>;
+      case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} /></div>;
       case 'Dashboard Overview': return <div className="flex-1 overflow-y-auto"><DashboardOverview /></div>;
       case 'Customer KYC Update': return <div className="flex-1 overflow-y-auto"><CustomerKYCUpdate /></div>;
       case 'Application Status': 
@@ -925,6 +927,7 @@ function App() {
           <div className="flex-1 overflow-y-auto flex flex-col">
             <ApplicationStatus 
               applications={customers}
+              userProfile={userProfile}
               onUpdateStatus={async (id, newStatus, extraData = {}) => {
                 const nowIso = new Date().toISOString();
                 try {
@@ -1473,6 +1476,7 @@ function App() {
               onBranchChange={handleBranchSwitch}
               onAddBranch={() => setIsAddBranchModalOpen(true)}
               onEditBranch={() => setIsEditBranchModalOpen(true)}
+              userProfile={userProfile}
             />
             <div className="flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] max-w-4xl mx-auto md:max-w-none md:mx-0 overflow-hidden">
               {renderView()}
