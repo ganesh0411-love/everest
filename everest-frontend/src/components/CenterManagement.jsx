@@ -256,9 +256,9 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
   };
 
   return (
-    <div className="p-4 md:p-6 w-full max-w-7xl mx-auto bg-slate-50 min-h-screen">
+    <div className="p-4 md:p-6 w-full max-w-7xl mx-auto bg-slate-50 h-[100dvh] flex flex-col overflow-hidden md:h-auto md:block md:min-h-screen md:overflow-visible">
       {/* Toolbar Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-0 md:gap-4 mb-4 md:mb-6 mt-2 w-full">
+      <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-0 md:gap-4 mb-4 md:mb-6 mt-2 w-full">
         {/* Row 1 (Mobile) / Left (Desktop): Filters */}
         <div className="flex items-center justify-between md:justify-start gap-1.5 md:gap-3 w-full md:w-auto">
           {/* Filter Pills */}
@@ -443,9 +443,9 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
       />
 
       {/* Data Table */}
-      <div className="bg-white md:rounded-xl shadow-sm border-t border-b md:border border-slate-200 overflow-x-hidden md:overflow-x-auto w-full max-w-full">
+      <div className="flex-1 min-h-0 bg-white md:rounded-xl shadow-sm border-t border-b md:border border-slate-200 overflow-x-hidden overflow-y-auto md:overflow-x-auto md:overflow-y-visible w-full max-w-full">
         <table className="w-full text-left border-collapse table-fixed md:table-auto md:min-w-[800px]">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="bg-blue-600 text-white border-b border-blue-700 text-[10px] md:text-sm font-bold md:font-semibold md:tracking-wide whitespace-nowrap">
               <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16 border-r border-white/40 md:border-white/30 box-border">#</th>
               {isMainBranch ? (

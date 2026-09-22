@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Pencil } from 'lucide-react';
+import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2 } from 'lucide-react';
 
 const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -45,26 +45,27 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
   };
 
   const menuItems = [
-    { name: 'Customer', icon: '👤' },
-    { name: 'Centers', icon: '👥' },
-    { name: 'Add Bulk Customer', icon: '📥' },
-    { name: 'Staff Management', icon: '👔' },
-    { name: 'Dashboard Overview', icon: '📊' },
-    { name: 'Customer KYC Update', icon: '🛡️' },
-    { name: 'Application Status', icon: '📝' },
-    { name: 'Recycle Bin', icon: '🗑️' }
+    { name: 'Dashboard Overview', view: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { name: 'Customer Management', view: 'Customer', icon: <Users className="w-5 h-5" /> },
+    { name: 'Center Management', view: 'Centers', icon: <Building2 className="w-5 h-5" /> },
+    { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: <UserPlus className="w-5 h-5" /> },
+    { name: 'Staff Management', view: 'Staff Management', icon: <UserCheck className="w-5 h-5" /> },
+    { name: 'Customer KYC Update', view: 'Customer KYC Update', icon: <ShieldCheck className="w-5 h-5" /> },
+    { name: 'Application Status', view: 'Application Status', icon: <ClipboardList className="w-5 h-5" /> },
+    { name: 'Recycle Bin', view: 'Recycle Bin', icon: <Trash2 className="w-5 h-5" /> }
   ].filter(item => {
     const permissions = userProfile?.permissions || {};
     const isAdmin = userProfile?.role === 'admin';
 
     if (item.name === 'Dashboard Overview') return isAdmin || permissions.dashboardOverview === true;
-    if (item.name === 'Customer') return isAdmin || permissions.customerManagement === true;
-    if (item.name === 'Centers') return isAdmin || permissions.centerManagement === true;
+    if (item.name === 'Customer Management') return isAdmin || permissions.customerManagement === true;
+    if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
+    if (item.name === 'Customer KYC Update') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 
-    return true;
+    return isAdmin; // Only admin can access the rest by default unless specified
   });
 
   const getDisplayBranch = () => {
@@ -229,10 +230,10 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
                 {menuItems.map((item) => (
                   <button 
                     key={item.name}
-                    className={`w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 transition-colors ${currentView === item.name ? 'bg-blue-50 text-brand-blue font-semibold' : 'text-slate-700'}`}
-                    onClick={() => handleMenuClick(item.name)}
+                    className={`w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 transition-colors ${currentView === item.view ? 'bg-blue-50 text-brand-blue font-semibold' : 'text-slate-700'}`}
+                    onClick={() => handleMenuClick(item.view)}
                   >
-                    <span className="text-lg opacity-80">{item.icon}</span>
+                    <span className="text-lg opacity-80 flex items-center">{item.icon}</span>
                     <span className="text-[15px]">{item.name}</span>
                   </button>
                 ))}
