@@ -4630,7 +4630,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           </div>
 
           {/* 4. EMI Calculator (Medium-Small) */}
-          <div className={`h-20 md:h-24 bg-white rounded-xl p-2.5 flex flex-col justify-between relative overflow-hidden cursor-pointer ${cardShadowClass}`} onClick={() => setCurrentView('EMI Calculator')}>
+          <div className={`h-24 bg-white rounded-xl p-3 md:p-3.5 flex flex-col justify-between relative overflow-hidden cursor-pointer ${cardShadowClass}`} onClick={() => setCurrentView('EMI Calculator')}>
             <div>
               <h3 className="font-black text-slate-800 text-[12px] uppercase mb-0.5 whitespace-nowrap">EMI Calculator</h3>
               <div className="text-slate-600 text-[9px] font-bold whitespace-nowrap">Calculate Your Loan EMI</div>
@@ -4730,11 +4730,14 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+      {(() => {
+        const totalCards = 3 + (showStaffCard ? 1 : 0) + (showLandSurveyCard ? 1 : 0);
+        return (
+          <div className="grid grid-cols-6 sm:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3 mb-3">
         {/* Staff Management */}
         {showStaffCard && (
           <div 
-            className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass} cursor-pointer`}
+            className={`col-span-3 sm:col-span-1 bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass} cursor-pointer`}
             onClick={() => setCurrentView('Staff Management')}
           >
             <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-2">Staff Management</h3>
@@ -4775,7 +4778,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
         {/* Application Status */}
         <div 
-          className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass} cursor-pointer`}
+          className={`${totalCards === 3 ? 'col-span-2' : 'col-span-3'} sm:col-span-1 bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass} cursor-pointer`}
           onClick={() => setCurrentView('Application Status')}
         >
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-1">Application Status</h3>
@@ -4799,7 +4802,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         </div>
 
         {/* Collection Reports */}
-        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}>
+        <div className={`${totalCards === 4 ? 'col-span-3' : 'col-span-2'} sm:col-span-1 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
@@ -4809,7 +4812,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         {/* Land Survey */}
         {showLandSurveyCard && (
           <div 
-            className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}
+            className={`${totalCards === 4 ? 'col-span-3' : 'col-span-2'} sm:col-span-1 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}
             onClick={() => setShowLandSurveyDashboard(true)}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -4820,13 +4823,15 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         )}
 
         {/* Attendance */}
-        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}>
+        <div className={`${totalCards === 4 ? 'col-span-3' : 'col-span-2'} sm:col-span-1 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Attendance</div>
         </div>
-      </div>
+          </div>
+        );
+      })()}
 
       {/* Land Survey Dashboard Overlay Route */}
       {showLandSurveyDashboard && (
