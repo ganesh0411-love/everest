@@ -46,7 +46,7 @@ export function useLiveTracking(userProfile) {
           if (req.location !== 'granted') return;
         }
 
-        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
         
         const updateData = {
           currentLocation: {
@@ -57,6 +57,7 @@ export function useLiveTracking(userProfile) {
         };
 
         if (isForced) {
+          console.log('[Daemon] Pushed fresh coords:', position.coords.latitude, position.coords.longitude);
           updateData['liveSession.forcePing'] = false;
         }
 
@@ -84,6 +85,7 @@ export function useLiveTracking(userProfile) {
 
       // Handle force ping
       if (liveSession.forcePing) {
+        console.log('[Daemon] Force Ping detected! Fetching fresh GPS...');
         await pingCurrentLocation(true);
       }
 

@@ -17,6 +17,17 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return (R * c).toFixed(1); 
 };
 
+function getRelativeTime(isoString) {
+  if (!isoString) return 'Unknown';
+  const diff = Date.now() - new Date(isoString).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 30) return 'Just now';
+  if (seconds < 60) return 'A few seconds ago';
+  if (seconds < 120) return '1 minute ago';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+  return new Date(isoString).toLocaleString();
+}
+
 export default function LiveTrackingModal({ staffId, staffName, adminLocation, onClose, initialMode = 'current' }) {
   const [mapLayer, setMapLayer] = useState('street'); // 'street' | 'satellite'
   const [trackingData, setTrackingData] = useState(null);
@@ -56,6 +67,8 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
       if (docSnap.exists()) {
         const data = docSnap.data();
         setTrackingData(data);
+        
+        console.log('[Admin] Received updated location snapshot at:', data.currentLocation?.updatedAt);
         
         // Auto-clear pinging state if updatedAt changes
         if (isPinging && data.currentLocation?.updatedAt !== lastUpdatedAtRef.current) {
@@ -148,9 +161,10 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
 
   const handleForcePing = async () => {
     setIsPinging(true);
+    console.log('[Admin] Force Ping dispatched to staffId:', staffId);
     try {
       await updateDoc(doc(db, 'staff_tracking', staffId), {
-        'liveSession.forcePing': true
+        'liveSession.forcePing': Date.now()
       });
       
       // Auto clear loading spinner after 5s max if location doesn't update
@@ -201,7 +215,7 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
                   )}
                 </h3>
                 <span className="text-xs text-slate-500">
-                  Updated: {loc?.updatedAt ? new Date(loc.updatedAt).toLocaleString() : 'Unknown'}
+                  Updated: {getRelativeTime(loc?.updatedAt)}
                 </span>
             </div>
             <button onClick={onClose} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
