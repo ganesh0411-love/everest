@@ -723,29 +723,50 @@ const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Ma
   const [userLocationMarker, setUserLocationMarker] = React.useState(null);
 
   const [todayMetrics, setTodayMetrics] = React.useState({ target: 0, collection: 0 });
+  const [weeklyMetrics, setWeeklyMetrics] = React.useState({ target: 0, collection: 0, overdue: 0 });
 
   React.useEffect(() => {
     if (!customers || customers.length === 0) {
       setTodayMetrics({ target: 0, collection: 0 });
+      setWeeklyMetrics({ target: 0, collection: 0, overdue: 0 });
       return;
     }
     const today = new Date();
     today.setHours(0,0,0,0);
     const todayTime = today.getTime();
 
-    let target = 0;
-    let collection = 0;
+    const d = new Date(today);
+    const day = d.getDay(); 
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const startOfWeek = new Date(d.setDate(diff));
+    startOfWeek.setHours(0,0,0,0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23,59,59,999);
+
+    let tTarget = 0;
+    let tCollection = 0;
+    let wTarget = 0;
+    let wCollection = 0;
+    let wOverdue = 0;
 
     customers.forEach(c => {
       // Only process active loans
       if (c.status !== 'Approved' && c.status !== 'approved' && c.status !== 'Live' && c.status !== 'live') return;
 
-      // Add to target if scheduled for today
-      if (c.scheduledDates && c.scheduledDates.includes(todayTime)) {
-        target += (c.dynamicEmiAmount || 0);
+      // Add to Target if scheduled
+      if (Array.isArray(c.scheduledDates)) {
+        c.scheduledDates.forEach(time => {
+          if (time === todayTime) {
+            tTarget += (c.dynamicEmiAmount || 0);
+          }
+          if (time >= startOfWeek.getTime() && time <= endOfWeek.getTime()) {
+            wTarget += (c.dynamicEmiAmount || 0);
+          }
+        });
       }
 
-      // Add to collection if they made a payment today
+      // Add to collection if they made a payment
       const insts = Array.isArray(c.installments) ? c.installments : [];
       insts.forEach(inst => {
         if (inst.status !== 'BOUNCED') {
@@ -770,15 +791,26 @@ const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Ma
           }
 
           if (dateObj && !isNaN(dateObj.getTime())) {
-            if (dateObj.getDate() === today.getDate() && dateObj.getMonth() === today.getMonth() && dateObj.getFullYear() === today.getFullYear()) {
-              collection += (parseFloat(inst.amount) || 0);
+            const time = dateObj.getTime();
+            const instDate = new Date(time);
+            instDate.setHours(0,0,0,0);
+            
+            if (instDate.getTime() === todayTime) {
+              tCollection += (parseFloat(inst.amount) || 0);
+            }
+            if (time >= startOfWeek.getTime() && time <= endOfWeek.getTime()) {
+              wCollection += (parseFloat(inst.amount) || 0);
             }
           }
         }
       });
+      
+      // Calculate overdue cumulative
+      wOverdue += (c.dynamicOverdue || 0);
     });
 
-    setTodayMetrics({ target, collection });
+    setTodayMetrics({ target: tTarget, collection: tCollection });
+    setWeeklyMetrics({ target: wTarget, collection: wCollection, overdue: wOverdue });
   }, [customers]);
 
   // --- MANUAL CAD ENGINE STATE -----
@@ -4364,41 +4396,95 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         {/* Left Column */}
         <div className="flex-1 flex flex-col gap-3">
           {/* 1. Collections Donut Chart (Largest & Tallest) */}
-          <div className={`h-48 rounded-xl p-3 flex flex-col items-center justify-between ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #10637c 0%, #0a3d4f 100%)' }}>
-            <h3 className="text-white text-sm font-black tracking-wider mb-1 uppercase">Collections</h3>
-            <div className="relative w-24 h-24 my-auto">
-              <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                <defs>
-                  <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#38bdf8" />
-                    <stop offset="100%" stopColor="#818cf8" />
-                  </linearGradient>
-                </defs>
-                <path
-                  className="text-[#d8892f]"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  stroke="url(#arcGradient)"
-                  strokeDasharray="65, 100"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  strokeWidth="4"
-                />
-              
-
-</svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-white/80 text-[8px] font-bold">Collected:</span>
-                <span className="text-white font-black text-sm leading-none mt-0.5">65%</span>
+          <div className={`h-48 rounded-xl p-4 flex flex-col justify-between ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #10637c 0%, #0a3d4f 100%)' }}>
+            <h3 className="text-white text-sm font-black tracking-wider mb-2 md:mb-1 uppercase text-center md:text-left w-full">Weekly Collection</h3>
+            
+            <div className="flex flex-row h-full items-center justify-between">
+              {/* Left Column (Metrics Summary) */}
+              <div className="flex flex-col gap-3 justify-center w-1/2 pr-2">
+                <div className="flex flex-col">
+                  <span className="text-white font-bold text-[9px] uppercase tracking-wide flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div> Target
+                  </span>
+                  <span className="text-blue-400 font-black text-sm">₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-white font-bold text-[9px] uppercase tracking-wide flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div> Collection
+                  </span>
+                  <span className="text-orange-400 font-black text-sm">₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-white font-bold text-[9px] uppercase tracking-wide flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> Overdue
+                  </span>
+                  <span className="text-red-400 font-black text-sm">₹{(weeklyMetrics.overdue || 0).toLocaleString('en-IN')}</span>
+                </div>
               </div>
-            </div>
-            <div className="text-center mt-1 w-full flex flex-col gap-0.5">
-              <div className="text-white font-bold text-[9px] uppercase tracking-wide">Target <span className="text-white text-[12px] ml-0.5">₹25,000</span></div>
-              <div className="text-white font-black text-[10px] uppercase tracking-wide">Collection <span className="text-white text-[13px] ml-0.5">₹15,450</span></div>
+
+              {/* Right Column (Tricolor Donut) */}
+              <div className="flex items-center justify-end md:justify-center w-1/2 h-full">
+                <div className="relative w-28 h-28 md:w-36 md:h-36 flex-shrink-0">
+                  <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                    <path
+                      className="text-slate-700/50"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    
+                    {(() => {
+                      const total = (weeklyMetrics.target || 0) + (weeklyMetrics.collection || 0) + (weeklyMetrics.overdue || 0);
+                      if (total === 0) return null;
+                      
+                      const targetPct = ((weeklyMetrics.target || 0) / total) * 100;
+                      const collectionPct = ((weeklyMetrics.collection || 0) / total) * 100;
+                      const overduePct = ((weeklyMetrics.overdue || 0) / total) * 100;
+                      
+                      return (
+                        <>
+                          <path
+                            className="text-blue-400"
+                            strokeDasharray={`${targetPct}, 100`}
+                            strokeDashoffset="0"
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="text-orange-400"
+                            strokeDasharray={`${collectionPct}, 100`}
+                            strokeDashoffset={`-${targetPct}`}
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="text-red-400"
+                            strokeDasharray={`${overduePct}, 100`}
+                            strokeDashoffset={`-${targetPct + collectionPct}`}
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                        </>
+                      );
+                    })()}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-white/80 text-[8px] md:text-[10px] font-bold">Collected:</span>
+                    <span className="text-white font-black text-sm md:text-xl leading-none mt-0.5 md:mt-1">
+                      {weeklyMetrics.target > 0 
+                        ? Math.min((weeklyMetrics.collection / weeklyMetrics.target) * 100, 100).toFixed(0) 
+                        : (weeklyMetrics.collection > 0 ? 100 : 0)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
