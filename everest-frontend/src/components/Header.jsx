@@ -104,7 +104,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
                             Select Branch
                           </div>
                           
-                          {branches.map((b) => {
+                          {branches.filter(b => b.isVisibleInDropdown !== false).map((b) => {
                             const branchName = typeof b === 'string' ? b : b.name;
                             const isMain = branchName.toLowerCase() === 'main branch' || branchName.toLowerCase() === 'main';
 
@@ -238,34 +238,14 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
                   </button>
                 ))}
                 
-                {/* Settings Submenu Toggle */}
-                <div className="relative">
-                  <button 
-                    className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-slate-700 transition-colors"
-                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                  >
-                    <span className="text-lg opacity-80">⚙️</span>
-                    <span className="text-[15px] flex-1">Settings</span>
-                    <span className={`text-xs transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`}>▼</span>
-                  </button>
-                  
-                  {isSettingsOpen && (
-                    <div className="bg-slate-50 border-y border-slate-100">
-                      <button 
-                        className="w-full text-left pl-12 pr-4 py-2 hover:bg-slate-100 text-sm text-slate-600"
-                        onClick={() => handleMenuClick('Change Password')}
-                      >
-                        Change Password
-                      </button>
-                      <button 
-                        className="w-full text-left pl-12 pr-4 py-2 hover:bg-slate-100 text-sm text-slate-600"
-                        onClick={() => handleMenuClick('Change Phone Number')}
-                      >
-                        Change Phone Number
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {/* Settings Toggle */}
+                <button 
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 text-slate-700 transition-colors border-t border-slate-100"
+                  onClick={() => handleMenuClick('Settings')}
+                >
+                  <span className="text-lg opacity-80">⚙️</span>
+                  <span className="text-[15px] flex-1">Settings</span>
+                </button>
               </div>
               <button 
                 onClick={handleLogout}

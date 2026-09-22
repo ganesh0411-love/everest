@@ -16,6 +16,7 @@ import {
   CustomerKYCUpdate, 
 } from './components/Placeholders';
 import CenterManagement from './components/CenterManagement';
+import Settings from './components/Settings';
 import StaffManagement from './components/StaffManagement';
 import ApplicationStatus from './components/ApplicationStatus';
 import AddCustomerModal from './components/AddCustomerModal';
@@ -673,7 +674,22 @@ function App() {
     return customers
       .filter(c => {
         const s = c.status?.trim().toLowerCase();
-        return s !== 'recycled' && s !== 'deleted' && c.isDeleted !== true && c.deleted !== true && c.inRecycleBin !== true;
+        if (s === 'recycled' || s === 'deleted' || c.isDeleted === true || c.deleted === true || c.inRecycleBin === true) {
+          return false;
+        }
+
+        // Branch Consolidation Filter for Main Branch
+        if (activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') {
+          const excludedIds = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.id));
+          const excludedNames = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.name).toLowerCase());
+          const cId = String(c.branchId || '');
+          const cName = String(c.branch || c.branchName || '').toLowerCase();
+          
+          if (excludedIds.includes(cId)) return false;
+          if (excludedNames.includes(cName)) return false;
+        }
+        
+        return true;
       })
       .map(c => {
         const repay = parseFloat(c.repayAmount) || 0;
@@ -717,7 +733,7 @@ function App() {
         scheduledDates
       };
     });
-  }, [customers]);
+  }, [customers, branches, activeBranch]);
 
   // 2. Processed Customers (With UI Table Filters Applied)
   const processedCustomers = useMemo(() => {
@@ -1006,7 +1022,8 @@ function App() {
       case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
-      case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} /></div>;
+      case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} branches={branches} /></div>;
+      case 'Settings': return <Settings branches={branches} />;
       case 'Dashboard Overview': return <div className="flex-1 overflow-y-auto"><DashboardOverview /></div>;
       case 'Customer KYC Update': return <div className="flex-1 overflow-y-auto"><CustomerKYCUpdate /></div>;
       case 'Application Status': 

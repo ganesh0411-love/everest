@@ -31,7 +31,7 @@ const dummyData = [
   { id: 'EMP007', name: 'Vijay Das', designation: 'Field Officer', status: 'Active', avatarColor: 'bg-indigo-100' },
 ];
 
-const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile }) => {
+const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, branches = [] }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
   
@@ -129,7 +129,17 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         .map(doc => ({ docId: doc.id, ...doc.data() }))
         .filter(s => {
           if (s.status === 'Recycled') return false;
-          if (activeBranch.id === 'main') return true;
+          if (activeBranch.id === 'main') {
+            const excludedIds = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.id));
+            const excludedNames = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.name).toLowerCase());
+            const sId = String(s.branchId || '');
+            const sName = String(s.branch || s.branchName || '').toLowerCase();
+            
+            if (excludedIds.includes(sId)) return false;
+            if (excludedNames.includes(sName)) return false;
+            
+            return true;
+          }
           return s.branchId === activeBranch.id;
         });
       setStaffList(fetchedStaffList);
