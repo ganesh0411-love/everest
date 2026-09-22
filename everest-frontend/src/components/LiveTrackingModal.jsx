@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { MapPin } from 'lucide-react';
+import { MapPin, Loader2 } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
@@ -20,6 +22,17 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
   const [trackingData, setTrackingData] = useState(null);
   const [isLiveActive, setIsLiveActive] = useState(initialMode === 'live');
   const [loading, setLoading] = useState(true);
+  
+  // New State for "Force Ping" loading state
+  const [isPinging, setIsPinging] = useState(false);
+  const lastUpdatedAtRef = useRef(null);
+
+  // Map Refs
+  const mapRef = useRef(null);
+  const mapInstance = useRef(null);
+  const markerRef = useRef(null);
+  const polylineRef = useRef(null);
+  const tileLayerRef = useRef(null);
 
   useEffect(() => {
     if (!staffId) return;
@@ -43,26 +56,108 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
       if (docSnap.exists()) {
         const data = docSnap.data();
         setTrackingData(data);
+        
+        // Auto-clear pinging state if updatedAt changes
+        if (isPinging && data.currentLocation?.updatedAt !== lastUpdatedAtRef.current) {
+          setIsPinging(false);
+        }
+        lastUpdatedAtRef.current = data.currentLocation?.updatedAt;
       }
       setLoading(false);
     });
 
     return () => {
       unsubscribe();
-      // On unmount, disable live tracking to conserve battery
+      // On unmount, cleanly exit live tracking
       updateDoc(trackingRef, {
-        'liveSession.isActive': false
+        'liveSession.isActive': false,
+        'liveSession.forcePing': false
       }).catch(console.error);
     };
-  }, [staffId, initialMode]);
+  }, [staffId, initialMode, isPinging]);
+
+  // Leaflet Map Initialization and updates
+  useEffect(() => {
+    const loc = trackingData?.currentLocation;
+    const route = trackingData?.liveSession?.routePath || [];
+    
+    if (loc?.lat && loc?.lng && mapRef.current && !loading) {
+      if (!mapInstance.current) {
+        // Initialize Map
+        mapInstance.current = L.map(mapRef.current, {
+          zoomControl: false,
+          attributionControl: false
+        }).setView([loc.lat, loc.lng], 17);
+
+        // Marker (Custom Icon)
+        const icon = L.divIcon({
+          html: `<div style="background: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`,
+          className: '',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+
+        markerRef.current = L.marker([loc.lat, loc.lng], { icon }).addTo(mapInstance.current);
+        
+        // Polyline
+        polylineRef.current = L.polyline([], { color: '#3b82f6', weight: 4, opacity: 0.8 }).addTo(mapInstance.current);
+      }
+
+      // Update Layer Based on state
+      if (tileLayerRef.current) {
+        mapInstance.current.removeLayer(tileLayerRef.current);
+      }
+      
+      const layerUrl = mapLayer === 'street' 
+        ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+        : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      
+      tileLayerRef.current = L.tileLayer(layerUrl, {
+        maxZoom: 19,
+      }).addTo(mapInstance.current);
+
+      // Smoothly update marker
+      markerRef.current.setLatLng([loc.lat, loc.lng]);
+
+      // Draw Polyline
+      if (isLiveActive && route.length > 0) {
+        const latLngs = route.map(pt => [pt.lat, pt.lng]);
+        polylineRef.current.setLatLngs(latLngs);
+        
+        // Auto-pan if the marker moves
+        mapInstance.current.panTo([loc.lat, loc.lng]);
+      } else {
+        polylineRef.current.setLatLngs([]);
+      }
+    }
+    
+    return () => {
+      // Cleanup happens in a separate unmount hook to avoid destroying map on every update
+    };
+  }, [trackingData, mapLayer, loading, isLiveActive]);
+  
+  // Destroy map instance on unmount
+  useEffect(() => {
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, []);
 
   const handleForcePing = async () => {
+    setIsPinging(true);
     try {
       await updateDoc(doc(db, 'staff_tracking', staffId), {
         'liveSession.forcePing': true
       });
+      
+      // Auto clear loading spinner after 5s max if location doesn't update
+      setTimeout(() => setIsPinging(false), 5000);
     } catch (e) {
       console.error(e);
+      setIsPinging(false);
     }
   };
 
@@ -73,12 +168,15 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
       if (newState) {
         await updateDoc(doc(db, 'staff_tracking', staffId), {
           'liveSession.isActive': true,
-          'liveSession.routePath': [] // reset on new session
+          'liveSession.routePath': [], // reset on new session
+          'liveSession.forcePing': false // Reset any stuck pings
         });
       } else {
         await updateDoc(doc(db, 'staff_tracking', staffId), {
-          'liveSession.isActive': false
+          'liveSession.isActive': false,
+          'liveSession.forcePing': false
         });
+        setIsPinging(false); // Reset buttons instantly
       }
     } catch (e) {
       console.error(e);
@@ -143,18 +241,7 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
                 <p>Loading location data...</p>
               </div>
             ) : loc?.lat && loc?.lng ? (
-              <iframe 
-                  width="100%" 
-                  height="100%" 
-                  frameBorder="0" 
-                  scrolling="no" 
-                  marginHeight="0" 
-                  marginWidth="0" 
-                  src={mapLayer === 'street' 
-                    ? `https://www.openstreetmap.org/export/embed.html?bbox=${loc.lng - 0.005},${loc.lat - 0.005},${loc.lng + 0.005},${loc.lat + 0.005}&layer=mapnik&marker=${loc.lat},${loc.lng}`
-                    : `https://maps.google.com/maps?q=${loc.lat},${loc.lng}&t=k&z=17&output=embed`
-                  }
-              ></iframe>
+              <div ref={mapRef} className="w-full h-full z-0" style={{ isolation: 'isolate' }}></div>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
                   <MapPin size={48} className="mb-2 opacity-30" />
@@ -166,12 +253,22 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
             {!isLiveActive ? (
               <button 
                   onClick={handleForcePing}
-                  className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors"
+                  disabled={isPinging}
+                  className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Force Ping
+                  {isPinging ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+                      Pinging...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Force Ping
+                    </>
+                  )}
               </button>
             ) : (
               <button 

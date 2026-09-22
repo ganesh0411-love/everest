@@ -98,7 +98,7 @@ export function useLiveTracking(userProfile) {
           }
 
           watchIdRef.current = await Geolocation.watchPosition(
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0, distanceFilter: 0 },
             async (position, err) => {
               if (err) {
                 console.error("Watch position error:", err);
