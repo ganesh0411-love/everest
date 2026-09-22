@@ -21,7 +21,6 @@ const Footer = ({ currentView, setCurrentView, userProfile }) => {
         </button>
 
         {showCenterCard ? (
-          {/* Groups Tab */}
           <button 
             onClick={() => setCurrentView('Centers')}
             className={`flex flex-col items-center justify-center gap-1 w-20 ${currentView === 'Centers' ? 'text-brand-blue' : 'text-slate-400 hover:text-slate-600'}`}
@@ -32,7 +31,6 @@ const Footer = ({ currentView, setCurrentView, userProfile }) => {
             <span className="text-xs font-medium">Groups</span>
           </button>
         ) : (
-          {/* View Report Tab */}
           <button 
             onClick={() => setCurrentView('Dashboard Overview')}
             className={`flex flex-col items-center justify-center gap-1 w-20 ${currentView === 'Dashboard Overview' ? 'text-brand-blue' : 'text-slate-400 hover:text-slate-600'}`}

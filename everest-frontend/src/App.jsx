@@ -164,18 +164,32 @@ function App() {
             // Augment staff profile with details from staff collection
             if (profileData.role === 'staff') {
                 try {
-                  const { collection, query, where, getDocs } = await import('firebase/firestore');
-                  const staffQuery = query(collection(db, 'staff'), where('uid', '==', currentUser.uid));
-                  const staffSnaps = await getDocs(staffQuery);
+                  const { collection, query, where, getDocs, updateDoc, doc: fDoc } = await import('firebase/firestore');
+                  let staffSnaps = await getDocs(query(collection(db, 'staff'), where('uid', '==', currentUser.uid)));
+                  
+                  if (staffSnaps.empty) {
+                    const cleanPhone = String(profileData.phone || currentUser.phoneNumber || '').replace(/\D/g, '').slice(-10);
+                    if (cleanPhone && cleanPhone.length === 10) {
+                      staffSnaps = await getDocs(query(collection(db, 'staff'), where('phone', '==', cleanPhone)));
                       if (!staffSnaps.empty) {
-                        const sDoc = staffSnaps.docs[0].data();
-                        profileData.name = sDoc.name || 'Staff Member';
-                        profileData.staffId = sDoc.staffId || sDoc.id || sDoc.employeeId || sDoc.customId || sDoc.phone || 'N/A';
-                        profileData.branchId = sDoc.branchId || profileData.branchId || 'main';
-                        profileData.branchName = sDoc.branchName || profileData.branchName || 'Main Branch';
-                        profileData.credentialsVersion = sDoc.credentialsVersion || null;
-                        profileData.photoBase64 = sDoc.photoBase64 || sDoc.photoUrl || sDoc.avatarUrl || sDoc.profileImage || null;
+                         // Auto-heal missing UID
+                         updateDoc(fDoc(db, 'staff', staffSnaps.docs[0].id), { uid: currentUser.uid }).catch(() => {});
                       }
+                    }
+                  }
+
+                  if (!staffSnaps.empty) {
+                    const sDoc = staffSnaps.docs[0].data();
+                    profileData.name = sDoc.name || 'Staff Member';
+                    profileData.staffId = sDoc.staffId || sDoc.id || sDoc.employeeId || sDoc.customId || sDoc.phone || 'N/A';
+                    profileData.branchId = sDoc.branchId || profileData.branchId || 'main';
+                    profileData.branchName = sDoc.branchName || profileData.branchName || 'Main Branch';
+                    profileData.credentialsVersion = sDoc.credentialsVersion || null;
+                    profileData.photoBase64 = sDoc.photoBase64 || sDoc.photoUrl || sDoc.avatarUrl || sDoc.profileImage || null;
+                    if (sDoc.permissions) {
+                      profileData.permissions = sDoc.permissions;
+                    }
+                  }
                   
                   // CRITICAL FIX: Lock the global application branch context to this staff's assigned branch
                   if (profileData.branchId) {
@@ -985,7 +999,7 @@ function App() {
     switch(currentView) {
       case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} onDrillDown={handleDrillDown} activeBranch={activeBranch} userProfile={userProfile} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} /></div>;
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
-      case 'Centers': return <div className="flex-1 overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} /></div>;
+      case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} /></div>;

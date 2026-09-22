@@ -446,17 +446,17 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
       <div className="flex-1 min-h-0 bg-white md:rounded-xl shadow-sm border-t border-b md:border border-slate-200 overflow-x-hidden overflow-y-auto md:overflow-x-auto md:overflow-y-visible w-full max-w-full">
         <table className="w-full text-left border-collapse table-fixed md:table-auto md:min-w-[800px]">
           <thead className="sticky top-0 z-10">
-            <tr className="bg-blue-600 text-white border-b border-blue-700 text-[10px] md:text-sm font-bold md:font-semibold md:tracking-wide whitespace-nowrap">
-              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[7%] md:w-16 border-r border-white/40 md:border-white/30 box-border">#</th>
+            <tr className="bg-blue-600 text-white border-b border-blue-700 text-[10px] md:text-sm font-bold md:font-semibold md:tracking-wide whitespace-nowrap w-full">
+              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[8%] md:w-16 border-r border-white/40 md:border-white/30 box-border">#</th>
               {isMainBranch ? (
                 <th className="hidden md:table-cell py-4 px-6 w-auto truncate md:border-r md:border-white/30 box-border">Branch Name</th>
               ) : (
                 <th className="hidden md:table-cell py-4 px-6 w-auto truncate md:border-r md:border-white/30 box-border">Staff Name</th>
               )}
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate border-r border-white/40 md:border-white/30 box-border">Village Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[22%] md:w-auto truncate border-r border-white/40 md:border-white/30 box-border">Leader</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate border-r border-white/40 md:border-white/30 box-border">Group Name</th>
-              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[11%] md:w-auto whitespace-nowrap border-r-0 md:border-r md:border-white/30 box-border">Members</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[25%] md:w-auto truncate border-r border-white/40 md:border-white/30 box-border">Village Name</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[24%] md:w-auto truncate border-r border-white/40 md:border-white/30 box-border">Leader</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 w-[27%] md:w-auto truncate border-r border-white/40 md:border-white/30 box-border">Group Name</th>
+              <th className="py-2.5 px-1 md:py-4 md:px-6 text-center w-[16%] md:w-auto whitespace-nowrap border-r-0 md:border-r md:border-white/30 box-border">Members</th>
               <th className="hidden lg:table-cell py-2.5 px-1 md:py-4 md:px-6 w-[14%] md:w-auto border-r-0 md:border-r-0 box-border">
                 <span className="hidden md:inline">Status</span>
               </th>
