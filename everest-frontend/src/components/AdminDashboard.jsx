@@ -4402,21 +4402,21 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   return (
     <div 
-      className="flex-1 w-full bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto"
+      className="flex-1 w-full max-w-full overflow-x-hidden bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
     >
       {/* Total Collections Progress */}
-      <div className={`bg-white rounded-xl p-4 mb-3 ${cardShadowClass}`}>
+      <div className={`bg-white rounded-xl px-4 py-2.5 md:p-4 mb-3 ${cardShadowClass}`}>
         {todayMetrics.target === 0 && todayMetrics.collection === 0 ? (
           <div className="text-center text-slate-500 font-bold text-[11px] py-1 uppercase tracking-wider">
             No Collection Today
           </div>
         ) : (
           <>
-            <div className="flex justify-between items-center text-[11px] font-bold mb-3">
+            <div className="flex justify-between items-center text-[11px] font-bold mb-1.5 md:mb-3">
               <div className="text-slate-900 flex items-center gap-1.5 font-black uppercase text-[10px]">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shadow-sm"></span>
                 Collection <span className="text-emerald-600 text-[14px] ml-1 tracking-tight">₹{(todayMetrics.collection || 0).toLocaleString('en-IN')}</span>
@@ -4426,21 +4426,25 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 Target <span className="text-red-500 text-[14px] ml-1 tracking-tight">₹{(todayMetrics.target || 0).toLocaleString('en-IN')}</span>
               </div>
             </div>
-            <div className="relative w-full bg-slate-100 h-3 rounded-full mt-4 border border-slate-200/60 shadow-inner">
+            <div className="relative w-full bg-slate-100 h-2.5 md:h-3 rounded-full mt-2 md:mt-4 border border-slate-200/60 shadow-inner">
               <div 
-                className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-full rounded-full transition-all duration-1000 ease-out shadow-sm" 
+                className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-full rounded-full transition-all duration-1000 ease-out shadow-sm relative" 
                 style={{ width: `${todayMetrics.target > 0 ? Math.min((todayMetrics.collection / todayMetrics.target) * 100, 100) : (todayMetrics.collection > 0 ? 100 : 0)}%` }}
               >
-                {/* Dynamic Remaining Pill */}
+                {/* Dynamic Remaining Pill (Desktop Only) */}
                 {todayMetrics.collection < todayMetrics.target && (
-                  <div className="absolute top-1/2 -translate-y-1/2 bg-slate-800 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full shadow-md whitespace-nowrap z-10"
+                  <div className="hidden md:block absolute top-1/2 -translate-y-1/2 bg-slate-800 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full shadow-md whitespace-nowrap z-10"
                        style={{ 
-                         left: `${todayMetrics.target > 0 ? Math.min((todayMetrics.collection / todayMetrics.target) * 100, 100) : 0}%`,
+                         left: `100%`,
                          transform: `translate(${todayMetrics.target > 0 && (todayMetrics.collection / todayMetrics.target) * 100 > 85 ? '-100%' : '-50%'}, -50%)`,
                          marginLeft: todayMetrics.target > 0 && (todayMetrics.collection / todayMetrics.target) * 100 > 85 ? '-8px' : '0'
                        }}>
                     ₹{(todayMetrics.target - todayMetrics.collection).toLocaleString('en-IN')} Left
                   </div>
+                )}
+                {/* Mobile Green Dot Indicator */}
+                {todayMetrics.collection > 0 && (
+                  <div className="md:hidden absolute top-1/2 -translate-y-1/2 right-0 w-2 h-2 bg-emerald-500 rounded-full shadow-sm border border-white transform translate-x-[40%]"></div>
                 )}
               </div>
             </div>
@@ -4457,35 +4461,38 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         {/* Left Column */}
         <div className="flex-1 flex flex-col gap-3">
           {/* 1. Collections Donut Chart (Largest & Tallest) */}
-          <div className={`h-48 rounded-xl p-4 flex flex-col justify-between ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #10637c 0%, #0a3d4f 100%)' }}>
-            <h3 className="text-white text-sm font-black tracking-wider mb-2 md:mb-1 uppercase text-center md:text-left w-full">Weekly Collection</h3>
+          <div className={`h-[13.5rem] md:h-48 rounded-xl p-3 md:p-4 flex flex-col justify-between ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #10637c 0%, #0a3d4f 100%)' }}>
+            <h3 className="text-white text-[12px] md:text-sm font-black tracking-wider mb-2 md:mb-1 uppercase text-center md:text-left w-full">
+              <span className="md:hidden">Weekly</span>
+              <span className="hidden md:inline">Weekly Collection</span>
+            </h3>
             
-            <div className="flex flex-row h-full items-center justify-between">
-              {/* Left Column (Metrics Summary) */}
-              <div className="flex flex-col gap-3 justify-center w-1/2 pr-2">
-                <div className="flex flex-col">
-                  <span className="text-white font-bold text-[9px] uppercase tracking-wide flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div> Target
+            <div className="flex flex-col md:flex-row h-full items-center justify-between gap-2 md:gap-0">
+              {/* Left Column / Mobile Bottom (Metrics Summary) */}
+              <div className="flex flex-col gap-0.5 md:gap-3 justify-center md:justify-start w-full md:w-1/2 md:pr-2 order-2 md:order-1 items-center md:items-start pb-1 md:pb-0">
+                <div className="flex flex-row md:flex-col items-center justify-center md:justify-start w-full gap-2 md:gap-0">
+                  <span className="text-white font-bold text-[11px] md:text-[9px] uppercase tracking-widest flex items-center gap-1">
+                    <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-blue-400"></div> Target
                   </span>
-                  <span className="text-blue-400 font-black text-sm">₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-white md:text-blue-400 font-bold tracking-wide text-[12px] md:text-sm">₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-white font-bold text-[9px] uppercase tracking-wide flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div> Collection
+                <div className="flex flex-row md:flex-col items-center justify-center md:justify-start w-full gap-2 md:gap-0 mt-0.5 md:mt-0">
+                  <span className="text-white font-bold text-[11px] md:text-[9px] uppercase tracking-widest flex items-center gap-1">
+                    <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-orange-400"></div> Collection
                   </span>
-                  <span className="text-orange-400 font-black text-sm">₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-white md:text-orange-400 font-bold tracking-wide text-[12px] md:text-sm">₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-white font-bold text-[9px] uppercase tracking-wide flex items-center gap-1">
+                <div className="hidden md:flex flex-col items-start gap-0">
+                  <span className="text-white font-bold text-[9px] uppercase tracking-widest flex items-center gap-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> Overdue
                   </span>
-                  <span className="text-red-400 font-black text-sm">₹{(weeklyMetrics.overdue || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-red-400 font-bold tracking-wide text-sm">₹{(weeklyMetrics.overdue || 0).toLocaleString('en-IN')}</span>
                 </div>
               </div>
-
-              {/* Right Column (Tricolor Donut) */}
-              <div className="flex items-center justify-end md:justify-center w-1/2 h-full">
-                <div className="relative w-28 h-28 md:w-36 md:h-36 flex-shrink-0">
+  
+              {/* Right Column / Mobile Top (Tricolor Donut) */}
+              <div className="flex items-center justify-center w-full md:w-1/2 h-full order-1 md:order-2">
+                <div className="relative w-24 h-24 md:w-36 md:h-36 flex-shrink-0">
                   {(() => {
                     const total = (weeklyMetrics.target || 0) + (weeklyMetrics.collection || 0) + (weeklyMetrics.overdue || 0);
                     return (
@@ -4556,7 +4563,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           {/* 2. Customer Recent List (Smallest) */}
           <button 
             onClick={() => setCurrentView('Customer')}
-            className={`h-24 bg-white rounded-xl p-3 flex items-center gap-3 text-left ${cardShadowClass}`}
+            className={`h-20 md:h-24 bg-white rounded-xl p-3 flex items-center gap-3 text-left ${cardShadowClass}`}
           >
             <div className="p-2 bg-slate-50 rounded-full text-[#0369a1] shadow-sm border border-slate-100 shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -4623,7 +4630,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           </div>
 
           {/* 4. EMI Calculator (Medium-Small) */}
-          <div className={`h-24 bg-white rounded-xl p-2.5 flex flex-col justify-between relative overflow-hidden cursor-pointer ${cardShadowClass}`} onClick={() => setCurrentView('EMI Calculator')}>
+          <div className={`h-20 md:h-24 bg-white rounded-xl p-2.5 flex flex-col justify-between relative overflow-hidden cursor-pointer ${cardShadowClass}`} onClick={() => setCurrentView('EMI Calculator')}>
             <div>
               <h3 className="font-black text-slate-800 text-[12px] uppercase mb-0.5 whitespace-nowrap">EMI Calculator</h3>
               <div className="text-slate-600 text-[9px] font-bold whitespace-nowrap">Calculate Your Loan EMI</div>
