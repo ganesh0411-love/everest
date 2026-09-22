@@ -9,6 +9,10 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
     allPermissions: false,
     
     // Module Access Items
+    dashboardOverview: false,
+    dashboardOverviewMode: 'Staff',
+    customerManagement: false,
+    customerManagementMode: 'Staff',
     centerManagement: false,
     staffManagement: false,
     staffManagementRole: 'Staff', // 'Staff' or 'Admin'
@@ -54,6 +58,8 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
     setPermissions(prev => ({
       ...prev,
       allPermissions: isChecked,
+      dashboardOverview: isChecked,
+      customerManagement: isChecked,
       centerManagement: isChecked,
       staffManagement: isChecked,
       applicationStatus: isChecked,
@@ -87,7 +93,76 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
         <section>
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Module Access Items</h3>
           <div className="space-y-3">
-            
+            {/* Dashboard Overview */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-xl transition-colors gap-3 sm:gap-0 ${permissions.dashboardOverview ? 'border-purple-200 bg-purple-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+              <label className="flex items-center cursor-pointer flex-1">
+                <input 
+                  type="checkbox"
+                  className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                  checked={permissions.dashboardOverview}
+                  onChange={() => handleToggle('dashboardOverview')}
+                />
+                <span className="text-sm font-bold text-slate-700">Dashboard Overview</span>
+              </label>
+              <div className={`flex items-center gap-4 sm:pl-4 sm:border-l border-slate-200 ml-7 sm:ml-0 ${!permissions.dashboardOverview ? 'opacity-40 pointer-events-none' : ''}`}>
+                <label className="flex items-center cursor-pointer text-sm">
+                  <input 
+                    type="radio"
+                    name="dashboardOverviewRole"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
+                    checked={permissions.dashboardOverviewMode === 'Staff'}
+                    onChange={() => handleRoleChange('dashboardOverviewMode', 'Staff')}
+                  />
+                  <span className="font-medium text-slate-600">Staff</span>
+                </label>
+                <label className="flex items-center cursor-pointer text-sm">
+                  <input 
+                    type="radio"
+                    name="dashboardOverviewRole"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
+                    checked={permissions.dashboardOverviewMode === 'Admin'}
+                    onChange={() => handleRoleChange('dashboardOverviewMode', 'Admin')}
+                  />
+                  <span className="font-medium text-slate-600">Admin</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Customer Management */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-xl transition-colors gap-3 sm:gap-0 ${permissions.customerManagement ? 'border-purple-200 bg-purple-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+              <label className="flex items-center cursor-pointer flex-1">
+                <input 
+                  type="checkbox"
+                  className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                  checked={permissions.customerManagement}
+                  onChange={() => handleToggle('customerManagement')}
+                />
+                <span className="text-sm font-bold text-slate-700">Customer Management</span>
+              </label>
+              <div className={`flex items-center gap-4 sm:pl-4 sm:border-l border-slate-200 ml-7 sm:ml-0 ${!permissions.customerManagement ? 'opacity-40 pointer-events-none' : ''}`}>
+                <label className="flex items-center cursor-pointer text-sm">
+                  <input 
+                    type="radio"
+                    name="customerManagementRole"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
+                    checked={permissions.customerManagementMode === 'Staff'}
+                    onChange={() => handleRoleChange('customerManagementMode', 'Staff')}
+                  />
+                  <span className="font-medium text-slate-600">Staff</span>
+                </label>
+                <label className="flex items-center cursor-pointer text-sm">
+                  <input 
+                    type="radio"
+                    name="customerManagementRole"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
+                    checked={permissions.customerManagementMode === 'Admin'}
+                    onChange={() => handleRoleChange('customerManagementMode', 'Admin')}
+                  />
+                  <span className="font-medium text-slate-600">Admin</span>
+                </label>
+              </div>
+            </div>
+
             {/* Center Management */}
             <div className="flex items-center p-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors">
               <label className="flex items-center cursor-pointer flex-1">

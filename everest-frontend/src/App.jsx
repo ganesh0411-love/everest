@@ -758,15 +758,6 @@ function App() {
       });
     }
 
-    if (userProfile?.role === 'staff') {
-      const loggedInStaffName = (userProfile?.name || userProfile?.staffName || userProfile?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : '')).toLowerCase().trim();
-      if (loggedInStaffName) {
-        filtered = filtered.filter(c => {
-          const assignedStaff = String(c?.assignedStaffName || c?.staffName || c?.assignedStaff || c?.staff || '').toLowerCase().trim();
-          return assignedStaff === loggedInStaffName;
-        });
-      }
-    }
 
     filtered.sort((a, b) => {
       switch (activeSort) {
@@ -790,9 +781,53 @@ function App() {
     return filtered;
   }, [activeCategory, activeSort, customers, searchQuery, activeBranch, activeBranchFilter, userProfile]);
 
+  // Apply RBAC Staff Scoping
+  const dashboardOverviewMode = userProfile?.permissions?.dashboardOverviewMode || 'Staff';
+  const customerManagementMode = userProfile?.permissions?.customerManagementMode || 'Staff';
+  const applicationStatusMode = userProfile?.permissions?.applicationStatusRole || 'Staff';
+
+  const isStaffAssigned = (c) => {
+    const uidMatch = c.staffId === user?.uid || c.assignedStaffId === user?.uid || c.createdBy === user?.uid;
+    if (uidMatch) return true;
+    
+    const loggedInStaffName = (userProfile?.name || userProfile?.staffName || userProfile?.displayName || user?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : '') || (user?.email ? user.email.split('@')[0] : ''))?.toLowerCase().trim();
+    if (loggedInStaffName) {
+      const cStaffName = String(c?.staffName || '').toLowerCase().trim();
+      const cAssignedStaff = String(c?.assignedStaff || '').toLowerCase().trim();
+      const cAssignedStaffName = String(c?.assignedStaffName || '').toLowerCase().trim();
+      const cStaff = String(c?.staff || '').toLowerCase().trim();
+      
+      if (cStaffName === loggedInStaffName || 
+          cAssignedStaff === loggedInStaffName || 
+          cAssignedStaffName === loggedInStaffName || 
+          cStaff === loggedInStaffName) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const rbacDashboardCustomers = useMemo(() => {
+    if (userProfile?.role === 'admin' || String(dashboardOverviewMode).toLowerCase() === 'admin') return processedCustomers;
+    return processedCustomers.filter(isStaffAssigned);
+  }, [processedCustomers, userProfile, dashboardOverviewMode, user]);
+
+  const rbacManagementCustomers = useMemo(() => {
+    if (userProfile?.role === 'admin' || String(customerManagementMode).toLowerCase() === 'admin') return processedCustomers;
+    return processedCustomers.filter(isStaffAssigned);
+  }, [processedCustomers, userProfile, customerManagementMode, user]);
+
+  const rbacApplicationCustomers = useMemo(() => {
+    if (userProfile?.role === 'admin' || String(applicationStatusMode).toLowerCase() === 'admin') return processedCustomers;
+    return processedCustomers.filter(isStaffAssigned);
+  }, [processedCustomers, userProfile, applicationStatusMode, user]);
+
+  // Select appropriate dataset based on current view to ensure metrics match tabular data
+  const activeMetricsCustomers = currentView === 'Customer' ? rbacManagementCustomers : rbacDashboardCustomers;
+
   // Aggregate Financials (Dynamic Based on UI Stream)
   const { totalLoan, totalOutstanding } = useMemo(() => {
-    const activeStream = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
+    const activeStream = activeMetricsCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
     return activeStream.reduce((acc, curr) => {
       const loanAmt = Number(curr.loanAmount) || 0;
       acc.totalLoan += loanAmt;
@@ -800,7 +835,7 @@ function App() {
       acc.totalOutstanding += (curr.dynamicOutstanding !== undefined ? curr.dynamicOutstanding : repay);
       return acc;
     }, { totalLoan: 0, totalOutstanding: 0 });
-  }, [processedCustomers]);
+  }, [activeMetricsCustomers]);
 
   // 1. SUMMARY METRICS CALCULATION ENGINE
   // STRICT FINANCIAL SUMMARY METRICS ENGINE
@@ -810,7 +845,7 @@ function App() {
     let totalOutstanding = 0;
     let totalOverdue = 0;
 
-    let approvedCustomers = (processedCustomers || []).filter(c => c && (c.status === 'Approved' || c.status === 'approved'));
+    let approvedCustomers = (activeMetricsCustomers || []).filter(c => c && (c.status === 'Approved' || c.status === 'approved'));
     if (isOdFilterActive) {
       approvedCustomers = approvedCustomers.filter(c => c.dynamicOverdue > 0 || c.dynamicPendingDues > 0);
     }
@@ -830,7 +865,7 @@ function App() {
       totalOutstanding,
       totalOverdue
     };
-  }, [processedCustomers, isOdFilterActive]);
+  }, [activeMetricsCustomers, isOdFilterActive]);
 
 
 
@@ -926,7 +961,7 @@ function App() {
         return (
           <div className="flex-1 overflow-y-auto flex flex-col">
             <ApplicationStatus 
-              applications={customers}
+              applications={rbacApplicationCustomers}
               userProfile={userProfile}
               onUpdateStatus={async (id, newStatus, extraData = {}) => {
                 const nowIso = new Date().toISOString();
@@ -1054,7 +1089,7 @@ function App() {
                 >
                   {(() => {
                     const isMainBranchView = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
-                    let approvedCustomers = processedCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
+                    let approvedCustomers = rbacManagementCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
                     
                     if (isOdFilterActive) {
                       approvedCustomers = approvedCustomers.filter(c => c.dynamicOverdue > 0 || c.dynamicPendingDues > 0);

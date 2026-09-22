@@ -41,6 +41,8 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     const permissions = userProfile?.permissions || {};
     const isAdmin = userProfile?.role === 'admin';
 
+    if (item.name === 'Dashboard Overview') return isAdmin || permissions.dashboardOverview === true;
+    if (item.name === 'Customer Management') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
