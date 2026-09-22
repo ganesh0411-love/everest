@@ -739,6 +739,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [shiftElapsed, setShiftElapsed] = React.useState('00h 00m 00s');
   const selfieInputRef = React.useRef(null);
   const [pendingAction, setPendingAction] = React.useState(null);
+  const [selectedCalendarDate, setSelectedCalendarDate] = React.useState(new Date().getDate());
 
   // Re-initialize state if user changes
   React.useEffect(() => {
@@ -5101,8 +5102,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   ))}
                 </div>
 
-                {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-y-3 gap-x-1 flex-1 content-start">
+                {/* Calendar Grid & Summary */}
+                <div className="flex flex-col flex-1">
                   {(() => {
                     const now = new Date();
                     const year = now.getFullYear();
@@ -5118,15 +5119,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     const remainingInRow = totalDaysSoFar % 7 === 0 ? 0 : 7 - (totalDaysSoFar % 7);
                     const nextDays = Array.from({ length: remainingInRow }, (_, i) => i + 1);
 
-                    return (
-                      <>
-                        {prevDays.map(d => (
-                          <div key={`prev-${d}`} className="flex flex-col items-center justify-center aspect-square text-slate-300">
-                            <span className="text-sm font-medium">{d}</span>
-                          </div>
-                        ))}
-                        
-                        {currentDays.map(d => {
+                    let presentCount = 0;
+                    let absentCount = 0;
+                    let halfDayCount = 0;
+
+                    const gridCells = currentDays.map(d => {
                           const isToday = d === now.getDate();
                           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                           const key = `attendance_${userProfile?.uid || 'guest'}_${dateStr}`;
@@ -5143,66 +5140,141 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                             status = 'absent';
                           }
 
-                          let dotColor = "bg-slate-300";
-                          if (status === 'present') dotColor = "bg-[#16a34a]";
-                          else if (status === 'half-day') dotColor = "bg-amber-400";
-                          else if (status === 'absent') dotColor = "bg-red-400";
+                          if (status === 'present') presentCount++;
+                          else if (status === 'absent') absentCount++;
+                          else if (status === 'half-day') halfDayCount++;
+
+                          let circleClass = "w-9 h-9 rounded-full flex flex-col items-center justify-center text-slate-400";
+                          let textClass = "text-sm font-medium";
+
+                          if (status === 'present') {
+                            circleClass = "w-8 h-8 rounded-full bg-green-500 shadow-md shadow-green-500/30 flex items-center justify-center text-white font-bold";
+                            textClass = "text-sm";
+                          } else if (status === 'half-day') {
+                            circleClass = "w-8 h-8 rounded-full bg-amber-400 shadow-md shadow-amber-400/30 flex items-center justify-center text-slate-900 font-bold";
+                            textClass = "text-sm";
+                          } else if (status === 'absent') {
+                            circleClass = "w-8 h-8 rounded-full bg-red-500 shadow-md shadow-red-500/30 flex items-center justify-center text-white font-bold";
+                            textClass = "text-sm";
+                          } else if (isToday) {
+                            circleClass = "w-8 h-8 rounded-full bg-blue-600 shadow-md shadow-blue-600/30 flex items-center justify-center text-white font-bold";
+                            textClass = "text-sm";
+                          }
+
+                          const isSelected = d === selectedCalendarDate;
+                          const selectionRing = isSelected ? "ring-2 ring-offset-1 ring-blue-400" : "";
 
                           return (
-                            <div key={d} className="flex flex-col items-center justify-center aspect-square relative">
-                              {isToday ? (
-                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                  <div className="w-8 h-8 rounded-full bg-blue-600 shadow-md shadow-blue-600/30 flex items-center justify-center text-white text-sm font-bold">
-                                    {d}
+                            <div key={d} onClick={() => setSelectedCalendarDate(d)} className="flex flex-col items-center justify-center aspect-square relative cursor-pointer hover:bg-slate-50 rounded-full transition-colors">
+                              {isToday && !status ? (
+                                <div className={`w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center ${selectionRing}`}>
+                                  <div className={circleClass}>
+                                    <span className={textClass}>{d}</span>
                                   </div>
                                 </div>
                               ) : (
-                                <div className="w-9 h-9 flex flex-col items-center justify-center text-slate-400">
-                                  <span className="text-sm font-medium">{d}</span>
-                                  <div className={`w-1 h-1 rounded-full ${dotColor} mt-1`}></div>
+                                <div className={`${circleClass} ${selectionRing}`}>
+                                  <span className={textClass}>{d}</span>
                                 </div>
                               )}
                             </div>
                           );
-                        })}
-                        
-                        {nextDays.map(d => (
-                          <div key={`next-${d}`} className="flex flex-col items-center justify-center aspect-square text-slate-300">
-                            <span className="text-sm font-medium">{d}</span>
+                    });
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-7 gap-y-3 gap-x-1 flex-1 content-start mb-2">
+                          {prevDays.map(d => (
+                            <div key={`prev-${d}`} className="flex flex-col items-center justify-center aspect-square text-slate-300">
+                              <span className="text-sm font-medium">{d}</span>
+                            </div>
+                          ))}
+                          
+                          {gridCells}
+                          
+                          {nextDays.map(d => (
+                            <div key={`next-${d}`} className="flex flex-col items-center justify-center aspect-square text-slate-300">
+                              <span className="text-sm font-medium">{d}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Summary Metrics Row */}
+                        <div className="flex items-center justify-between gap-1.5 mt-auto mb-1 px-1">
+                          <div className="flex flex-1 items-center justify-center py-1.5 bg-green-50 rounded-full border border-green-100/60 shadow-sm">
+                            <span className="text-[10px] font-bold text-green-700 tracking-tight whitespace-nowrap">🟢 Present: {presentCount}</span>
                           </div>
-                        ))}
+                          <div className="flex flex-1 items-center justify-center py-1.5 bg-red-50 rounded-full border border-red-100/60 shadow-sm">
+                            <span className="text-[10px] font-bold text-red-700 tracking-tight whitespace-nowrap">🔴 Absent: {absentCount}</span>
+                          </div>
+                          <div className="flex flex-1 items-center justify-center py-1.5 bg-amber-50 rounded-full border border-amber-100/60 shadow-sm">
+                            <span className="text-[10px] font-bold text-amber-700 tracking-tight whitespace-nowrap">🟡 Half Day: {halfDayCount}</span>
+                          </div>
+                        </div>
+
+                        {/* Compact Daily Shift Details Card */}
+                        <div className="mt-4 border-t border-slate-100 pt-3">
+                           {(() => {
+                             const selectedDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedCalendarDate).padStart(2, '0')}`;
+                             const selectedKey = `attendance_${userProfile?.uid || 'guest'}_${selectedDateStr}`;
+                             const selectedSaved = localStorage.getItem(selectedKey);
+                             
+                             let inStr = '--:--';
+                             let outStr = '--:--';
+                             let durStr = '--';
+                             let hasActivity = false;
+                             
+                             if (selectedSaved) {
+                               const parsed = JSON.parse(selectedSaved);
+                               if (parsed.checkInTime) {
+                                 hasActivity = true;
+                                 inStr = new Date(parsed.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                               }
+                               if (parsed.checkOutTime) {
+                                 outStr = new Date(parsed.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                 if (parsed.checkInTime) {
+                                   const diffMs = new Date(parsed.checkOutTime).getTime() - new Date(parsed.checkInTime).getTime();
+                                   const h = Math.floor(diffMs / 3600000);
+                                   const m = Math.floor((diffMs % 3600000) / 60000);
+                                   durStr = `${h}h ${String(m).padStart(2, '0')}m`;
+                                 }
+                               }
+                             }
+                             
+                             if (!hasActivity) {
+                               return (
+                                 <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 text-center">
+                                   <span className="text-xs font-medium text-slate-500">No shift activity recorded for {new Date(year, month, selectedCalendarDate).toLocaleDateString([], {month: 'short', day: 'numeric'})}</span>
+                                 </div>
+                               );
+                             }
+                             
+                             return (
+                                <div className="bg-white border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] rounded-2xl p-3 flex flex-row items-center justify-between">
+                                  <div className="flex flex-col items-center flex-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Check-in</span>
+                                    <span className="text-xs font-bold text-slate-700">{inStr}</span>
+                                  </div>
+                                  <div className="w-px h-8 bg-slate-100"></div>
+                                  <div className="flex flex-col items-center flex-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Check-out</span>
+                                    <span className="text-xs font-bold text-slate-700">{outStr}</span>
+                                  </div>
+                                  <div className="w-px h-8 bg-slate-100"></div>
+                                  <div className="flex flex-col items-center flex-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Duration</span>
+                                    <span className="text-xs font-bold text-blue-600">{durStr}</span>
+                                  </div>
+                                </div>
+                             );
+                           })()}
+                        </div>
                       </>
                     );
                   })()}
                 </div>
 
-                {/* Legend */}
-                <div className="flex flex-wrap items-center justify-center gap-3 md:gap-5 mt-4 pt-4 border-t border-slate-100">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded-full bg-[#16a34a] text-white flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    </div>
-                    <span className="text-[10px] font-medium text-slate-600">Present</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded-full bg-red-400 text-white flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </div>
-                    <span className="text-[10px] font-medium text-slate-600">Absent</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded-full bg-amber-400 text-white flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <span className="text-[10px] font-medium text-slate-600">Half Day</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                    </div>
-                    <span className="text-[10px] font-medium text-slate-600">No Record</span>
-                  </div>
-                </div>
+
               </div>
 
               {/* Bottom Action Area */}
