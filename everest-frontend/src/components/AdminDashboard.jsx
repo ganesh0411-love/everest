@@ -726,6 +726,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [weeklyMetrics, setWeeklyMetrics] = React.useState({ target: 0, collection: 0, overdue: 0 });
   const [activeDonutSlice, setActiveDonutSlice] = React.useState(null);
   const [showAttendanceOverlay, setShowAttendanceOverlay] = React.useState(false);
+  const [showMarkAttendanceCalendar, setShowMarkAttendanceCalendar] = React.useState(false);
 
   // --- OVERVIEW METRICS ENGINE ---
   const [centerMetrics, setCenterMetrics] = React.useState({ total: 0, active: 0, closed: 0 });
@@ -4889,7 +4890,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               <div className="flex flex-col md:grid md:grid-cols-3 gap-4 md:gap-6 w-full">
                 
                 {/* Action Card 1: Mark Attendance */}
-                <div className="bg-white border-2 border-[#10637c]/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-[#10637c] hover:shadow-lg transition-all active:scale-[0.98] group">
+                <div 
+                  onClick={() => setShowMarkAttendanceCalendar(true)}
+                  className="bg-white border-2 border-[#10637c]/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-[#10637c] hover:shadow-lg transition-all active:scale-[0.98] group"
+                >
                   <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-blue-50 text-[#10637c] flex items-center justify-center shrink-0 group-hover:bg-[#10637c] group-hover:text-white transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
@@ -4929,6 +4933,188 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark Attendance Calendar Overlay */}
+      {showMarkAttendanceCalendar && (
+        <div className="fixed inset-0 z-[140] bg-[#eff3f9] flex flex-col md:items-center md:justify-center md:p-8 animate-in slide-in-from-bottom-8 md:fade-in duration-300 overflow-y-auto">
+          <div className="w-full max-w-xl mx-auto flex flex-col min-h-[100dvh] md:min-h-0 md:h-auto md:rounded-[32px] bg-[#eff3f9] md:bg-white md:shadow-2xl overflow-hidden relative">
+            
+            {/* Top Navigation */}
+            <div className="flex items-center justify-between p-4 px-5">
+              <button 
+                onClick={() => setShowMarkAttendanceCalendar(false)}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-slate-800 hover:bg-black/5 active:scale-95 transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div className="flex flex-col items-center flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">Attendance</h2>
+                </div>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Be Present • Be Productive</p>
+              </div>
+              <button className="w-10 h-10 rounded-full flex items-center justify-center text-slate-800 hover:bg-black/5 active:scale-95 transition-all relative">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#eff3f9]"></div>
+              </button>
+            </div>
+
+            {/* Calendar Main Card */}
+            <div className="flex-1 px-4 pb-4 flex flex-col gap-4">
+              <div className="bg-white rounded-3xl p-5 shadow-sm flex-1 flex flex-col border border-slate-100">
+                {/* Month Selector */}
+                <div className="flex items-center justify-between mb-6">
+                  <button className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">September 2026</h3>
+                  <button className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Days Header */}
+                <div className="grid grid-cols-7 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="text-center text-[10px] font-bold text-slate-500 tracking-wide uppercase">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-y-3 gap-x-1 flex-1 content-start">
+                  {/* Previous month days */}
+                  {[30, 31].map(d => (
+                    <div key={`prev-${d}`} className="flex flex-col items-center justify-center aspect-square">
+                      <span className="text-sm text-slate-300 font-medium">{d}</span>
+                    </div>
+                  ))}
+                  
+                  {/* Current month days */}
+                  {Array.from({ length: 30 }, (_, i) => i + 1).map(d => {
+                    const isPresent = d >= 1 && d <= 21;
+                    const isToday = d === 22;
+                    
+                    return (
+                      <div key={d} className="flex flex-col items-center justify-center aspect-square relative">
+                        {isToday ? (
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-blue-600 shadow-md shadow-blue-600/30 flex items-center justify-center text-white text-sm font-bold">
+                              {d}
+                            </div>
+                          </div>
+                        ) : isPresent ? (
+                          <div className="w-9 h-9 rounded-full bg-[#16a34a] shadow-sm flex flex-col items-center justify-center text-white">
+                            <span className="text-[13px] font-bold leading-none">{d}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        ) : (
+                          <div className="w-9 h-9 flex flex-col items-center justify-center text-slate-400">
+                            <span className="text-sm font-medium">{d}</span>
+                            <div className="w-1 h-1 rounded-full bg-slate-300 mt-1"></div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Next month days */}
+                  {[1, 2, 3].map(d => (
+                    <div key={`next-${d}`} className="flex flex-col items-center justify-center aspect-square text-slate-300">
+                      <span className="text-sm font-medium">{d}</span>
+                      <div className="w-1 h-1 rounded-full bg-slate-200 mt-1"></div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Legend */}
+                <div className="flex flex-wrap items-center justify-center gap-3 md:gap-5 mt-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded-full bg-[#16a34a] text-white flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-600">Present</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded-full bg-red-400 text-white flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-600">Absent</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded-full bg-amber-400 text-white flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-600">Half Day</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-600">No Record</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Action Bar */}
+              <div className="bg-white rounded-3xl p-4 md:p-5 shadow-sm border border-slate-100 flex items-center gap-3">
+                
+                {/* Date Info Box */}
+                <div className="flex items-center gap-3 flex-1 border-r border-slate-100 pr-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-slate-700 flex flex-col items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <div className="w-3 h-0.5 bg-blue-500 rounded-full mt-0.5"></div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">TODAY</span>
+                    <span className="text-[13px] font-black text-slate-800 leading-tight">22 Sep 2026</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Tuesday</span>
+                  </div>
+                </div>
+
+                {/* Check-in Button */}
+                <button className="flex-1 h-14 bg-gradient-to-br from-[#10b981] to-[#047857] hover:from-[#34d399] hover:to-[#059669] rounded-2xl flex flex-col items-center justify-center text-white shadow-lg shadow-[#10b981]/20 transition-all active:scale-95">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="text-[11px] font-bold leading-none mb-0.5">Check-in</span>
+                  <span className="text-[8px] font-medium text-emerald-100 opacity-90">Take Selfie</span>
+                </button>
+
+                {/* Check-out Button */}
+                <button className="flex-1 h-14 bg-gradient-to-br from-[#8b5cf6] to-[#6d28d9] hover:from-[#a78bfa] hover:to-[#7c3aed] rounded-2xl flex flex-col items-center justify-center text-white shadow-lg shadow-[#8b5cf6]/20 transition-all active:scale-95">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="text-[11px] font-bold leading-none mb-0.5">Check-out</span>
+                  <span className="text-[8px] font-medium text-purple-200 opacity-90">Take Selfie</span>
+                </button>
+
+              </div>
+            </div>
+
           </div>
         </div>
       )}
