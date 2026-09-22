@@ -1444,9 +1444,24 @@ function App() {
                                     <div className="w-[16px] flex justify-center items-center">
                                       <div className="w-[2px] h-6 bg-gray-900 rounded-full flex-shrink-0"></div>
                                     </div>
-                                    <div className="w-[72px] text-left text-sm font-semibold text-rose-600">
-                                      ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
-                                    </div>
+                                    {(() => {
+                                      const outAmount = customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding : (customer.repayAmount || 0);
+                                      if (outAmount <= 0 || customer.status === 'SETTLED' || customer.status === 'CLOSED') {
+                                        return (
+                                          <div className="w-[72px] flex justify-start items-center">
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 tracking-wider">
+                                              SETTLED
+                                            </span>
+                                          </div>
+                                        );
+                                      } else {
+                                        return (
+                                          <div className="w-[72px] text-left text-sm font-semibold text-rose-600">
+                                            ₹{outAmount.toLocaleString('en-IN')}
+                                          </div>
+                                        );
+                                      }
+                                    })()}
                                   </div>
                                 </div>
                               </div>
@@ -1752,9 +1767,9 @@ function App() {
               )}
 
               {currentView !== 'Customer Detail' && !(currentView === 'Staff Management' && (activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch')) && (
-                  <div className="flex-shrink-0 z-40 relative md:hidden">
-                    <Footer currentView={currentView} setCurrentView={switchTab} userProfile={userProfile} />
-                  </div>
+                    <div className="flex-shrink-0 z-40 relative md:hidden">
+                      <Footer currentView={currentView} setCurrentView={switchTab} userProfile={userProfile} onDrillDown={handleDrillDown} />
+                    </div>
               )}
             </div>
           </div>
