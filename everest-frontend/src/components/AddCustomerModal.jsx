@@ -359,30 +359,37 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
   const [repayAmount, setRepayAmount] = useState(initialData?.repayAmount || '');
   const [interestPercent, setInterestPercent] = useState(initialData?.interestPercent || '');
   const [disbursedAmount, setDisbursedAmount] = useState(initialData?.disbursedAmount || '');
+  const [processingFee, setProcessingFee] = useState(initialData?.processingFee || '');
 
   const handleFinancialChange = (field, value) => {
     let loan = parseFloat(field === 'loanAmount' ? value : loanAmount) || 0;
     let repay = parseFloat(field === 'repayAmount' ? value : repayAmount) || 0;
     let interest = parseFloat(field === 'interestPercent' ? value : interestPercent) || 0;
+    let disbursed = parseFloat(field === 'disbursedAmount' ? value : disbursedAmount) || loan;
 
     if (field === 'loanAmount') setLoanAmount(value);
     if (field === 'repayAmount') setRepayAmount(value);
     if (field === 'interestPercent') setInterestPercent(value);
+    if (field === 'disbursedAmount') setDisbursedAmount(value);
 
     // Scenario A: Repayment-driven
-    if (field === 'loanAmount' || field === 'repayAmount') {
-      if (loan > 0 && repay > 0) {
-        setInterestPercent((((repay - loan) / loan) * 100).toFixed(2));
+    if (field === 'loanAmount' || field === 'repayAmount' || field === 'disbursedAmount') {
+      const principal = disbursed > 0 ? disbursed : loan;
+      if (principal > 0 && repay > 0) {
+        setInterestPercent((((repay - principal) / principal) * 100).toFixed(2));
+      } else if (field === 'disbursedAmount' && interest > 0) {
+        setRepayAmount((principal + (principal * interest / 100)).toFixed(2));
       } else if (field === 'loanAmount' && interest > 0) {
-        setRepayAmount((loan + (loan * interest / 100)).toFixed(2));
+        setRepayAmount((principal + (principal * interest / 100)).toFixed(2));
       } else {
         setInterestPercent('');
       }
     } 
     // Scenario B: Interest-driven
     else if (field === 'interestPercent') {
-      if (loan > 0 && interest > 0) {
-        setRepayAmount((loan + (loan * interest / 100)).toFixed(2));
+      const principal = disbursed > 0 ? disbursed : loan;
+      if (principal > 0 && interest > 0) {
+        setRepayAmount((principal + (principal * interest / 100)).toFixed(2));
       } else {
         setRepayAmount('');
       }
@@ -478,6 +485,7 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
         loanAmount: parseFloat(loanAmount) || 0,
         repayAmount: parseFloat(repayAmount) || 0,
         disbursedAmount: parseFloat(disbursedAmount) || 0,
+        processingFee: parseFloat(processingFee) || 0,
         category: 'Upcoming',
         // Schema Verification: Explicit mapping
         appDate, appDay, appNumber, image: updatedProfilePic, branchName: branch,
@@ -1217,15 +1225,27 @@ const AddCustomerModal = ({ onClose, onAddCustomer, initialData, activeBranch = 
               </div>
             </div>
 
-            <div className="mt-4">
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Disbursed Amount (₹)</label>
-              <input 
-                type="number" 
-                value={disbursedAmount} 
-                onChange={e => setDisbursedAmount(e.target.value)} 
-                placeholder="Actual amount handed to customer" 
-                className="w-full p-3 border rounded-xl outline-none transition-all duration-200 border-slate-200 bg-white text-slate-700" 
-              />
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Disbursed Amount (₹)</label>
+                <input 
+                  type="number" 
+                  value={disbursedAmount} 
+                  onChange={e => handleFinancialChange('disbursedAmount', e.target.value)} 
+                  placeholder="Actual amount" 
+                  className="w-full p-3 border rounded-xl outline-none transition-all duration-200 border-slate-200 bg-white text-slate-700" 
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Processing Fee / Others (₹)</label>
+                <input 
+                  type="number" 
+                  value={processingFee} 
+                  onChange={e => setProcessingFee(e.target.value)} 
+                  placeholder="Fee amount" 
+                  className="w-full p-3 border rounded-xl outline-none transition-all duration-200 border-slate-200 bg-white text-slate-700" 
+                />
+              </div>
             </div>
             
           </div>

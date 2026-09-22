@@ -567,13 +567,19 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Loan Amount</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">₹{application.repayAmount || '0'}</span>
+                <span className="pt-[1px]">₹{application.loanAmount || '0'}</span>
               </div>
 
               <div className="grid grid-cols-[150px_15px_1fr] items-start">
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Payable Amount</span>
                 <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
-                <span className="pt-[1px]">₹{application.repayAmount || '0'}</span>
+                <span className="pt-[1px]">₹{application.repayAmount || application.payableAmount || '0'}</span>
+              </div>
+
+              <div className="grid grid-cols-[150px_15px_1fr] items-start">
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>Processing Fee</span>
+                <span className="font-bold text-[15px]" style={{ color: '#23b3e3' }}>:</span>
+                <span className="pt-[1px]">₹{application.processingFee || '0'}</span>
               </div>
             </div>
           </div>
