@@ -21,6 +21,7 @@ import ApplicationStatus from './components/ApplicationStatus';
 import AddCustomerModal from './components/AddCustomerModal';
 import RecycleBinView from './components/RecycleBinView';
 import CenterDetailsView from './components/CenterDetailsView';
+import LiveTrackingDaemon from './components/LiveTrackingDaemon';
 import { App as CapacitorApp } from '@capacitor/app';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -1552,6 +1553,7 @@ function App() {
 
   return (
     <div className="h-[100dvh] bg-[#f8fafc] flex flex-col overflow-hidden relative">
+      <LiveTrackingDaemon userProfile={userProfile} />
       {userProfile?.role === 'customer' ? (
         <CustomerDashboard userProfile={userProfile} customers={customers} />
       ) : (
