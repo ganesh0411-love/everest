@@ -710,7 +710,12 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
   );
 };
 
-const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
+const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile }) => {
+  const isAdmin = userProfile?.role === 'admin';
+  const showStaffCard = isAdmin || userProfile?.permissions?.dashboardStaffCard === true;
+  const showLandSurveyCard = isAdmin || userProfile?.permissions?.dashboardLandSurveyCard === true;
+  const hasCenterManagement = isAdmin || userProfile?.permissions?.centerManagement === true;
+
   const cardShadowClass = "interactive-card";
   const [showLandSurveyDashboard, setShowLandSurveyDashboard] = React.useState(false);  const [activeLandSurveyView, setActiveLandSurveyView] = React.useState('menu'); // 'menu', 'simple', 'fmb', 'recreate_fmb', 'dark_draw_manual'
 
@@ -4336,10 +4341,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         <div className="flex-1 flex flex-col gap-3">
           {/* 3. Centers Overview (Medium-Large) */}
           <div className={`h-40 bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
-            <h3 className="font-black text-slate-800 text-[12px] uppercase text-center mb-1 whitespace-nowrap">Centers Overview</h3>
+            <h3 className="font-black text-slate-800 text-[12px] uppercase text-center mb-1 whitespace-nowrap">{hasCenterManagement ? 'Centers Overview' : 'Customer Overview'}</h3>
             <div className="text-center my-auto">
               <div className="text-[#d8892f] text-3xl font-black leading-none">33</div>
-              <div className="text-slate-800 text-[10px] font-black mt-1 uppercase tracking-wide">All Centers</div>
+              <div className="text-slate-800 text-[10px] font-black mt-1 uppercase tracking-wide">{hasCenterManagement ? 'All Centers' : 'All Customers'}</div>
             </div>
             <div className="flex justify-between border-b border-slate-100 pb-1.5 mb-1.5 mt-auto">
               <div className="text-center w-1/2">
@@ -4356,7 +4361,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               </div>
             </div>
             <div className="flex justify-between text-[9px] font-black uppercase">
-              <button className="text-[#0369a1]">All Centers &gt;</button>
+              <button className="text-[#0369a1]">{hasCenterManagement ? 'All Centers' : 'All Customers'} &gt;</button>
               <button className="text-red-600">Closed &gt;</button>
             </div>
           </div>
@@ -4462,50 +4467,52 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
         {/* Staff Management */}
-        <div 
-          className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}
-          onClick={() => setCurrentView('Staff Management')}
-        >
-          <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-2">Staff Management</h3>
-          <div className="flex items-center justify-between">
-            <div className="flex -space-x-2">
-              {dashboardStaffList.length === 0 ? (
-                <span className="text-xs font-bold text-slate-400 italic py-1 pl-2">+ Add Staff</span>
-              ) : (
-                dashboardStaffList.slice(0, 4).map((staff, idx) => {
-                  const avatarUrl = staff.photoBase64 || staff.photoUrl || staff.avatar || staff.photo;
-                  
-                  if (avatarUrl) {
+        {showStaffCard && (
+          <div 
+            className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass} cursor-pointer`}
+            onClick={() => setCurrentView('Staff Management')}
+          >
+            <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-2">Staff Management</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex -space-x-2">
+                {dashboardStaffList.length === 0 ? (
+                  <span className="text-xs font-bold text-slate-400 italic py-1 pl-2">+ Add Staff</span>
+                ) : (
+                  dashboardStaffList.slice(0, 4).map((staff, idx) => {
+                    const avatarUrl = staff.photoBase64 || staff.photoUrl || staff.avatar || staff.photo;
+                    
+                    if (avatarUrl) {
+                      return (
+                        <img key={staff.id || idx} src={avatarUrl} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover bg-slate-100 relative z-10" alt={staff.name} />
+                      );
+                    }
+                    
+                    const nameParts = (staff.name || 'S').trim().split(' ');
+                    let initials = nameParts[0].charAt(0).toUpperCase();
+                    if (nameParts.length > 1) {
+                      initials += nameParts[nameParts.length - 1].charAt(0).toUpperCase();
+                    } else if (nameParts[0].length > 1) {
+                      initials += nameParts[0].charAt(1).toUpperCase();
+                    }
+                    
                     return (
-                      <img key={staff.id || idx} src={avatarUrl} className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover bg-slate-100 relative z-10" alt={staff.name} />
+                      <div key={staff.id || idx} className="w-7 h-7 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-blue-100 text-blue-700 font-black text-[10px] uppercase relative z-10">
+                        {initials}
+                      </div>
                     );
-                  }
-                  
-                  const nameParts = (staff.name || 'S').trim().split(' ');
-                  let initials = nameParts[0].charAt(0).toUpperCase();
-                  if (nameParts.length > 1) {
-                    initials += nameParts[nameParts.length - 1].charAt(0).toUpperCase();
-                  } else if (nameParts[0].length > 1) {
-                    initials += nameParts[0].charAt(1).toUpperCase();
-                  }
-                  
-                  return (
-                    <div key={staff.id || idx} className="w-7 h-7 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-blue-100 text-blue-700 font-black text-[10px] uppercase relative z-10">
-                      {initials}
-                    </div>
-                  );
-                })
-              )}
+                  })
+                )}
+              </div>
+              <span className="text-slate-400 font-bold text-sm">&gt;</span>
             </div>
-            <span className="text-slate-400 font-bold text-sm">&gt;</span>
           </div>
-        </div>
+        )}
 
         {/* Application Status */}
         <div 
-          className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}
+          className={`bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass} cursor-pointer`}
           onClick={() => setCurrentView('Application Status')}
         >
           <h3 className="font-black text-slate-800 text-[10px] tracking-wider uppercase mb-1">Application Status</h3>
@@ -4527,26 +4534,30 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Bottom Actions Grid */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
+        {/* Collection Reports */}
+        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
           <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Collection<br/>Reports</div>
         </div>
-        <div 
-          className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}
-          onClick={() => setShowLandSurveyDashboard(true)}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Land<br/>Survey</div>
-        </div>
-        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass}`}>
+
+        {/* Land Survey */}
+        {showLandSurveyCard && (
+          <div 
+            className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}
+            onClick={() => setShowLandSurveyDashboard(true)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="font-black text-slate-800 text-[8px] uppercase tracking-wider">Land<br/>Survey</div>
+          </div>
+        )}
+
+        {/* Attendance */}
+        <div className={`bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>

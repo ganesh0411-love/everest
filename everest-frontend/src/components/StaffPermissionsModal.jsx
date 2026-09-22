@@ -17,7 +17,7 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
     recycleBin: false,
 
     // Dashboard Cards
-    dashboardStaffManagementCard: false,
+    dashboardStaffCard: false,
     dashboardLandSurveyCard: false,
 
     // Customer Profile Settings
@@ -58,7 +58,7 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
       staffManagement: isChecked,
       applicationStatus: isChecked,
       recycleBin: isChecked,
-      dashboardStaffManagementCard: isChecked,
+      dashboardStaffCard: isChecked,
       dashboardLandSurveyCard: isChecked,
       userSettings: isChecked
     }));
@@ -196,8 +196,8 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
               <input 
                 type="checkbox"
                 className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
-                checked={permissions.dashboardStaffManagementCard}
-                onChange={() => handleToggle('dashboardStaffManagementCard')}
+                checked={permissions.dashboardStaffCard}
+                onChange={() => handleToggle('dashboardStaffCard')}
               />
               <span className="text-sm font-medium text-slate-700">Dashboard Staff Management Card</span>
             </label>
