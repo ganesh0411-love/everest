@@ -710,7 +710,7 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
   );
 };
 
-const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile }) => {
+const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, customers = [] }) => {
   const isAdmin = userProfile?.role === 'admin';
   const showStaffCard = isAdmin || userProfile?.permissions?.dashboardStaffCard === true;
   const showLandSurveyCard = isAdmin || userProfile?.permissions?.dashboardLandSurveyCard === true;
@@ -721,6 +721,65 @@ const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Ma
 
   const [mapConfig, setMapConfig] = React.useState({ active: false, isLoading: false, baseMercX: 0, baseMercY: 0, baseLat: 0 });
   const [userLocationMarker, setUserLocationMarker] = React.useState(null);
+
+  const [todayMetrics, setTodayMetrics] = React.useState({ target: 0, collection: 0 });
+
+  React.useEffect(() => {
+    if (!customers || customers.length === 0) {
+      setTodayMetrics({ target: 0, collection: 0 });
+      return;
+    }
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const todayTime = today.getTime();
+
+    let target = 0;
+    let collection = 0;
+
+    customers.forEach(c => {
+      // Only process active loans
+      if (c.status !== 'Approved' && c.status !== 'approved' && c.status !== 'Live' && c.status !== 'live') return;
+
+      // Add to target if scheduled for today
+      if (c.scheduledDates && c.scheduledDates.includes(todayTime)) {
+        target += (c.dynamicEmiAmount || 0);
+      }
+
+      // Add to collection if they made a payment today
+      const insts = Array.isArray(c.installments) ? c.installments : [];
+      insts.forEach(inst => {
+        if (inst.status !== 'BOUNCED') {
+          // parse inst.date
+          let dateObj = null;
+          if (inst.date && typeof inst.date.toDate === 'function') dateObj = inst.date.toDate();
+          else if (inst.date && typeof inst.date === 'object' && inst.date.seconds !== undefined) dateObj = new Date(inst.date.seconds * 1000);
+          else if (typeof inst.date === 'string') {
+            if (inst.date.includes('-') && inst.date.split('-')[0].length === 2) {
+              const parts = inst.date.split('-');
+              const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
+              dateObj = new Date(`${year}-${parts[1]}-${parts[0]}`);
+            } else if (inst.date.includes('/') && inst.date.split('/')[0].length === 2) {
+              const parts = inst.date.split('/');
+              const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
+              dateObj = new Date(`${year}-${parts[1]}-${parts[0]}`);
+            } else {
+              dateObj = new Date(inst.date);
+            }
+          } else {
+            dateObj = new Date(inst.date);
+          }
+
+          if (dateObj && !isNaN(dateObj.getTime())) {
+            if (dateObj.getDate() === today.getDate() && dateObj.getMonth() === today.getMonth() && dateObj.getFullYear() === today.getFullYear()) {
+              collection += (parseFloat(inst.amount) || 0);
+            }
+          }
+        }
+      });
+    });
+
+    setTodayMetrics({ target, collection });
+  }, [customers]);
 
   // --- MANUAL CAD ENGINE STATE -----
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
@@ -4257,20 +4316,43 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       onTouchCancel={handleTouchEnd}
     >
       {/* Total Collections Progress */}
-      <div className={`bg-white rounded-xl p-3 mb-3 ${cardShadowClass}`}>
-        <div className="flex justify-between items-center text-[11px] font-bold mb-1">
-          <div className="text-slate-900 flex items-center gap-1 font-black uppercase text-[10px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-            Collection <span className="text-emerald-600 text-[13px] ml-0.5">₹15,450</span>
+      <div className={`bg-white rounded-xl p-4 mb-3 ${cardShadowClass}`}>
+        {todayMetrics.target === 0 && todayMetrics.collection === 0 ? (
+          <div className="text-center text-slate-500 font-bold text-[11px] py-1 uppercase tracking-wider">
+            No Collection Today
           </div>
-          <div className="text-slate-900 flex items-center gap-1 font-black uppercase text-[10px]">
-            <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
-            Target <span className="text-red-500 text-[13px] ml-0.5">₹25,000</span>
-          </div>
-        </div>
-        <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
-          <div className="bg-[#1ca3a6] h-full rounded-full" style={{ width: '65%' }}></div>
-        </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center text-[11px] font-bold mb-3">
+              <div className="text-slate-900 flex items-center gap-1.5 font-black uppercase text-[10px]">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shadow-sm"></span>
+                Collection <span className="text-emerald-600 text-[14px] ml-1 tracking-tight">₹{(todayMetrics.collection || 0).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-slate-900 flex items-center gap-1.5 font-black uppercase text-[10px]">
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block shadow-sm"></span>
+                Target <span className="text-red-500 text-[14px] ml-1 tracking-tight">₹{(todayMetrics.target || 0).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+            <div className="relative w-full bg-slate-100 h-3 rounded-full mt-4 border border-slate-200/60 shadow-inner">
+              <div 
+                className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-full rounded-full transition-all duration-1000 ease-out shadow-sm" 
+                style={{ width: `${todayMetrics.target > 0 ? Math.min((todayMetrics.collection / todayMetrics.target) * 100, 100) : (todayMetrics.collection > 0 ? 100 : 0)}%` }}
+              >
+                {/* Dynamic Remaining Pill */}
+                {todayMetrics.collection < todayMetrics.target && (
+                  <div className="absolute top-1/2 -translate-y-1/2 bg-slate-800 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full shadow-md whitespace-nowrap z-10"
+                       style={{ 
+                         left: `${todayMetrics.target > 0 ? Math.min((todayMetrics.collection / todayMetrics.target) * 100, 100) : 0}%`,
+                         transform: `translate(${todayMetrics.target > 0 && (todayMetrics.collection / todayMetrics.target) * 100 > 85 ? '-100%' : '-50%'}, -50%)`,
+                         marginLeft: todayMetrics.target > 0 && (todayMetrics.collection / todayMetrics.target) * 100 > 85 ? '-8px' : '0'
+                       }}>
+                    ₹{(todayMetrics.target - todayMetrics.collection).toLocaleString('en-IN')} Left
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <h2 className="text-[15px] font-black mb-3 uppercase tracking-wide text-black">
