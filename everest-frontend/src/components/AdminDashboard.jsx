@@ -4498,10 +4498,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     const total = (weeklyMetrics.target || 0) + (weeklyMetrics.collection || 0) + (weeklyMetrics.overdue || 0);
                     return (
                       <>
-                        <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                        <svg viewBox="0 0 42 42" className="w-full h-full transform -rotate-90 overflow-visible">
                           <path
                             className={total === 0 ? "text-slate-300/30" : "text-slate-700/50"}
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            d="M21 5.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="4"
@@ -4519,7 +4519,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                   className={`text-blue-400 transition-all duration-300 cursor-pointer ${activeDonutSlice && activeDonutSlice !== 'target' ? 'opacity-30' : 'opacity-100'}`}
                                   strokeDasharray={`${targetPct}, 100`}
                                   strokeDashoffset="0"
-                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  d="M21 5.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth={activeDonutSlice === 'target' ? "7" : "4"}
@@ -4529,7 +4529,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                   className={`text-orange-400 transition-all duration-300 cursor-pointer ${activeDonutSlice && activeDonutSlice !== 'collection' ? 'opacity-30' : 'opacity-100'}`}
                                   strokeDasharray={`${collectionPct}, 100`}
                                   strokeDashoffset={`-${targetPct}`}
-                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  d="M21 5.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth={activeDonutSlice === 'collection' ? "7" : "4"}
@@ -4539,7 +4539,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                   className={`text-red-400 transition-all duration-300 cursor-pointer ${activeDonutSlice && activeDonutSlice !== 'overdue' ? 'opacity-30' : 'opacity-100'}`}
                                   strokeDasharray={`${overduePct}, 100`}
                                   strokeDashoffset={`-${targetPct + collectionPct}`}
-                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  d="M21 5.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth={activeDonutSlice === 'overdue' ? "7" : "4"}
@@ -4549,40 +4549,35 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           })()}
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          {activeDonutSlice === 'target' && (
-                            <>
-                              <span className="text-white/80 text-[8px] md:text-[10px] font-bold uppercase tracking-wider">Target</span>
-                              <span className="text-blue-400 font-black text-[12px] md:text-xl leading-none mt-0.5 md:mt-1">
-                                ₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}
-                              </span>
-                            </>
-                          )}
-                          {activeDonutSlice === 'collection' && (
-                            <>
-                              <span className="text-white/80 text-[8px] md:text-[10px] font-bold uppercase tracking-wider">Collected</span>
-                              <span className="text-orange-400 font-black text-[12px] md:text-xl leading-none mt-0.5 md:mt-1">
-                                ₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}
-                              </span>
-                            </>
-                          )}
-                          {activeDonutSlice === 'overdue' && (
-                            <>
-                              <span className="text-white/80 text-[8px] md:text-[10px] font-bold uppercase tracking-wider">Overdue</span>
-                              <span className="text-red-400 font-black text-[12px] md:text-xl leading-none mt-0.5 md:mt-1">
-                                ₹{(weeklyMetrics.overdue || 0).toLocaleString('en-IN')}
-                              </span>
-                            </>
-                          )}
-                          {!activeDonutSlice && (
-                            <>
-                              <span className="text-white/80 text-[8px] md:text-[10px] font-bold">Collected:</span>
-                              <span className="text-white font-black text-sm md:text-xl leading-none mt-0.5 md:mt-1">
-                                {total === 0 ? '--' : (weeklyMetrics.target > 0 
+                          {(() => {
+                            const renderMetric = (label, valStr, colorClass, isDefault = false) => {
+                              const sizeClass = valStr.length > 7 ? 'text-[11px] md:text-lg tracking-tight' : (isDefault ? 'text-sm md:text-xl tracking-normal' : 'text-[12px] md:text-xl tracking-normal');
+                              const labelClass = isDefault ? 'text-white/80 text-[8px] md:text-[10px] font-bold' : 'text-white/80 text-[8px] md:text-[10px] font-bold uppercase tracking-wider';
+                              return (
+                                <>
+                                  <span className={labelClass}>{label}</span>
+                                  <span className={`${colorClass} font-black ${sizeClass} leading-none mt-0.5 md:mt-1`}>
+                                    {valStr}
+                                  </span>
+                                </>
+                              );
+                            };
+
+                            if (activeDonutSlice === 'target') {
+                              return renderMetric('Target', `₹${(weeklyMetrics.target || 0).toLocaleString('en-IN')}`, 'text-blue-400');
+                            }
+                            if (activeDonutSlice === 'collection') {
+                              return renderMetric('Collected', `₹${(weeklyMetrics.collection || 0).toLocaleString('en-IN')}`, 'text-orange-400');
+                            }
+                            if (activeDonutSlice === 'overdue') {
+                              return renderMetric('Overdue', `₹${(weeklyMetrics.overdue || 0).toLocaleString('en-IN')}`, 'text-red-400');
+                            }
+
+                            const pctStr = total === 0 ? '--' : (weeklyMetrics.target > 0 
                                   ? Math.min((weeklyMetrics.collection / weeklyMetrics.target) * 100, 100).toFixed(0) + '%'
-                                  : (weeklyMetrics.collection > 0 ? '100%' : '0%'))}
-                              </span>
-                            </>
-                          )}
+                                  : (weeklyMetrics.collection > 0 ? '100%' : '0%'));
+                            return renderMetric('Collected:', pctStr, 'text-white', true);
+                          })()}
                         </div>
                       </>
                     );
