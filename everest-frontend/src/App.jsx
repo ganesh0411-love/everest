@@ -525,6 +525,17 @@ function App() {
     setIsOdFilterActive(false);
   }, [activeBranch?.id, activeBranch?.name]);
 
+  // Fallback to Main Branch if active branch gets hidden from dropdown
+  useEffect(() => {
+    if (activeBranch && activeBranch.id !== 'main') {
+      const currentConfig = branches.find(b => b.id === activeBranch.id);
+      if (currentConfig && currentConfig.isVisibleInDropdown === false) {
+        const mainBranch = branches.find(b => b.id === 'main') || { id: 'main', name: 'Main Branch' };
+        setActiveBranch(mainBranch);
+      }
+    }
+  }, [branches, activeBranch]);
+
 
   const currentViewRef = useRef(currentView);
   useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
@@ -1019,7 +1030,7 @@ function App() {
     switch(currentView) {
       case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} onDrillDown={handleDrillDown} activeBranch={activeBranch} userProfile={userProfile} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} /></div>;
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
-      case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} /></div>;
+      case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} branches={branches} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} branches={branches} /></div>;

@@ -38,7 +38,11 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'branches'), (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+      const fetched = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        name: doc.data().name,
+        includeInConsolidatedTotals: doc.data().includeInConsolidatedTotals
+      }));
       setBranches([{ id: 'all', name: 'All Center' }, ...fetched]);
     });
     return () => unsub();
@@ -78,6 +82,17 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
         c.branchId === activeBranchId || 
         (selectedBranch && c.branchName === selectedBranch.name)
       );
+    } else if (isMainBranch && activeBranchId === 'all') {
+      // MAIN BRANCH VIEW with "All Center" selected - Exclude consolidated branches
+      const excludedIds = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.id));
+      const excludedNames = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.name).toLowerCase());
+      filtered = filtered.filter(c => {
+        const cId = String(c.branchId || '');
+        const cName = String(c.branchName || c.branch || '').toLowerCase();
+        if (excludedIds.includes(cId)) return false;
+        if (excludedNames.includes(cName)) return false;
+        return true;
+      });
     }
     
     return filtered;
