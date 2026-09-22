@@ -725,6 +725,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [todayMetrics, setTodayMetrics] = React.useState({ target: 0, collection: 0 });
   const [weeklyMetrics, setWeeklyMetrics] = React.useState({ target: 0, collection: 0, overdue: 0 });
   const [activeDonutSlice, setActiveDonutSlice] = React.useState(null);
+  const [showAttendanceOverlay, setShowAttendanceOverlay] = React.useState(false);
 
   // --- OVERVIEW METRICS ENGINE ---
   const [centerMetrics, setCenterMetrics] = React.useState({ total: 0, active: 0, closed: 0 });
@@ -4850,7 +4851,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         )}
 
         {/* Attendance */}
-        <div className={`${totalCards === 4 ? 'col-span-3' : 'col-span-2'} sm:col-span-1 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}>
+        <div 
+          onClick={() => setShowAttendanceOverlay(true)}
+          className={`${totalCards === 4 ? 'col-span-3' : 'col-span-2'} sm:col-span-1 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer hover:bg-slate-50 transition-colors`}
+        >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
@@ -4859,6 +4863,75 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           </div>
         );
       })()}
+
+      {/* Attendance Modal Overlay */}
+      {showAttendanceOverlay && (
+        <div className="fixed inset-0 z-[130] bg-slate-900/60 backdrop-blur-sm flex flex-col justify-end md:justify-center items-center animate-in fade-in duration-200">
+          <div className="bg-[#f8fafc] w-full md:w-auto md:min-w-[600px] h-[85vh] md:h-auto md:max-h-[80vh] rounded-t-3xl md:rounded-2xl flex flex-col shadow-2xl animate-in slide-in-from-bottom-full md:slide-in-from-bottom-8 duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-white rounded-t-3xl md:rounded-t-2xl shrink-0">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setShowAttendanceOverlay(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 active:scale-95 transition-all"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <h2 className="text-lg font-black text-slate-800 tracking-tight">ATTENDANCE ACTION</h2>
+              </div>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-5 md:p-8 flex-1 overflow-y-auto">
+              {/* Responsive Grid: Column on Mobile, Row on Desktop */}
+              <div className="flex flex-col md:grid md:grid-cols-3 gap-4 md:gap-6 w-full">
+                
+                {/* Action Card 1: Mark Attendance */}
+                <div className="bg-white border-2 border-[#10637c]/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-[#10637c] hover:shadow-lg transition-all active:scale-[0.98] group">
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-blue-50 text-[#10637c] flex items-center justify-center shrink-0 group-hover:bg-[#10637c] group-hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                    </svg>
+                  </div>
+                  <div className="flex flex-col flex-1 md:items-center">
+                    <h3 className="text-base md:text-lg font-bold text-slate-800">Mark Attendance</h3>
+                    <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5 md:mt-2 line-clamp-2">Log today's check-in / check-out.</p>
+                  </div>
+                </div>
+
+                {/* Action Card 2: Permission */}
+                <div className="bg-white border-2 border-orange-500/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-orange-500 hover:shadow-lg transition-all active:scale-[0.98] group">
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex flex-col flex-1 md:items-center">
+                    <h3 className="text-base md:text-lg font-bold text-slate-800">Permission</h3>
+                    <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5 md:mt-2 line-clamp-2">Request short duration work permission.</p>
+                  </div>
+                </div>
+
+                {/* Action Card 3: Ask Leave */}
+                <div className="bg-white border-2 border-rose-500/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-rose-500 hover:shadow-lg transition-all active:scale-[0.98] group">
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex flex-col flex-1 md:items-center">
+                    <h3 className="text-base md:text-lg font-bold text-slate-800">Ask Leave</h3>
+                    <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5 md:mt-2 line-clamp-2">Submit formal leave application.</p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Land Survey Dashboard Overlay Route */}
       {showLandSurveyDashboard && (
