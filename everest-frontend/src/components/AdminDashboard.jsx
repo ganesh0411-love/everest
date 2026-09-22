@@ -728,6 +728,66 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [showAttendanceOverlay, setShowAttendanceOverlay] = React.useState(false);
   const [showMarkAttendanceCalendar, setShowMarkAttendanceCalendar] = React.useState(false);
 
+  // --- ATTENDANCE SELFIE & TIMER ENGINE ---
+  const [attendanceState, setAttendanceState] = React.useState(() => {
+    const saved = localStorage.getItem('attendanceState_sep22');
+    return saved ? JSON.parse(saved) : { checkInTime: null, checkOutTime: null, status: null };
+  });
+  const [shiftElapsed, setShiftElapsed] = React.useState('00h 00m 00s');
+  const selfieInputRef = React.useRef(null);
+  const [pendingAction, setPendingAction] = React.useState(null);
+
+  React.useEffect(() => {
+    localStorage.setItem('attendanceState_sep22', JSON.stringify(attendanceState));
+    let timer;
+    if (attendanceState.checkInTime && !attendanceState.checkOutTime) {
+      const start = new Date(attendanceState.checkInTime).getTime();
+      timer = setInterval(() => {
+        const now = new Date().getTime();
+        const diff = now - start;
+        const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+        const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+        const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+        setShiftElapsed(`${h}h ${m}m ${s}s`);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [attendanceState]);
+
+  const handleSelfieCapture = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const now = new Date().toISOString();
+          if (pendingAction === 'check-in') {
+            setAttendanceState(prev => ({ ...prev, checkInTime: now }));
+          } else if (pendingAction === 'check-out') {
+            const coNow = new Date();
+            const ciDate = new Date(attendanceState.checkInTime);
+            const ciTime = ciDate.getHours() + ciDate.getMinutes() / 60;
+            const coTime = coNow.getHours() + coNow.getMinutes() / 60;
+            let status = 'absent';
+            if (ciTime <= 9.0 && coTime >= 17.0) {
+              status = 'present';
+            } else {
+              status = 'half-day';
+            }
+            setAttendanceState(prev => ({ ...prev, checkOutTime: now, status }));
+          }
+        },
+        (error) => {
+          console.error("GPS Error:", error);
+          alert("GPS is required for attendance.");
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
+  };
+
   // --- OVERVIEW METRICS ENGINE ---
   const [centerMetrics, setCenterMetrics] = React.useState({ total: 0, active: 0, closed: 0 });
   const [customerOverviewMetrics, setCustomerOverviewMetrics] = React.useState({ total: 0, active: 0, closed: 0 });
@@ -4961,7 +5021,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   </div>
                   <h2 className="text-xl font-bold text-slate-900 tracking-tight">Attendance</h2>
                 </div>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Be Present • Be Productive</p>
+                {attendanceState.checkInTime && !attendanceState.checkOutTime ? (
+                  <p className="text-xs text-blue-600 font-bold mt-0.5 animate-pulse">Shift Time: {shiftElapsed}</p>
+                ) : (
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Be Present • Be Productive</p>
+                )}
               </div>
               <button className="w-10 h-10 rounded-full flex items-center justify-center text-slate-800 hover:bg-black/5 active:scale-95 transition-all relative">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -5009,7 +5073,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   
                   {/* Current month days */}
                   {Array.from({ length: 30 }, (_, i) => i + 1).map(d => {
-                    const isPresent = d >= 1 && d <= 21;
                     const isToday = d === 22;
                     
                     return (
@@ -5019,13 +5082,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                             <div className="w-8 h-8 rounded-full bg-blue-600 shadow-md shadow-blue-600/30 flex items-center justify-center text-white text-sm font-bold">
                               {d}
                             </div>
-                          </div>
-                        ) : isPresent ? (
-                          <div className="w-9 h-9 rounded-full bg-[#16a34a] shadow-sm flex flex-col items-center justify-center text-white">
-                            <span className="text-[13px] font-bold leading-none">{d}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
                           </div>
                         ) : (
                           <div className="w-9 h-9 flex flex-col items-center justify-center text-slate-400">
@@ -5075,43 +5131,63 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 </div>
               </div>
 
-              {/* Bottom Action Bar */}
-              <div className="bg-white rounded-3xl p-4 md:p-5 shadow-sm border border-slate-100 flex items-center gap-3">
+              {/* Bottom Action Area */}
+              <div className="flex flex-col gap-2">
+                <input type="file" accept="image/*" capture="user" ref={selfieInputRef} className="hidden" onChange={handleSelfieCapture} />
                 
-                {/* Date Info Box */}
-                <div className="flex items-center gap-3 flex-1 border-r border-slate-100 pr-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-slate-700 flex flex-col items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                {attendanceState.checkInTime && (
+                  <div className="text-center text-xs font-bold text-slate-500">
+                    Checked in at {new Date(attendanceState.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    {attendanceState.checkOutTime && ` • Checked out at ${new Date(attendanceState.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
+                  </div>
+                )}
+                
+                {/* Bottom Action Bar */}
+                <div className="bg-white rounded-3xl p-4 md:p-5 shadow-sm border border-slate-100 flex items-center gap-3">
+                  
+                  {/* Date Info Box */}
+                  <div className="flex items-center gap-3 flex-1 border-r border-slate-100 pr-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-slate-700 flex flex-col items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <div className="w-3 h-0.5 bg-blue-500 rounded-full mt-0.5"></div>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">TODAY</span>
+                      <span className="text-[13px] font-black text-slate-800 leading-tight">22 Sep 2026</span>
+                      <span className="text-[10px] text-slate-400 font-medium">Tuesday</span>
+                    </div>
+                  </div>
+
+                  {/* Check-in Button */}
+                  <button 
+                    onClick={() => { setPendingAction('check-in'); selfieInputRef.current?.click(); }}
+                    disabled={!!attendanceState.checkInTime}
+                    className={`flex-1 h-14 rounded-2xl flex flex-col items-center justify-center text-white shadow-lg transition-all active:scale-95 ${attendanceState.checkInTime ? 'bg-slate-300 shadow-none text-white' : 'bg-gradient-to-br from-[#10b981] to-[#047857] hover:from-[#34d399] hover:to-[#059669] shadow-[#10b981]/20'}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <div className="w-3 h-0.5 bg-blue-500 rounded-full mt-0.5"></div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">TODAY</span>
-                    <span className="text-[13px] font-black text-slate-800 leading-tight">22 Sep 2026</span>
-                    <span className="text-[10px] text-slate-400 font-medium">Tuesday</span>
-                  </div>
+                    <span className="text-[11px] font-bold leading-none mb-0.5">Check-in</span>
+                    <span className="text-[8px] font-medium opacity-90">Take Selfie</span>
+                  </button>
+
+                  {/* Check-out Button */}
+                  <button 
+                    onClick={() => { setPendingAction('check-out'); selfieInputRef.current?.click(); }}
+                    disabled={!attendanceState.checkInTime || !!attendanceState.checkOutTime}
+                    className={`flex-1 h-14 rounded-2xl flex flex-col items-center justify-center text-white shadow-lg transition-all active:scale-95 ${(!attendanceState.checkInTime || attendanceState.checkOutTime) ? 'bg-slate-300 shadow-none text-white' : 'bg-gradient-to-br from-[#8b5cf6] to-[#6d28d9] hover:from-[#a78bfa] hover:to-[#7c3aed] shadow-[#8b5cf6]/20'}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span className="text-[11px] font-bold leading-none mb-0.5">Check-out</span>
+                    <span className="text-[8px] font-medium opacity-90">Take Selfie</span>
+                  </button>
+
                 </div>
-
-                {/* Check-in Button */}
-                <button className="flex-1 h-14 bg-gradient-to-br from-[#10b981] to-[#047857] hover:from-[#34d399] hover:to-[#059669] rounded-2xl flex flex-col items-center justify-center text-white shadow-lg shadow-[#10b981]/20 transition-all active:scale-95">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span className="text-[11px] font-bold leading-none mb-0.5">Check-in</span>
-                  <span className="text-[8px] font-medium text-emerald-100 opacity-90">Take Selfie</span>
-                </button>
-
-                {/* Check-out Button */}
-                <button className="flex-1 h-14 bg-gradient-to-br from-[#8b5cf6] to-[#6d28d9] hover:from-[#a78bfa] hover:to-[#7c3aed] rounded-2xl flex flex-col items-center justify-center text-white shadow-lg shadow-[#8b5cf6]/20 transition-all active:scale-95">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  <span className="text-[11px] font-bold leading-none mb-0.5">Check-out</span>
-                  <span className="text-[8px] font-medium text-purple-200 opacity-90">Take Selfie</span>
-                </button>
-
               </div>
             </div>
 
