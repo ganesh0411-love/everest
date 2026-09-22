@@ -725,6 +725,64 @@ const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Ma
   const [todayMetrics, setTodayMetrics] = React.useState({ target: 0, collection: 0 });
   const [weeklyMetrics, setWeeklyMetrics] = React.useState({ target: 0, collection: 0, overdue: 0 });
 
+  // --- OVERVIEW METRICS ENGINE ---
+  const [centerMetrics, setCenterMetrics] = React.useState({ total: 0, active: 0, closed: 0 });
+  const [customerOverviewMetrics, setCustomerOverviewMetrics] = React.useState({ total: 0, active: 0, closed: 0 });
+
+  React.useEffect(() => {
+    if (!hasCenterManagement) {
+      if (!customers || customers.length === 0) {
+        setCustomerOverviewMetrics({ total: 0, active: 0, closed: 0 });
+        return;
+      }
+      let activeCount = 0;
+      let settledCount = 0;
+      customers.forEach(c => {
+        const status = c.status?.trim().toLowerCase() || '';
+        if (['live', 'active', 'approved', 'overdue'].includes(status)) {
+          activeCount++;
+        } else if (['settled', 'closed'].includes(status)) {
+          settledCount++;
+        }
+      });
+      
+      const totalCount = activeCount + settledCount;
+      
+      setCustomerOverviewMetrics({ total: totalCount, active: activeCount, closed: settledCount });
+      return;
+    }
+
+    // If hasCenterManagement, fetch centers in real-time
+    const unsub = onSnapshot(collection(db, 'centers'), (snapshot) => {
+      let fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name?.toLowerCase() === 'main branch';
+      
+      if (userProfile?.role?.toLowerCase() === 'staff') {
+        fetched = fetched.filter(c => 
+          (c.staffName && userProfile?.name && c.staffName.toLowerCase() === userProfile.name.toLowerCase()) || 
+          (c.createdByStaffId && userProfile?.id && c.createdByStaffId === userProfile.id)
+        );
+      } else if (!isMainBranch) {
+        fetched = fetched.filter(c => 
+          c.branchId === activeBranch?.id || 
+          c.branchName?.trim().toLowerCase() === activeBranch?.name?.trim().toLowerCase()
+        );
+      }
+
+      let activeCount = 0;
+      let closedCount = 0;
+      fetched.forEach(c => {
+        if (c.status?.toLowerCase() === 'active') activeCount++;
+        else if (c.status?.toLowerCase() === 'closed') closedCount++;
+      });
+
+      setCenterMetrics({ total: fetched.length, active: activeCount, closed: closedCount });
+    });
+
+    return () => unsub();
+  }, [hasCenterManagement, activeBranch, userProfile, customers]);
+
   React.useEffect(() => {
     if (!customers || customers.length === 0) {
       setTodayMetrics({ target: 0, collection: 0 });
@@ -4425,64 +4483,68 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               {/* Right Column (Tricolor Donut) */}
               <div className="flex items-center justify-end md:justify-center w-1/2 h-full">
                 <div className="relative w-28 h-28 md:w-36 md:h-36 flex-shrink-0">
-                  <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                    <path
-                      className="text-slate-700/50"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    
-                    {(() => {
-                      const total = (weeklyMetrics.target || 0) + (weeklyMetrics.collection || 0) + (weeklyMetrics.overdue || 0);
-                      if (total === 0) return null;
-                      
-                      const targetPct = ((weeklyMetrics.target || 0) / total) * 100;
-                      const collectionPct = ((weeklyMetrics.collection || 0) / total) * 100;
-                      const overduePct = ((weeklyMetrics.overdue || 0) / total) * 100;
-                      
-                      return (
-                        <>
+                  {(() => {
+                    const total = (weeklyMetrics.target || 0) + (weeklyMetrics.collection || 0) + (weeklyMetrics.overdue || 0);
+                    return (
+                      <>
+                        <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                           <path
-                            className="text-blue-400"
-                            strokeDasharray={`${targetPct}, 100`}
-                            strokeDashoffset="0"
+                            className={total === 0 ? "text-slate-300/30" : "text-slate-700/50"}
                             d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="4"
                           />
-                          <path
-                            className="text-orange-400"
-                            strokeDasharray={`${collectionPct}, 100`}
-                            strokeDashoffset={`-${targetPct}`}
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="text-red-400"
-                            strokeDasharray={`${overduePct}, 100`}
-                            strokeDashoffset={`-${targetPct + collectionPct}`}
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                        </>
-                      );
-                    })()}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-white/80 text-[8px] md:text-[10px] font-bold">Collected:</span>
-                    <span className="text-white font-black text-sm md:text-xl leading-none mt-0.5 md:mt-1">
-                      {weeklyMetrics.target > 0 
-                        ? Math.min((weeklyMetrics.collection / weeklyMetrics.target) * 100, 100).toFixed(0) 
-                        : (weeklyMetrics.collection > 0 ? 100 : 0)}%
-                    </span>
-                  </div>
+                          
+                          {total > 0 && (() => {
+                            const targetPct = ((weeklyMetrics.target || 0) / total) * 100;
+                            const collectionPct = ((weeklyMetrics.collection || 0) / total) * 100;
+                            const overduePct = ((weeklyMetrics.overdue || 0) / total) * 100;
+                            
+                            return (
+                              <>
+                                <path
+                                  className="text-blue-400"
+                                  strokeDasharray={`${targetPct}, 100`}
+                                  strokeDashoffset="0"
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                                <path
+                                  className="text-orange-400"
+                                  strokeDasharray={`${collectionPct}, 100`}
+                                  strokeDashoffset={`-${targetPct}`}
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                                <path
+                                  className="text-red-400"
+                                  strokeDasharray={`${overduePct}, 100`}
+                                  strokeDashoffset={`-${targetPct + collectionPct}`}
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                              </>
+                            );
+                          })()}
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-white/80 text-[8px] md:text-[10px] font-bold">Collected:</span>
+                          <span className="text-white font-black text-sm md:text-xl leading-none mt-0.5 md:mt-1">
+                            {total === 0 ? '--' : (weeklyMetrics.target > 0 
+                              ? Math.min((weeklyMetrics.collection / weeklyMetrics.target) * 100, 100).toFixed(0) + '%'
+                              : (weeklyMetrics.collection > 0 ? '100%' : '0%'))}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -4511,26 +4573,26 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           <div className={`h-40 bg-white rounded-xl p-3 flex flex-col justify-between ${cardShadowClass}`}>
             <h3 className="font-black text-slate-800 text-[12px] uppercase text-center mb-1 whitespace-nowrap">{hasCenterManagement ? 'Centers Overview' : 'Customer Overview'}</h3>
             <div className="text-center my-auto">
-              <div className="text-[#d8892f] text-3xl font-black leading-none">33</div>
+              <div className="text-[#d8892f] text-3xl font-black leading-none">{hasCenterManagement ? centerMetrics.total : customerOverviewMetrics.total}</div>
               <div className="text-slate-800 text-[10px] font-black mt-1 uppercase tracking-wide">{hasCenterManagement ? 'All Centers' : 'All Customers'}</div>
             </div>
             <div className="flex justify-between border-b border-slate-100 pb-1.5 mb-1.5 mt-auto">
               <div className="text-center w-1/2">
                 <div className="flex items-center justify-center gap-1 text-[10px] font-black text-slate-800 pr-2">
-                  ACTIVE <span className="text-emerald-600 ml-0.5">20</span>
+                  ACTIVE <span className="text-emerald-600 ml-0.5">{hasCenterManagement ? centerMetrics.active : customerOverviewMetrics.active}</span>
                 </div>
                 <div className="text-[9px] text-slate-600 font-bold leading-tight mt-0.5 pr-2">Current Status</div>
               </div>
               <div className="text-center w-1/2 border-l border-slate-100">
                 <div className="flex items-center justify-center gap-1 text-[10px] font-black text-slate-800">
-                  CLOSED <span className="text-red-500 ml-0.5">13</span>
+                  {hasCenterManagement ? 'CLOSED' : 'SETTLED'} <span className="text-red-500 ml-0.5">{hasCenterManagement ? centerMetrics.closed : customerOverviewMetrics.closed}</span>
                 </div>
                 <div className="text-[9px] text-slate-600 font-bold leading-tight mt-0.5">Current Status</div>
               </div>
             </div>
             <div className="flex justify-between text-[9px] font-black uppercase">
               <button className="text-[#0369a1]">{hasCenterManagement ? 'All Centers' : 'All Customers'} &gt;</button>
-              <button className="text-red-600">Closed &gt;</button>
+              <button className="text-red-600">{hasCenterManagement ? 'Closed' : 'Settled'} &gt;</button>
             </div>
           </div>
 

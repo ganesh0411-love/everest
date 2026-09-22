@@ -626,17 +626,22 @@ function App() {
     setIsFilterOpen(false);
   };
 
-  // Process Customers List
-  const processedCustomers = useMemo(() => {
+  // 1. Base Mapped Customers (No UI Table Filters)
+  const baseMappedCustomers = useMemo(() => {
     const today = new Date();
     today.setHours(0,0,0,0);
     const parseDate = (dStr) => {
       return parseGlobalDate(dStr);
     };
 
-    let filtered = customers.map(c => {
-      const repay = parseFloat(c.repayAmount) || 0;
-      const insts = Array.isArray(c.installments) ? c.installments : [];
+    return customers
+      .filter(c => {
+        const s = c.status?.trim().toLowerCase();
+        return s !== 'recycled' && s !== 'deleted' && c.isDeleted !== true && c.deleted !== true && c.inRecycleBin !== true;
+      })
+      .map(c => {
+        const repay = parseFloat(c.repayAmount) || 0;
+        const insts = Array.isArray(c.installments) ? c.installments : [];
       const nonBouncedInsts = insts.filter(inst => inst.status !== 'BOUNCED');
       const sub = nonBouncedInsts.reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0);
       
@@ -676,6 +681,16 @@ function App() {
         scheduledDates
       };
     });
+  }, [customers]);
+
+  // 2. Processed Customers (With UI Table Filters Applied)
+  const processedCustomers = useMemo(() => {
+    let filtered = [...baseMappedCustomers];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const parseDate = (dStr) => {
+      return parseGlobalDate(dStr);
+    };
     
     if (activeCategory !== 'All') {
       const loanTypeCategories = ['Microfinance', 'Personal Loan', 'Agri Loan', 'Weekly Loan', 'Daily Loan'];
@@ -780,7 +795,7 @@ function App() {
     });
 
     return filtered;
-  }, [activeCategory, activeSort, customers, searchQuery, activeBranch, activeBranchFilter, userProfile]);
+  }, [baseMappedCustomers, activeCategory, activeSort, searchQuery, activeBranch, activeBranchFilter, userProfile, activeCustomDate]);
 
   // Apply RBAC Staff Scoping
   const dashboardOverviewMode = userProfile?.permissions?.dashboardOverviewMode || 'Staff';
@@ -809,9 +824,9 @@ function App() {
   };
 
   const rbacDashboardCustomers = useMemo(() => {
-    if (userProfile?.role === 'admin' || String(dashboardOverviewMode).toLowerCase() === 'admin') return processedCustomers;
-    return processedCustomers.filter(isStaffAssigned);
-  }, [processedCustomers, userProfile, dashboardOverviewMode, user]);
+    if (userProfile?.role === 'admin' || String(customerManagementMode).toLowerCase() === 'admin') return baseMappedCustomers;
+    return baseMappedCustomers.filter(isStaffAssigned);
+  }, [baseMappedCustomers, userProfile, customerManagementMode, user]);
 
   const rbacManagementCustomers = useMemo(() => {
     if (userProfile?.role === 'admin' || String(customerManagementMode).toLowerCase() === 'admin') return processedCustomers;
@@ -819,9 +834,9 @@ function App() {
   }, [processedCustomers, userProfile, customerManagementMode, user]);
 
   const rbacApplicationCustomers = useMemo(() => {
-    if (userProfile?.role === 'admin' || String(applicationStatusMode).toLowerCase() === 'admin') return processedCustomers;
-    return processedCustomers.filter(isStaffAssigned);
-  }, [processedCustomers, userProfile, applicationStatusMode, user]);
+    if (userProfile?.role === 'admin' || String(applicationStatusMode).toLowerCase() === 'admin') return baseMappedCustomers;
+    return baseMappedCustomers.filter(isStaffAssigned);
+  }, [baseMappedCustomers, userProfile, applicationStatusMode, user]);
 
   // Select appropriate dataset based on current view to ensure metrics match tabular data
   const activeMetricsCustomers = currentView === 'Customer' ? rbacManagementCustomers : rbacDashboardCustomers;
