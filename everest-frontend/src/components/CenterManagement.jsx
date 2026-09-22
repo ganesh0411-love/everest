@@ -209,6 +209,27 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
     }
   };
 
+  const visibleDropdownBranches = useMemo(() => {
+    if (isMainBranch) {
+      return branches.filter(b => b.id === 'all' || b.includeInConsolidatedTotals !== false);
+    }
+    return branches;
+  }, [branches, isMainBranch]);
+
+  const allCenterCount = useMemo(() => {
+    let activeCenters = centers.filter(c => c.status !== 'Deleted' && !c.isDeleted);
+    if (isMainBranch) {
+      const excludedIds = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.id));
+      const excludedNames = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.name).toLowerCase());
+      return activeCenters.filter(c => {
+        const cId = String(c.branchId || '');
+        const cName = String(c.branchName || c.branch || '').toLowerCase();
+        return !excludedIds.includes(cId) && !excludedNames.includes(cName);
+      }).length;
+    }
+    return activeCenters.length;
+  }, [centers, branches, isMainBranch]);
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Active':
@@ -348,11 +369,11 @@ export default function CenterManagement({ userProfile, activeBranch, navigateTo
                   onChange={(e) => setActiveBranchId(e.target.value)}
                   className="appearance-none bg-white border border-slate-200 text-slate-700 font-medium py-1.5 md:py-2 pl-2 md:pl-4 pr-6 md:pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-9 md:h-auto text-[11px] md:text-base"
                 >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.id === 'all' ? `All Center (${centers.filter(c => c.status !== 'Deleted' && !c.isDeleted).length})` : b.name}
-                    </option>
-                  ))}
+                    {visibleDropdownBranches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.id === 'all' ? `All Center (${allCenterCount})` : b.name}
+                      </option>
+                    ))}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 md:px-2 text-slate-500">
                   <ChevronDown size={14} />

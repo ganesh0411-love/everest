@@ -710,7 +710,7 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
   );
 };
 
-const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, customers = [] }) => {
+const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, customers = [], branches = [] }) => {
   const isAdmin = userProfile?.role === 'admin';
   const showStaffCard = isAdmin || userProfile?.permissions?.dashboardStaffCard === true;
   const showLandSurveyCard = isAdmin || userProfile?.permissions?.dashboardLandSurveyCard === true;
@@ -874,6 +874,16 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
           c.branchId === activeBranch?.id || 
           c.branchName?.trim().toLowerCase() === activeBranch?.name?.trim().toLowerCase()
         );
+      } else if (isMainBranch) {
+        const excludedIds = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.id));
+        const excludedNames = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.name).toLowerCase());
+        fetched = fetched.filter(c => {
+          const cId = String(c.branchId || '');
+          const cName = String(c.branchName || c.branch || '').toLowerCase();
+          if (excludedIds.includes(cId)) return false;
+          if (excludedNames.includes(cName)) return false;
+          return true;
+        });
       }
 
       let activeCount = 0;
