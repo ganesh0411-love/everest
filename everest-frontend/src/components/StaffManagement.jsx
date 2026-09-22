@@ -763,41 +763,76 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         {/* Mobile Card View */}
         <div className="md:hidden flex flex-col gap-3">
           {filteredStaff.map((staff, index) => (
-            <div key={index} className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${staff.photoBase64 ? 'bg-transparent' : staff.avatarColor || 'bg-slate-100'}`}>
-                  {staff.photoBase64 ? (
-                    <img src={staff.photoBase64} alt={staff.name || staff.staffName} className="w-full h-full object-cover" />
-                  ) : (
-                    <svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="24" height="24">
-                      <mask id={`mask__beam_mobile_${index}`} maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask>
-                      <g mask={`url(#mask__beam_mobile_${index})`}>
-                        <rect width="36" height="36" fill="#f0f0f0"></rect>
-                        <rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(196 18 18) scale(1)" fill="#474747" rx="36"></rect>
-                        <g transform="translate(-4 -1) rotate(6 18 18)">
-                          <path d="M15 19c2 1 4 1 6 0" stroke="#FFFFFF" fill="none" strokeLinecap="round"></path>
-                          <rect x="10" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect>
-                          <rect x="24" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect>
+            <div key={index} className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm w-full">
+              {/* 3-Column Mobile Layout */}
+              <div className="flex items-center justify-between w-full">
+                
+                {/* Column 1: Profile & Name (Left) */}
+                <div className="flex items-center gap-3 flex-[1.2] min-w-0">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${staff.photoBase64 ? 'bg-transparent' : staff.avatarColor || 'bg-slate-100'}`}>
+                    {staff.photoBase64 ? (
+                      <img src={staff.photoBase64} alt={staff.name || staff.staffName} className="w-full h-full object-cover" />
+                    ) : (
+                      <svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                        <mask id={`mask__beam_mobile_${index}`} maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36"><rect width="36" height="36" rx="72" fill="#FFFFFF"></rect></mask>
+                        <g mask={`url(#mask__beam_mobile_${index})`}>
+                          <rect width="36" height="36" fill="#f0f0f0"></rect>
+                          <rect x="0" y="0" width="36" height="36" transform="translate(6 6) rotate(196 18 18) scale(1)" fill="#474747" rx="36"></rect>
+                          <g transform="translate(-4 -1) rotate(6 18 18)">
+                            <path d="M15 19c2 1 4 1 6 0" stroke="#FFFFFF" fill="none" strokeLinecap="round"></path>
+                            <rect x="10" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect>
+                            <rect x="24" y="14" width="1.5" height="2" rx="1" stroke="none" fill="#FFFFFF"></rect>
+                          </g>
                         </g>
-                      </g>
-                    </svg>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex flex-col min-w-0 pr-2">
+                    <span className="font-bold text-slate-800 text-sm truncate">{staff.name || staff.staffName}</span>
+                    <span className="text-xs text-brand-blue font-semibold truncate">{staff.branch || staff.branchName || staff.branchId}</span>
+                  </div>
+                </div>
+
+                {/* Column 2: ID & Designation (Center) */}
+                <div className="flex flex-col flex-1 pl-2 border-l border-slate-100 min-w-0">
+                  <span className="text-[13px] font-black text-slate-800 truncate">{staff.staffId || staff.id || staff.employeeId || staff.customId || staff.uid}</span>
+                  <span className="text-[10px] font-medium text-slate-500 truncate">{staff.designation || staff.role || staff.position || 'Staff'}</span>
+                </div>
+
+                {/* Column 3: Actions (Right) */}
+                <div className="flex items-center justify-end gap-1 shrink-0 pl-1">
+                  {/* Admin Tracking Icons */}
+                  {(userProfile?.role === 'admin' || userProfile?.isAdmin === true || userProfile?.permissions?.staffManagement === true) && (
+                    <div className="flex items-center gap-0.5">
+                      <button 
+                        onClick={() => console.log('Live Tracking clicked')} 
+                        className="p-1.5 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                      >
+                        <Radio size={14} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedStaffLocation({
+                            name: staff.name,
+                            lat: staff.lastLatitude,
+                            lng: staff.lastLongitude,
+                            updatedAt: staff.lastLocationUpdatedAt
+                          });
+                          setShowMapModal(true);
+                        }}
+                        className="p-1.5 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                      >
+                        <MapPin size={14} />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {!isMainBranch && (
+                    <button onClick={() => handleOpenEditForm(staff)} className="text-slate-400 hover:text-purple-600 p-1 sm:p-1.5 transition-colors">
+                      <MoreVertical size={18} />
+                    </button>
                   )}
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-slate-800 text-sm">{staff.name || staff.staffName}</span>
-                  <span className="text-xs text-brand-blue font-semibold">{staff.branch || staff.branchName || staff.branchId}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 sm:gap-2">
-                <div className="flex flex-col items-end">
-                  <span className="text-[13px] font-black text-slate-800">{staff.staffId || staff.id || staff.employeeId || staff.customId || staff.uid}</span>
-                  <span className="text-[10px] font-medium text-slate-500">{staff.designation || staff.role || staff.position || 'Staff'}</span>
-                </div>
-                {!isMainBranch && (
-                  <button onClick={() => handleOpenEditForm(staff)} className="text-slate-400 hover:text-purple-600 p-1 sm:p-1.5 transition-colors">
-                    <MoreVertical size={18} />
-                  </button>
-                )}
               </div>
             </div>
           ))}
