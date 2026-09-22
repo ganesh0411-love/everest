@@ -724,6 +724,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
 
   const [todayMetrics, setTodayMetrics] = React.useState({ target: 0, collection: 0 });
   const [weeklyMetrics, setWeeklyMetrics] = React.useState({ target: 0, collection: 0, overdue: 0 });
+  const [activeDonutSlice, setActiveDonutSlice] = React.useState(null);
 
   // --- OVERVIEW METRICS ENGINE ---
   const [centerMetrics, setCenterMetrics] = React.useState({ total: 0, active: 0, closed: 0 });
@@ -4461,26 +4462,26 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         {/* Left Column */}
         <div className="flex-1 flex flex-col gap-3">
           {/* 1. Collections Donut Chart (Largest & Tallest) */}
-          <div className={`h-[13.5rem] md:h-48 rounded-xl p-3 md:p-4 flex flex-col justify-between ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #10637c 0%, #0a3d4f 100%)' }}>
-            <h3 className="text-white text-[12px] md:text-sm font-black tracking-wider mb-2 md:mb-1 uppercase text-center md:text-left w-full">
-              <span className="md:hidden">Weekly</span>
-              <span className="hidden md:inline">Weekly Collection</span>
+          <div onClick={() => setActiveDonutSlice(null)} className={`h-[13.5rem] md:h-48 rounded-xl p-3 md:p-4 flex flex-col justify-between ${cardShadowClass}`} style={{ background: 'linear-gradient(135deg, #10637c 0%, #0a3d4f 100%)' }}>
+            <h3 className="text-white font-black tracking-wider mb-2 md:mb-1 uppercase text-center md:text-left w-full">
+              <span className="md:hidden text-[10px]">Weekly Report</span>
+              <span className="hidden md:inline text-sm">Weekly Collection</span>
             </h3>
             
             <div className="flex flex-col md:flex-row h-full items-center justify-between gap-2 md:gap-0">
               {/* Left Column / Mobile Bottom (Metrics Summary) */}
               <div className="flex flex-col gap-0.5 md:gap-3 justify-center md:justify-start w-full md:w-1/2 md:pr-2 order-2 md:order-1 items-center md:items-start pb-1 md:pb-0">
                 <div className="flex flex-row md:flex-col items-center justify-center md:justify-start w-full gap-2 md:gap-0">
-                  <span className="text-white font-bold text-[11px] md:text-[9px] uppercase tracking-widest flex items-center gap-1">
-                    <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-blue-400"></div> Target
+                  <span className="font-medium text-white text-[11px] md:text-[9px] uppercase tracking-widest flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div> Target
                   </span>
-                  <span className="text-white md:text-blue-400 font-bold tracking-wide text-[12px] md:text-sm">₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-blue-400 font-bold tracking-wide text-[12px] md:text-sm">₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex flex-row md:flex-col items-center justify-center md:justify-start w-full gap-2 md:gap-0 mt-0.5 md:mt-0">
-                  <span className="text-white font-bold text-[11px] md:text-[9px] uppercase tracking-widest flex items-center gap-1">
-                    <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-orange-400"></div> Collection
+                  <span className="font-medium text-white text-[11px] md:text-[9px] uppercase tracking-widest flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div> Collection
                   </span>
-                  <span className="text-white md:text-orange-400 font-bold tracking-wide text-[12px] md:text-sm">₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-orange-400 font-bold tracking-wide text-[12px] md:text-sm">₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="hidden md:flex flex-col items-start gap-0">
                   <span className="text-white font-bold text-[9px] uppercase tracking-widest flex items-center gap-1">
@@ -4514,43 +4515,74 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                             return (
                               <>
                                 <path
-                                  className="text-blue-400"
+                                  onClick={(e) => { e.stopPropagation(); setActiveDonutSlice(activeDonutSlice === 'target' ? null : 'target'); }}
+                                  className={`text-blue-400 transition-all duration-300 cursor-pointer ${activeDonutSlice && activeDonutSlice !== 'target' ? 'opacity-30' : 'opacity-100'}`}
                                   strokeDasharray={`${targetPct}, 100`}
                                   strokeDashoffset="0"
                                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                                   fill="none"
                                   stroke="currentColor"
-                                  strokeWidth="4"
+                                  strokeWidth={activeDonutSlice === 'target' ? "7" : "4"}
                                 />
                                 <path
-                                  className="text-orange-400"
+                                  onClick={(e) => { e.stopPropagation(); setActiveDonutSlice(activeDonutSlice === 'collection' ? null : 'collection'); }}
+                                  className={`text-orange-400 transition-all duration-300 cursor-pointer ${activeDonutSlice && activeDonutSlice !== 'collection' ? 'opacity-30' : 'opacity-100'}`}
                                   strokeDasharray={`${collectionPct}, 100`}
                                   strokeDashoffset={`-${targetPct}`}
                                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                                   fill="none"
                                   stroke="currentColor"
-                                  strokeWidth="4"
+                                  strokeWidth={activeDonutSlice === 'collection' ? "7" : "4"}
                                 />
                                 <path
-                                  className="text-red-400"
+                                  onClick={(e) => { e.stopPropagation(); setActiveDonutSlice(activeDonutSlice === 'overdue' ? null : 'overdue'); }}
+                                  className={`text-red-400 transition-all duration-300 cursor-pointer ${activeDonutSlice && activeDonutSlice !== 'overdue' ? 'opacity-30' : 'opacity-100'}`}
                                   strokeDasharray={`${overduePct}, 100`}
                                   strokeDashoffset={`-${targetPct + collectionPct}`}
                                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                                   fill="none"
                                   stroke="currentColor"
-                                  strokeWidth="4"
+                                  strokeWidth={activeDonutSlice === 'overdue' ? "7" : "4"}
                                 />
                               </>
                             );
                           })()}
                         </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="text-white/80 text-[8px] md:text-[10px] font-bold">Collected:</span>
-                          <span className="text-white font-black text-sm md:text-xl leading-none mt-0.5 md:mt-1">
-                            {total === 0 ? '--' : (weeklyMetrics.target > 0 
-                              ? Math.min((weeklyMetrics.collection / weeklyMetrics.target) * 100, 100).toFixed(0) + '%'
-                              : (weeklyMetrics.collection > 0 ? '100%' : '0%'))}
-                          </span>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                          {activeDonutSlice === 'target' && (
+                            <>
+                              <span className="text-white/80 text-[8px] md:text-[10px] font-bold uppercase tracking-wider">Target</span>
+                              <span className="text-blue-400 font-black text-[12px] md:text-xl leading-none mt-0.5 md:mt-1">
+                                ₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}
+                              </span>
+                            </>
+                          )}
+                          {activeDonutSlice === 'collection' && (
+                            <>
+                              <span className="text-white/80 text-[8px] md:text-[10px] font-bold uppercase tracking-wider">Collected</span>
+                              <span className="text-orange-400 font-black text-[12px] md:text-xl leading-none mt-0.5 md:mt-1">
+                                ₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}
+                              </span>
+                            </>
+                          )}
+                          {activeDonutSlice === 'overdue' && (
+                            <>
+                              <span className="text-white/80 text-[8px] md:text-[10px] font-bold uppercase tracking-wider">Overdue</span>
+                              <span className="text-red-400 font-black text-[12px] md:text-xl leading-none mt-0.5 md:mt-1">
+                                ₹{(weeklyMetrics.overdue || 0).toLocaleString('en-IN')}
+                              </span>
+                            </>
+                          )}
+                          {!activeDonutSlice && (
+                            <>
+                              <span className="text-white/80 text-[8px] md:text-[10px] font-bold">Collected:</span>
+                              <span className="text-white font-black text-sm md:text-xl leading-none mt-0.5 md:mt-1">
+                                {total === 0 ? '--' : (weeklyMetrics.target > 0 
+                                  ? Math.min((weeklyMetrics.collection / weeklyMetrics.target) * 100, 100).toFixed(0) + '%'
+                                  : (weeklyMetrics.collection > 0 ? '100%' : '0%'))}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </>
                     );
@@ -4562,7 +4594,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
           {/* 2. Customer Recent List (Smallest) */}
           <button 
-            onClick={() => setCurrentView('Customer')}
+            onClick={() => { if (onDrillDown) onDrillDown('Active'); else setCurrentView('Customer'); }}
             className={`h-20 md:h-24 bg-white rounded-xl p-3 flex items-center gap-3 text-left ${cardShadowClass}`}
           >
             <div className="p-2 bg-slate-50 rounded-full text-[#0369a1] shadow-sm border border-slate-100 shrink-0">
@@ -4606,7 +4638,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   if (hasCenterManagement) {
                     setCurrentView('Centers');
                   } else {
-                    if (onDrillDown) onDrillDown('Active');
+                    if (onDrillDown) onDrillDown('All');
                     else setCurrentView('Customer');
                   }
                 }}
@@ -4787,16 +4819,16 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             <div className="absolute top-1.5 left-2 w-1/2 h-0.5 bg-emerald-500 z-0"></div>
             
             <div className="flex flex-col items-center z-10">
-              <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[7px] flex items-center justify-center font-black mb-1 shadow-sm border border-white">1</div>
-              <div className="text-[7px] font-black text-slate-800 uppercase">Apply</div>
+              <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[7px] flex items-center justify-center font-black shadow-sm border border-white">1</div>
+              <div className="hidden md:block text-[7px] font-black text-slate-800 uppercase mt-1">Apply</div>
             </div>
             <div className="flex flex-col items-center z-10">
-              <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[7px] flex items-center justify-center font-black mb-1 shadow-sm border border-white">2</div>
-              <div className="text-[7px] font-black text-slate-800 uppercase">Progress</div>
+              <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[7px] flex items-center justify-center font-black shadow-sm border border-white">2</div>
+              <div className="hidden md:block text-[7px] font-black text-slate-800 uppercase mt-1">Progress</div>
             </div>
             <div className="flex flex-col items-center z-10">
-              <div className="w-3.5 h-3.5 rounded-full bg-slate-200 text-slate-500 text-[7px] flex items-center justify-center font-black mb-1 shadow-sm border border-white">3</div>
-              <div className="text-[7px] font-black text-slate-800 uppercase">Status</div>
+              <div className="w-3.5 h-3.5 rounded-full bg-slate-200 text-slate-500 text-[7px] flex items-center justify-center font-black shadow-sm border border-white">3</div>
+              <div className="hidden md:block text-[7px] font-black text-slate-800 uppercase mt-1">Status</div>
             </div>
           </div>
         </div>

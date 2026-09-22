@@ -468,6 +468,9 @@ function App() {
   
   const handleDrillDown = (category) => {
     setActiveCategory(category);
+    setSearchQuery('');
+    setActiveSort('Recent');
+    setActiveBranchFilter('All');
     setCurrentView('Customer');
   };
 
