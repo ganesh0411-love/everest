@@ -38,6 +38,32 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [selectedStaffLocation, setSelectedStaffLocation] = useState(null);
+  const [mapLayer, setMapLayer] = useState('street'); // 'street' | 'satellite'
+  const [adminLocation, setAdminLocation] = useState(null);
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;  
+    const dLon = (lon2 - lon1) * Math.PI / 180; 
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return (R * c).toFixed(1); 
+  };
+
+  useEffect(() => {
+    if (showMapModal && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setAdminLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => console.log("Admin location not available", err),
+        { enableHighAccuracy: true }
+      );
+    }
+  }, [showMapModal]);
 
   useEffect(() => {
     const handleClickOutside = () => setActiveDropdown(null);
@@ -681,8 +707,16 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                         <Radio size={16} />
                       </button>
                       <button 
-                        onClick={() => console.log('Current Location clicked')} 
-                        title="Current / Attendance Location (Coming Soon)"
+                        onClick={() => {
+                          setSelectedStaffLocation({
+                            name: staff.name,
+                            lat: staff.lastLatitude,
+                            lng: staff.lastLongitude,
+                            updatedAt: staff.lastLocationUpdatedAt
+                          });
+                          setShowMapModal(true);
+                        }}
+                        title="View Current Location"
                         className="p-1.5 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:shadow-sm transition-all"
                       >
                         <MapPin size={16} />
@@ -794,6 +828,95 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           </div>
         )}
       </div>
+
+      {showMapModal && selectedStaffLocation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex flex-col">
+                   <h3 className="font-bold text-slate-800">{selectedStaffLocation.name}'s Location</h3>
+                   <span className="text-xs text-slate-500">
+                     Updated: {selectedStaffLocation.updatedAt ? new Date(selectedStaffLocation.updatedAt).toLocaleString() : 'Unknown'}
+                   </span>
+                </div>
+                <button onClick={() => setShowMapModal(false)} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+             </div>
+             <div className="p-0 bg-slate-50 h-[300px] md:h-[400px] relative">
+                {/* Distance Badge */}
+                {adminLocation && selectedStaffLocation?.lat && (
+                   <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                     Distance: {calculateDistance(adminLocation.lat, adminLocation.lng, selectedStaffLocation.lat, selectedStaffLocation.lng)} km away
+                   </div>
+                )}
+                
+                {/* Layer Toggle Button */}
+                <button 
+                  onClick={() => setMapLayer(prev => prev === 'street' ? 'satellite' : 'street')}
+                  className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-sm border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                  title="Toggle Map Layer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
+                </button>
+
+                {selectedStaffLocation.lat && selectedStaffLocation.lng ? (
+                  <iframe 
+                     width="100%" 
+                     height="100%" 
+                     frameBorder="0" 
+                     scrolling="no" 
+                     marginHeight="0" 
+                     marginWidth="0" 
+                     src={mapLayer === 'street' 
+                        ? `https://www.openstreetmap.org/export/embed.html?bbox=${selectedStaffLocation.lng - 0.005},${selectedStaffLocation.lat - 0.005},${selectedStaffLocation.lng + 0.005},${selectedStaffLocation.lat + 0.005}&layer=mapnik&marker=${selectedStaffLocation.lat},${selectedStaffLocation.lng}`
+                        : `https://maps.google.com/maps?q=${selectedStaffLocation.lat},${selectedStaffLocation.lng}&t=k&z=17&output=embed`
+                     }
+                  ></iframe>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                     <MapPin size={48} className="mb-2 opacity-30" />
+                     <p>No location data available</p>
+                  </div>
+                )}
+             </div>
+             <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
+                <button 
+                   onClick={() => {
+                      const freshStaff = staffList.find(s => s.name === selectedStaffLocation.name);
+                      if (freshStaff) {
+                        setSelectedStaffLocation({
+                          name: freshStaff.name,
+                          lat: freshStaff.lastLatitude,
+                          lng: freshStaff.lastLongitude,
+                          updatedAt: freshStaff.lastLocationUpdatedAt
+                        });
+                      }
+                   }}
+                   className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                   </svg>
+                   Refresh
+                </button>
+                <button 
+                   onClick={() => {
+                     const url = adminLocation?.lat && adminLocation?.lng
+                       ? `https://www.google.com/maps/dir/?api=1&origin=${adminLocation.lat},${adminLocation.lng}&destination=${selectedStaffLocation.lat},${selectedStaffLocation.lng}&travelmode=driving`
+                       : `https://www.google.com/maps/search/?api=1&query=${selectedStaffLocation.lat},${selectedStaffLocation.lng}`;
+                     window.open(url, '_blank');
+                   }}
+                   className="flex-1 py-2.5 bg-blue-600 border border-blue-600 rounded-xl text-white font-semibold shadow-sm flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+                >
+                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                   Get Directions
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

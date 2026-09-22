@@ -729,16 +729,30 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [showMarkAttendanceCalendar, setShowMarkAttendanceCalendar] = React.useState(false);
 
   // --- ATTENDANCE SELFIE & TIMER ENGINE ---
+  const todayStr = new Date().toISOString().split('T')[0];
+  const attendanceKey = `attendance_${userProfile?.uid || 'guest'}_${todayStr}`;
+
   const [attendanceState, setAttendanceState] = React.useState(() => {
-    const saved = localStorage.getItem('attendanceState_sep22');
+    const saved = localStorage.getItem(attendanceKey);
     return saved ? JSON.parse(saved) : { checkInTime: null, checkOutTime: null, status: null };
   });
   const [shiftElapsed, setShiftElapsed] = React.useState('00h 00m 00s');
   const selfieInputRef = React.useRef(null);
   const [pendingAction, setPendingAction] = React.useState(null);
 
+  // Re-initialize state if user changes
   React.useEffect(() => {
-    localStorage.setItem('attendanceState_sep22', JSON.stringify(attendanceState));
+    const saved = localStorage.getItem(attendanceKey);
+    if (saved) {
+      setAttendanceState(JSON.parse(saved));
+    } else {
+      setAttendanceState({ checkInTime: null, checkOutTime: null, status: null });
+      setShiftElapsed('00h 00m 00s');
+    }
+  }, [attendanceKey]);
+
+  React.useEffect(() => {
+    localStorage.setItem(attendanceKey, JSON.stringify(attendanceState));
     let timer;
     if (attendanceState.checkInTime && !attendanceState.checkOutTime) {
       const start = new Date(attendanceState.checkInTime).getTime();
@@ -752,15 +766,34 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [attendanceState]);
+  }, [attendanceState, attendanceKey]);
 
   const handleSelfieCapture = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const now = new Date().toISOString();
+          
+          // Phase 1: Update Firestore with Staff Location
+          if (userProfile && userProfile.uid) {
+            try {
+              const { getDocs } = await import('firebase/firestore');
+              const staffSnaps = await getDocs(query(collection(db, 'staff'), where('uid', '==', userProfile.uid)));
+              if (!staffSnaps.empty) {
+                const staffDocId = staffSnaps.docs[0].id;
+                await updateDoc(doc(db, 'staff', staffDocId), {
+                  lastLatitude: position.coords.latitude,
+                  lastLongitude: position.coords.longitude,
+                  lastLocationUpdatedAt: now
+                });
+              }
+            } catch (err) {
+              console.error("Failed to update staff location in Firestore", err);
+            }
+          }
+
           if (pendingAction === 'check-in') {
             setAttendanceState(prev => ({ ...prev, checkInTime: now }));
           } else if (pendingAction === 'check-out') {
@@ -768,11 +801,17 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
             const ciDate = new Date(attendanceState.checkInTime);
             const ciTime = ciDate.getHours() + ciDate.getMinutes() / 60;
             const coTime = coNow.getHours() + coNow.getMinutes() / 60;
+            const durationHours = (coNow.getTime() - ciDate.getTime()) / 3600000;
+            
             let status = 'absent';
-            if (ciTime <= 9.0 && coTime >= 17.0) {
+            if (durationHours < 4) {
+              status = 'absent';
+            } else if (ciTime <= 9.0 && coTime >= 17.0) {
               status = 'present';
-            } else {
+            } else if (ciTime <= 10.0 && coTime >= 16.0) {
               status = 'half-day';
+            } else {
+              status = 'absent';
             }
             setAttendanceState(prev => ({ ...prev, checkOutTime: now, status }));
           }
