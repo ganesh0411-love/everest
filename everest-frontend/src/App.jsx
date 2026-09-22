@@ -437,6 +437,13 @@ function App() {
   };
 
   const navigateToView = (newView) => {
+    if (newView === 'Customer') {
+      setActiveCategory('Active');
+      setSearchQuery('');
+      setActiveSort('Recent');
+      setActiveBranchFilter('All');
+    }
+    
     verifySessionGuard();
     setViewHistory(prev => {
       if (prev[prev.length - 1] === newView) return prev;
@@ -444,8 +451,19 @@ function App() {
     });
     setCurrentView(newView);
   };
+  
+  const handleDrillDown = (category) => {
+    setActiveCategory(category);
+    setCurrentView('Customer');
+  };
 
   const switchTab = (newView) => {
+    if (newView === 'Customer') {
+      setActiveCategory('Active');
+      setSearchQuery('');
+      setActiveSort('Recent');
+      setActiveBranchFilter('All');
+    }
     verifySessionGuard();
     if (newView === 'Home') {
       setViewHistory(['Home']);
@@ -965,7 +983,7 @@ function App() {
 
   const renderView = () => {
     switch(currentView) {
-      case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} customers={rbacDashboardCustomers} /></div>;
+      case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} onDrillDown={handleDrillDown} activeBranch={activeBranch} userProfile={userProfile} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} /></div>;
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
       case 'Centers': return <div className="flex-1 overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;

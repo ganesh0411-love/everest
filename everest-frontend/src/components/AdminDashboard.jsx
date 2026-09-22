@@ -710,7 +710,7 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
   );
 };
 
-const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, customers = [] }) => {
+const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, customers = [] }) => {
   const isAdmin = userProfile?.role === 'admin';
   const showStaffCard = isAdmin || userProfile?.permissions?.dashboardStaffCard === true;
   const showLandSurveyCard = isAdmin || userProfile?.permissions?.dashboardLandSurveyCard === true;
@@ -737,12 +737,15 @@ const AdminDashboard = ({ setCurrentView, activeBranch = { id: 'main', name: 'Ma
       }
       let activeCount = 0;
       let settledCount = 0;
+      
       customers.forEach(c => {
-        const status = c.status?.trim().toLowerCase() || '';
-        if (['live', 'active', 'approved', 'overdue'].includes(status)) {
-          activeCount++;
-        } else if (['settled', 'closed'].includes(status)) {
+        const s = (c.status || c.loanStatus || c.customerStatus || '')?.trim().toLowerCase();
+        const out = c.dynamicOutstanding !== undefined ? Number(c.dynamicOutstanding) : Number(c.repayAmount || 0);
+        
+        if (['settled', 'closed', 'completed'].includes(s) || out <= 0) {
           settledCount++;
+        } else {
+          activeCount++;
         }
       });
       
@@ -4591,8 +4594,31 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               </div>
             </div>
             <div className="flex justify-between text-[9px] font-black uppercase">
-              <button className="text-[#0369a1]">{hasCenterManagement ? 'All Centers' : 'All Customers'} &gt;</button>
-              <button className="text-red-600">{hasCenterManagement ? 'Closed' : 'Settled'} &gt;</button>
+              <button 
+                onClick={() => {
+                  if (hasCenterManagement) {
+                    setCurrentView('Centers');
+                  } else {
+                    if (onDrillDown) onDrillDown('Active');
+                    else setCurrentView('Customer');
+                  }
+                }}
+                className="text-[#0369a1] hover:underline"
+              >
+                {hasCenterManagement ? 'All Centers' : 'All Customers'} &gt;
+              </button>
+              <button 
+                onClick={() => {
+                  if (hasCenterManagement) {
+                    // Placeholder for closed center drilldown
+                  } else {
+                    if (onDrillDown) onDrillDown('Settled');
+                  }
+                }}
+                className="text-red-600 hover:underline"
+              >
+                {hasCenterManagement ? 'Closed' : 'Settled'} &gt;
+              </button>
             </div>
           </div>
 
