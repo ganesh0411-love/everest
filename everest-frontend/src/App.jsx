@@ -866,7 +866,11 @@ function App() {
   const applicationStatusMode = userProfile?.permissions?.applicationStatusRole || 'Staff';
 
   const isStaffAssigned = (c) => {
-    const uidMatch = c.staffId === user?.uid || c.assignedStaffId === user?.uid || c.createdBy === user?.uid;
+    const uidMatch = 
+      c.staffId === user?.uid || 
+      c.assignedStaffId === user?.uid || 
+      c.createdBy === user?.uid ||
+      (userProfile?.staffId && String(c.staffId) === String(userProfile.staffId));
     if (uidMatch) return true;
     
     const loggedInStaffName = (userProfile?.name || userProfile?.staffName || userProfile?.displayName || user?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : '') || (user?.email ? user.email.split('@')[0] : ''))?.toLowerCase().trim();
@@ -1763,7 +1767,7 @@ function App() {
                 <AddCustomerModal 
                   onClose={() => setIsAddCustomerOpen(false)} 
                   activeBranch={activeBranch}
-                  isStaff={userProfile?.role === 'staff'}
+                  isStaff={userProfile?.role === 'staff' && String(userProfile?.permissions?.applicationStatusRole || '').toLowerCase() !== 'admin'}
                   onAddCustomer={async (newCustomer) => {
                     const nowIso = new Date().toISOString();
                     const customerToSave = { 

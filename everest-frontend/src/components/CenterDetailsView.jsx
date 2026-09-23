@@ -636,6 +636,7 @@ export default function CenterDetailsView({ center, customers, userProfile, acti
           onClose={() => setIsAddCustomerOpen(false)} 
           userProfile={userProfile} 
           activeBranch={activeBranch}
+          isStaff={userProfile?.role === 'staff' && String(userProfile?.permissions?.applicationStatusRole || '').toLowerCase() !== 'admin'}
           initialData={addCustomerContext}
           onAddCustomer={handleAddCustomer}
         />
