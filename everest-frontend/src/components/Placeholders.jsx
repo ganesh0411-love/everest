@@ -8,20 +8,6 @@ export const Centers = () => (
   </div>
 );
 
-export const AddBulkCustomer = () => (
-  <div className="p-6 min-h-[50vh]">
-    <h2 className="text-xl font-bold text-slate-800 mb-4">Add Bulk Customer</h2>
-    <div className="border-2 border-dashed border-blue-300 rounded-xl bg-blue-50/50 p-12 flex flex-col items-center justify-center text-center hover:bg-blue-50 cursor-pointer transition-colors">
-      <div className="text-4xl mb-3">📥</div>
-      <p className="font-semibold text-slate-700">Drag and drop your file here</p>
-      <p className="text-sm text-slate-500 mt-1">or click to browse (.csv, .xlsx)</p>
-      <button className="mt-6 px-6 py-2 bg-white border border-slate-300 rounded-lg shadow-sm font-medium text-slate-700 hover:bg-slate-50">
-        Browse Files
-      </button>
-    </div>
-  </div>
-);
-
 
 
 export const DashboardOverview = () => (

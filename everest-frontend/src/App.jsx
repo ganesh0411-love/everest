@@ -11,10 +11,10 @@ import {
   Banknote, User, Sprout, CalendarDays, Search, Filter, Coins, Receipt, ClockAlert
 } from 'lucide-react';
 import { 
-  AddBulkCustomer, 
   DashboardOverview, 
   CustomerKYCUpdate, 
 } from './components/Placeholders';
+import AddBulkCustomer from './components/AddBulkCustomer';
 import CenterManagement from './components/CenterManagement';
 import Settings from './components/Settings';
 import StaffManagement from './components/StaffManagement';
@@ -1032,7 +1032,7 @@ function App() {
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
       case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} branches={branches} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
-      case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer /></div>;
+      case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer activeBranch={activeBranch} /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} branches={branches} /></div>;
       case 'Settings': return <Settings branches={branches} />;
       case 'Dashboard Overview': return <div className="flex-1 overflow-y-auto"><DashboardOverview /></div>;
