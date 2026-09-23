@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { MapPin, Loader2 } from 'lucide-react';
 import L from 'leaflet';
@@ -37,122 +37,143 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     if (!staffId) return;
 
     const trackingRef = doc(db, 'staff_tracking', staffId);
+    let unsubscribe = null;
 
-    // If starting in live mode, ensure liveSession is active
-    if (initialMode === 'live') {
-      setDoc(trackingRef, {
-        liveSession: {
-          isActive: true,
-          requestedBy: 'admin',
-          routePath: [], // reset path
-          currentSpeed: 0,
-          heading: 0
+    if (!isLiveActive && !isPinging) {
+      // Static Mode (Current Location): Fetch once
+      getDoc(trackingRef).then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setTrackingData(data);
+          lastUpdatedAtRef.current = data.currentLocation?.updatedAt;
         }
-      }, { merge: true }).catch(console.error);
+        setLoading(false);
+      }).catch(console.error);
+    } else {
+      // Stream Mode: Subscribe to live updates
+      unsubscribe = onSnapshot(trackingRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setTrackingData(data);
+          
+          if (isPinging && data.currentLocation?.updatedAt !== lastUpdatedAtRef.current) {
+            setIsPinging(false);
+          }
+          lastUpdatedAtRef.current = data.currentLocation?.updatedAt;
+        }
+        setLoading(false);
+      });
     }
 
-    const unsubscribe = onSnapshot(trackingRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setTrackingData(data);
-        
-        console.log('[Admin] Received updated location snapshot at:', data.currentLocation?.updatedAt);
-        
-        // Auto-clear pinging state if updatedAt changes
-        if (isPinging && data.currentLocation?.updatedAt !== lastUpdatedAtRef.current) {
-          setIsPinging(false);
-        }
-        lastUpdatedAtRef.current = data.currentLocation?.updatedAt;
-      }
-      setLoading(false);
-    });
-
     return () => {
-      unsubscribe();
-      // On unmount, cleanly exit live tracking
+      if (unsubscribe) unsubscribe();
+    };
+  }, [staffId, isLiveActive, isPinging]);
+
+  // Admin Heartbeat & Session Management
+  useEffect(() => {
+    let heartbeatInterval;
+    if (isLiveActive && staffId) {
+      const trackingRef = doc(db, 'staff_tracking', staffId);
+      
+      // Emit initial heartbeat immediately to activate/resume session
       updateDoc(trackingRef, {
-        'liveSession.isActive': false,
+        lastAdminHeartbeat: Date.now(),
+        'liveSession.isActive': true,
         'liveSession.forcePing': false
       }).catch(console.error);
-    };
-  }, [staffId, initialMode, isPinging]);
 
-  // Leaflet Map Initialization and updates
+      // Keep handset daemon alive every 20s
+      heartbeatInterval = setInterval(() => {
+        updateDoc(trackingRef, { lastAdminHeartbeat: Date.now() }).catch(console.error);
+      }, 20000);
+    }
+
+    return () => {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      if (isLiveActive && staffId) {
+        updateDoc(doc(db, 'staff_tracking', staffId), {
+          'liveSession.isActive': false,
+          'liveSession.forcePing': false
+        }).catch(console.error);
+      }
+    };
+  }, [staffId, isLiveActive]);
+
+  // 1. Map Initialization (Run Once when loaded)
+  useEffect(() => {
+    if (loading || !mapRef.current || mapInstance.current) return;
+    
+    mapInstance.current = L.map(mapRef.current, {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([0, 0], 17);
+
+    // Motorbike SVG Marker
+    const motorbikeSvg = `
+      <div style="background: white; border-radius: 50%; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #3b82f6; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; transition: transform 0.3s ease;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; transition: transform 0.5s ease-out;">
+          <path d="M5 16a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M19 16a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M5 14h3l1.5-3"/><path d="M9.5 11 12 7h4"/><path d="m11 14 1.5-3 3 3H19"/><path d="M16 14v-2"/><path d="M12 7v-2"/><path d="M10 5h4"/>
+        </svg>
+      </div>`;
+
+    const icon = L.divIcon({
+      html: motorbikeSvg,
+      className: '',
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    });
+
+    markerRef.current = L.marker([0, 0], { icon }).addTo(mapInstance.current);
+    polylineRef.current = L.polyline([], { color: '#3b82f6', weight: 4, opacity: 0.8 }).addTo(mapInstance.current);
+  }, [loading]);
+
+  // 2. Tile Layer Update
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    
+    if (tileLayerRef.current) {
+      mapInstance.current.removeLayer(tileLayerRef.current);
+    }
+    
+    const layerUrl = mapLayer === 'street' 
+      ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    
+    tileLayerRef.current = L.tileLayer(layerUrl, { maxZoom: 19 }).addTo(mapInstance.current);
+  }, [mapLayer, loading]);
+
+  // 3. Dynamic Telemetry Updates (No Flicker)
   useEffect(() => {
     const loc = trackingData?.currentLocation;
     const route = trackingData?.liveSession?.routePath || [];
     
-    if (loc?.lat && loc?.lng && mapRef.current && !loading) {
-      if (!mapInstance.current) {
-        // Initialize Map
-        mapInstance.current = L.map(mapRef.current, {
-          zoomControl: false,
-          attributionControl: false
-        }).setView([loc.lat, loc.lng], 17);
+    if (!loc?.lat || !mapInstance.current || !markerRef.current) return;
 
-        // Marker (Custom Icon)
-        const icon = L.divIcon({
-          html: `
-            <div style="background: white; border-radius: 12px; padding: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #3b82f6; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                <line x1="12" y1="18" x2="12.01" y2="18"></line>
-              </svg>
-            </div>`,
-          className: '',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16]
-        });
+    // Smoothly update marker
+    markerRef.current.setLatLng([loc.lat, loc.lng]);
 
-        markerRef.current = L.marker([loc.lat, loc.lng], { icon }).addTo(mapInstance.current);
-        
-        // Polyline
-        polylineRef.current = L.polyline([], { color: '#3b82f6', weight: 4, opacity: 0.8 }).addTo(mapInstance.current);
-      }
-
-      // Update Layer Based on state
-      if (tileLayerRef.current) {
-        mapInstance.current.removeLayer(tileLayerRef.current);
-      }
-      
-      const layerUrl = mapLayer === 'street' 
-        ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-        : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      
-      tileLayerRef.current = L.tileLayer(layerUrl, {
-        maxZoom: 19,
-      }).addTo(mapInstance.current);
-
-      // Smoothly update marker
-      markerRef.current.setLatLng([loc.lat, loc.lng]);
-
-      const el = markerRef.current.getElement();
-      if (el) {
-        el.style.transition = 'transform 1s linear';
-        const svg = el.querySelector('svg');
-        if (svg) {
-          svg.style.transition = 'transform 0.5s ease-out';
-          svg.style.transform = `rotate(${trackingData?.liveSession?.heading || 0}deg)`;
-        }
-      }
-
-      // Draw Polyline
-      if (isLiveActive && route.length > 0) {
-        const latLngs = route.map(pt => [pt.lat, pt.lng]);
-        polylineRef.current.setLatLngs(latLngs);
-        
-        // Auto-pan if the marker moves
-        mapInstance.current.panTo([loc.lat, loc.lng]);
-      } else {
-        polylineRef.current.setLatLngs([]);
+    // Apply rotation
+    const el = markerRef.current.getElement();
+    if (el) {
+      el.style.transition = 'transform 1s linear';
+      const svg = el.querySelector('svg');
+      if (svg) {
+        svg.style.transform = `rotate(${trackingData?.liveSession?.heading || 0}deg)`;
       }
     }
-    
-    return () => {
-      // Cleanup happens in a separate unmount hook to avoid destroying map on every update
-    };
-  }, [trackingData, mapLayer, loading, isLiveActive]);
-  
+
+    // Draw Polyline & Pan
+    if (isLiveActive && route.length > 0) {
+      const latLngs = route.map(pt => [pt.lat, pt.lng]);
+      polylineRef.current.setLatLngs(latLngs);
+      mapInstance.current.panTo([loc.lat, loc.lng], { animate: true, duration: 1 });
+    } else {
+      polylineRef.current.setLatLngs([]);
+      mapInstance.current.setView([loc.lat, loc.lng], 17);
+    }
+  }, [trackingData, isLiveActive, loading]);
+
   // Destroy map instance on unmount
   useEffect(() => {
     return () => {

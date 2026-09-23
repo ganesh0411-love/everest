@@ -138,18 +138,21 @@ export function useLiveTracking(userProfile) {
         await pingCurrentLocation(true);
       }
 
-      // Switch to 0m aggressive filter if Admin requests it
-      if (liveSession.isActive && !isLiveStreamActiveRef.current) {
-        isLiveStreamActiveRef.current = true;
+      // Switch to 0m aggressive filter if Admin requests it and manage watchdog
+      if (liveSession.isActive) {
+        if (!isLiveStreamActiveRef.current) {
+          isLiveStreamActiveRef.current = true;
+          // Re-init watcher with 0m filter for fluid streaming
+          startWatcher(0);
+        }
         
+        // Rolling 60s heartbeat watchdog: Every snapshot (including heartbeat) resets this timer.
+        // If no heartbeat arrives for 60 seconds, gracefully fallback.
         if (watchdogTimeoutRef.current) clearTimeout(watchdogTimeoutRef.current);
         watchdogTimeoutRef.current = setTimeout(() => {
-          console.log('[Daemon] 5-minute watchdog triggered. Stopping live stream.');
+          console.log('[Daemon] 60-second watchdog triggered (Admin disconnected). Stopping live stream.');
           updateDoc(trackingDocRef, { 'liveSession.isActive': false }).catch(console.error);
-        }, 5 * 60 * 1000);
-        
-        // Re-init watcher with 0m filter for fluid streaming
-        startWatcher(0);
+        }, 60 * 1000);
       } 
       
       // Admin turns off live tracking -> fallback to 50m filter
