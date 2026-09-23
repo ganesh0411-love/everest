@@ -1018,6 +1018,16 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     setWeeklyMetrics({ target: wTarget, collection: wCollection, overdue: wOverdue });
   }, [customers]);
 
+  // --- VIEWPORT & RESPONSIVE STATE ---
+  const [activeTooltip, setActiveTooltip] = React.useState(null);
+  // --- VIEWPORT & RESPONSIVE STATE ---
+  const [isMobileViewport, setIsMobileViewport] = React.useState(window.innerWidth < 768);
+  React.useEffect(() => {
+    const handleResize = () => setIsMobileViewport(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // --- CHART AGGREGATION ENGINE ---
   const chartData = React.useMemo(() => {
     const parseGlobalDate = (dStr) => {
@@ -1042,9 +1052,10 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     const now = new Date();
     now.setHours(23, 59, 59, 999);
     const buckets = [];
+    const bucketCount = isMobileViewport ? 6 : 12;
     
     if (overviewPeriod === 'Daily') {
-      for (let i = 6; i >= 0; i--) {
+      for (let i = bucketCount - 1; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
         buckets.push({
@@ -1055,7 +1066,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
         });
       }
     } else if (overviewPeriod === 'Weekly') {
-      for (let i = 5; i >= 0; i--) {
+      for (let i = bucketCount - 1; i >= 0; i--) {
         const dEnd = new Date(now);
         dEnd.setDate(dEnd.getDate() - (i * 7));
         const dStart = new Date(dEnd);
@@ -1063,14 +1074,14 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
         dStart.setHours(0,0,0,0);
         dEnd.setHours(23,59,59,999);
         buckets.push({
-          label: `W${6-i}`,
+          label: `W${bucketCount - i}`,
           start: dStart.getTime(),
           end: dEnd.getTime(),
           loanAmount: 0, disbursements: 0, collections: 0
         });
       }
     } else { 
-      for (let i = 5; i >= 0; i--) {
+      for (let i = bucketCount - 1; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const endMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
         buckets.push({
@@ -1141,8 +1152,30 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
       v >= 1000 ? (v/1000).toFixed(1).replace('.0', '') + 'k' : v.toString()
     );
 
-    return { buckets, ceiling, yLabels, totalLoan, totalDisb, totalColl };
-  }, [customers, overviewPeriod]);
+    // Calculate wave path based on the highest bar peak in each bucket
+    const wavePoints = buckets.map((b, idx) => {
+      const bucketPeak = Math.max(b.loanAmount, b.disbursements, b.collections);
+      // Determine Y coordinate (SVG origin is top-left, so 0 is top (value=ceiling), 100 is bottom (value=0))
+      // Values are scaled 0-100% of the SVG height
+      // The wave will peak strictly at the tallest bar.
+      const yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100));
+      // Determine X coordinate (aligned with the center of the bar group)
+      // There are N buckets. For N buckets distributed with justify-between, 
+      // they are roughly at x = (i / (N-1)) * 100
+      const xPerc = buckets.length > 1 ? (idx / (buckets.length - 1)) * 100 : 50;
+      return `${xPerc},${yPerc}`;
+    });
+
+    let pathD = "M 0,100 "; // Start at bottom left
+    if (wavePoints.length > 0) {
+      pathD = `M ${wavePoints[0]} `;
+      for (let i = 1; i < wavePoints.length; i++) {
+        pathD += `L ${wavePoints[i]} `;
+      }
+    }
+
+    return { buckets, ceiling, yLabels, totalLoan, totalDisb, totalColl, wavePathD: pathD };
+  }, [customers, overviewPeriod, isMobileViewport]);
 
   // --- MANUAL CAD ENGINE STATE -----
   const [cadSurveys, setCadSurveys] = React.useState([]); // [{ id, surveyNo, subDivisionNo, hexColor, isVisible }]
@@ -4961,7 +4994,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       </div>
 
       {/* Business Overview & Analytics */}
-      <div className={`rounded-xl mb-3 flex flex-col overflow-hidden ${cardShadowClass}`} style={{ background: 'linear-gradient(90deg, #10637c 0%, #0a3d4f 100%)' }}>
+      <div 
+        className={`rounded-xl mb-3 flex flex-col overflow-hidden shadow-md`} 
+        style={{ background: 'linear-gradient(90deg, #10637c 0%, #0a3d4f 100%)' }}
+        onClick={() => setActiveTooltip(null)}
+      >
         
         {/* Header Row with Toggle */}
         <div className="flex justify-between items-center px-3 pt-3">
@@ -4970,7 +5007,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             {['Daily', 'Weekly', 'Monthly'].map(period => (
               <button 
                 key={period}
-                onClick={() => setOverviewPeriod(period)}
+                onClick={(e) => { e.stopPropagation(); setOverviewPeriod(period); }}
                 className={`text-[8px] font-bold px-2 py-1 rounded-sm uppercase tracking-wider transition-colors ${overviewPeriod === period ? 'bg-white/20 text-white shadow-sm' : 'text-white/60 hover:text-white/90'}`}
               >
                 {period}
@@ -4989,6 +5026,15 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             
             {/* SVG Chart: Three Solid Bars Per Bucket */}
             <div className="h-24 w-full relative mt-auto border-b border-white/20 pl-6 pb-2 flex items-end justify-between pr-2">
+               
+               {/* Tooltip Overlay */}
+               {activeTooltip && (
+                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 bg-white px-2 py-1 rounded shadow-lg z-50 pointer-events-none flex flex-col items-center">
+                   <div className="text-[8px] font-black text-slate-500 uppercase">{activeTooltip.type}</div>
+                   <div className="text-[10px] font-black text-slate-800">₹{activeTooltip.val.toLocaleString('en-IN')}</div>
+                 </div>
+               )}
+
                {/* SVG Wave Line underneath */}
                <div className="absolute top-0 bottom-2 left-6 right-2 z-0 overflow-hidden pointer-events-none">
                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
@@ -4999,11 +5045,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                      </linearGradient>
                    </defs>
                    <path 
-                     d="M 0,60 L 8,60 L 25,40 L 42,50 L 58,15 L 75,45 L 92,10 L 100,10 L 100,100 L 0,100 Z" 
+                     d={`${chartData.wavePathD} L 100,100 L 0,100 Z`} 
                      fill="url(#waveGradient)" 
                    />
                    <path 
-                     d="M 0,60 L 8,60 L 25,40 L 42,50 L 58,15 L 75,45 L 92,10 L 100,10" 
+                     d={chartData.wavePathD} 
                      fill="none" 
                      stroke="#06b6d4" 
                      strokeWidth="2.5" 
@@ -5013,12 +5059,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                </div>
                
                {/* Y-Axis Labels */}
-               <div className="absolute left-0 top-0 bottom-2 flex flex-col justify-between text-[7px] font-bold text-white/90 h-full z-10">
+               <div className="absolute left-0 top-0 bottom-2 flex flex-col justify-between text-[7px] font-bold text-white/90 h-full z-10 pointer-events-none">
                  {chartData.yLabels.map((lbl, idx) => <span key={idx}>{lbl}</span>)}
                </div>
                
                {/* X-Axis Labels */}
-               <div className="absolute -bottom-3.5 left-6 right-2 flex justify-between text-[7px] font-bold text-white/90 z-10">
+               <div className="absolute -bottom-3.5 left-6 right-2 flex justify-between text-[7px] font-bold text-white/90 z-10 pointer-events-none">
                  {chartData.buckets.map((b, i) => <span key={i}>{b.label}</span>)}
                </div>
                
@@ -5029,9 +5075,27 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                  const collH = Math.max(0, Math.min(100, (b.collections / chartData.ceiling) * 100));
                  return (
                    <div key={i} className="flex items-end gap-[1px] h-full z-10">
-                     <div className="w-1.5 bg-[#2563eb] relative z-20 rounded-t-sm" style={{height: `${loanH}%`}}></div>
-                     <div className="w-1.5 bg-[#d8892f] relative z-20 rounded-t-sm" style={{height: `${disbH}%`}}></div>
-                     <div className="w-1.5 bg-[#059669] relative z-20 rounded-t-sm" style={{height: `${collH}%`}}></div>
+                     <div 
+                       className="w-1.5 bg-[#2563eb] relative z-20 rounded-t-sm cursor-pointer transition-all hover:scale-y-[1.15] hover:brightness-125" 
+                       style={{height: `${loanH}%`, transformOrigin: 'bottom'}}
+                       onMouseEnter={(e) => { e.stopPropagation(); setActiveTooltip({ type: 'Loan Amount', val: b.loanAmount }); }}
+                       onMouseLeave={() => setActiveTooltip(null)}
+                       onClick={(e) => { e.stopPropagation(); setActiveTooltip({ type: 'Loan Amount', val: b.loanAmount }); }}
+                     ></div>
+                     <div 
+                       className="w-1.5 bg-[#d8892f] relative z-20 rounded-t-sm cursor-pointer transition-all hover:scale-y-[1.15] hover:brightness-125" 
+                       style={{height: `${disbH}%`, transformOrigin: 'bottom'}}
+                       onMouseEnter={(e) => { e.stopPropagation(); setActiveTooltip({ type: 'Disbursement', val: b.disbursements }); }}
+                       onMouseLeave={() => setActiveTooltip(null)}
+                       onClick={(e) => { e.stopPropagation(); setActiveTooltip({ type: 'Disbursement', val: b.disbursements }); }}
+                     ></div>
+                     <div 
+                       className="w-1.5 bg-[#059669] relative z-20 rounded-t-sm cursor-pointer transition-all hover:scale-y-[1.15] hover:brightness-125" 
+                       style={{height: `${collH}%`, transformOrigin: 'bottom'}}
+                       onMouseEnter={(e) => { e.stopPropagation(); setActiveTooltip({ type: 'Collection', val: b.collections }); }}
+                       onMouseLeave={() => setActiveTooltip(null)}
+                       onClick={(e) => { e.stopPropagation(); setActiveTooltip({ type: 'Collection', val: b.collections }); }}
+                     ></div>
                    </div>
                  );
                })}
