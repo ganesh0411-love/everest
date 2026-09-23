@@ -1156,7 +1156,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     const wavePoints = buckets.map((b, idx) => {
       const bucketPeak = Math.max(b.loanAmount, b.disbursements, b.collections);
       // Natural float offset above the bar (bars are already compact due to buffered ceiling)
-      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 10;
+      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 30;
       if (yPerc < 5) yPerc = 5;
       
       const xPerc = buckets.length > 1 ? (idx / (buckets.length - 1)) * 100 : 50;
@@ -5052,7 +5052,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                )}
 
                {/* SVG Wave Line underneath */}
-               <div className="absolute top-0 bottom-2 left-6 right-2 z-0 overflow-hidden pointer-events-none">
+               <div className="absolute top-0 bottom-2 left-6 right-2 z-20 overflow-hidden pointer-events-none">
                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
                    <defs>
                      <linearGradient id="waveGradient" x1="0" x2="0" y1="0" y2="1">
