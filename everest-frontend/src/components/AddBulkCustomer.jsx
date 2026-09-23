@@ -206,15 +206,19 @@ const AddBulkCustomer = ({ activeBranch }) => {
       for (let i = 0; i < customers.length; i += CHUNK_SIZE) {
         const chunk = customers.slice(i, i + CHUNK_SIZE);
         const batch = writeBatch(db);
-        
-        const today = new Date().toISOString().split('T')[0];
 
         chunk.forEach(cust => {
           const docRef = doc(db, 'customers', cust.docId);
           
+          // Use the specific customer's apply date, fallback to today if missing
+          const applyDateStr = cust.date || cust.appDate || new Date().toISOString().split('T')[0];
+          const approvalDateObj = new Date(applyDateStr);
+          approvalDateObj.setDate(approvalDateObj.getDate() + 1);
+          const customerApprovalDate = approvalDateObj.toISOString().split('T')[0];
+          
           let nextDueDate = '';
           const loanType = (cust.loanType || cust.scheme || '').toLowerCase();
-          const d = new Date(today);
+          const d = new Date(customerApprovalDate);
           
           if (loanType.includes('daily')) {
             d.setDate(d.getDate() + 1);
@@ -232,7 +236,7 @@ const AddBulkCustomer = ({ activeBranch }) => {
 
           batch.update(docRef, { 
             status: 'Approved', 
-            approvalDate: today,
+            approvalDate: customerApprovalDate,
             nextDueDate: nextDueDate,
             lastUpdated: new Date().toISOString() 
           });

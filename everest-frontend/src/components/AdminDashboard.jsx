@@ -4544,20 +4544,18 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-full rounded-full transition-all duration-1000 ease-out shadow-sm relative" 
                 style={{ width: `${todayMetrics.target > 0 ? Math.min((todayMetrics.collection / todayMetrics.target) * 100, 100) : (todayMetrics.collection > 0 ? 100 : 0)}%` }}
               >
-                {/* Dynamic Remaining Pill (Desktop Only) */}
+                {/* Dynamic Progress Tip Dot & Clean Typography */}
                 {todayMetrics.collection < todayMetrics.target && (
-                  <div className="hidden md:block absolute top-1/2 -translate-y-1/2 bg-slate-800 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full shadow-md whitespace-nowrap z-10"
+                  <div className="absolute top-1/2 -translate-y-1/2 z-10 flex flex-col items-center"
                        style={{ 
                          left: `100%`,
                          transform: `translate(${todayMetrics.target > 0 && (todayMetrics.collection / todayMetrics.target) * 100 > 85 ? '-100%' : '-50%'}, -50%)`,
-                         marginLeft: todayMetrics.target > 0 && (todayMetrics.collection / todayMetrics.target) * 100 > 85 ? '-8px' : '0'
                        }}>
-                    ₹{(todayMetrics.target - todayMetrics.collection).toLocaleString('en-IN')} Left
+                    <span className="text-slate-700 font-bold text-[10px] md:text-[11px] mb-1 -mt-4 bg-white/70 px-1 rounded whitespace-nowrap shadow-none">
+                      ₹{(todayMetrics.target - todayMetrics.collection).toLocaleString('en-IN')}
+                    </span>
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-800 border-[1.5px] border-white shadow-sm absolute top-1/2 -translate-y-1/2"></div>
                   </div>
-                )}
-                {/* Mobile Green Dot Indicator */}
-                {todayMetrics.collection > 0 && (
-                  <div className="md:hidden absolute top-1/2 -translate-y-1/2 right-0 w-2 h-2 bg-emerald-500 rounded-full shadow-sm border border-white transform translate-x-[40%]"></div>
                 )}
               </div>
             </div>
@@ -4580,32 +4578,38 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               <span className="hidden md:inline text-sm">Weekly Collection</span>
             </h3>
             
-            <div className="flex flex-col md:flex-row h-full items-center justify-between gap-2 md:gap-0">
+            <div className="flex flex-col md:flex-row h-full items-center justify-center gap-4 md:gap-12 pb-2">
               {/* Left Column / Mobile Bottom (Metrics Summary) */}
-              <div className="flex flex-col gap-0.5 md:gap-3 justify-center md:justify-start w-full md:w-1/2 md:pr-2 order-2 md:order-1 items-center md:items-start pb-1 md:pb-0">
-                <div className="flex flex-row md:flex-col items-center justify-center md:justify-start w-full gap-2 md:gap-0">
-                  <span className="font-medium text-white text-[11px] md:text-[9px] uppercase tracking-widest flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div> Target
+              <div className="flex flex-col gap-2 md:gap-4 justify-center w-full md:w-auto order-2 md:order-1 items-center md:items-start md:pl-8">
+                <div className="flex flex-row md:flex-col items-center md:items-start w-full gap-2 md:gap-0.5">
+                  <span className="font-medium text-white text-[11px] md:text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-blue-400"></div> Target
                   </span>
-                  <span className="text-blue-400 font-bold tracking-wide text-[12px] md:text-sm">₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-blue-400 font-bold tracking-wide text-[12px] md:text-[15px] md:pl-3.5 leading-none">
+                    ₹{(weeklyMetrics.target || 0).toLocaleString('en-IN')}
+                  </span>
                 </div>
-                <div className="flex flex-row md:flex-col items-center justify-center md:justify-start w-full gap-2 md:gap-0 mt-0.5 md:mt-0">
-                  <span className="font-medium text-white text-[11px] md:text-[9px] uppercase tracking-widest flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div> Collection
+                <div className="flex flex-row md:flex-col items-center md:items-start w-full gap-2 md:gap-0.5">
+                  <span className="font-medium text-white text-[11px] md:text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-orange-400"></div> Collection
                   </span>
-                  <span className="text-orange-400 font-bold tracking-wide text-[12px] md:text-sm">₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-orange-400 font-bold tracking-wide text-[12px] md:text-[15px] md:pl-3.5 leading-none">
+                    ₹{(weeklyMetrics.collection || 0).toLocaleString('en-IN')}
+                  </span>
                 </div>
-                <div className="hidden md:flex flex-col items-start gap-0">
-                  <span className="text-white font-bold text-[9px] uppercase tracking-widest flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> Overdue
+                <div className="hidden md:flex flex-col items-start w-full gap-0.5">
+                  <span className="font-medium text-white text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-red-400"></div> Overdue
                   </span>
-                  <span className="text-red-400 font-bold tracking-wide text-sm">₹{(weeklyMetrics.overdue || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-red-400 font-bold tracking-wide text-[15px] md:pl-3.5 leading-none">
+                    ₹{(weeklyMetrics.overdue || 0).toLocaleString('en-IN')}
+                  </span>
                 </div>
               </div>
   
               {/* Right Column / Mobile Top (Tricolor Donut) */}
-              <div className="flex items-center justify-center w-full md:w-1/2 h-full order-1 md:order-2">
-                <div className="relative w-24 h-24 md:w-36 md:h-36 flex-shrink-0">
+              <div className="flex items-center justify-center w-full md:w-auto h-full order-1 md:order-2 md:pr-8">
+                <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0">
                   {(() => {
                     const total = (weeklyMetrics.target || 0) + (weeklyMetrics.collection || 0) + (weeklyMetrics.overdue || 0);
                     return (
