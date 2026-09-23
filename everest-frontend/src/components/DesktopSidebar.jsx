@@ -46,6 +46,7 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
+    if (item.name === 'Add Bulk Customer') return isAdmin;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 
     return true;

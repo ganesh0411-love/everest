@@ -12,7 +12,12 @@ const AddBulkCustomer = ({ activeBranch }) => {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'uploadBatches'), orderBy('uploadedAt', 'desc'));
+    if (!activeBranch?.id) return;
+    const q = query(
+      collection(db, 'uploadBatches'),
+      where('branchId', '==', activeBranch.id),
+      orderBy('uploadedAt', 'desc')
+    );
     const unsub = onSnapshot(q, (snapshot) => {
       const fetchedBatches = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -22,7 +27,7 @@ const AddBulkCustomer = ({ activeBranch }) => {
       setBatches(fetchedBatches);
     });
     return () => unsub();
-  }, []);
+  }, [activeBranch?.id]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -174,11 +179,16 @@ const AddBulkCustomer = ({ activeBranch }) => {
 
       // Write Summary Batch Record
       const batchSummaryRef = doc(collection(db, 'uploadBatches'), batchId);
+      const storedProfile = localStorage.getItem('everest_user_profile');
+      const userProfile = storedProfile ? JSON.parse(storedProfile) : null;
+      
       await writeBatch(db).set(batchSummaryRef, {
         fileName: file.name,
         totalCustomers: customersToStage.length,
         status: 'Pending Review',
         branchId: activeBranch?.id || 'main',
+        branchName: activeBranch?.name || 'Main Branch',
+        uploadedBy: userProfile?.email || 'admin',
         uploadedAt: serverTimestamp()
       }).commit();
 
