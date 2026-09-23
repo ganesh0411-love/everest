@@ -126,6 +126,16 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       // Smoothly update marker
       markerRef.current.setLatLng([loc.lat, loc.lng]);
 
+      const el = markerRef.current.getElement();
+      if (el) {
+        el.style.transition = 'transform 1s linear';
+        const svg = el.querySelector('svg');
+        if (svg) {
+          svg.style.transition = 'transform 0.5s ease-out';
+          svg.style.transform = `rotate(${trackingData?.liveSession?.heading || 0}deg)`;
+        }
+      }
+
       // Draw Polyline
       if (isLiveActive && route.length > 0) {
         const latLngs = route.map(pt => [pt.lat, pt.lng]);
@@ -193,6 +203,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
 
   const loc = trackingData?.currentLocation;
   const speed = trackingData?.liveSession?.currentSpeed || 0;
+  const isMoving = speed > 2;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
@@ -221,10 +232,16 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             {/* Speed & Distance Badges */}
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               {isLiveActive && (
-                <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-indigo-700 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                  Speed: {speed.toFixed(1)} km/h
-                </div>
+                <>
+                  <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-indigo-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    Speed: {speed.toFixed(1)} km/h
+                  </div>
+                  <div className={`bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold flex items-center gap-1.5 ${isMoving ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    <span className={`w-2 h-2 rounded-full ${isMoving ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                    Status: {isMoving ? 'Moving' : 'Stationary'}
+                  </div>
+                </>
               )}
             </div>
             
