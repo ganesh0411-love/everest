@@ -751,24 +751,18 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   }, [showMarkAttendanceCalendar]);
 
   React.useEffect(() => {
-    let lastBackPress = 0;
-    const backListener = App.addListener('backButton', () => {
+    window.handleAndroidBack = () => {
       if (showMarkAttendanceCalendar) {
         setShowMarkAttendanceCalendar(false);
+        return true;
       } else if (showAttendanceOverlay) {
         setShowAttendanceOverlay(false);
-      } else {
-        const now = new Date().getTime();
-        if (now - lastBackPress < 2000) {
-          App.exitApp();
-        } else {
-          lastBackPress = now;
-          // Optionally trigger a toast here if we had one imported
-        }
+        return true;
       }
-    });
+      return false;
+    };
     return () => {
-      backListener.then(l => l.remove());
+      window.handleAndroidBack = null;
     };
   }, [showMarkAttendanceCalendar, showAttendanceOverlay]);
 
@@ -787,15 +781,17 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     localStorage.setItem(attendanceKey, JSON.stringify(attendanceState));
     let timer;
     if (attendanceState.checkInTime && !attendanceState.checkOutTime) {
-      const start = new Date(attendanceState.checkInTime).getTime();
-      timer = setInterval(() => {
+      const updateTimer = () => {
         const now = new Date().getTime();
+        const start = new Date(attendanceState.checkInTime).getTime();
         const diff = now - start;
         const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
         const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
         const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
         setShiftElapsed(`${h}h ${m}m ${s}s`);
-      }, 1000);
+      };
+      updateTimer();
+      timer = setInterval(updateTimer, 1000);
     }
     return () => clearInterval(timer);
   }, [attendanceState, attendanceKey]);
@@ -803,11 +799,18 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const handleSelfieCapture = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    const now = new Date().toISOString();
+    
+    // Immediately update state so timer ticks even while GPS is fetching
+    if (pendingAction === 'check-in') {
+      setAttendanceState(prev => ({ ...prev, checkInTime: now }));
+      setShiftElapsed('00h 00m 00s');
+    }
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          const now = new Date().toISOString();
-          
           // Phase 1: Update Firestore with Staff Location
           if (userProfile && userProfile.uid) {
             try {
@@ -826,9 +829,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
             }
           }
 
-          if (pendingAction === 'check-in') {
-            setAttendanceState(prev => ({ ...prev, checkInTime: now }));
-          } else if (pendingAction === 'check-out') {
+          if (pendingAction === 'check-out') {
             const coNow = new Date();
             const ciDate = new Date(attendanceState.checkInTime);
             const ciTime = ciDate.getHours() + ciDate.getMinutes() / 60;
@@ -5215,7 +5216,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           return (
                             <div key={d} onClick={() => setSelectedCalendarDate(d)} className="flex flex-col items-center justify-center aspect-square relative cursor-pointer hover:bg-slate-50 rounded-full transition-colors">
                               {isToday && !status ? (
-                                <div className={`w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center animate-soft-pulse ${selectionRing}`}>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center animate-soft-pulse ${selectionRing} ${
+                                  attendanceState.checkInTime && !attendanceState.checkOutTime
+                                    ? 'border-2 border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.5)] bg-emerald-50 text-emerald-700'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}>
                                   <div className={circleClass}>
                                     <span className={textClass}>{d}</span>
                                   </div>
