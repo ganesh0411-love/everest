@@ -62,6 +62,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
+    if (item.name === 'Add Bulk Customer') return true;
     if (item.name === 'Customer KYC Update') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 
