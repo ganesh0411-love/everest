@@ -751,22 +751,6 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     }
   }, [showMarkAttendanceCalendar]);
 
-  React.useEffect(() => {
-    window.handleAndroidBack = () => {
-      if (showMarkAttendanceCalendar) {
-        setShowMarkAttendanceCalendar(false);
-        return true;
-      } else if (showAttendanceOverlay) {
-        setShowAttendanceOverlay(false);
-        return true;
-      }
-      return false;
-    };
-    return () => {
-      window.handleAndroidBack = null;
-    };
-  }, [showMarkAttendanceCalendar, showAttendanceOverlay]);
-
   // Re-initialize state if user changes
   React.useEffect(() => {
     const saved = localStorage.getItem(attendanceKey);
@@ -4705,6 +4689,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   // Global interceptor for Android Hardware Back Button
   React.useEffect(() => {
     window.handleAndroidBack = () => {
+      // 0. Attendance Hierarchy
+      if (showMarkAttendanceCalendar) { setShowMarkAttendanceCalendar(false); return true; }
+      if (showAttendanceOverlay) { setShowAttendanceOverlay(false); return true; }
+
       // 1. Modals & Popups
       if (isLandSearchModalOpen) { setIsLandSearchModalOpen(false); return true; }
       if (showDarkDrawSettings) { setShowDarkDrawSettings(false); return true; }
