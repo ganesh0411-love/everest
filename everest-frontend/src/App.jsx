@@ -919,6 +919,7 @@ function App() {
   // 1. SUMMARY METRICS CALCULATION ENGINE
   // STRICT FINANCIAL SUMMARY METRICS ENGINE
   const summaryMetrics = useMemo(() => {
+    let totalDisbursed = 0;
     let totalLoan = 0;
     let totalCollection = 0;
     let totalOutstanding = 0;
@@ -931,6 +932,8 @@ function App() {
     const list = Array.isArray(approvedCustomers) ? approvedCustomers : [];
 
     list.forEach((customer) => {
+      const disbursed = Number(customer.disbursedAmount || 0);
+      totalDisbursed += isNaN(disbursed) ? 0 : disbursed;
       const loan = Number(customer.loanAmount || customer.principalAmount || customer.amount || 0);
       totalLoan += isNaN(loan) ? 0 : loan;
       totalCollection += (customer.dynamicTotalPaid || 0);
@@ -939,6 +942,7 @@ function App() {
     });
 
     return {
+      totalDisbursed,
       totalLoan,
       totalCollection,
       totalOutstanding,
@@ -1187,7 +1191,24 @@ function App() {
                         
                         {/* COMPACT 4-CARD SUMMARY METRICS BAR WITH CUSTOM ICONS (ALL BRANCHES, DESKTOP ONLY) */}
                         <div className="hidden lg:grid grid-cols-4 gap-3 mb-4">
-                          {/* Card 1: Loan Amount */}
+                          {/* Card 1: Disbursement Amount */}
+                          <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
+                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
+                                  <div className="w-full h-full rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
+                                    <Banknote size={24} strokeWidth={2} />
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xs md:text-sm font-extrabold text-slate-900 uppercase tracking-wider block">
+                                    Disbursed
+                                  </span>
+                                  <div className="text-lg md:text-xl font-bold text-blue-600 mt-0.5">
+                                    ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
+                                  </div>
+                                </div>
+                              </div>
+
+                          {/* Card 2: Loan Amount */}
                           <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
                                 <div className="w-11 h-11 flex items-center justify-center shrink-0">
                                   <img 
@@ -1206,7 +1227,7 @@ function App() {
                                 </div>
                               </div>
 
-                              {/* Card 2: Collection */}
+                              {/* Card 3: Collection */}
                               <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
                                 <div className="w-11 h-11 flex items-center justify-center shrink-0">
                                   <img 
@@ -1225,7 +1246,7 @@ function App() {
                                 </div>
                               </div>
 
-                              {/* Card 3: Outstanding (Shortened label) */}
+                              {/* Card 4: Outstanding (Shortened label) */}
                               <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
                                 <div className="w-11 h-11 flex items-center justify-center shrink-0">
                                   <img 
@@ -1243,55 +1264,58 @@ function App() {
                                   </div>
                                 </div>
                               </div>
-
-                              {/* Card 4: Overdue (OD) Amount (Interactive Toggle) */}
-                              <div 
-                                onClick={() => setIsOdFilterActive(!isOdFilterActive)}
-                                className={`px-4 py-3 rounded-xl shadow-sm flex items-center justify-between transition-all cursor-pointer hover:shadow-md ${isOdFilterActive ? 'bg-rose-50 border-2 border-rose-400 scale-[1.02]' : 'bg-white border border-rose-100 bg-rose-50/20 hover:border-rose-200'}`}
-                              >
-                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
-                                  <img 
-                                    src={overdueIcon} 
-                                    alt="Overdue" 
-                                    className="w-full h-full object-contain" 
-                                  />
-                                </div>
-                                <div className="text-right flex flex-col items-end">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
-                                      {isOdFilterActive ? 'FILTER ACTIVE' : 'Past Due'}
-                                    </span>
-                                    <span className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider block">
-                                      OD Amount (Overdue)
-                                    </span>
-                                  </div>
-                                  <div className="text-lg md:text-xl font-bold text-rose-600 mt-0.5">
-                                    ₹{summaryMetrics.totalOverdue.toLocaleString('en-IN')}
-                                  </div>
-                                </div>
-                              </div>
                             </div>
 
                         {/* DESKTOP TABLE VIEW (ALL BRANCHES, DESKTOP ONLY) */}
                         <div className="hidden lg:block">
-                            {/* 2. SEARCH BAR & FILTER ROW */}
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <input
-                                  type="text"
-                                  placeholder="Search Customer"
-                                  value={searchQuery}
-                                  onChange={(e) => setSearchQuery(e.target.value)}
-                                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                            {/* 2. SEARCH BAR, FILTER ROW & OD CARD ALIGNMENT */}
+                            <div className="grid grid-cols-4 gap-3 mb-3">
+                              <div className="col-span-3 flex items-center gap-3 w-full max-w-md">
+                                <div className="relative flex-1">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    placeholder="Search Customer"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                </div>
+                                <button
+                                  onClick={openFilter}
+                                  className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                                >
+                                  <Filter className="w-4 h-4 text-slate-600" />
+                                </button>
                               </div>
-                              <button
-                                onClick={openFilter}
-                                className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                              >
-                                <Filter className="w-4 h-4 text-slate-600" />
-                              </button>
+                              <div className="col-span-1">
+                                {/* Card 5: Overdue (OD) Amount (Interactive Toggle) */}
+                                <div 
+                                  onClick={() => setIsOdFilterActive(!isOdFilterActive)}
+                                  className={`px-4 py-2.5 rounded-xl shadow-sm flex items-center justify-between transition-all cursor-pointer hover:shadow-md h-full ${isOdFilterActive ? 'bg-rose-50 border-2 border-rose-400 scale-[1.02]' : 'bg-white border border-rose-100 bg-rose-50/20 hover:border-rose-200'}`}
+                                >
+                                  <div className="w-9 h-9 flex items-center justify-center shrink-0">
+                                    <img 
+                                      src={overdueIcon} 
+                                      alt="Overdue" 
+                                      className="w-full h-full object-contain" 
+                                    />
+                                  </div>
+                                  <div className="text-right flex flex-col items-end">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
+                                        {isOdFilterActive ? 'FILTER ACTIVE' : 'Past Due'}
+                                      </span>
+                                      <span className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider block">
+                                        OD Amount
+                                      </span>
+                                    </div>
+                                    <div className="text-base md:text-lg font-bold text-rose-600 mt-0.5">
+                                      ₹{summaryMetrics.totalOverdue.toLocaleString('en-IN')}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
 
                             {/* 3. ENTRIES COUNTER & RESET FILTER */}
