@@ -18,6 +18,10 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
     staffManagementRole: 'Staff', // 'Staff' or 'Admin'
     applicationStatus: false,
     applicationStatusRole: 'Staff', // 'Staff' or 'Admin'
+    collectionReport: false,
+    collectionReportRole: 'Staff', // 'Staff' or 'Admin'
+    attendance: false,
+    attendanceRole: 'Staff', // 'Staff' or 'Admin'
     recycleBin: false,
 
     // Dashboard Cards
@@ -250,6 +254,76 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                     className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
                     checked={permissions.applicationStatusRole === 'Admin'}
                     onChange={() => handleRoleChange('applicationStatusRole', 'Admin')}
+                  />
+                  <span className="font-medium text-slate-600">Admin</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Collection Report */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-xl transition-colors gap-3 sm:gap-0 ${permissions.collectionReport ? 'border-purple-200 bg-purple-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+              <label className="flex items-center cursor-pointer flex-1">
+                <input 
+                  type="checkbox"
+                  className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                  checked={permissions.collectionReport}
+                  onChange={() => handleToggle('collectionReport')}
+                />
+                <span className="text-sm font-bold text-slate-700">Collection Report</span>
+              </label>
+              <div className={`flex items-center gap-4 sm:pl-4 sm:border-l border-slate-200 ml-7 sm:ml-0 ${!permissions.collectionReport ? 'opacity-40 pointer-events-none' : ''}`}>
+                <label className="flex items-center cursor-pointer text-sm">
+                  <input 
+                    type="radio"
+                    name="collectionRole"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
+                    checked={permissions.collectionReportRole === 'Staff'}
+                    onChange={() => handleRoleChange('collectionReportRole', 'Staff')}
+                  />
+                  <span className="font-medium text-slate-600">Staff</span>
+                </label>
+                <label className="flex items-center cursor-pointer text-sm">
+                  <input 
+                    type="radio"
+                    name="collectionRole"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
+                    checked={permissions.collectionReportRole === 'Admin'}
+                    onChange={() => handleRoleChange('collectionReportRole', 'Admin')}
+                  />
+                  <span className="font-medium text-slate-600">Admin</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Attendance */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-xl transition-colors gap-3 sm:gap-0 ${permissions.attendance ? 'border-purple-200 bg-purple-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+              <label className="flex items-center cursor-pointer flex-1">
+                <input 
+                  type="checkbox"
+                  className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                  checked={permissions.attendance}
+                  onChange={() => handleToggle('attendance')}
+                />
+                <span className="text-sm font-bold text-slate-700">Attendance</span>
+              </label>
+              <div className={`flex items-center gap-4 sm:pl-4 sm:border-l border-slate-200 ml-7 sm:ml-0 ${!permissions.attendance ? 'opacity-40 pointer-events-none' : ''}`}>
+                <label className="flex items-center cursor-pointer text-sm">
+                  <input 
+                    type="radio"
+                    name="attendanceRole"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
+                    checked={permissions.attendanceRole === 'Staff'}
+                    onChange={() => handleRoleChange('attendanceRole', 'Staff')}
+                  />
+                  <span className="font-medium text-slate-600">Staff</span>
+                </label>
+                <label className="flex items-center cursor-pointer text-sm">
+                  <input 
+                    type="radio"
+                    name="attendanceRole"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
+                    checked={permissions.attendanceRole === 'Admin'}
+                    onChange={() => handleRoleChange('attendanceRole', 'Admin')}
                   />
                   <span className="font-medium text-slate-600">Admin</span>
                 </label>
