@@ -1155,9 +1155,9 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     // Calculate wave path based on the highest bar peak in each bucket
     const wavePoints = buckets.map((b, idx) => {
       const bucketPeak = Math.max(b.loanAmount, b.disbursements, b.collections);
-      // Generous headroom: 22 units above the tallest bar peak (with min cap 12)
-      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 22;
-      if (yPerc < 12) yPerc = 12;
+      // Natural float offset above the bar (bars are already compact due to buffered ceiling)
+      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 10;
+      if (yPerc < 5) yPerc = 5;
       
       const xPerc = buckets.length > 1 ? (idx / (buckets.length - 1)) * 100 : 50;
       return { x: xPerc, y: yPerc, peak: bucketPeak };
@@ -1176,17 +1176,18 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     }
     
     if (wavePoints.length > 0 && firstActiveIdx !== -1) {
-       // Left Edge: Perpendicular drop from baseline
-       pathD = `M ${wavePoints[firstActiveIdx].x},100 L ${wavePoints[firstActiveIdx].x},${wavePoints[firstActiveIdx].y} `;
-       
+       // Stroke Path: Trace ONLY the top crest without the perpendicular vertical drops
+       pathD = `M ${wavePoints[firstActiveIdx].x},${wavePoints[firstActiveIdx].y} `;
        for (let i = firstActiveIdx + 1; i <= lastActiveIdx; i++) {
          pathD += `L ${wavePoints[i].x},${wavePoints[i].y} `;
        }
        
-       // Right Edge: Perpendicular drop to baseline
-       pathD += `L ${wavePoints[lastActiveIdx].x},100`;
-       
-       fillD = `${pathD} Z`;
+       // Fill Path: Complete the shape including vertical drops and bottom baseline closure
+       fillD = `M ${wavePoints[firstActiveIdx].x},100 L ${wavePoints[firstActiveIdx].x},${wavePoints[firstActiveIdx].y} `;
+       for (let i = firstActiveIdx + 1; i <= lastActiveIdx; i++) {
+         fillD += `L ${wavePoints[i].x},${wavePoints[i].y} `;
+       }
+       fillD += `L ${wavePoints[lastActiveIdx].x},100 Z`;
     }
 
     return { buckets, ceiling, yLabels, totalLoan, totalDisb, totalColl, wavePathD: pathD, waveFillD: fillD };
