@@ -1155,22 +1155,24 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     // Calculate wave path based on the highest bar peak in each bucket
     const wavePoints = buckets.map((b, idx) => {
       const bucketPeak = Math.max(b.loanAmount, b.disbursements, b.collections);
-      // Determine Y coordinate (SVG origin is top-left, so 0 is top (value=ceiling), 100 is bottom (value=0))
-      // Values are scaled 0-100% of the SVG height
-      // The wave will peak strictly at the tallest bar.
-      const yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100));
-      // Determine X coordinate (aligned with the center of the bar group)
-      // There are N buckets. For N buckets distributed with justify-between, 
-      // they are roughly at x = (i / (N-1)) * 100
+      // Introduce 15 units of visual headroom above the highest bar
+      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 15;
+      // Prevent clipping outside the SVG viewBox at the top
+      if (yPerc < 5) yPerc = 5;
+      
       const xPerc = buckets.length > 1 ? (idx / (buckets.length - 1)) * 100 : 50;
-      return `${xPerc},${yPerc}`;
+      return { x: xPerc, y: yPerc };
     });
 
-    let pathD = "M 0,100 "; // Start at bottom left
+    let pathD = "M 0,100 "; // Fallback
     if (wavePoints.length > 0) {
-      pathD = `M ${wavePoints[0]} `;
-      for (let i = 1; i < wavePoints.length; i++) {
-        pathD += `L ${wavePoints[i]} `;
+      pathD = `M ${wavePoints[0].x},${wavePoints[0].y} `;
+      for (let i = 0; i < wavePoints.length - 1; i++) {
+        const curr = wavePoints[i];
+        const next = wavePoints[i+1];
+        // Use a cubic Bezier curve with horizontal control points for an ambient, organic spline curve
+        const midX = (curr.x + next.x) / 2;
+        pathD += `C ${midX},${curr.y} ${midX},${next.y} ${next.x},${next.y} `;
       }
     }
 
@@ -5052,7 +5054,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                      d={chartData.wavePathD} 
                      fill="none" 
                      stroke="#06b6d4" 
-                     strokeWidth="2.5" 
+                     strokeWidth="1.5" 
+                     strokeLinecap="round"
+                     strokeLinejoin="round"
+                     vectorEffect="non-scaling-stroke"
                      style={{ filter: 'drop-shadow(0px 2px 4px rgba(6,182,212,0.8))' }}
                    />
                  </svg>
