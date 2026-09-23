@@ -34,6 +34,7 @@ const dummyData = [
 const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, branches = [] }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
+  const hasDutyTrackingPermission = userProfile?.role === 'admin' || userProfile?.role === 'Admin' || userProfile?.role === 'main_admin' || userProfile?.permissions?.staffManagementRole === 'Tracking';
   
   // State for Add/Edit Form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -664,7 +665,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                 <th className="py-3 px-4 text-left border-l border-slate-200">ID</th>
                 <th className="py-3 px-4 text-left border-l border-slate-200">Phone Number</th>
                 <th className="py-3 px-4 text-left border-l border-slate-200">Designation</th>
-                <th className="py-3 px-4 text-left border-l border-slate-200 text-center">Duty Tracking</th>
+                {hasDutyTrackingPermission && <th className="py-3 px-4 text-left border-l border-slate-200 text-center">Duty Tracking</th>}
                 {!isMainBranch && <th className="py-3 px-2 text-center border-l border-slate-200 w-12"></th>}
               </tr>
             </thead>
@@ -706,36 +707,38 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                   <td className="py-3 px-4 text-sm text-slate-600 border-l border-slate-200">
                     {staff.designation || staff.role || staff.position || 'Staff'}
                   </td>
-                  <td className="py-3 px-4 border-l border-slate-200">
-                    <div className="flex items-center justify-center gap-3">
-                      <button 
-                        onClick={() => {
-                          setActiveTrackingSession({
-                            staffId: staff.uid || staff.docId || staff.id,
-                            staffName: staff.name || staff.staffName,
-                            mode: 'live'
-                          });
-                        }}
-                        title="Live Movement Tracking"
-                        className="p-1.5 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:shadow-sm transition-all"
-                      >
-                        <Radio size={16} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setActiveTrackingSession({
-                            staffId: staff.uid || staff.docId || staff.id,
-                            staffName: staff.name || staff.staffName,
-                            mode: 'current'
-                          });
-                        }}
-                        title="View Current Location"
-                        className="p-1.5 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:shadow-sm transition-all"
-                      >
-                        <MapPin size={16} />
-                      </button>
-                    </div>
-                  </td>
+                  {hasDutyTrackingPermission && (
+                    <td className="py-3 px-4 border-l border-slate-200">
+                      <div className="flex items-center justify-center gap-3">
+                        <button 
+                          onClick={() => {
+                            setActiveTrackingSession({
+                              staffId: staff.uid || staff.docId || staff.id,
+                              staffName: staff.name || staff.staffName,
+                              mode: 'live'
+                            });
+                          }}
+                          title="Live Movement Tracking"
+                          className="p-1.5 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:shadow-sm transition-all"
+                        >
+                          <Radio size={16} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setActiveTrackingSession({
+                              staffId: staff.uid || staff.docId || staff.id,
+                              staffName: staff.name || staff.staffName,
+                              mode: 'current'
+                            });
+                          }}
+                          title="View Current Location"
+                          className="p-1.5 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:shadow-sm transition-all"
+                        >
+                          <MapPin size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                   {!isMainBranch && (
                     <td className="py-3 px-2 text-center border-l border-slate-200 relative">
                       <div className="inline-block text-left" onClick={(e) => e.stopPropagation()}>
@@ -815,7 +818,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                 {/* Column 3: Actions (Right) */}
                 <div className="flex items-center justify-end gap-1 shrink-0 pl-1">
                   {/* Admin Tracking Icons */}
-                  {(userProfile?.role === 'admin' || userProfile?.isAdmin === true || userProfile?.permissions?.staffManagement === true) && (
+                  {hasDutyTrackingPermission && (
                     <div className="flex items-center gap-0.5">
                       <button 
                         onClick={() => {

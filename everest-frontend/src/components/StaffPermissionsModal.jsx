@@ -125,16 +125,6 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                   />
                   <span className="font-medium text-slate-600">Admin</span>
                 </label>
-                <label className="flex items-center cursor-pointer text-sm">
-                  <input 
-                    type="radio"
-                    name="dashboardOverviewRole"
-                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
-                    checked={permissions.dashboardOverviewMode === 'Tracking'}
-                    onChange={() => handleRoleChange('dashboardOverviewMode', 'Tracking')}
-                  />
-                  <span className="font-medium text-slate-600">Tracking</span>
-                </label>
               </div>
             </div>
 
@@ -169,16 +159,6 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                     onChange={() => handleRoleChange('customerManagementMode', 'Admin')}
                   />
                   <span className="font-medium text-slate-600">Admin</span>
-                </label>
-                <label className="flex items-center cursor-pointer text-sm">
-                  <input 
-                    type="radio"
-                    name="customerManagementRole"
-                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
-                    checked={permissions.customerManagementMode === 'Tracking'}
-                    onChange={() => handleRoleChange('customerManagementMode', 'Tracking')}
-                  />
-                  <span className="font-medium text-slate-600">Tracking</span>
                 </label>
               </div>
             </div>
@@ -236,7 +216,7 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                     checked={permissions.staffManagementRole === 'Tracking'}
                     onChange={() => handleRoleChange('staffManagementRole', 'Tracking')}
                   />
-                  <span className="font-medium text-slate-600">Tracking</span>
+                  <span className="font-medium text-slate-600">Duty Tracking</span>
                 </label>
               </div>
             </div>
@@ -272,16 +252,6 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                     onChange={() => handleRoleChange('applicationStatusRole', 'Admin')}
                   />
                   <span className="font-medium text-slate-600">Admin</span>
-                </label>
-                <label className="flex items-center cursor-pointer text-sm">
-                  <input 
-                    type="radio"
-                    name="appRole"
-                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
-                    checked={permissions.applicationStatusRole === 'Tracking'}
-                    onChange={() => handleRoleChange('applicationStatusRole', 'Tracking')}
-                  />
-                  <span className="font-medium text-slate-600">Tracking</span>
                 </label>
               </div>
             </div>
