@@ -5,18 +5,6 @@ import { MapPin, Loader2 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;  
-  const dLon = (lon2 - lon1) * Math.PI / 180; 
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2); 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-  return (R * c).toFixed(1); 
-};
-
 function getRelativeTime(isoString) {
   if (!isoString) return 'Unknown';
   const diff = Date.now() - new Date(isoString).getTime();
@@ -28,7 +16,7 @@ function getRelativeTime(isoString) {
   return new Date(isoString).toLocaleString();
 }
 
-export default function LiveTrackingModal({ staffId, staffName, adminLocation, onClose, initialMode = 'current' }) {
+export default function LiveTrackingModal({ staffId, staffName, onClose, initialMode = 'current' }) {
   const [mapLayer, setMapLayer] = useState('street'); // 'street' | 'satellite'
   const [trackingData, setTrackingData] = useState(null);
   const [isLiveActive, setIsLiveActive] = useState(initialMode === 'live');
@@ -104,10 +92,16 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
 
         // Marker (Custom Icon)
         const icon = L.divIcon({
-          html: `<div style="background: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`,
+          html: `
+            <div style="background: white; border-radius: 12px; padding: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #3b82f6; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+              </svg>
+            </div>`,
           className: '',
-          iconSize: [16, 16],
-          iconAnchor: [8, 8]
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
         });
 
         markerRef.current = L.marker([loc.lat, loc.lng], { icon }).addTo(mapInstance.current);
@@ -226,12 +220,6 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
             
             {/* Speed & Distance Badges */}
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-              {adminLocation && loc?.lat && (
-                  <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Dist: {calculateDistance(adminLocation.lat, adminLocation.lng, loc.lat, loc.lng)} km
-                  </div>
-              )}
               {isLiveActive && (
                 <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-indigo-700 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
@@ -259,7 +247,7 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
                   <MapPin size={48} className="mb-2 opacity-30" />
-                  <p>No location data available yet</p>
+                  <p>Awaiting staff mobile GPS signal</p>
               </div>
             )}
           </div>
@@ -295,9 +283,7 @@ export default function LiveTrackingModal({ staffId, staffName, adminLocation, o
             
             <button 
                 onClick={() => {
-                  const url = adminLocation?.lat && adminLocation?.lng
-                    ? `https://www.google.com/maps/dir/?api=1&origin=${adminLocation.lat},${adminLocation.lng}&destination=${loc.lat},${loc.lng}&travelmode=driving`
-                    : `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
+                  const url = `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
                   window.open(url, '_blank');
                 }}
                 disabled={!loc?.lat}

@@ -41,29 +41,6 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
   const [editingStaff, setEditingStaff] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [activeTrackingSession, setActiveTrackingSession] = useState(null);
-  const [adminLocation, setAdminLocation] = useState(null);
-
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;  
-    const dLon = (lon2 - lon1) * Math.PI / 180; 
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    return (R * c).toFixed(1); 
-  };
-
-  useEffect(() => {
-    if (activeTrackingSession && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setAdminLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        (err) => console.log("Admin location not available", err),
-        { enableHighAccuracy: true }
-      );
-    }
-  }, [activeTrackingSession]);
 
   useEffect(() => {
     const handleClickOutside = () => setActiveDropdown(null);
@@ -888,7 +865,6 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
         <LiveTrackingModal
           staffId={activeTrackingSession.staffId}
           staffName={activeTrackingSession.staffName}
-          adminLocation={adminLocation}
           initialMode={activeTrackingSession.mode}
           onClose={() => setActiveTrackingSession(null)}
         />

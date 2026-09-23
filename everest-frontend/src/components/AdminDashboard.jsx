@@ -812,18 +812,44 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          // Phase 1: Update Firestore with Staff Location
+          let computedStatus = 'absent';
+          let durationHours = 0;
+
+          if (pendingAction === 'check-out') {
+            const coNow = new Date();
+            const ciDate = new Date(attendanceState.checkInTime);
+            durationHours = (coNow.getTime() - ciDate.getTime()) / 3600000;
+            
+            if (durationHours >= 8) {
+              computedStatus = 'present';
+            } else if (durationHours >= 4) {
+              computedStatus = 'half-day';
+            } else {
+              computedStatus = 'absent';
+            }
+          }
+
+          // Phase 1: Update Firestore with Staff Location & Attendance Status
           if (userProfile && userProfile.uid) {
             try {
               const { getDocs } = await import('firebase/firestore');
               const staffSnaps = await getDocs(query(collection(db, 'staff'), where('uid', '==', userProfile.uid)));
               if (!staffSnaps.empty) {
                 const staffDocId = staffSnaps.docs[0].id;
-                await updateDoc(doc(db, 'staff', staffDocId), {
+                let updatePayload = {
                   lastLatitude: position.coords.latitude,
                   lastLongitude: position.coords.longitude,
                   lastLocationUpdatedAt: now
-                });
+                };
+                
+                if (pendingAction === 'check-in') {
+                  updatePayload.lastCheckInTime = now;
+                } else if (pendingAction === 'check-out') {
+                  updatePayload.lastCheckOutTime = now;
+                  updatePayload.lastAttendanceStatus = computedStatus;
+                }
+
+                await updateDoc(doc(db, 'staff', staffDocId), updatePayload);
               }
             } catch (err) {
               console.error("Failed to update staff location in Firestore", err);
@@ -831,28 +857,14 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
           }
 
           if (pendingAction === 'check-out') {
-            const coNow = new Date();
-            const ciDate = new Date(attendanceState.checkInTime);
-            const ciTime = ciDate.getHours() + ciDate.getMinutes() / 60;
-            const coTime = coNow.getHours() + coNow.getMinutes() / 60;
-            const durationHours = (coNow.getTime() - ciDate.getTime()) / 3600000;
-            
-            let status = 'absent';
-            if (durationHours >= 8) {
-              status = 'present';
-            } else if (durationHours >= 4) {
-              status = 'half-day';
-            } else {
-              status = 'absent';
-            }
-            setAttendanceState(prev => ({ ...prev, checkOutTime: now, status }));
+            setAttendanceState(prev => ({ ...prev, checkOutTime: now, status: computedStatus }));
           }
         },
         (error) => {
           console.error("GPS Error:", error);
           alert("GPS is required for attendance.");
         },
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
       alert("Geolocation is not supported by this browser.");
