@@ -21,6 +21,7 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
   const storedProfile = localStorage.getItem('everest_user_profile');
   const userProfile = storedProfile ? JSON.parse(storedProfile) : null;
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'Admin' || userProfile?.role === 'main_admin';
+  const canAccessCustomerUserSettings = isAdmin || userProfile?.permissions?.userSettings === true;
   const isStaffEmpty = !localApp.staffId || localApp.staffId === 'N/A';
   const canAssignStaff = isAdmin || isStaffEmpty;
 
@@ -245,7 +246,7 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
   }, [approvalDate, application]);
 
   const viewSequence = isReadOnly 
-    ? ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc', ...(isAdmin ? ['userSettings'] : [])]
+    ? ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc', ...(canAccessCustomerUserSettings ? ['userSettings'] : [])]
     : ['loanDetails', 'centerDetails', 'staff', 'personal', 'nominee', 'pastLoans', 'kyc'];
 
   const syncNomineeData = async () => {
@@ -423,7 +424,7 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
       icon: <IdCard size={20} className="text-indigo-600" />,
       bg: 'bg-indigo-100',
     },
-    ...(isReadOnly && isAdmin ? [{
+    ...(isReadOnly && canAccessCustomerUserSettings ? [{
       id: 'userSettings',
       title: 'User Setting',
       subtitle: 'Manage account & deletion',
