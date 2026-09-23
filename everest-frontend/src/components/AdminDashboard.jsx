@@ -1131,23 +1131,26 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
       });
     });
 
-    let peakValue = 0;
+    let actualPeak = 0;
     buckets.forEach(b => {
       const mx = Math.max(b.loanAmount, b.disbursements, b.collections);
-      if (mx > peakValue) peakValue = mx;
+      if (mx > actualPeak) actualPeak = mx;
     });
 
-    if (peakValue === 0) peakValue = 1000;
+    if (actualPeak === 0) actualPeak = 1000;
     
-    const magnitude = Math.pow(10, Math.floor(Math.log10(peakValue)));
-    const normalized = peakValue / magnitude;
+    // Add 40% overhead buffer
+    const bufferedPeak = actualPeak * 1.40;
+    
+    const magnitude = Math.pow(10, Math.floor(Math.log10(bufferedPeak)));
+    const normalized = bufferedPeak / magnitude;
     let step;
     if (normalized <= 1.5) step = 0.2 * magnitude;
     else if (normalized <= 2) step = 0.5 * magnitude;
     else if (normalized <= 5) step = 1 * magnitude;
     else step = 2 * magnitude;
     
-    const ceiling = Math.ceil(peakValue / step) * step;
+    const ceiling = Math.ceil(bufferedPeak / step) * step;
     const yLabels = [ceiling, ceiling * 0.8, ceiling * 0.6, ceiling * 0.4, ceiling * 0.2, 0].map(v => 
       v >= 1000 ? (v/1000).toFixed(1).replace('.0', '') + 'k' : v.toString()
     );
@@ -1156,7 +1159,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     const wavePoints = buckets.map((b, idx) => {
       const bucketPeak = Math.max(b.loanAmount, b.disbursements, b.collections);
       // Natural float offset above the bar (bars are already compact due to buffered ceiling)
-      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 30;
+      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 35;
       if (yPerc < 5) yPerc = 5;
       
       const xPerc = buckets.length > 1 ? (idx / (buckets.length - 1)) * 100 : 50;
