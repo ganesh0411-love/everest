@@ -2,6 +2,7 @@ import React from 'react';
 import { flushSync } from 'react-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Geolocation } from '@capacitor/geolocation';
+import { App } from '@capacitor/app';
 import { area as turfArea } from '@turf/area';
 import { length as turfLength } from '@turf/length';
 import { db } from '../firebase';
@@ -740,6 +741,36 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const selfieInputRef = React.useRef(null);
   const [pendingAction, setPendingAction] = React.useState(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = React.useState(new Date().getDate());
+  const [calendarDate, setCalendarDate] = React.useState(new Date());
+
+  React.useEffect(() => {
+    if (showMarkAttendanceCalendar) {
+      setCalendarDate(new Date());
+      setSelectedCalendarDate(new Date().getDate());
+    }
+  }, [showMarkAttendanceCalendar]);
+
+  React.useEffect(() => {
+    let lastBackPress = 0;
+    const backListener = App.addListener('backButton', () => {
+      if (showMarkAttendanceCalendar) {
+        setShowMarkAttendanceCalendar(false);
+      } else if (showAttendanceOverlay) {
+        setShowAttendanceOverlay(false);
+      } else {
+        const now = new Date().getTime();
+        if (now - lastBackPress < 2000) {
+          App.exitApp();
+        } else {
+          lastBackPress = now;
+          // Optionally trigger a toast here if we had one imported
+        }
+      }
+    });
+    return () => {
+      backListener.then(l => l.remove());
+    };
+  }, [showMarkAttendanceCalendar, showAttendanceOverlay]);
 
   // Re-initialize state if user changes
   React.useEffect(() => {
@@ -805,11 +836,9 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
             const durationHours = (coNow.getTime() - ciDate.getTime()) / 3600000;
             
             let status = 'absent';
-            if (durationHours < 4) {
-              status = 'absent';
-            } else if (ciTime <= 9.0 && coTime >= 17.0) {
+            if (durationHours >= 8) {
               status = 'present';
-            } else if (ciTime <= 10.0 && coTime >= 16.0) {
+            } else if (durationHours >= 4) {
               status = 'half-day';
             } else {
               status = 'absent';
@@ -5094,13 +5123,17 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               <div className="bg-white rounded-3xl p-5 shadow-sm flex-1 flex flex-col border border-slate-100">
                 {/* Month Selector */}
                 <div className="flex items-center justify-between mb-6">
-                  <button className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
+                  <button 
+                    onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1))}
+                    className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </button>
-                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-                  <button className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">{calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+                  <button 
+                    onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1))}
+                    className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                     </svg>
@@ -5119,9 +5152,9 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 {/* Calendar Grid & Summary */}
                 <div className="flex flex-col flex-1">
                   {(() => {
-                    const now = new Date();
-                    const year = now.getFullYear();
-                    const month = now.getMonth();
+                    const todayDate = new Date();
+                    const year = calendarDate.getFullYear();
+                    const month = calendarDate.getMonth();
                     const firstDay = new Date(year, month, 1).getDay();
                     const daysInMonth = new Date(year, month + 1, 0).getDate();
                     const daysInPrevMonth = new Date(year, month, 0).getDate();
@@ -5138,7 +5171,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     let halfDayCount = 0;
 
                     const gridCells = currentDays.map(d => {
-                          const isToday = d === now.getDate();
+                          const isToday = d === todayDate.getDate() && month === todayDate.getMonth() && year === todayDate.getFullYear();
+                          const isPastDay = new Date(year, month, d) < new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
                           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                           const key = `attendance_${userProfile?.uid || 'guest'}_${dateStr}`;
                           const saved = localStorage.getItem(key);
@@ -5147,10 +5181,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           if (saved) {
                             const parsed = JSON.parse(saved);
                             status = parsed.status;
-                            if (d < now.getDate() && !status) {
+                            if (isPastDay && !status) {
                                if (!parsed.checkInTime || !parsed.checkOutTime) status = 'absent';
                             }
-                          } else if (d < now.getDate()) {
+                          } else if (isPastDay) {
                             status = 'absent';
                           }
 
@@ -5181,7 +5215,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           return (
                             <div key={d} onClick={() => setSelectedCalendarDate(d)} className="flex flex-col items-center justify-center aspect-square relative cursor-pointer hover:bg-slate-50 rounded-full transition-colors">
                               {isToday && !status ? (
-                                <div className={`w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center ${selectionRing}`}>
+                                <div className={`w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center animate-soft-pulse ${selectionRing}`}>
                                   <div className={circleClass}>
                                     <span className={textClass}>{d}</span>
                                   </div>
