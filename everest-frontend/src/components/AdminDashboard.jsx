@@ -1155,28 +1155,27 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     // Calculate wave path based on the highest bar peak in each bucket
     const wavePoints = buckets.map((b, idx) => {
       const bucketPeak = Math.max(b.loanAmount, b.disbursements, b.collections);
-      // Introduce 15 units of visual headroom above the highest bar
-      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 15;
-      // Prevent clipping outside the SVG viewBox at the top
+      // Generous headroom: 25% higher than the tallest bar peak
+      let yPerc = 100 - Math.max(0, Math.min(100, (bucketPeak / ceiling) * 100)) - 25;
       if (yPerc < 5) yPerc = 5;
       
       const xPerc = buckets.length > 1 ? (idx / (buckets.length - 1)) * 100 : 50;
-      return { x: xPerc, y: yPerc };
+      return { x: xPerc, y: yPerc, peak: bucketPeak };
     });
 
-    let pathD = "M 0,100 "; // Fallback
-    if (wavePoints.length > 0) {
-      pathD = `M ${wavePoints[0].x},${wavePoints[0].y} `;
-      for (let i = 0; i < wavePoints.length - 1; i++) {
-        const curr = wavePoints[i];
-        const next = wavePoints[i+1];
-        // Use a cubic Bezier curve with horizontal control points for an ambient, organic spline curve
-        const midX = (curr.x + next.x) / 2;
-        pathD += `C ${midX},${curr.y} ${midX},${next.y} ${next.x},${next.y} `;
-      }
+    let pathD = "M 0,100 L 100,100"; 
+    let fillD = "M 0,100 L 100,100 Z";
+    const firstActiveIdx = wavePoints.findIndex(wp => wp.peak > 0);
+    
+    if (wavePoints.length > 0 && firstActiveIdx !== -1) {
+       pathD = `M ${wavePoints[firstActiveIdx].x},${wavePoints[firstActiveIdx].y} `;
+       for (let i = firstActiveIdx + 1; i < wavePoints.length; i++) {
+         pathD += `L ${wavePoints[i].x},${wavePoints[i].y} `;
+       }
+       fillD = `${pathD} L ${wavePoints[wavePoints.length-1].x},100 L ${wavePoints[firstActiveIdx].x},100 Z`;
     }
 
-    return { buckets, ceiling, yLabels, totalLoan, totalDisb, totalColl, wavePathD: pathD };
+    return { buckets, ceiling, yLabels, totalLoan, totalDisb, totalColl, wavePathD: pathD, waveFillD: fillD };
   }, [customers, overviewPeriod, isMobileViewport]);
 
   // --- MANUAL CAD ENGINE STATE -----
