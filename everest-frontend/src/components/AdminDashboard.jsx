@@ -797,7 +797,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     return () => clearInterval(timer);
   }, [attendanceState, attendanceKey]);
 
-  const handleSelfieCapture = (e) => {
+  const handleSelfieCapture = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
@@ -809,65 +809,68 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
       setShiftElapsed('00h 00m 00s');
     }
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          let computedStatus = 'absent';
-          let durationHours = 0;
+    let coords = null;
+    try {
+      const { Geolocation } = await import('@capacitor/geolocation');
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: false, 
+        timeout: 10000,
+        maximumAge: 60000 
+      });
+      coords = pos.coords;
+    } catch (err) {
+      console.warn("GPS lock delayed, proceeding with last known timestamp or null coords");
+    }
 
-          if (pendingAction === 'check-out') {
-            const coNow = new Date();
-            const ciDate = new Date(attendanceState.checkInTime);
-            durationHours = (coNow.getTime() - ciDate.getTime()) / 3600000;
-            
-            if (durationHours >= 8) {
-              computedStatus = 'present';
-            } else if (durationHours >= 4) {
-              computedStatus = 'half-day';
-            } else {
-              computedStatus = 'absent';
-            }
+    let computedStatus = 'absent';
+    let durationHours = 0;
+
+    if (pendingAction === 'check-out') {
+      const coNow = new Date();
+      const ciDate = new Date(attendanceState.checkInTime);
+      durationHours = (coNow.getTime() - ciDate.getTime()) / 3600000;
+      
+      if (durationHours >= 8) {
+        computedStatus = 'present';
+      } else if (durationHours >= 4) {
+        computedStatus = 'half-day';
+      } else {
+        computedStatus = 'absent';
+      }
+    }
+
+    // Phase 1: Update Firestore with Staff Location & Attendance Status
+    if (userProfile && userProfile.uid) {
+      try {
+        const { getDocs } = await import('firebase/firestore');
+        const staffSnaps = await getDocs(query(collection(db, 'staff'), where('uid', '==', userProfile.uid)));
+        if (!staffSnaps.empty) {
+          const staffDocId = staffSnaps.docs[0].id;
+          let updatePayload = {
+            lastLocationUpdatedAt: now
+          };
+          
+          if (coords) {
+            updatePayload.lastLatitude = coords.latitude;
+            updatePayload.lastLongitude = coords.longitude;
+          }
+          
+          if (pendingAction === 'check-in') {
+            updatePayload.lastCheckInTime = now;
+          } else if (pendingAction === 'check-out') {
+            updatePayload.lastCheckOutTime = now;
+            updatePayload.lastAttendanceStatus = computedStatus;
           }
 
-          // Phase 1: Update Firestore with Staff Location & Attendance Status
-          if (userProfile && userProfile.uid) {
-            try {
-              const { getDocs } = await import('firebase/firestore');
-              const staffSnaps = await getDocs(query(collection(db, 'staff'), where('uid', '==', userProfile.uid)));
-              if (!staffSnaps.empty) {
-                const staffDocId = staffSnaps.docs[0].id;
-                let updatePayload = {
-                  lastLatitude: position.coords.latitude,
-                  lastLongitude: position.coords.longitude,
-                  lastLocationUpdatedAt: now
-                };
-                
-                if (pendingAction === 'check-in') {
-                  updatePayload.lastCheckInTime = now;
-                } else if (pendingAction === 'check-out') {
-                  updatePayload.lastCheckOutTime = now;
-                  updatePayload.lastAttendanceStatus = computedStatus;
-                }
+          await updateDoc(doc(db, 'staff', staffDocId), updatePayload);
+        }
+      } catch (err) {
+        console.error("Failed to update staff location in Firestore", err);
+      }
+    }
 
-                await updateDoc(doc(db, 'staff', staffDocId), updatePayload);
-              }
-            } catch (err) {
-              console.error("Failed to update staff location in Firestore", err);
-            }
-          }
-
-          if (pendingAction === 'check-out') {
-            setAttendanceState(prev => ({ ...prev, checkOutTime: now, status: computedStatus }));
-          }
-        },
-        (error) => {
-          console.error("GPS Error:", error);
-          alert("GPS is required for attendance.");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
-      alert("Geolocation is not supported by this browser.");
+    if (pendingAction === 'check-out') {
+      setAttendanceState(prev => ({ ...prev, checkOutTime: now, status: computedStatus }));
     }
   };
 

@@ -2,15 +2,15 @@ import { useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Geolocation } from '@capacitor/geolocation';
-import { BackgroundGeolocation } from '@capacitor-community/background-geolocation';
+import { registerPlugin } from '@capacitor/core';
+const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 export function useLiveTracking(userProfile) {
   const watchIdRef = useRef(null);
-  const isWatchingRef = useRef(false);
+  const isLiveStreamActiveRef = useRef(false);
   const watchdogTimeoutRef = useRef(null);
 
   useEffect(() => {
-    // Only run for staff users with a valid uid
     if (!userProfile?.uid || userProfile?.role === 'admin' || userProfile?.isAdmin) {
       return;
     }
@@ -18,7 +18,6 @@ export function useLiveTracking(userProfile) {
     const staffId = userProfile.uid;
     const trackingDocRef = doc(db, 'staff_tracking', staffId);
 
-    // Initial check to create the document if it doesn't exist
     const initializeTrackingDoc = async () => {
       try {
         await setDoc(trackingDocRef, {
@@ -39,144 +38,138 @@ export function useLiveTracking(userProfile) {
     };
     initializeTrackingDoc();
 
-    // Helper to get current location and update it
+    // Helper for manual ping
     const pingCurrentLocation = async (isForced = false) => {
       try {
-        const permissions = await Geolocation.checkPermissions();
-        if (permissions.location !== 'granted') {
-          const req = await Geolocation.requestPermissions();
-          if (req.location !== 'granted') return;
-        }
-
-        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-        
+        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+        const now = new Date().toISOString();
         const updateData = {
           currentLocation: {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-            updatedAt: new Date().toISOString()
+            updatedAt: now
           }
         };
-
         if (isForced) {
-          console.log('[Daemon] Pushed fresh coords:', position.coords.latitude, position.coords.longitude);
+          console.log('[GPS DAEMON] Pushed coords (Forced):', position.coords.latitude, position.coords.longitude, 'at', now);
           updateData['liveSession.forcePing'] = false;
         }
-
         await updateDoc(trackingDocRef, updateData);
       } catch (err) {
-        console.error("Error getting ping location:", err);
+        console.error("Error getting manual ping:", err);
       }
     };
 
-    // Do an initial ping on mount
+    // Initial setup ping
     pingCurrentLocation();
 
-    // Set up heartbeat every 5 minutes if app is open
-    const heartbeatInterval = setInterval(() => {
-      if (!isWatchingRef.current) {
-        pingCurrentLocation();
+    const startWatcher = async (distanceFilter = 0) => {
+      if (watchIdRef.current != null) {
+        await BackgroundGeolocation.removeWatcher({ id: watchIdRef.current });
+        watchIdRef.current = null;
       }
-    }, 5 * 60 * 1000);
+      
+      try {
+        watchIdRef.current = await BackgroundGeolocation.addWatcher(
+          {
+            backgroundMessage: "Everest Field Service running in background",
+            backgroundTitle: "Active Tracking",
+            requestPermissions: true,
+            stale: false,
+            distanceFilter: distanceFilter
+          },
+          async (position, err) => {
+            if (err) {
+              console.error("Watch position error:", err);
+              return;
+            }
+            if (!position) return;
+            
+            // Accept all coords including mock locations in debug builds
+            const speedInKmH = position.speed != null && position.speed > 0 
+              ? Math.round(position.speed * 3.6) 
+              : 0;
+            const now = new Date().toISOString();
+            
+            console.log(`[GPS DAEMON] Pushed coords: ${position.latitude}, ${position.longitude} at ${now}`);
 
-    // Listen to changes in the tracking doc
+            const point = {
+              lat: position.latitude,
+              lng: position.longitude,
+              speed: speedInKmH,
+              timestamp: now
+            };
+
+            try {
+              let updatePayload = {
+                currentLocation: {
+                  lat: position.latitude,
+                  lng: position.longitude,
+                  updatedAt: now
+                }
+              };
+              
+              if (isLiveStreamActiveRef.current) {
+                updatePayload['liveSession.currentSpeed'] = speedInKmH;
+                updatePayload['liveSession.heading'] = position.bearing || 0;
+                updatePayload['liveSession.lastPingAt'] = now;
+                updatePayload['liveSession.routePath'] = arrayUnion(point);
+              }
+              await updateDoc(trackingDocRef, updatePayload);
+            } catch (e) {
+              console.error("Error updating tracking doc:", e);
+            }
+          }
+        );
+      } catch (err) {
+        console.error("Could not start BackgroundWatcher:", err);
+      }
+    };
+
+    // Start default 50m battery-saving continuous watcher
+    startWatcher(50);
+
+    // Watch for Admin live tracking triggers
     const unsubscribe = onSnapshot(trackingDocRef, async (snapshot) => {
       if (!snapshot.exists()) return;
-      const data = snapshot.data();
-      const liveSession = data.liveSession || {};
+      const liveSession = snapshot.data().liveSession || {};
 
-      // Handle force ping
       if (liveSession.forcePing) {
-        console.log('[Daemon] Force Ping detected! Fetching fresh GPS...');
         await pingCurrentLocation(true);
       }
 
-      // Handle live tracking session activation
-      if (liveSession.isActive && !isWatchingRef.current) {
-        isWatchingRef.current = true;
+      // Switch to 0m aggressive filter if Admin requests it
+      if (liveSession.isActive && !isLiveStreamActiveRef.current) {
+        isLiveStreamActiveRef.current = true;
         
-        // 5-Minute Watchdog: Stop live stream if Admin doesn't turn it off
         if (watchdogTimeoutRef.current) clearTimeout(watchdogTimeoutRef.current);
         watchdogTimeoutRef.current = setTimeout(() => {
           console.log('[Daemon] 5-minute watchdog triggered. Stopping live stream.');
           updateDoc(trackingDocRef, { 'liveSession.isActive': false }).catch(console.error);
         }, 5 * 60 * 1000);
         
-        try {
-          watchIdRef.current = await BackgroundGeolocation.addWatcher(
-            {
-              backgroundMessage: "Everest Field Service running in background",
-              backgroundTitle: "Active Tracking",
-              requestPermissions: true,
-              stale: false,
-              distanceFilter: 0
-            },
-            async (position, err) => {
-              if (err) {
-                console.error("Watch position error:", err);
-                return;
-              }
-              if (!position) return;
-
-              const speedInKmH = position.speed != null && position.speed > 0 
-                ? Math.round(position.speed * 3.6) 
-                : 0;
-              const now = new Date().toISOString();
-
-              const point = {
-                lat: position.latitude,
-                lng: position.longitude,
-                speed: speedInKmH,
-                timestamp: now
-              };
-
-              // Update live session with new point and current speed
-              try {
-                await updateDoc(trackingDocRef, {
-                  currentLocation: {
-                    lat: position.latitude,
-                    lng: position.longitude,
-                    updatedAt: now
-                  },
-                  'liveSession.currentSpeed': speedInKmH,
-                  'liveSession.heading': position.bearing || 0,
-                  'liveSession.lastPingAt': now,
-                  'liveSession.routePath': arrayUnion(point)
-                });
-              } catch (e) {
-                console.error("Error updating live tracking:", e);
-              }
-            }
-          );
-        } catch (err) {
-          console.error("Could not start watch position:", err);
-          isWatchingRef.current = false;
-        }
+        // Re-init watcher with 0m filter for fluid streaming
+        startWatcher(0);
       } 
       
-      // Handle live tracking session deactivation
-      if (!liveSession.isActive && isWatchingRef.current) {
-        isWatchingRef.current = false;
+      // Admin turns off live tracking -> fallback to 50m filter
+      if (!liveSession.isActive && isLiveStreamActiveRef.current) {
+        isLiveStreamActiveRef.current = false;
         if (watchdogTimeoutRef.current) {
           clearTimeout(watchdogTimeoutRef.current);
           watchdogTimeoutRef.current = null;
         }
-        if (watchIdRef.current != null) {
-          await BackgroundGeolocation.removeWatcher({ id: watchIdRef.current });
-          watchIdRef.current = null;
-        }
+        startWatcher(50);
       }
     });
 
     return () => {
-      clearInterval(heartbeatInterval);
       unsubscribe();
       if (watchdogTimeoutRef.current) clearTimeout(watchdogTimeoutRef.current);
       if (watchIdRef.current != null) {
         BackgroundGeolocation.removeWatcher({ id: watchIdRef.current }).catch(console.error);
         watchIdRef.current = null;
       }
-      isWatchingRef.current = false;
     };
   }, [userProfile]);
 }
