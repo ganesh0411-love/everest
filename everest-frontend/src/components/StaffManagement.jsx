@@ -690,7 +690,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                         <button 
                           onClick={() => {
                             setActiveTrackingSession({
-                              staffId: staff.uid || staff.docId || staff.id,
+                              staffId: String(staff.staffId || staff.id || staff.uid),
                               staffName: staff.name || staff.staffName,
                               mode: 'live'
                             });
@@ -703,7 +703,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                         <button 
                           onClick={() => {
                             setActiveTrackingSession({
-                              staffId: staff.uid || staff.docId || staff.id,
+                              staffId: String(staff.staffId || staff.id || staff.uid),
                               staffName: staff.name || staff.staffName,
                               mode: 'current'
                             });
@@ -800,7 +800,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                       <button 
                         onClick={() => {
                           setActiveTrackingSession({
-                            staffId: staff.uid || staff.docId || staff.id,
+                            staffId: String(staff.staffId || staff.id || staff.uid),
                             staffName: staff.name || staff.staffName,
                             mode: 'live'
                           });
@@ -812,7 +812,7 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
                       <button 
                         onClick={() => {
                           setActiveTrackingSession({
-                            staffId: staff.uid || staff.docId || staff.id,
+                            staffId: String(staff.staffId || staff.id || staff.uid),
                             staffName: staff.name || staff.staffName,
                             mode: 'current'
                           });

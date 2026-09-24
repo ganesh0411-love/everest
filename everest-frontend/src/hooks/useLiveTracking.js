@@ -11,11 +11,13 @@ export function useLiveTracking(userProfile) {
   const watchdogTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!userProfile?.uid || userProfile?.role === 'admin' || userProfile?.isAdmin) {
+    if (!userProfile || userProfile?.role === 'admin' || userProfile?.isAdmin) {
       return;
     }
 
-    const staffId = userProfile.uid;
+    const staffId = String(userProfile.staffId || userProfile.id || userProfile.uid);
+    if (!staffId || staffId === 'undefined') return;
+    
     const trackingDocRef = doc(db, 'staff_tracking', staffId);
 
     const initializeTrackingDoc = async () => {
@@ -41,7 +43,7 @@ export function useLiveTracking(userProfile) {
     // Helper for manual ping
     const pingCurrentLocation = async (isForced = false) => {
       try {
-        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 5000 });
         const now = new Date().toISOString();
         const updateData = {
           currentLocation: {
@@ -53,10 +55,15 @@ export function useLiveTracking(userProfile) {
         if (isForced) {
           console.log('[GPS DAEMON] Pushed coords (Forced):', position.coords.latitude, position.coords.longitude, 'at', now);
           updateData['liveSession.forcePing'] = false;
+          updateData['liveSession.currentSpeed'] = Math.round((position.coords.speed || 0) * 3.6);
+          updateData['liveSession.heading'] = position.coords.heading || 0;
         }
         await updateDoc(trackingDocRef, updateData);
       } catch (err) {
         console.error("Error getting manual ping:", err);
+        if (isForced) {
+          await updateDoc(trackingDocRef, { 'liveSession.forcePing': false }).catch(console.error);
+        }
       }
     };
 
@@ -76,7 +83,8 @@ export function useLiveTracking(userProfile) {
             backgroundTitle: "Active Tracking",
             requestPermissions: true,
             stale: false,
-            distanceFilter: distanceFilter
+            distanceFilter: distanceFilter,
+            autoStart: true
           },
           async (position, err) => {
             if (err) {
