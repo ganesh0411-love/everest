@@ -741,13 +741,13 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [shiftElapsed, setShiftElapsed] = React.useState('00h 00m 00s');
   const selfieInputRef = React.useRef(null);
   const [pendingAction, setPendingAction] = React.useState(null);
-  const [selectedCalendarDate, setSelectedCalendarDate] = React.useState(new Date().getDate());
+  const [selectedCalendarDate, setSelectedCalendarDate] = React.useState(new Date().toLocaleDateString('en-CA'));
   const [calendarDate, setCalendarDate] = React.useState(new Date());
 
   React.useEffect(() => {
     if (showMarkAttendanceCalendar) {
       setCalendarDate(new Date());
-      setSelectedCalendarDate(new Date().getDate());
+      setSelectedCalendarDate(new Date().toLocaleDateString('en-CA'));
     }
   }, [showMarkAttendanceCalendar]);
 
@@ -844,6 +844,18 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
           } else if (pendingAction === 'check-out') {
             updatePayload.lastCheckOutTime = now;
             updatePayload.lastAttendanceStatus = computedStatus;
+            
+            const checkOutDate = new Date();
+            const checkInDate = new Date(attendanceState.checkInTime);
+            const durationMs = checkOutDate - checkInDate;
+            const durationHours = durationMs / (1000 * 60 * 60);
+
+            const checkOutFormatted = checkOutDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+            updatePayload[`attendance.${todayStr}.checkOut`] = checkOutFormatted;
+            updatePayload[`attendance.${todayStr}.duration`] = Number(durationHours.toFixed(2));
+            updatePayload[`attendance.${todayStr}.status`] = computedStatus;
+            updatePayload.isShiftActive = false;
           }
 
           await updateDoc(doc(db, 'staff', staffDocId), updatePayload);
@@ -5448,11 +5460,11 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                             textClass = "text-sm";
                           }
 
-                          const isSelected = d === selectedCalendarDate;
+                          const isSelected = dateStr === selectedCalendarDate;
                           const selectionRing = isSelected ? "ring-2 ring-offset-1 ring-blue-400" : "";
 
                           return (
-                            <div key={d} onClick={() => setSelectedCalendarDate(d)} className="flex flex-col items-center justify-center aspect-square relative cursor-pointer hover:bg-slate-50 rounded-full transition-colors">
+                            <div key={d} onClick={() => setSelectedCalendarDate(dateStr)} className="flex flex-col items-center justify-center aspect-square relative cursor-pointer hover:bg-slate-50 rounded-full transition-colors">
                               {isToday && !status ? (
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center animate-soft-pulse ${selectionRing} ${
                                   attendanceState.checkInTime && !attendanceState.checkOutTime
@@ -5506,7 +5518,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                         {/* Compact Daily Shift Details Card */}
                         <div className="mt-4 border-t border-slate-100 pt-3">
                            {(() => {
-                             const selectedDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedCalendarDate).padStart(2, '0')}`;
+                             const selectedDateStr = selectedCalendarDate;
                              const selectedKey = `attendance_${userProfile?.uid || 'guest'}_${selectedDateStr}`;
                              const selectedSaved = localStorage.getItem(selectedKey);
                              
@@ -5535,7 +5547,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              if (!hasActivity) {
                                return (
                                  <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 text-center">
-                                   <span className="text-xs font-medium text-slate-500">No shift activity recorded for {new Date(year, month, selectedCalendarDate).toLocaleDateString([], {month: 'short', day: 'numeric'})}</span>
+                                   <span className="text-xs font-medium text-slate-500">No shift activity recorded for {new Date(selectedCalendarDate + 'T00:00:00').toLocaleDateString([], {month: 'short', day: 'numeric'})}</span>
                                  </div>
                                );
                              }
