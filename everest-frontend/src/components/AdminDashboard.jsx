@@ -746,6 +746,9 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [selectedCalendarDate, setSelectedCalendarDate] = React.useState(new Date().toLocaleDateString('en-CA'));
   const [calendarDate, setCalendarDate] = React.useState(new Date());
 
+  // Image modal state
+  const [modalImage, setModalImage] = React.useState(null);
+
   React.useEffect(() => {
     if (showMarkAttendanceCalendar) {
       setCalendarDate(new Date());
@@ -763,6 +766,49 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
       setShiftElapsed('00h 00m 00s');
     }
   }, [attendanceKey]);
+
+  // Hydrate attendanceState from Firestore to prevent reset bug
+  React.useEffect(() => {
+    let unsub = () => {};
+    if (userProfile?.uid && showAttendanceOverlay) {
+       import('firebase/firestore').then(({ collection, query, where, onSnapshot }) => {
+          const q = query(collection(db, 'staff'), where('uid', '==', userProfile.uid));
+          unsub = onSnapshot(q, (snapshot) => {
+             if (!snapshot.empty) {
+                const staffDoc = snapshot.docs[0].data();
+                if (staffDoc.attendance && staffDoc.attendance[todayStr]) {
+                   const att = staffDoc.attendance[todayStr];
+                   setAttendanceState(prev => {
+                      if (prev.checkInTime === att.checkInTime && prev.checkOutTime === att.checkOutTime) return prev;
+                      const newState = {
+                         checkInTime: att.checkInTime || prev.checkInTime,
+                         checkOutTime: att.checkOutTime || prev.checkOutTime,
+                         status: att.status || prev.status,
+                         checkInSelfie: att.selfieUrl || att.checkInSelfie || prev.checkInSelfie,
+                         checkOutSelfie: att.checkOutSelfieUrl || att.checkOutSelfie || prev.checkOutSelfie
+                      };
+                      localStorage.setItem(attendanceKey, JSON.stringify(newState));
+                      return newState;
+                   });
+                } else if (staffDoc.lastCheckInTime && staffDoc.lastCheckInTime.startsWith(todayStr)) {
+                   setAttendanceState(prev => {
+                      const newState = {
+                         checkInTime: staffDoc.lastCheckInTime || prev.checkInTime,
+                         checkOutTime: staffDoc.lastCheckOutTime || prev.checkOutTime,
+                         status: staffDoc.lastAttendanceStatus || prev.status,
+                         checkInSelfie: staffDoc.lastSelfieUrl || prev.checkInSelfie,
+                         checkOutSelfie: staffDoc.lastCheckOutSelfieUrl || prev.checkOutSelfie
+                      };
+                      localStorage.setItem(attendanceKey, JSON.stringify(newState));
+                      return newState;
+                   });
+                }
+             }
+          });
+       });
+    }
+    return () => unsub();
+  }, [userProfile?.uid, todayStr, attendanceKey, showAttendanceOverlay]);
 
   React.useEffect(() => {
     localStorage.setItem(attendanceKey, JSON.stringify(attendanceState));
@@ -788,11 +834,25 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     if (!file) return;
     
     const now = new Date().toISOString();
+
+    // Read file as base64
+    let base64Selfie = null;
+    try {
+       const reader = new FileReader();
+       base64Selfie = await new Promise((resolve) => {
+         reader.onload = (event) => resolve(event.target.result);
+         reader.readAsDataURL(file);
+       });
+    } catch (err) {
+       console.error("Failed to read selfie file", err);
+    }
     
     // Immediately update state so timer ticks even while GPS is fetching
     if (pendingAction === 'check-in') {
-      setAttendanceState(prev => ({ ...prev, checkInTime: now }));
+      setAttendanceState(prev => ({ ...prev, checkInTime: now, checkInSelfie: base64Selfie }));
       setShiftElapsed('00h 00m 00s');
+    } else if (pendingAction === 'check-out') {
+      setAttendanceState(prev => ({ ...prev, checkOutSelfie: base64Selfie }));
     }
 
     let coords = null;
@@ -843,6 +903,11 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
           
           if (pendingAction === 'check-in') {
             updatePayload.lastCheckInTime = now;
+            updatePayload[`attendance.${todayStr}.checkIn`] = now;
+            if (base64Selfie) {
+               updatePayload.lastSelfieUrl = base64Selfie;
+               updatePayload[`attendance.${todayStr}.selfieUrl`] = base64Selfie;
+            }
           } else if (pendingAction === 'check-out') {
             updatePayload.lastCheckOutTime = now;
             updatePayload.lastAttendanceStatus = computedStatus;
@@ -857,6 +922,10 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
             updatePayload[`attendance.${todayStr}.checkOut`] = checkOutFormatted;
             updatePayload[`attendance.${todayStr}.duration`] = Number(durationHours.toFixed(2));
             updatePayload[`attendance.${todayStr}.status`] = computedStatus;
+            if (base64Selfie) {
+               updatePayload.lastCheckOutSelfieUrl = base64Selfie;
+               updatePayload[`attendance.${todayStr}.checkOutSelfieUrl`] = base64Selfie;
+            }
             updatePayload.isShiftActive = false;
           }
 
@@ -5581,20 +5650,78 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              }
                              
                              return (
-                                <div className="bg-white border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] rounded-2xl p-3 flex flex-row items-center justify-between">
-                                  <div className="flex flex-col items-center flex-1">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Check-in</span>
-                                    <span className="text-xs font-bold text-slate-700">{inStr}</span>
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col mt-2">
+                                  {/* Header Profile Section */}
+                                  <div className="p-3 flex items-center gap-3 border-b border-slate-100 bg-slate-50/50">
+                                    <div className="relative shrink-0">
+                                      {userProfile?.photoBase64 ? (
+                                        <img src={userProfile.photoBase64} alt={userProfile.name} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 font-bold border border-indigo-100 text-sm">
+                                          {(userProfile?.name || 'S').substring(0,2).toUpperCase()}
+                                        </div>
+                                      )}
+                                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${parsed.checkInTime && !parsed.checkOutTime ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
+                                    </div>
+                                    <div className="flex-1 min-w-0 pt-0.5">
+                                      <h3 className="font-bold text-slate-800 text-sm truncate">{userProfile?.name || 'Staff Member'}</h3>
+                                      <p className="text-[10px] text-slate-500 font-medium truncate">{userProfile?.role || 'Staff'}</p>
+                                    </div>
+                                    <div className="shrink-0 text-center bg-blue-50/80 px-3 py-1.5 rounded-xl border border-blue-100/50">
+                                      <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider block mb-0.5">Duration</span>
+                                      <span className="text-xs font-black text-blue-600">{durStr}</span>
+                                    </div>
                                   </div>
-                                  <div className="w-px h-8 bg-slate-100"></div>
-                                  <div className="flex flex-col items-center flex-1">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Check-out</span>
-                                    <span className="text-xs font-bold text-slate-700">{outStr}</span>
-                                  </div>
-                                  <div className="w-px h-8 bg-slate-100"></div>
-                                  <div className="flex flex-col items-center flex-1">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Duration</span>
-                                    <span className="text-xs font-bold text-blue-600">{durStr}</span>
+
+                                  {/* Symmetrical Data Body */}
+                                  <div className="p-3">
+                                    <div className="grid grid-cols-2 gap-x-3 divide-x divide-slate-100">
+                                      
+                                      {/* LEFT: Check-In Column */}
+                                      <div className="flex items-center gap-3">
+                                        <div 
+                                          className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 cursor-pointer"
+                                          onClick={() => parsed.checkInSelfie && setModalImage(parsed.checkInSelfie)}
+                                        >
+                                          {parsed.checkInSelfie ? (
+                                            <img src={parsed.checkInSelfie} alt="Check-in" className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                              <User size={16} />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5">
+                                            <Clock size={10}/> Check-In
+                                          </span>
+                                          <span className="font-bold text-slate-800 text-base leading-tight">{inStr}</span>
+                                        </div>
+                                      </div>
+
+                                      {/* RIGHT: Check-Out Column */}
+                                      <div className="flex items-center gap-3 justify-end text-right pl-3">
+                                        <div className="flex flex-col items-end">
+                                          <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center justify-end gap-1 mb-0.5">
+                                            <Clock size={10}/> Check-Out
+                                          </span>
+                                          <span className="font-bold text-slate-800 text-base leading-tight">{outStr}</span>
+                                        </div>
+                                        <div 
+                                          className={`w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 ${parsed.checkOutSelfie ? 'cursor-pointer' : ''}`}
+                                          onClick={() => parsed.checkOutSelfie && setModalImage(parsed.checkOutSelfie)}
+                                        >
+                                          {parsed.checkOutSelfie ? (
+                                            <img src={parsed.checkOutSelfie} alt="Check-out" className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-slate-300 border-2 border-dashed border-slate-200">
+                                              <User size={16} />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                    </div>
                                   </div>
                                 </div>
                              );
@@ -5677,6 +5804,27 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* Global Image Modal for AdminDashboard */}
+      {modalImage && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setModalImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
+            onClick={(e) => { e.stopPropagation(); setModalImage(null); }}
+          >
+            <X size={24} />
+          </button>
+          <img 
+            src={modalImage} 
+            alt="Enlarged view" 
+            className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain border border-white/10"
+            onClick={(e) => e.stopPropagation()} 
+          />
         </div>
       )}
 
