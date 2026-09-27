@@ -41,16 +41,29 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
   };
 
   // Helper to find first valid non-empty URL
-  const getValidUrl = (...urls) => urls.find(u => u && typeof u === 'string' && u.trim() !== '');
+  const getValidUrl = (...urls) => {
+    for (const u of urls) {
+      if (!u) continue;
+      if (typeof u === 'string' && u.trim() !== '') return u;
+      if (typeof u === 'object' && u.url && typeof u.url === 'string' && u.url.trim() !== '') return u.url;
+    }
+    return null;
+  };
 
   // Using specific fields for selfies or fallback
-  const avatarUrl = getValidUrl(staff.photoURL, staff.photoUrl, staff.avatar, staff.profileImage, staff.profilePic, staff.photo, staff.dp, staff.image);
+  const avatarUrl = getValidUrl(staff.photoURL, staff.photoUrl, staff.avatarUrl, staff.avatar, staff.profileImage, staff.profilePic, staff.photo, staff.dp, staff.image, staff.profilePicture, staff.profile_url);
   
   // NOTE: If checkIn selfie doesn't exist, we do NOT fallback to the profile avatar here, 
   // because the user says "Display the actual selfie photo... The check-in photo placeholder currently renders an empty user outline icon".
-  // Wait, if it doesn't exist, it should render the empty placeholder.
-  const ciPhoto = getValidUrl(att?.selfieUrl, att?.checkInSelfie, att?.selfie, att?.checkInImage, att?.photoUrl, att?.photo, att?.image);
-  const coPhoto = getValidUrl(att?.checkOutSelfieUrl, att?.checkOutSelfie, att?.checkOutImage);
+  const ciPhoto = getValidUrl(
+    att?.checkInPhoto, att?.checkInPhotoUrl, att?.selfieUrl, att?.checkInSelfie, att?.selfie, att?.checkInImage, att?.photoUrl, att?.photo, att?.image, att?.picture, att?.checkin_selfie, att?.selfie_url,
+    staff.lastSelfieUrl, staff.checkInSelfie, staff.selfieUrl // fallback to root staff fields if attendance object is missing it
+  );
+  
+  const coPhoto = getValidUrl(
+    att?.checkOutPhoto, att?.checkOutPhotoUrl, att?.checkOutSelfieUrl, att?.checkOutSelfie, att?.checkOutImage, 
+    staff.lastCheckOutSelfieUrl
+  );
 
   const getInitials = (name) => {
     if (!name) return '??';
