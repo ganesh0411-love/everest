@@ -40,17 +40,54 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
     return 'No location captured';
   };
 
-  // Using specific fields for selfies or fallback
-  const ciPhoto = att?.selfieUrl || att?.checkInSelfie || staff.photoUrl || staff.photoURL || staff.profilePic;
-  const coPhoto = att?.checkOutSelfieUrl || att?.checkOutSelfie;
+  // Helper to find first valid non-empty URL
+  const getValidUrl = (...urls) => urls.find(u => u && typeof u === 'string' && u.trim() !== '');
 
-  const avatarUrl = staff.photoURL || staff.photoUrl || staff.avatar || staff.profileImage || staff.profilePic;
+  // Using specific fields for selfies or fallback
+  const avatarUrl = getValidUrl(staff.photoURL, staff.photoUrl, staff.avatar, staff.profileImage, staff.profilePic, staff.photo, staff.dp, staff.image);
+  
+  // NOTE: If checkIn selfie doesn't exist, we do NOT fallback to the profile avatar here, 
+  // because the user says "Display the actual selfie photo... The check-in photo placeholder currently renders an empty user outline icon".
+  // Wait, if it doesn't exist, it should render the empty placeholder.
+  const ciPhoto = getValidUrl(att?.selfieUrl, att?.checkInSelfie, att?.selfie, att?.checkInImage, att?.photoUrl, att?.photo, att?.image);
+  const coPhoto = getValidUrl(att?.checkOutSelfieUrl, att?.checkOutSelfie, att?.checkOutImage);
 
   const getInitials = (name) => {
     if (!name) return '??';
     const parts = name.trim().split(' ');
     if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.substring(0, 2).toUpperCase();
+  };
+
+  const renderLocation = (locObj, isCheckIn) => {
+    const locStr = getLocString(locObj);
+    const isEmpty = locStr === 'No location captured';
+    
+    let mapUrl = '';
+    if (locObj && locObj.latitude && locObj.longitude) {
+       mapUrl = `https://www.google.com/maps?q=${locObj.latitude},${locObj.longitude}`;
+    } else if (typeof locObj === 'string' && locObj.includes(',')) {
+       mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(locStr)}`;
+    }
+
+    return (
+      <div className={`bg-slate-50 rounded-xl p-3 flex items-center gap-2 border border-slate-100 mt-1 h-full`}>
+        <MapPin size={14} className={`${isCheckIn ? 'text-indigo-400' : 'text-rose-400'} shrink-0`} />
+        <div className="min-w-0 flex-1 flex flex-col justify-center">
+          <span className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5">{isCheckIn ? 'Check-In' : 'Check-Out'} Location</span>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-medium text-slate-700 truncate" title={locStr}>
+              {locStr}
+            </p>
+            {!isEmpty && mapUrl && (
+              <a href={mapUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 shrink-0 flex items-center" title="Open in Google Maps" onClick={e => e.stopPropagation()}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -78,12 +115,12 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
       </div>
 
       {/* Symmetrical Data Body */}
-      <div className="p-4 relative">
+      <div className="p-4 relative mt-2">
         <div className="grid grid-cols-2 gap-x-4 relative divide-x divide-slate-100">
           
-          {/* Centered Shift Timer overlay */}
-          <div className="absolute left-1/2 top-4 -translate-x-1/2 z-10 flex justify-center">
-            <div className="bg-white/90 backdrop-blur-sm border border-slate-200 px-3 py-1 rounded-full flex items-center gap-2 shadow-sm">
+          {/* Centered Shift Timer overlay (Positioned just beneath top separator to avoid overlap) */}
+          <div className="absolute left-1/2 top-[-26px] -translate-x-1/2 z-10 flex justify-center">
+            <div className="bg-white/95 backdrop-blur-sm border border-slate-200 px-3 py-1 rounded-full flex items-center gap-2 shadow-sm whitespace-nowrap">
                {statusInfo.label === 'Active' ? (
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                ) : (
@@ -94,7 +131,7 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
           </div>
           
           {/* LEFT: Check-In Column */}
-          <div className="flex flex-col gap-3 pt-6">
+          <div className="flex flex-col gap-3 pt-2">
             <div className="flex items-center gap-3">
               <div 
                 className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0"
@@ -116,19 +153,11 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
               </div>
             </div>
             
-            <div className="bg-slate-50 rounded-xl p-3 flex items-start gap-2 border border-slate-100 mt-1 h-full">
-              <MapPin size={14} className="text-indigo-400 shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <span className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5">Check-In Location</span>
-                <p className="text-xs font-medium text-slate-600 line-clamp-3 leading-snug">
-                  {getLocString(att?.checkInLocation)}
-                </p>
-              </div>
-            </div>
+            {renderLocation(att?.checkInLocation, true)}
           </div>
 
           {/* RIGHT: Check-Out Column */}
-          <div className="flex flex-col gap-3 pt-6 pl-4">
+          <div className="flex flex-col gap-3 pt-2 pl-4">
             <div className="flex items-center gap-3 justify-end text-right">
               <div className="flex flex-col items-end">
                 <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-end gap-1 mb-0.5">
@@ -150,15 +179,7 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
               </div>
             </div>
             
-            <div className="bg-slate-50 rounded-xl p-3 flex items-start gap-2 border border-slate-100 mt-1 h-full">
-              <MapPin size={14} className="text-rose-400 shrink-0 mt-0.5" />
-              <div className="min-w-0 text-left">
-                <span className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5">Check-Out Location</span>
-                <p className="text-xs font-medium text-slate-600 line-clamp-3 leading-snug">
-                  {getLocString(att?.checkOutLocation)}
-                </p>
-              </div>
-            </div>
+            {renderLocation(att?.checkOutLocation, false)}
           </div>
 
         </div>
