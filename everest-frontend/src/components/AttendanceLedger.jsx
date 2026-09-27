@@ -41,20 +41,29 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
   };
 
   // Using specific fields for selfies or fallback
-  const ciPhoto = att?.selfieUrl || att?.checkInSelfie || staff.photoUrl || staff.profilePic;
+  const ciPhoto = att?.selfieUrl || att?.checkInSelfie || staff.photoUrl || staff.photoURL || staff.profilePic;
   const coPhoto = att?.checkOutSelfieUrl || att?.checkOutSelfie;
+
+  const avatarUrl = staff.photoURL || staff.photoUrl || staff.avatar || staff.profileImage || staff.profilePic;
+
+  const getInitials = (name) => {
+    if (!name) return '??';
+    const parts = name.trim().split(' ');
+    if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
       
       {/* Header Profile Section */}
-      <div className="p-4 flex items-start gap-4 border-b border-slate-100 bg-slate-50/30">
+      <div className="p-4 flex items-start gap-4 border-b border-slate-100 bg-white">
         <div className="relative shrink-0">
-          {staff.profilePic || staff.photoUrl ? (
-            <img src={staff.profilePic || staff.photoUrl} alt={staff.name} className="w-12 h-12 rounded-full object-cover border border-slate-200" />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={staff.name} className="w-12 h-12 rounded-full object-cover border border-slate-200" />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200">
-              <User size={20} />
+            <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 font-black border border-indigo-100 text-lg">
+              {getInitials(staff.name)}
             </div>
           )}
           <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${statusInfo.dot}`}></div>
@@ -184,44 +193,30 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
         }
 
         unsubscribeStaff = onSnapshot(staffQuery, (staffSnap) => {
-          const staffList = staffSnap.docs.map(d => ({ docId: d.id, ...d.data() }));
-          
-          unsubscribesAttendance.forEach(u => u());
-          unsubscribesAttendance = [];
-
-          let combinedData = [...staffList];
-          
-          if (staffList.length === 0) {
-            setStaffData([]);
-            setLoading(false);
-            return;
-          }
-
-          let loadedCount = 0;
-
-          staffList.forEach((staff, index) => {
-            const attRef = doc(db, 'staff', staff.uid || staff.docId, 'attendance', todayStr);
-            const unsubAtt = onSnapshot(attRef, (attSnap) => {
-              const attData = attSnap.exists() ? attSnap.data() : null;
-              
-              combinedData[index] = {
-                ...combinedData[index],
-                attendance: attData
+          const staffList = staffSnap.docs.map(d => {
+            const data = d.data();
+            // Parse attendance map for today
+            let todayAtt = null;
+            if (data.attendance && data.attendance[todayStr]) {
+              todayAtt = data.attendance[todayStr];
+            } else if (data.lastCheckInTime && data.lastCheckInTime.startsWith(todayStr)) {
+              // Fallback if mobile app updates root fields first
+              todayAtt = {
+                checkInTime: data.lastCheckInTime,
+                checkInLocation: { latitude: data.lastLatitude, longitude: data.lastLongitude },
+                selfieUrl: data.lastSelfieUrl || data.profilePic || data.photoUrl, // Fallback
+                status: data.lastAttendanceStatus || 'active'
               };
-              
-              setStaffData([...combinedData]);
-              
-              loadedCount++;
-              if (loadedCount >= staffList.length) {
-                setLoading(false);
-              }
-            }, (err) => {
-              console.error("Error fetching attendance", err);
-              loadedCount++;
-              if (loadedCount >= staffList.length) setLoading(false);
-            });
-            unsubscribesAttendance.push(unsubAtt);
+            }
+            return {
+              docId: d.id,
+              ...data,
+              todayAttendance: todayAtt
+            };
           });
+          
+          setStaffData(staffList);
+          setLoading(false);
         });
 
       } catch (e) {
@@ -305,12 +300,12 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {staffData.map(staff => {
-              const statusInfo = getStatusInfo(staff.attendance);
+              const statusInfo = getStatusInfo(staff.todayAttendance);
               return (
                 <LedgerCard 
                   key={staff.docId} 
                   staff={staff} 
-                  att={staff.attendance} 
+                  att={staff.todayAttendance} 
                   statusInfo={statusInfo}
                   onImageClick={(url) => setModalImage(url)}
                 />
