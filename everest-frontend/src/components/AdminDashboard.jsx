@@ -5634,13 +5634,18 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           }
 
                           if (att) {
-                             if (att.status === 'Half Day' || att.status === 'half-day' || att.status === 'half') status = 'half-day';
-                             else if (att.status === 'absent') status = 'absent';
-                             else if ((att.checkOutTime || att.checkOut) && (att.checkInTime || att.checkIn)) {
+                             const ci = att.checkInTime || att.checkIn;
+                             const co = att.checkOutTime || att.checkOut;
+                             
+                             if (ci && co) {
                                 const mins = getElapsedMins(att);
                                 if (mins > 0 && mins < 420) status = 'half-day';
                                 else status = 'present';
-                             } else if (isPastDay && !(att.checkOutTime || att.checkOut)) {
+                             } else if (ci && !co) {
+                                status = 'active';
+                             } else if (att.status === 'absent') {
+                                status = 'absent';
+                             } else if (isPastDay) {
                                 status = 'absent';
                              }
                           } else if (isPastDay) {
@@ -5659,6 +5664,9 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                             textClass = "text-sm";
                           } else if (status === 'half-day') {
                             circleClass = "w-8 h-8 rounded-full bg-amber-400 shadow-md shadow-amber-400/30 flex items-center justify-center text-slate-900 font-bold";
+                            textClass = "text-sm";
+                          } else if (status === 'active') {
+                            circleClass = "w-8 h-8 rounded-full bg-blue-600 shadow-md shadow-blue-600/30 flex items-center justify-center text-white font-bold";
                             textClass = "text-sm";
                           } else if (status === 'absent') {
                             circleClass = "w-8 h-8 rounded-full bg-red-500 shadow-md shadow-red-500/30 flex items-center justify-center text-white font-bold";
@@ -5870,8 +5878,31 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 
                 {attendanceState.checkInTime && (
                   <div className={`text-center text-xs ${attendanceState.checkOutTime ? 'text-blue-600 font-medium' : 'font-bold text-slate-500'}`}>
-                    Checked in at {new Date(attendanceState.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    {attendanceState.checkOutTime && ` • Checked out at ${new Date(attendanceState.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} (Shift Closed)`}
+                    {(() => {
+                        const formatTimeSafe = (timeString) => {
+                            if (!timeString) return '--:--';
+                            let d = new Date(timeString);
+                            if (isNaN(d.getTime())) {
+                                const match = String(timeString).match(/(\d+):(\d+)/);
+                                if (match) {
+                                    const now = new Date();
+                                    let hour = parseInt(match[1], 10);
+                                    const minute = parseInt(match[2], 10);
+                                    const isPM = String(timeString).toUpperCase().includes('PM');
+                                    const isAM = String(timeString).toUpperCase().includes('AM');
+                                    if (isPM && hour < 12) hour += 12;
+                                    if (isAM && hour === 12) hour = 0;
+                                    d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
+                                } else return String(timeString);
+                            }
+                            return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+                        };
+                        const ci = formatTimeSafe(attendanceState.checkInTime);
+                        const co = attendanceState.checkOutTime ? formatTimeSafe(attendanceState.checkOutTime) : null;
+                        return co 
+                           ? `Checked in at ${ci} • Checked out at ${co} (Shift Closed)`
+                           : `Checked in at ${ci}`;
+                    })()}
                   </div>
                 )}
                 
