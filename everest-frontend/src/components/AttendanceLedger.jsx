@@ -232,12 +232,26 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
             // Parse attendance map for today
             let todayAtt = null;
             if (data.attendance && data.attendance[todayStr]) {
-              todayAtt = data.attendance[todayStr];
+              const rawAtt = data.attendance[todayStr];
+              todayAtt = {
+                ...rawAtt,
+                checkInTime: rawAtt.checkInTime || rawAtt.checkIn || data.lastCheckInTime,
+                checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || data.lastCheckOutTime,
+                checkInLocation: rawAtt.checkInLocation || rawAtt.location || (data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
+                checkOutLocation: rawAtt.checkOutLocation,
+                selfieUrl: rawAtt.selfieUrl || data.lastSelfieUrl || data.profilePic || data.photoUrl,
+                checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || data.lastCheckOutSelfieUrl,
+                status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : 'Not Checked In')
+              };
+              if (todayAtt.checkInTime && !todayAtt.checkOutTime) {
+                todayAtt.status = 'active';
+              }
             } else if (data.lastCheckInTime && data.lastCheckInTime.startsWith(todayStr)) {
               // Fallback if mobile app updates root fields first
               todayAtt = {
                 checkInTime: data.lastCheckInTime,
-                checkInLocation: { latitude: data.lastLatitude, longitude: data.lastLongitude },
+                checkOutTime: data.lastCheckOutTime,
+                checkInLocation: (data.lastLatitude && data.lastLongitude) ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null,
                 selfieUrl: data.lastSelfieUrl || data.profilePic || data.photoUrl, // Fallback
                 status: data.lastAttendanceStatus || 'active'
               };
