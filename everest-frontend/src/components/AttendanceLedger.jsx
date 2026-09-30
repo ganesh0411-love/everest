@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { X, MapPin, Clock, User, ChevronDown } from 'lucide-react';
+import { X, MapPin, Clock, User, ChevronDown, Phone } from 'lucide-react';
 
-const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
+const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr }) => {
   const [elapsed, setElapsed] = useState('--h --m --s');
+  
+  const formattedDate = new Date((selectedDateStr || new Date().toLocaleDateString('en-CA')) + 'T12:00:00')
+     .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   useEffect(() => {
     if (att?.duration !== undefined && att?.duration !== null) {
@@ -164,23 +167,32 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
       
       {/* Header Profile Section */}
-      <div className="p-4 flex items-start gap-4 border-b border-slate-100 bg-white">
-        <div className="relative shrink-0">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={staff.name} className="w-12 h-12 rounded-full object-cover border border-slate-200" />
-          ) : (
-            <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 font-black border border-indigo-100 text-lg">
-              {getInitials(staff.name)}
-            </div>
-          )}
-          <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${statusInfo.dot}`}></div>
-        </div>
-        <div className="flex-1 min-w-0 pt-0.5">
-          <h3 className="font-bold text-slate-800 text-base truncate">{staff.name || 'Unnamed Staff'}</h3>
-          <p className="text-xs text-slate-500 font-medium truncate mb-1.5">{staff.designation || staff.role || 'Staff Member'}</p>
-          <div className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${statusInfo.color}`}>
-            {statusInfo.label}
+      <div className="p-4 flex items-start justify-between gap-2 border-b border-slate-100 bg-white">
+        <div className="flex items-start gap-4 flex-1 min-w-0">
+          <div className="relative shrink-0">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={staff.name} className="w-12 h-12 rounded-full object-cover border border-slate-200" />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 font-black border border-indigo-100 text-lg">
+                {getInitials(staff.name)}
+              </div>
+            )}
+            <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${statusInfo.dot}`}></div>
           </div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <h3 className="font-bold text-slate-800 text-base truncate">{staff.name || 'Unnamed Staff'}</h3>
+            <p className="text-xs text-slate-500 font-medium truncate mb-1.5">{staff.designation || staff.role || 'Staff Member'}</p>
+            <div className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${statusInfo.color}`}>
+              {statusInfo.label}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-end shrink-0 pl-3 border-l border-slate-100">
+           <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap tracking-wide">{formattedDate}</span>
+           <button className="mt-1.5 w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors border border-slate-200 shadow-sm active:scale-95">
+             <Phone size={14} />
+           </button>
         </div>
       </div>
 
@@ -447,6 +459,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
                   att={staff.todayAttendance} 
                   statusInfo={statusInfo}
                   onImageClick={(url) => setModalImage(url)}
+                  selectedDateStr={selectedDateStr}
                 />
               );
             })}
