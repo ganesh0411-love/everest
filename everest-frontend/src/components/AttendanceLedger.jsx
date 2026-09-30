@@ -108,7 +108,7 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
   };
 
   // Using specific fields for selfies or fallback
-  const avatarUrl = getValidUrl(staff.photoURL, staff.photoUrl, staff.avatarUrl, staff.avatar, staff.profileImage, staff.profilePic, staff.photo, staff.dp, staff.image, staff.profilePicture, staff.profile_url);
+  const avatarUrl = getValidUrl(staff.photoBase64, staff.photoURL, staff.photoUrl, staff.avatarUrl, staff.avatar, staff.profileImage, staff.profilePic, staff.photo, staff.dp, staff.image, staff.profilePicture, staff.profile_url);
   
   // NOTE: If checkIn selfie doesn't exist, we do NOT fallback to the profile avatar here, 
   // because the user says "Display the actual selfie photo... The check-in photo placeholder currently renders an empty user outline icon".
@@ -144,8 +144,8 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
       <div className={`bg-slate-50 rounded-xl p-3 flex items-center gap-2 border border-slate-100 mt-1 h-full`}>
         <MapPin size={14} className={`${isCheckIn ? 'text-indigo-400' : 'text-rose-400'} shrink-0`} />
         <div className="min-w-0 flex-1 flex flex-col justify-center">
-          <span className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5">{isCheckIn ? 'Check-In' : 'Check-Out'} Location</span>
-          <div className="flex items-center gap-1.5">
+          <span className="text-[9px] font-bold text-slate-400 uppercase block mb-0.5 whitespace-nowrap truncate">{isCheckIn ? 'Check-In' : 'Check-Out'} Location</span>
+          <div className="flex items-center gap-1.5 min-w-0">
             <p className="text-xs font-medium text-slate-700 truncate" title={locStr}>
               {locStr}
             </p>
@@ -219,7 +219,7 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5">
                   <Clock size={10}/> Check-In
                 </span>
-                <span className="font-bold text-slate-800 text-lg leading-tight">{formatTime(att?.checkInTime)}</span>
+                <span className="font-bold text-slate-800 text-base whitespace-nowrap leading-tight">{formatTime(att?.checkInTime)}</span>
               </div>
             </div>
             
@@ -233,7 +233,7 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-end gap-1 mb-0.5">
                   <Clock size={10}/> Check-Out
                 </span>
-                <span className="font-bold text-slate-800 text-lg leading-tight">{formatTime(att?.checkOutTime)}</span>
+                <span className="font-bold text-slate-800 text-base whitespace-nowrap leading-tight">{formatTime(att?.checkOutTime)}</span>
               </div>
               <div 
                 className={`w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 ${coPhoto ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
