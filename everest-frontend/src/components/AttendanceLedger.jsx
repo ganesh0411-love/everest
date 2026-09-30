@@ -3,7 +3,7 @@ import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { X, MapPin, Clock, User, ChevronDown, Calendar } from 'lucide-react';
 
-const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr }) => {
+const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onDateChange }) => {
   const [elapsed, setElapsed] = useState('--h --m --s');
   
   const formattedDate = new Date((selectedDateStr || new Date().toLocaleDateString('en-CA')) + 'T12:00:00')
@@ -190,9 +190,15 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr }) =
         
         <div className="flex flex-col items-end shrink-0 pl-3 border-l border-slate-100">
            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap tracking-wide">{formattedDate}</span>
-           <button className="mt-1.5 w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors border border-slate-200 shadow-sm active:scale-95">
-             <Calendar size={14} />
-           </button>
+           <div className="relative mt-1.5 w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors border border-slate-200 shadow-sm overflow-hidden">
+             <Calendar size={14} className="pointer-events-none" />
+             <input 
+               type="date"
+               value={selectedDateStr}
+               onChange={(e) => { if (e.target.value && onDateChange) onDateChange(e.target.value); }}
+               className="absolute inset-0 opacity-0 cursor-pointer"
+             />
+           </div>
         </div>
       </div>
 
@@ -317,7 +323,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
                 checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr) ? data.lastCheckOutTime : null),
                 checkInLocation: rawAtt.checkInLocation || rawAtt.location || (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
                 checkOutLocation: rawAtt.checkOutLocation || ((rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
-                selfieUrl: rawAtt.selfieUrl || (isToday ? data.lastSelfieUrl : null) || data.profilePic || data.photoUrl,
+                selfieUrl: rawAtt.selfieUrl || (isToday ? data.lastSelfieUrl : null),
                 checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || (isToday ? data.lastCheckOutSelfieUrl : null),
                 status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : (rawAtt.checkOut ? 'COMPLETED' : 'Not Checked In')),
                 duration: rawAtt.duration
@@ -331,7 +337,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
                 checkInTime: data.lastCheckInTime,
                 checkOutTime: data.lastCheckOutTime,
                 checkInLocation: (data.lastLatitude && data.lastLongitude) ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null,
-                selfieUrl: data.lastSelfieUrl || data.profilePic || data.photoUrl, // Fallback
+                selfieUrl: data.lastSelfieUrl, // Fallback strictly to last selfie, DO NOT use profilePic
                 status: data.lastAttendanceStatus || 'active'
               };
             }
@@ -462,6 +468,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
                   statusInfo={statusInfo}
                   onImageClick={(url) => setModalImage(url)}
                   selectedDateStr={selectedDateStr}
+                  onDateChange={setSelectedDateStr}
                 />
               );
             })}
