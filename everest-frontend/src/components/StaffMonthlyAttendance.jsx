@@ -43,7 +43,17 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
   const handleNextMonth = () => setCurrentMonth(new Date(year, month + 1, 15));
 
   const monthName = currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  const avatarUrl = getValidUrl(staff?.profilePic) || getValidUrl(staff?.photoUrl);
+  const avatarUrl = getValidUrl(staff?.photoBase64, staff?.photoURL, staff?.photoUrl, staff?.avatarUrl, staff?.avatar, staff?.profileImage, staff?.profilePic, staff?.photo, staff?.dp, staff?.image, staff?.profilePicture, staff?.profile_url);
+
+  const formatTime = (timeString) => {
+    if (!timeString) return '--:--';
+    if (typeof timeString === 'string' && !timeString.includes('T') && (timeString.includes(':') || timeString.includes('AM') || timeString.includes('PM'))) {
+        return timeString;
+    }
+    const d = new Date(timeString);
+    if (isNaN(d.getTime())) return String(timeString);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   // Compute stats for the month
   let presentCount = 0;
@@ -61,8 +71,8 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
       return 'future';
     }
     const att = staff.attendance[dStr];
-    if (att.status === 'Half Day' || (att.duration && att.duration < 4 && att.checkOut)) return 'half';
-    if (att.checkIn) return 'present';
+    if (att.status === 'Half Day') return 'half';
+    if (att.checkIn || att.checkInTime) return 'present';
     return 'absent';
   };
 
@@ -317,7 +327,7 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
                         <span className="text-[9px] font-black uppercase tracking-wider">Check-in</span>
                       </div>
                       <span className="text-lg font-black text-slate-800 tracking-tight leading-none mb-1">
-                        {selectedAtt?.checkInTime ? new Date(selectedAtt.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}) : '--:--'}
+                        {formatTime(selectedAtt?.checkInTime)}
                       </span>
                     </div>
                   </div>
@@ -336,7 +346,7 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
                         <span className="text-[9px] font-black uppercase tracking-wider">Check-out</span>
                       </div>
                       <span className="text-lg font-black text-slate-800 tracking-tight leading-none mb-1">
-                        {selectedAtt?.checkOutTime ? new Date(selectedAtt.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}) : '--:--'}
+                        {formatTime(selectedAtt?.checkOutTime)}
                       </span>
                     </div>
                     <div 
@@ -370,7 +380,7 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
              
              {/* Bottom timestamp */}
              <div className="text-center mt-3 pt-3 border-t border-slate-100 mx-4">
-                <span className="text-[11px] font-medium text-slate-400">Checked in at {selectedAtt?.checkInTime ? new Date(selectedAtt.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}) : '--:--'}</span>
+                <span className="text-[11px] font-medium text-slate-400">Checked in at {formatTime(selectedAtt?.checkInTime)}</span>
              </div>
           </div>
         </div>

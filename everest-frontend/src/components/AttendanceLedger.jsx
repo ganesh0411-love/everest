@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { X, MapPin, Clock, User, ChevronDown, Calendar } from 'lucide-react';
+import { App } from '@capacitor/app';
 import StaffMonthlyAttendance from './StaffMonthlyAttendance';
 
 const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onCalendarClick }) => {
@@ -285,6 +286,31 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
   const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
   const [selectedDateStr, setSelectedDateStr] = useState(todayStr);
 
+  useEffect(() => {
+    let listener = null;
+    const setupListener = async () => {
+      try {
+        listener = await App.addListener('backButton', () => {
+          if (modalImage) {
+            setModalImage(null);
+          } else if (selectedStaffForModal) {
+            setSelectedStaffForModal(null);
+          } else {
+            window.history.back();
+          }
+        });
+      } catch (err) {
+        console.log('App back button listener error:', err);
+      }
+    };
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      setupListener();
+    }
+    return () => {
+      if (listener && listener.remove) listener.remove();
+    };
+  }, [modalImage, selectedStaffForModal]);
+
   const dates = [];
   const now = new Date();
   for (let i = 0; i <= 14; i++) {
@@ -476,7 +502,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
       {/* Image Modal */}
       {modalImage && (
         <div 
-          className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setModalImage(null)}
         >
           <button 
