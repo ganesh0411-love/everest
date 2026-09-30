@@ -6,6 +6,7 @@ import { App } from '@capacitor/app';
 import { area as turfArea } from '@turf/area';
 import { length as turfLength } from '@turf/length';
 import { db } from '../firebase';
+import { Clock, User } from 'lucide-react';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 import AttendanceLedger from './AttendanceLedger';
 
@@ -5670,21 +5671,25 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              let outStr = '--:--';
                              let durStr = '--';
                              let hasActivity = false;
-                             
+                             let parsed = null;
                              if (selectedSaved) {
-                               const parsed = JSON.parse(selectedSaved);
-                               if (parsed.checkInTime) {
-                                 hasActivity = true;
-                                 inStr = new Date(parsed.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                               }
-                               if (parsed.checkOutTime) {
-                                 outStr = new Date(parsed.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                               try {
+                                 parsed = JSON.parse(selectedSaved);
                                  if (parsed.checkInTime) {
-                                   const diffMs = new Date(parsed.checkOutTime).getTime() - new Date(parsed.checkInTime).getTime();
-                                   const h = Math.floor(diffMs / 3600000);
-                                   const m = Math.floor((diffMs % 3600000) / 60000);
-                                   durStr = `${h}h ${String(m).padStart(2, '0')}m`;
+                                   hasActivity = true;
+                                   inStr = new Date(parsed.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                                  }
+                                 if (parsed.checkOutTime) {
+                                   outStr = new Date(parsed.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                   if (parsed.checkInTime) {
+                                     const diffMs = new Date(parsed.checkOutTime).getTime() - new Date(parsed.checkInTime).getTime();
+                                     const h = Math.floor(diffMs / 3600000);
+                                     const m = Math.floor((diffMs % 3600000) / 60000);
+                                     durStr = `${h}h ${String(m).padStart(2, '0')}m`;
+                                   }
+                                 }
+                               } catch (e) {
+                                 console.warn("Failed to parse selectedSaved", e);
                                }
                              }
                              
@@ -5708,7 +5713,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                           {(userProfile?.name || 'S').substring(0,2).toUpperCase()}
                                         </div>
                                       )}
-                                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${parsed.checkInTime && !parsed.checkOutTime ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
+                                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${parsed?.checkInTime && !parsed?.checkOutTime ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
                                     </div>
                                     <div className="flex-1 min-w-0 pt-0.5">
                                       <h3 className="font-bold text-slate-800 text-sm truncate">{userProfile?.name || 'Staff Member'}</h3>
@@ -5728,9 +5733,9 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                       <div className="flex items-center gap-3">
                                         <div 
                                           className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 cursor-pointer"
-                                          onClick={() => parsed.checkInSelfie && setModalImage(parsed.checkInSelfie)}
+                                          onClick={() => parsed?.checkInSelfie && setModalImage(parsed.checkInSelfie)}
                                         >
-                                          {parsed.checkInSelfie ? (
+                                          {parsed?.checkInSelfie ? (
                                             <img src={parsed.checkInSelfie} alt="Check-in" className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
                                           ) : (
                                             <div className="w-full h-full flex items-center justify-center text-slate-300">
@@ -5755,10 +5760,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                           <span className="font-bold text-slate-800 text-base leading-tight">{outStr}</span>
                                         </div>
                                         <div 
-                                          className={`w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 ${parsed.checkOutSelfie ? 'cursor-pointer' : ''}`}
-                                          onClick={() => parsed.checkOutSelfie && setModalImage(parsed.checkOutSelfie)}
+                                          className={`w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 ${parsed?.checkOutSelfie ? 'cursor-pointer' : ''}`}
+                                          onClick={() => parsed?.checkOutSelfie && setModalImage(parsed.checkOutSelfie)}
                                         >
-                                          {parsed.checkOutSelfie ? (
+                                          {parsed?.checkOutSelfie ? (
                                             <img src={parsed.checkOutSelfie} alt="Check-out" className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
                                           ) : (
                                             <div className="w-full h-full flex items-center justify-center text-slate-300 border-2 border-dashed border-slate-200">
@@ -5771,7 +5776,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                     </div>
                                   </div>
                                 </div>
-                             );
+                              );
                            })()}
                         </div>
                       </>
