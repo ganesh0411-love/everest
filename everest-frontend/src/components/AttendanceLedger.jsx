@@ -7,29 +7,86 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick }) => {
   const [elapsed, setElapsed] = useState('--h --m --s');
 
   useEffect(() => {
+    if (att?.duration !== undefined && att?.duration !== null) {
+      if (typeof att.duration === 'string') {
+         setElapsed(att.duration);
+         return;
+      }
+      if (typeof att.duration === 'number') {
+         const h = Math.floor(att.duration);
+         const m = Math.floor((att.duration - h) * 60);
+         setElapsed(`${h}h ${m}m`);
+         return;
+      }
+    }
+
     if (statusInfo.label === 'Active' && att?.checkInTime) {
       const interval = setInterval(() => {
-        const diff = Date.now() - new Date(att.checkInTime).getTime();
-        const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-        const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-        const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-        setElapsed(`${h}h ${m}m ${s}s`);
+        let inTime = new Date(att.checkInTime).getTime();
+        if (isNaN(inTime)) {
+            const match = String(att.checkInTime).match(/(\d+):(\d+)/);
+            if (match) {
+                const now = new Date();
+                inTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(match[1]), parseInt(match[2])).getTime();
+            }
+        }
+        
+        if (!isNaN(inTime)) {
+            const diff = Date.now() - inTime;
+            if (diff >= 0) {
+               const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+               const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+               const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+               setElapsed(`${h}h ${m}m ${s}s`);
+            }
+        }
       }, 1000);
       return () => clearInterval(interval);
     } else if (att?.checkInTime && att?.checkOutTime) {
-       const diff = new Date(att.checkOutTime).getTime() - new Date(att.checkInTime).getTime();
-       const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-       const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-       const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-       setElapsed(`${h}h ${m}m ${s}s`);
+       let inTime = new Date(att.checkInTime).getTime();
+       let outTime = new Date(att.checkOutTime).getTime();
+       
+       if (isNaN(inTime)) {
+           const match = String(att.checkInTime).match(/(\d+):(\d+)/);
+           if (match) {
+               const now = new Date();
+               inTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(match[1]), parseInt(match[2])).getTime();
+           }
+       }
+       if (isNaN(outTime)) {
+           const match = String(att.checkOutTime).match(/(\d+):(\d+)/);
+           if (match) {
+               const now = new Date();
+               outTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(match[1]), parseInt(match[2])).getTime();
+           }
+       }
+       
+       if (!isNaN(inTime) && !isNaN(outTime)) {
+           const diff = outTime - inTime;
+           if (diff >= 0) {
+               const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+               const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+               const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+               setElapsed(`${h}h ${m}m ${s}s`);
+           } else {
+               setElapsed('--h --m --s');
+           }
+       } else {
+           setElapsed('--h --m --s');
+       }
     } else {
        setElapsed('--h --m --s');
     }
   }, [att, statusInfo.label]);
 
-  const formatTime = (isoString) => {
-    if (!isoString) return '--:--';
-    return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (timeString) => {
+    if (!timeString) return '--:--';
+    if (typeof timeString === 'string' && !timeString.includes('T') && (timeString.includes(':') || timeString.includes('AM') || timeString.includes('PM'))) {
+        return timeString;
+    }
+    const d = new Date(timeString);
+    if (isNaN(d.getTime())) return String(timeString);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const getLocString = (locObj) => {
@@ -235,13 +292,14 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
               const rawAtt = data.attendance[todayStr];
               todayAtt = {
                 ...rawAtt,
-                checkInTime: rawAtt.checkInTime || rawAtt.checkIn || data.lastCheckInTime,
-                checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || data.lastCheckOutTime,
+                checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (data.lastCheckInTime?.startsWith(todayStr) ? data.lastCheckInTime : null),
+                checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (data.lastCheckOutTime?.startsWith(todayStr) ? data.lastCheckOutTime : null),
                 checkInLocation: rawAtt.checkInLocation || rawAtt.location || (data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
-                checkOutLocation: rawAtt.checkOutLocation,
+                checkOutLocation: rawAtt.checkOutLocation || (rawAtt.checkOut || data.lastCheckOutTime?.startsWith(todayStr) ? (data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
                 selfieUrl: rawAtt.selfieUrl || data.lastSelfieUrl || data.profilePic || data.photoUrl,
                 checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || data.lastCheckOutSelfieUrl,
-                status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : 'Not Checked In')
+                status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : 'Not Checked In'),
+                duration: rawAtt.duration
               };
               if (todayAtt.checkInTime && !todayAtt.checkOutTime) {
                 todayAtt.status = 'active';
