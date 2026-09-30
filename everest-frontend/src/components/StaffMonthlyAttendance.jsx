@@ -135,17 +135,26 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
       return 'future';
     }
     
+    const hasCheckIn = !!(att.checkIn || att.checkInTime);
+    const hasCheckOut = !!(att.checkOut || att.checkOutTime);
+    
     if (att.status === 'Half Day') return 'half';
     
-    if (att.checkOut || att.checkOutTime) {
+    if (hasCheckIn && hasCheckOut) {
        const totalMins = getElapsedMins(att);
        if (totalMins > 0 && totalMins < 420) {
            return 'half';
        }
+       return 'present';
     }
     
-    if (att.checkIn || att.checkInTime) return 'present';
-    return 'absent';
+    if (hasCheckIn && !hasCheckOut) {
+       return 'active';
+    }
+    
+    const dObj = new Date(dStr + 'T12:00:00').getTime();
+    if (dObj <= todayVal) return 'absent';
+    return 'future';
   };
 
   // Build the selected day's detailed data exactly like the ledger strictly guarding against cross-date leaks
@@ -191,9 +200,9 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
   const renderLocation = (loc) => {
     if (!loc || !loc.latitude || !loc.longitude) {
       return (
-        <div className="flex flex-col">
+        <div className="flex flex-col min-w-0">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 opacity-80">Location</span>
-          <span className="text-xs text-slate-500 font-medium truncate opacity-70">No location captured</span>
+          <span className="text-[11px] text-slate-500 font-medium truncate overflow-hidden whitespace-nowrap opacity-70">No location</span>
         </div>
       );
     }
@@ -301,6 +310,8 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
                   bgColor = 'bg-rose-500'; textColor = 'text-white'; shadow = 'shadow-md shadow-rose-500/30';
                 } else if (status === 'half') {
                   bgColor = 'bg-amber-400'; textColor = 'text-white'; shadow = 'shadow-md shadow-amber-400/30';
+                } else if (status === 'active') {
+                  bgColor = 'bg-blue-600'; textColor = 'text-white'; shadow = 'shadow-md shadow-blue-600/30';
                 }
 
                 if (status === 'future') {
@@ -308,13 +319,16 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
                 }
 
                 return (
-                  <div key={dStr} className="flex items-center justify-center relative">
-                    {isSelected && (
+                  <div key={dStr} className="flex items-center justify-center relative w-9 h-9 mx-auto">
+                    {isSelected && status !== 'active' && (
                       <div className="absolute inset-0 rounded-full border-2 border-blue-500 scale-125 z-0 transition-transform"></div>
+                    )}
+                    {status === 'active' && (
+                      <div className="absolute -inset-1 rounded-full border-2 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-soft-pulse z-0 pointer-events-none bg-blue-50"></div>
                     )}
                     <button 
                       onClick={() => setSelectedDateStr(dStr)}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold z-10 transition-all ${bgColor} ${textColor} ${shadow} ${isSelected && status === 'future' ? 'bg-blue-600 text-white' : ''}`}
+                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm font-bold z-10 transition-all ${bgColor} ${textColor} ${shadow} ${isSelected && status === 'future' ? 'bg-blue-600 text-white' : ''}`}
                     >
                       {dayNum}
                     </button>
