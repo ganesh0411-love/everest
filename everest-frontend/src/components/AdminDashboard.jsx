@@ -830,30 +830,55 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   }, [attendanceState, attendanceKey]);
 
   const handleSelfieCapture = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const now = new Date().toISOString();
-
-    // Read file as base64
-    let base64Selfie = null;
     try {
-       const reader = new FileReader();
-       base64Selfie = await new Promise((resolve) => {
-         reader.onload = (event) => resolve(event.target.result);
-         reader.readAsDataURL(file);
-       });
-    } catch (err) {
-       console.error("Failed to read selfie file", err);
-    }
-    
-    // Immediately update state so timer ticks even while GPS is fetching
-    if (pendingAction === 'check-in') {
-      setAttendanceState(prev => ({ ...prev, checkInTime: now, checkInSelfie: base64Selfie }));
-      setShiftElapsed('00h 00m 00s');
-    } else if (pendingAction === 'check-out') {
-      setAttendanceState(prev => ({ ...prev, checkOutSelfie: base64Selfie }));
-    }
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const now = new Date().toISOString();
+
+      // Read and COMPRESS file as base64 to prevent Firestore size limits / WSOD
+      let base64Selfie = null;
+      try {
+         const reader = new FileReader();
+         const rawBase64 = await new Promise((resolve, reject) => {
+           reader.onload = (event) => resolve(event.target.result);
+           reader.onerror = (error) => reject(error);
+           reader.readAsDataURL(file);
+         });
+
+         // Compress the image via Canvas
+         base64Selfie = await new Promise((resolve, reject) => {
+           const img = new Image();
+           img.onload = () => {
+             const canvas = document.createElement('canvas');
+             const MAX_WIDTH = 500; // strict cap for Firestore 1MB limits
+             const scaleSize = Math.min(1, MAX_WIDTH / img.width);
+             canvas.width = img.width * scaleSize;
+             canvas.height = img.height * scaleSize;
+             const ctx = canvas.getContext('2d');
+             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+             resolve(canvas.toDataURL('image/jpeg', 0.6));
+           };
+           img.onerror = (err) => reject(err);
+           img.src = rawBase64;
+         });
+      } catch (err) {
+         console.error("Failed to read/compress selfie file", err);
+         alert("Image processing failed. Please try a smaller file or try again.");
+         return; // Abort if we can't process the image safely
+      }
+      
+      // Immediately update state so timer ticks even while GPS is fetching
+      try {
+        if (pendingAction === 'check-in') {
+          setAttendanceState(prev => ({ ...prev, checkInTime: now, checkInSelfie: base64Selfie }));
+          setShiftElapsed('00h 00m 00s');
+        } else if (pendingAction === 'check-out') {
+          setAttendanceState(prev => ({ ...prev, checkOutSelfie: base64Selfie }));
+        }
+      } catch(stateErr) {
+        console.error("Failed to update UI state, but continuing with save", stateErr);
+      }
 
     let coords = null;
     try {
@@ -933,11 +958,17 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
         }
       } catch (err) {
         console.error("Failed to update staff location in Firestore", err);
+        alert("Failed to sync attendance to cloud. Please check your network connection.");
       }
     }
 
     if (pendingAction === 'check-out') {
       setAttendanceState(prev => ({ ...prev, checkOutTime: now, status: computedStatus }));
+    }
+    
+    } catch (globalErr) {
+      console.error("Critical error in handleSelfieCapture", globalErr);
+      alert("An unexpected error occurred during attendance submission. Please try again.");
     }
   };
 
