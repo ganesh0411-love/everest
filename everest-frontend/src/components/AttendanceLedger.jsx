@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { X, MapPin, Clock, User, ChevronDown, Phone } from 'lucide-react';
+import { X, MapPin, Clock, User, ChevronDown, Calendar } from 'lucide-react';
 
 const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr }) => {
   const [elapsed, setElapsed] = useState('--h --m --s');
@@ -191,7 +191,7 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr }) =
         <div className="flex flex-col items-end shrink-0 pl-3 border-l border-slate-100">
            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap tracking-wide">{formattedDate}</span>
            <button className="mt-1.5 w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors border border-slate-200 shadow-sm active:scale-95">
-             <Phone size={14} />
+             <Calendar size={14} />
            </button>
         </div>
       </div>
@@ -307,24 +307,26 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
             const data = d.data();
             // Parse attendance map for today
             let todayAtt = null;
+            const isToday = selectedDateStr === todayStr;
+
             if (data.attendance && data.attendance[selectedDateStr]) {
               const rawAtt = data.attendance[selectedDateStr];
               todayAtt = {
                 ...rawAtt,
-                checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (data.lastCheckInTime?.startsWith(selectedDateStr) ? data.lastCheckInTime : null),
-                checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (data.lastCheckOutTime?.startsWith(selectedDateStr) ? data.lastCheckOutTime : null),
-                checkInLocation: rawAtt.checkInLocation || rawAtt.location || (data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
-                checkOutLocation: rawAtt.checkOutLocation || (rawAtt.checkOut || data.lastCheckOutTime?.startsWith(selectedDateStr) ? (data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
-                selfieUrl: rawAtt.selfieUrl || data.lastSelfieUrl || data.profilePic || data.photoUrl,
-                checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || data.lastCheckOutSelfieUrl,
-                status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : 'Not Checked In'),
+                checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (isToday && data.lastCheckInTime?.startsWith(selectedDateStr) ? data.lastCheckInTime : null),
+                checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr) ? data.lastCheckOutTime : null),
+                checkInLocation: rawAtt.checkInLocation || rawAtt.location || (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
+                checkOutLocation: rawAtt.checkOutLocation || ((rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
+                selfieUrl: rawAtt.selfieUrl || (isToday ? data.lastSelfieUrl : null) || data.profilePic || data.photoUrl,
+                checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || (isToday ? data.lastCheckOutSelfieUrl : null),
+                status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : (rawAtt.checkOut ? 'COMPLETED' : 'Not Checked In')),
                 duration: rawAtt.duration
               };
               if (todayAtt.checkInTime && !todayAtt.checkOutTime) {
                 todayAtt.status = 'active';
               }
-            } else if (data.lastCheckInTime && data.lastCheckInTime.startsWith(selectedDateStr)) {
-              // Fallback if mobile app updates root fields first
+            } else if (isToday && data.lastCheckInTime && data.lastCheckInTime.startsWith(selectedDateStr)) {
+              // Fallback if mobile app updates root fields first (only valid for TODAY)
               todayAtt = {
                 checkInTime: data.lastCheckInTime,
                 checkOutTime: data.lastCheckOutTime,
