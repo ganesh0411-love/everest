@@ -291,6 +291,15 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
   const [selectedBranch, setSelectedBranch] = useState(activeBranch.name);
   const [staffData, setStaffData] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (selectedBranch !== 'All Branches' && selectedBranch !== 'Main Branch' && selectedBranch !== 'All') {
+      const branchConfig = branches.find(b => b.name === selectedBranch);
+      if (branchConfig && (branchConfig.isVisibleInDropdown === false || branchConfig.includeInConsolidatedTotals === false)) {
+        setSelectedBranch('All Branches');
+      }
+    }
+  }, [branches, selectedBranch]);
   
   // Image modal state
   const [modalImage, setModalImage] = useState(null);
@@ -356,7 +365,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
         }
 
         unsubscribeStaff = onSnapshot(staffQuery, (staffSnap) => {
-          const staffList = staffSnap.docs.map(d => {
+          let staffList = staffSnap.docs.map(d => {
             const data = d.data();
             // Parse attendance map for today
             let todayAtt = null;
@@ -393,6 +402,14 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
               ...data,
               todayAttendance: todayAtt
             };
+          });
+          
+          staffList = staffList.filter(s => {
+            const branchConfig = branches.find(b => b.name === s.branch);
+            if (branchConfig) {
+              if (branchConfig.isVisibleInDropdown === false || branchConfig.includeInConsolidatedTotals === false) return false;
+            }
+            return true;
           });
           
           setStaffData(staffList);
@@ -498,19 +515,21 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
         </div>
         
         {/* Branch Filter */}
-        <div className="relative shrink-0 ml-3">
-          <select 
-            value={selectedBranch}
-            onChange={(e) => setSelectedBranch(e.target.value)}
-            className="appearance-none bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold py-2 pl-3 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer text-xs md:text-sm"
-          >
-            <option value="All Branches">All Branches</option>
-            {branches.filter(b => b.id !== 'main').map(b => (
-              <option key={b.id} value={b.name}>{b.name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" size={14} />
-        </div>
+        {activeBranch?.id === 'main' && (
+          <div className="relative shrink-0 ml-3">
+            <select 
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="appearance-none bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold py-2 pl-3 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer text-xs md:text-sm"
+            >
+              <option value="All Branches">All Branches</option>
+              {branches.filter(b => b.id !== 'main' && b.isVisibleInDropdown !== false && b.includeInConsolidatedTotals !== false).map(b => (
+                <option key={b.id} value={b.name}>{b.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" size={14} />
+          </div>
+        )}
       </div>
 
       {/* Horizontal Date Picker Strip */}
