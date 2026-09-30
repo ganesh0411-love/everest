@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { X, MapPin, Clock, User, ChevronDown, Calendar } from 'lucide-react';
+import StaffMonthlyAttendance from './StaffMonthlyAttendance';
 
-const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onDateChange }) => {
+const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onCalendarClick }) => {
   const [elapsed, setElapsed] = useState('--h --m --s');
   
   const formattedDate = new Date((selectedDateStr || new Date().toLocaleDateString('en-CA')) + 'T12:00:00')
@@ -190,15 +191,12 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onD
         
         <div className="flex flex-col items-end shrink-0 pl-3 border-l border-slate-100">
            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap tracking-wide">{formattedDate}</span>
-           <div className="relative mt-1.5 w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors border border-slate-200 shadow-sm overflow-hidden">
-             <Calendar size={14} className="pointer-events-none" />
-             <input 
-               type="date"
-               value={selectedDateStr}
-               onChange={(e) => { if (e.target.value && onDateChange) onDateChange(e.target.value); }}
-               className="absolute inset-0 opacity-0 cursor-pointer"
-             />
-           </div>
+           <button 
+             onClick={() => onCalendarClick && onCalendarClick(staff)}
+             className="mt-1.5 w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors border border-slate-200 shadow-sm active:scale-95"
+           >
+             <Calendar size={14} />
+           </button>
         </div>
       </div>
 
@@ -284,6 +282,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
   
   // Image modal state
   const [modalImage, setModalImage] = useState(null);
+  const [selectedStaffForModal, setSelectedStaffForModal] = useState(null);
 
   const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
   const [selectedDateStr, setSelectedDateStr] = useState(todayStr);
@@ -468,7 +467,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
                   statusInfo={statusInfo}
                   onImageClick={(url) => setModalImage(url)}
                   selectedDateStr={selectedDateStr}
-                  onDateChange={setSelectedDateStr}
+                  onCalendarClick={setSelectedStaffForModal}
                 />
               );
             })}
@@ -495,6 +494,14 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
             onClick={(e) => e.stopPropagation()} 
           />
         </div>
+      )}
+
+      {selectedStaffForModal && (
+        <StaffMonthlyAttendance 
+          staff={selectedStaffForModal} 
+          onClose={() => setSelectedStaffForModal(null)} 
+          onImageClick={(url) => setModalImage(url)} 
+        />
       )}
     </div>
   );
