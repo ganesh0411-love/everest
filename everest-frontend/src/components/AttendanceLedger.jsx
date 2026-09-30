@@ -293,13 +293,15 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (selectedBranch !== 'All Branches' && selectedBranch !== 'Main Branch' && selectedBranch !== 'All') {
-      const branchConfig = branches.find(b => b.name === selectedBranch);
-      if (branchConfig && (branchConfig.isVisibleInDropdown === false || branchConfig.includeInConsolidatedTotals === false)) {
-        setSelectedBranch('All Branches');
+    if (activeBranch?.id === 'main') {
+      if (selectedBranch !== 'All Branches' && selectedBranch !== 'Main Branch' && selectedBranch !== 'All') {
+        const branchConfig = branches.find(b => b.name === selectedBranch);
+        if (branchConfig && (branchConfig.isVisibleInDropdown === false || branchConfig.includeInConsolidatedTotals === false)) {
+          setSelectedBranch('All Branches');
+        }
       }
     }
-  }, [branches, selectedBranch]);
+  }, [branches, selectedBranch, activeBranch]);
   
   // Image modal state
   const [modalImage, setModalImage] = useState(null);
@@ -358,10 +360,13 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
       setLoading(true);
       try {
         let staffQuery;
-        if (selectedBranch === 'All Branches' || selectedBranch === 'Main Branch' || selectedBranch === 'All') {
+        const isMainBranch = activeBranch?.id === 'main';
+
+        if (isMainBranch && (selectedBranch === 'All Branches' || selectedBranch === 'Main Branch' || selectedBranch === 'All')) {
           staffQuery = query(collection(db, 'staff')); 
         } else {
-          staffQuery = query(collection(db, 'staff'), where('branch', '==', selectedBranch));
+          const branchToQuery = isMainBranch ? selectedBranch : activeBranch.name;
+          staffQuery = query(collection(db, 'staff'), where('branch', '==', branchToQuery));
         }
 
         unsubscribeStaff = onSnapshot(staffQuery, (staffSnap) => {
@@ -405,6 +410,9 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
           });
           
           staffList = staffList.filter(s => {
+            if (activeBranch?.id !== 'main') {
+              return s.branch === activeBranch.name;
+            }
             const branchConfig = branches.find(b => b.name === s.branch);
             if (branchConfig) {
               if (branchConfig.isVisibleInDropdown === false || branchConfig.includeInConsolidatedTotals === false) return false;
