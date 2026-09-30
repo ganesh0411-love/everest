@@ -41,6 +41,7 @@ import CustomerDetail from './components/CustomerDetail';
 import DesktopSidebar from './components/DesktopSidebar';
 import AddBranchModal from './components/AddBranchModal';
 import EditBranchModal from './components/EditBranchModal';
+import PermissionGate from './components/PermissionGate';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
 
@@ -1653,11 +1654,12 @@ function App() {
   return (
     <div className="h-[100dvh] bg-[#f8fafc] flex flex-col overflow-hidden relative">
       <LiveTrackingDaemon userProfile={userProfile} />
-      {userProfile?.role === 'customer' ? (
-        <CustomerDashboard userProfile={userProfile} customers={customers} />
-      ) : (
-        <div className="w-full h-full flex flex-col relative overflow-hidden">
-          {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && (
+      <PermissionGate>
+        {userProfile?.role === 'customer' ? (
+          <CustomerDashboard userProfile={userProfile} customers={customers} />
+        ) : (
+          <div className="w-full h-full flex flex-col relative overflow-hidden">
+            {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && (
             <Header 
               currentView={currentView} 
               setCurrentView={switchTab}
@@ -1878,7 +1880,8 @@ function App() {
             </div>
           </div>
         </div>
-      )}
+        )}
+      </PermissionGate>
     </div>
   );
 }
