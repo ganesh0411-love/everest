@@ -268,7 +268,14 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
   const [modalImage, setModalImage] = useState(null);
 
   const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
+  const [selectedDateStr, setSelectedDateStr] = useState(todayStr);
 
+  const dates = [];
+  const now = new Date();
+  for (let i = 0; i <= 14; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    dates.push(d.toLocaleDateString('en-CA'));
+  }
   useEffect(() => {
     let unsubscribeStaff = null;
     let unsubscribesAttendance = [];
@@ -288,14 +295,14 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
             const data = d.data();
             // Parse attendance map for today
             let todayAtt = null;
-            if (data.attendance && data.attendance[todayStr]) {
-              const rawAtt = data.attendance[todayStr];
+            if (data.attendance && data.attendance[selectedDateStr]) {
+              const rawAtt = data.attendance[selectedDateStr];
               todayAtt = {
                 ...rawAtt,
-                checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (data.lastCheckInTime?.startsWith(todayStr) ? data.lastCheckInTime : null),
-                checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (data.lastCheckOutTime?.startsWith(todayStr) ? data.lastCheckOutTime : null),
+                checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (data.lastCheckInTime?.startsWith(selectedDateStr) ? data.lastCheckInTime : null),
+                checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (data.lastCheckOutTime?.startsWith(selectedDateStr) ? data.lastCheckOutTime : null),
                 checkInLocation: rawAtt.checkInLocation || rawAtt.location || (data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
-                checkOutLocation: rawAtt.checkOutLocation || (rawAtt.checkOut || data.lastCheckOutTime?.startsWith(todayStr) ? (data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
+                checkOutLocation: rawAtt.checkOutLocation || (rawAtt.checkOut || data.lastCheckOutTime?.startsWith(selectedDateStr) ? (data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
                 selfieUrl: rawAtt.selfieUrl || data.lastSelfieUrl || data.profilePic || data.photoUrl,
                 checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || data.lastCheckOutSelfieUrl,
                 status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : 'Not Checked In'),
@@ -304,7 +311,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
               if (todayAtt.checkInTime && !todayAtt.checkOutTime) {
                 todayAtt.status = 'active';
               }
-            } else if (data.lastCheckInTime && data.lastCheckInTime.startsWith(todayStr)) {
+            } else if (data.lastCheckInTime && data.lastCheckInTime.startsWith(selectedDateStr)) {
               // Fallback if mobile app updates root fields first
               todayAtt = {
                 checkInTime: data.lastCheckInTime,
@@ -337,7 +344,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
       if (unsubscribeStaff) unsubscribeStaff();
       unsubscribesAttendance.forEach(u => u());
     };
-  }, [selectedBranch, todayStr]);
+  }, [selectedBranch, selectedDateStr, todayStr]);
 
   const getStatusInfo = (att) => {
     if (!att) return { label: 'Not Checked In', color: 'bg-slate-100 text-slate-500', dot: 'bg-slate-400' };
@@ -361,33 +368,59 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
     <div className="fixed inset-0 z-[150] flex flex-col bg-[#eff3f9] animate-in slide-in-from-bottom-8 duration-300">
       
       {/* Header */}
-      <div className="bg-white px-4 py-4 md:px-8 border-b border-slate-200 flex items-center justify-between shadow-sm sticky top-0 z-10">
-        <div className="flex items-center gap-3">
+      <div className="bg-white px-4 py-3 md:px-8 border-b border-slate-200 flex items-center justify-between shadow-sm sticky top-0 z-20">
+        <div className="flex items-center gap-3 overflow-hidden">
           <button 
             onClick={onClose}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors"
+            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors"
           >
             <X size={20} />
           </button>
-          <div>
-            <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">Attendance Ledger</h1>
-            <p className="text-xs md:text-sm text-slate-500 font-medium">{new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight whitespace-nowrap truncate">Attendance Ledger</h1>
+            <p className="text-xs md:text-sm text-slate-500 font-medium whitespace-nowrap truncate">{new Date(selectedDateStr + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</p>
           </div>
         </div>
         
         {/* Branch Filter */}
-        <div className="relative">
+        <div className="relative shrink-0 ml-3">
           <select 
             value={selectedBranch}
             onChange={(e) => setSelectedBranch(e.target.value)}
-            className="appearance-none bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold py-2.5 pl-4 pr-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer text-sm"
+            className="appearance-none bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold py-2 pl-3 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer text-xs md:text-sm"
           >
             <option value="All Branches">All Branches</option>
             {branches.filter(b => b.id !== 'main').map(b => (
               <option key={b.id} value={b.name}>{b.name}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" size={16} />
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" size={14} />
+        </div>
+      </div>
+
+      {/* Horizontal Date Picker Strip */}
+      <div className="bg-slate-50/80 border-b border-slate-200 py-3 px-4 md:px-8 overflow-x-auto flex gap-2.5 snap-x sticky top-[65px] z-10" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <style dangerouslySetInnerHTML={{__html: `
+          .date-strip::-webkit-scrollbar { display: none; }
+        `}} />
+        <div className="flex gap-2.5 date-strip w-max pb-0.5">
+          {dates.map((dStr) => {
+            const dObj = new Date(dStr + 'T12:00:00');
+            const dayOfWeek = dObj.toLocaleDateString(undefined, { weekday: 'short' });
+            const dayOfMonth = dObj.getDate();
+            const isSelected = dStr === selectedDateStr;
+            
+            return (
+              <div 
+                key={dStr}
+                onClick={() => setSelectedDateStr(dStr)}
+                className={`snap-center shrink-0 flex flex-col items-center justify-center w-[52px] h-[60px] md:w-[60px] md:h-[68px] rounded-2xl cursor-pointer transition-all border ${isSelected ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/20 scale-[1.02]' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'}`}
+              >
+                <span className={`text-[10px] md:text-xs font-bold uppercase tracking-wide ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>{dayOfWeek}</span>
+                <span className="text-[17px] md:text-[20px] font-black leading-none mt-0.5">{dayOfMonth}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
