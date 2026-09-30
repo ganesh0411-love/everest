@@ -1124,7 +1124,12 @@ function App() {
               onRestore={async (id, prevStatus) => {
                 const nowIso = new Date().toISOString();
                 try {
-                  await updateDoc(doc(db, 'customers', id), { status: prevStatus, lastUpdated: nowIso });
+                  await updateDoc(doc(db, 'customers', id), { 
+                    status: prevStatus, 
+                    isDeleted: false,
+                    deletedAt: null,
+                    lastUpdated: nowIso 
+                  });
                 } catch(e) { console.error('Restore error', e); }
               }}
               onPermanentDelete={async (id) => {

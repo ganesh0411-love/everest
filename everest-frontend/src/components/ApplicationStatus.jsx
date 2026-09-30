@@ -4,8 +4,8 @@ import PdfPreviewModal from './PdfPreviewModal';
 import AddCustomerModal from './AddCustomerModal';
 import ApprovalDetailsModal from './ApprovalDetailsModal';
 import OfflineImage from './OfflineImage';
-import { Eye } from 'lucide-react';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { Eye, Search, X, CheckSquare, Trash2, ListChecks, Square } from 'lucide-react';
+import { collection, query, onSnapshot, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
@@ -27,6 +27,11 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const [isEditing, setIsEditing] = useState(false);
   const [selectedPendingApp, setSelectedPendingApp] = useState(null);
   const [centers, setCenters] = useState([]);
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedApps, setSelectedApps] = useState([]);
 
   useEffect(() => {
     const q = query(collection(db, 'centers'));
@@ -106,6 +111,17 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
   const tabs = isStaffMode ? staffTabs : adminTabs;
 
   const currentApps = applications.filter(app => {
+    if (app.isDeleted) return false;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = 
+        (app.customerName && app.customerName.toLowerCase().includes(q)) ||
+        (app.fileNo && app.fileNo.toLowerCase().includes(q)) ||
+        (app.mobile && String(app.mobile).includes(q));
+      if (!matchesSearch) return false;
+    }
+
     if (isStaffMode && app.status === 'Draft') {
       if (app.centerId || app.groupName || app.centerName || app.center) {
         return false;
@@ -133,6 +149,30 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
     setActiveMenuId(null);
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedApps.length === 0) return;
+    if (!window.confirm(`Are you sure you want to move ${selectedApps.length} applications to the Recycle Bin?`)) return;
+
+    try {
+      const batch = writeBatch(db);
+      selectedApps.forEach(appId => {
+        const appRef = doc(db, 'customers', appId);
+        batch.update(appRef, {
+          isDeleted: true,
+          deletedAt: new Date().toISOString(),
+          deletedBy: userProfile?.id || userProfile?.uid || 'admin'
+        });
+      });
+      await batch.commit();
+      
+      setSelectedApps([]);
+      setIsSelectionMode(false);
+    } catch (err) {
+      console.error("Bulk delete error:", err);
+      alert("Error moving to Recycle Bin.");
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuId(null);
     document.addEventListener('click', handleClickOutside);
@@ -152,17 +192,86 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
     <div className="w-full flex-1 max-w-4xl md:max-w-none mx-auto bg-white min-h-full flex flex-col animate-in fade-in duration-300 relative md:px-6 md:py-6">
       
       {/* Header & Tabs */}
-      <div className="px-4 py-3 border-b border-slate-200 sticky top-0 bg-white z-20">
+      <div className="px-4 py-3 border-b border-slate-200 sticky top-0 bg-white z-20 flex flex-col gap-3">
         
+        {/* Top Action Bar (Search & Select) */}
+        {!isSelectionMode ? (
+          <div className="flex items-center justify-between w-full h-10">
+            <div className="flex-1 relative flex items-center justify-end">
+              <div className={`flex items-center bg-slate-100 rounded-full transition-all duration-300 overflow-hidden ${isSearchActive ? 'w-full max-w-sm px-3 py-1.5' : 'w-10 h-10 justify-center cursor-pointer hover:bg-slate-200'}`}>
+                <Search 
+                  className={`w-5 h-5 text-slate-500 ${!isSearchActive && 'hover:text-slate-800'}`} 
+                  onClick={() => !isSearchActive && setIsSearchActive(true)}
+                />
+                {isSearchActive && (
+                  <>
+                    <input 
+                      autoFocus
+                      type="text" 
+                      placeholder="Search name, file no..." 
+                      className="bg-transparent border-none outline-none text-sm font-semibold text-slate-800 ml-2 w-full placeholder-slate-400"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <button onClick={() => { setIsSearchActive(false); setSearchQuery(''); }} className="p-1 hover:bg-slate-200 rounded-full ml-1 shrink-0">
+                      <X className="w-4 h-4 text-slate-500" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {/* Selection Toggle */}
+            <button 
+              onClick={() => setIsSelectionMode(true)}
+              className="ml-3 flex items-center justify-center w-10 h-10 shrink-0 rounded-full bg-slate-50 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors border border-slate-200"
+            >
+              <ListChecks className="w-5 h-5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between w-full h-10 bg-indigo-50 rounded-xl px-4 border border-indigo-100 animate-in slide-in-from-top-2">
+            <button 
+              onClick={() => { setIsSelectionMode(false); setSelectedApps([]); }}
+              className="text-sm font-bold text-slate-600 hover:text-slate-800"
+            >
+              Cancel
+            </button>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => {
+                  if (selectedApps.length === currentApps.length && currentApps.length > 0) {
+                    setSelectedApps([]);
+                  } else {
+                    setSelectedApps(currentApps.map(app => app.id));
+                  }
+                }}
+                className="text-sm font-bold text-indigo-600 hover:text-indigo-800"
+              >
+                {selectedApps.length === currentApps.length && currentApps.length > 0 ? 'Deselect All' : 'Select All'}
+              </button>
+              {selectedApps.length > 0 && (
+                <button 
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-bold transition-colors shadow-sm shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete ({selectedApps.length})</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2">
           {tabs.map(tab => {
             let count = 0;
             if (tab.id === 'Draft' && isStaffMode) {
-              count = applications.filter(a => a.status === 'Draft' && !a.centerId && !a.groupName && !a.centerName && !a.center).length;
+              count = applications.filter(a => !a.isDeleted && a.status === 'Draft' && !a.centerId && !a.groupName && !a.centerName && !a.center).length;
             } else if (tab.id === 'Approved_Rejected') {
-              count = applications.filter(a => a.status === 'Approved' || a.status === 'Rejected').length;
+              count = applications.filter(a => !a.isDeleted && (a.status === 'Approved' || a.status === 'Rejected')).length;
             } else {
-              count = applications.filter(a => a.status === tab.id).length;
+              count = applications.filter(a => !a.isDeleted && a.status === tab.id).length;
             }
             const isActive = activeTab === tab.id;
             
@@ -214,13 +323,64 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                   <td colSpan="4" className="p-6 text-center text-slate-500 text-sm">No applications in this status.</td>
                 </tr>
               ) : currentApps.map((app, index) => {
-                console.log("Customer Record in AppStatus:", app);
                 return (
                 <tr 
                   key={app.id || index} 
-                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors w-full`}
+                  className={`border-b border-slate-100 transition-colors w-full select-none ${selectedApps.includes(app.id) ? 'bg-indigo-50/50' : 'hover:bg-slate-50'} ${isSelectionMode ? 'cursor-pointer' : ''}`}
+                  onClick={(e) => {
+                    if (isSelectionMode) {
+                      e.stopPropagation();
+                      if (selectedApps.includes(app.id)) {
+                        setSelectedApps(prev => prev.filter(id => id !== app.id));
+                      } else {
+                        setSelectedApps(prev => [...prev, app.id]);
+                      }
+                    }
+                  }}
+                  onTouchStart={() => {
+                    if (!isSelectionMode) {
+                      window.longPressTimer = setTimeout(() => {
+                        setIsSelectionMode(true);
+                        setSelectedApps([app.id]);
+                      }, 600);
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    if (window.longPressTimer) clearTimeout(window.longPressTimer);
+                  }}
+                  onTouchMove={() => {
+                    if (window.longPressTimer) clearTimeout(window.longPressTimer);
+                  }}
+                  onMouseDown={() => {
+                    if (!isSelectionMode) {
+                      window.longPressTimer = setTimeout(() => {
+                        setIsSelectionMode(true);
+                        setSelectedApps([app.id]);
+                      }, 600);
+                    }
+                  }}
+                  onMouseUp={() => {
+                    if (window.longPressTimer) clearTimeout(window.longPressTimer);
+                  }}
+                  onMouseLeave={() => {
+                    if (window.longPressTimer) clearTimeout(window.longPressTimer);
+                  }}
                 >
-                  <td className="p-2 font-bold text-slate-800 text-sm text-left md:pl-6">{index + 1}</td>
+                  <td className="p-2 text-left md:pl-6 w-12" onClick={(e) => {
+                    if (!isSelectionMode) {
+                      e.stopPropagation();
+                      setIsSelectionMode(true);
+                      setSelectedApps([app.id]);
+                    }
+                  }}>
+                    {isSelectionMode ? (
+                      <div className="flex items-center justify-center w-6 h-6">
+                        {selectedApps.includes(app.id) ? <CheckSquare className="w-5 h-5 text-indigo-600" /> : <Square className="w-5 h-5 text-slate-300" />}
+                      </div>
+                    ) : (
+                      <span className="font-bold text-slate-800 text-sm">{index + 1}</span>
+                    )}
+                  </td>
                   <td className="p-2 font-semibold text-slate-600 text-xs">
                     {activeTab === 'Approved' ? formatDate(app.approvalDate || app.appDate) : formatDate(app.appDate)}
                   </td>

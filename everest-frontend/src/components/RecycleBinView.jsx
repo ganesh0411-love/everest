@@ -6,7 +6,7 @@ const RecycleBinView = ({ customers = [], onRestore, onPermanentDelete, onRestor
   const [activeTab, setActiveTab] = useState('customers');
   const [recycledStaff, setRecycledStaff] = useState([]);
   
-  const recycledCustomers = customers.filter(c => c.status === 'Recycled');
+  const recycledCustomers = customers.filter(c => c.status === 'Recycled' || c.isDeleted === true);
   const recycledEntries = customers.flatMap(c => 
     (c.deletedInstallments || []).map(entry => ({
       ...entry,
