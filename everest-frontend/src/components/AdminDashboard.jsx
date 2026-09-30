@@ -5578,18 +5578,35 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                       if (att.duration !== undefined && att.duration !== null) {
                         if (typeof att.duration === 'number') return Math.round(att.duration * 60);
                         if (typeof att.duration === 'string') {
-                           const hm = att.duration.match(/(\d+)h/i);
-                           const mm = att.duration.match(/(\d+)m/i);
+                           const hm = String(att.duration).match(/(\d+)\s*h/i);
+                           const mm = String(att.duration).match(/(\d+)\s*m/i);
                            let h = hm ? parseInt(hm[1], 10) : 0;
                            let m = mm ? parseInt(mm[1], 10) : 0;
                            if (h > 0 || m > 0) return (h * 60) + m;
                         }
                       }
+                      
+                      const parseMs = (ts) => {
+                         if (!ts) return 0;
+                         let d = new Date(ts);
+                         if (!isNaN(d.getTime())) return d.getTime();
+                         const m = String(ts).match(/(\d+):(\d+)/);
+                         if (m) {
+                            const now = new Date();
+                            let h = parseInt(m[1], 10);
+                            const isPM = String(ts).toUpperCase().includes('PM');
+                            if (isPM && h < 12) h += 12;
+                            if (String(ts).toUpperCase().includes('AM') && h === 12) h = 0;
+                            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, parseInt(m[2], 10)).getTime();
+                         }
+                         return 0;
+                      };
+
                       const checkIn = att.checkInTime || att.checkIn;
                       const checkOut = att.checkOutTime || att.checkOut;
                       if (checkIn && checkOut) {
-                        const inTime = new Date(checkIn).getTime();
-                        const outTime = new Date(checkOut).getTime();
+                        const inTime = parseMs(checkIn);
+                        const outTime = parseMs(checkOut);
                         if (inTime > 0 && outTime > 0 && outTime >= inTime) {
                            return Math.floor((outTime - inTime) / 60000);
                         }
@@ -5717,53 +5734,97 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              let hasActivity = false;
                              let parsed = null;
                              
-                             if (isTodaySelected && attendanceState.checkInTime) {
-                                hasActivity = true;
-                                inStr = new Date(attendanceState.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                if (attendanceState.checkOutTime) {
-                                  outStr = new Date(attendanceState.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                  const diffMs = new Date(attendanceState.checkOutTime).getTime() - new Date(attendanceState.checkInTime).getTime();
-                                  const h = Math.floor(diffMs / 3600000);
-                                  const m = Math.floor((diffMs % 3600000) / 60000);
-                                  durStr = `${h}h ${String(m).padStart(2, '0')}m`;
+                             const formatTimeSafe = (timeString) => {
+                                if (!timeString) return '--:--';
+                                let d = new Date(timeString);
+                                if (isNaN(d.getTime())) {
+                                    const match = String(timeString).match(/(\d+):(\d+)/);
+                                    if (match) {
+                                        const now = new Date();
+                                        let hour = parseInt(match[1], 10);
+                                        const minute = parseInt(match[2], 10);
+                                        const isPM = String(timeString).toUpperCase().includes('PM');
+                                        const isAM = String(timeString).toUpperCase().includes('AM');
+                                        if (isPM && hour < 12) hour += 12;
+                                        if (isAM && hour === 12) hour = 0;
+                                        d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
+                                    } else {
+                                        return String(timeString);
+                                    }
                                 }
+                                return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+                             };
+                             
+                             const parseMsSafe = (timeString) => {
+                                if (!timeString) return 0;
+                                let d = new Date(timeString);
+                                if (!isNaN(d.getTime())) return d.getTime();
+                                const match = String(timeString).match(/(\d+):(\d+)/);
+                                if (match) {
+                                   const now = new Date();
+                                   let h = parseInt(match[1], 10);
+                                   const isPM = String(timeString).toUpperCase().includes('PM');
+                                   if (isPM && h < 12) h += 12;
+                                   if (String(timeString).toUpperCase().includes('AM') && h === 12) h = 0;
+                                   return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, parseInt(match[2], 10)).getTime();
+                                }
+                                return 0;
+                             };
+                             
+                             const formatDur = (durInput, ci, co) => {
+                                if (durInput !== undefined && durInput !== null) {
+                                    if (typeof durInput === 'number') {
+                                        const h = Math.floor(durInput);
+                                        const m = Math.round((durInput - h) * 60);
+                                        return `${h}h ${String(m).padStart(2, '0')}m`;
+                                    }
+                                    if (typeof durInput === 'string' && durInput.trim() !== '') return durInput;
+                                }
+                                if (ci && co) {
+                                    const ms1 = parseMsSafe(ci);
+                                    const ms2 = parseMsSafe(co);
+                                    if (ms1 > 0 && ms2 > 0 && ms2 >= ms1) {
+                                        const diff = ms2 - ms1;
+                                        const h = Math.floor(diff / 3600000);
+                                        const m = Math.floor((diff % 3600000) / 60000);
+                                        return `${h}h ${String(m).padStart(2, '0')}m`;
+                                    }
+                                }
+                                return '--';
+                             };
+
+                             let targetCi = null;
+                             let targetCo = null;
+                             let targetDur = null;
+
+                             if (isTodaySelected && attendanceState.checkInTime) {
+                                targetCi = attendanceState.checkInTime;
+                                targetCo = attendanceState.checkOutTime;
+                                targetDur = attendanceState.duration; // Might be undefined
                              } else if (staffAttendanceData && staffAttendanceData[selectedDateStr]) {
                                 const att = staffAttendanceData[selectedDateStr];
-                                const ci = att.checkInTime || att.checkIn;
-                                const co = att.checkOutTime || att.checkOut;
-                                if (ci) {
-                                  hasActivity = true;
-                                  inStr = new Date(ci).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                  if (co) {
-                                    outStr = new Date(co).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                    const diffMs = new Date(co).getTime() - new Date(ci).getTime();
-                                    const h = Math.floor(diffMs / 3600000);
-                                    const m = Math.floor((diffMs % 3600000) / 60000);
-                                    durStr = `${h}h ${String(m).padStart(2, '0')}m`;
-                                  }
-                                }
+                                targetCi = att.checkInTime || att.checkIn;
+                                targetCo = att.checkOutTime || att.checkOut;
+                                targetDur = att.duration;
                              } else {
                                const selectedKey = `attendance_${userProfile?.uid || 'guest'}_${selectedDateStr}`;
                                const selectedSaved = localStorage.getItem(selectedKey);
                                if (selectedSaved) {
                                  try {
                                    parsed = JSON.parse(selectedSaved);
-                                   if (parsed.checkInTime) {
-                                     hasActivity = true;
-                                     inStr = new Date(parsed.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                   }
-                                   if (parsed.checkOutTime) {
-                                     outStr = new Date(parsed.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                     if (parsed.checkInTime) {
-                                       const diffMs = new Date(parsed.checkOutTime).getTime() - new Date(parsed.checkInTime).getTime();
-                                       const h = Math.floor(diffMs / 3600000);
-                                       const m = Math.floor((diffMs % 3600000) / 60000);
-                                       durStr = `${h}h ${String(m).padStart(2, '0')}m`;
-                                     }
-                                   }
-                                 } catch (e) {
-                                   console.warn("Failed to parse selectedSaved", e);
-                                 }
+                                   targetCi = parsed.checkInTime || parsed.checkIn;
+                                   targetCo = parsed.checkOutTime || parsed.checkOut;
+                                   targetDur = parsed.duration;
+                                 } catch (e) {}
+                               }
+                             }
+
+                             if (targetCi) {
+                               hasActivity = true;
+                               inStr = formatTimeSafe(targetCi);
+                               if (targetCo) {
+                                 outStr = formatTimeSafe(targetCo);
+                                 durStr = formatDur(targetDur, targetCi, targetCo);
                                }
                              }
                              
