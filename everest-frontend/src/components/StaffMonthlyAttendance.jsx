@@ -163,16 +163,36 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
 
   if (staff?.attendance && staff.attendance[selectedDateStr]) {
     const rawAtt = staff.attendance[selectedDateStr];
+
+    const extractLoc = (prefix) => {
+       let l = rawAtt[`${prefix}Location`] || rawAtt[`${prefix}Coords`] || rawAtt.location;
+       if (l) return l;
+       let pObj = rawAtt[prefix];
+       if (pObj && typeof pObj === 'object') {
+          if (pObj.location) return pObj.location;
+          if (pObj.coords) return pObj.coords;
+          if (pObj.coordinates) return pObj.coordinates;
+          if (pObj.latitude !== undefined || pObj._latitude !== undefined) return pObj;
+       }
+       if (rawAtt[`${prefix}Latitude`] !== undefined) {
+          return { latitude: rawAtt[`${prefix}Latitude`], longitude: rawAtt[`${prefix}Longitude`] };
+       }
+       if (rawAtt.latitude !== undefined) {
+          return { latitude: rawAtt.latitude, longitude: rawAtt.longitude };
+       }
+       return null;
+    };
+
     selectedAtt = {
       ...rawAtt,
       checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (isToday && staff.lastCheckInTime?.startsWith(selectedDateStr) ? staff.lastCheckInTime : null),
       checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (isToday && staff.lastCheckOutTime?.startsWith(selectedDateStr) ? staff.lastCheckOutTime : null),
       selfieUrl: getValidUrl(rawAtt.selfieUrl) || (isToday ? getValidUrl(staff.lastSelfieUrl) : null),
-      checkOutSelfieUrl: getValidUrl(rawAtt.checkOutSelfieUrl) || (isToday ? getValidUrl(staff.lastCheckOutSelfieUrl) : null),
+      checkOutSelfieUrl: getValidUrl(rawAtt.checkOutSelfieUrl) || null,
       duration: rawAtt.duration,
       status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : (rawAtt.checkOut ? 'COMPLETED' : 'Not Checked In')),
-      checkInLocation: rawAtt.checkInLocation || rawAtt.location || (isToday && staff.lastLatitude ? { latitude: staff.lastLatitude, longitude: staff.lastLongitude } : null),
-      checkOutLocation: rawAtt.checkOutLocation || ((rawAtt.checkOut || (isToday && staff.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && staff.lastLatitude ? { latitude: staff.lastLatitude, longitude: staff.lastLongitude } : null) : null),
+      checkInLocation: extractLoc('checkIn') || (isToday && staff.lastLatitude ? { latitude: staff.lastLatitude, longitude: staff.lastLongitude } : null),
+      checkOutLocation: extractLoc('checkOut') || ((rawAtt.checkOut || (isToday && staff.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && staff.lastLatitude ? { latitude: staff.lastLatitude, longitude: staff.lastLongitude } : null) : null),
     };
   } else if (isToday && staff?.lastCheckInTime && staff.lastCheckInTime.startsWith(selectedDateStr)) {
     // Fallback strictly for TODAY if app updated root fields first
@@ -196,9 +216,27 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
   const formattedDate = new Date((selectedDateStr) + 'T12:00:00')
      .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
+  const formatLocation = (loc) => {
+    if (!loc) return null;
+    if (typeof loc === 'string' && loc.trim() !== '' && loc !== 'No location captured' && loc !== 'No location') {
+      if (loc.match(/^\d{1,2}:\d{2}\s*(AM|PM)?$/i)) return null;
+      return loc;
+    }
+    if (typeof loc === 'object') {
+      if (loc.address) return loc.address;
+      const lat = loc.latitude ?? loc.lat ?? loc._latitude;
+      const lng = loc.longitude ?? loc.lng ?? loc._longitude;
+      if (lat !== undefined && lng !== undefined) {
+        return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
+      }
+    }
+    return null;
+  };
+
   // Render location helper
   const renderLocation = (loc) => {
-    if (!loc || !loc.latitude || !loc.longitude) {
+    const locStr = formatLocation(loc);
+    if (!locStr) {
       return (
         <div className="flex flex-col min-w-0">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 opacity-80">Location</span>
@@ -207,8 +245,12 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
       );
     }
     
-    const coordStr = `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`;
-    const mapsUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+    let mapsUrl = '';
+    if (typeof loc === 'object' && (loc.latitude ?? loc.lat) !== undefined && (loc.longitude ?? loc.lng) !== undefined) {
+      mapsUrl = `https://www.google.com/maps?q=${loc.latitude ?? loc.lat},${loc.longitude ?? loc.lng}`;
+    } else {
+      mapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(locStr)}`;
+    }
     
     return (
       <div className="flex flex-col min-w-0">
@@ -220,7 +262,7 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
           className="text-xs text-indigo-600 font-semibold truncate hover:text-indigo-800 transition-colors flex items-center group cursor-pointer"
           title="Open in Google Maps"
         >
-          {coordStr}
+          {locStr}
           <svg className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>

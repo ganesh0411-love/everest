@@ -107,12 +107,25 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onC
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
   };
 
+  const formatLocation = (loc) => {
+    if (!loc) return null;
+    if (typeof loc === 'string' && loc.trim() !== '' && loc !== 'No location captured' && loc !== 'No location') {
+      if (loc.match(/^\d{1,2}:\d{2}\s*(AM|PM)?$/i)) return null;
+      return loc;
+    }
+    if (typeof loc === 'object') {
+      if (loc.address) return loc.address;
+      const lat = loc.latitude ?? loc.lat ?? loc._latitude;
+      const lng = loc.longitude ?? loc.lng ?? loc._longitude;
+      if (lat !== undefined && lng !== undefined) {
+        return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
+      }
+    }
+    return null;
+  };
+
   const getLocString = (locObj) => {
-    if (!locObj) return 'No location captured';
-    if (typeof locObj === 'string') return locObj;
-    if (locObj.address) return locObj.address;
-    if (locObj.latitude && locObj.longitude) return `${locObj.latitude.toFixed(4)}, ${locObj.longitude.toFixed(4)}`;
-    return 'No location captured';
+    return formatLocation(locObj) || 'No location';
   };
 
   // Helper to find first valid non-empty URL
@@ -147,11 +160,11 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onC
 
   const renderLocation = (locObj, isCheckIn) => {
     const locStr = getLocString(locObj);
-    const isEmpty = locStr === 'No location captured';
+    const isEmpty = locStr === 'No location captured' || locStr === 'No location';
     
     let mapUrl = '';
-    if (locObj && locObj.latitude && locObj.longitude) {
-       mapUrl = `https://www.google.com/maps?q=${locObj.latitude},${locObj.longitude}`;
+    if (locObj && (locObj.latitude ?? locObj.lat) !== undefined && (locObj.longitude ?? locObj.lng) !== undefined) {
+       mapUrl = `https://www.google.com/maps?q=${locObj.latitude ?? locObj.lat},${locObj.longitude ?? locObj.lng}`;
     } else if (typeof locObj === 'string' && locObj.includes(',')) {
        mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(locStr)}`;
     }
@@ -376,14 +389,38 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
 
             if (data.attendance && data.attendance[selectedDateStr]) {
               const rawAtt = data.attendance[selectedDateStr];
+
+              if (data.name?.toLowerCase().includes('muthumani')) {
+                 console.log("RAW ATTENDANCE DOC FOR MUTHUMANI:", rawAtt);
+              }
+
+              const extractLoc = (prefix) => {
+                 let l = rawAtt[`${prefix}Location`] || rawAtt[`${prefix}Coords`] || rawAtt.location;
+                 if (l) return l;
+                 let pObj = rawAtt[prefix];
+                 if (pObj && typeof pObj === 'object') {
+                    if (pObj.location) return pObj.location;
+                    if (pObj.coords) return pObj.coords;
+                    if (pObj.coordinates) return pObj.coordinates;
+                    if (pObj.latitude !== undefined || pObj._latitude !== undefined) return pObj;
+                 }
+                 if (rawAtt[`${prefix}Latitude`] !== undefined) {
+                    return { latitude: rawAtt[`${prefix}Latitude`], longitude: rawAtt[`${prefix}Longitude`] };
+                 }
+                 if (rawAtt.latitude !== undefined) {
+                    return { latitude: rawAtt.latitude, longitude: rawAtt.longitude };
+                 }
+                 return null;
+              };
+
               todayAtt = {
                 ...rawAtt,
                 checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (isToday && data.lastCheckInTime?.startsWith(selectedDateStr) ? data.lastCheckInTime : null),
                 checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr) ? data.lastCheckOutTime : null),
-                checkInLocation: rawAtt.checkInLocation || rawAtt.location || (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
-                checkOutLocation: rawAtt.checkOutLocation || ((rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
+                checkInLocation: extractLoc('checkIn') || (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
+                checkOutLocation: extractLoc('checkOut') || ((rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
                 selfieUrl: rawAtt.selfieUrl || (isToday ? data.lastSelfieUrl : null),
-                checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || (isToday ? data.lastCheckOutSelfieUrl : null),
+                checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || null,
                 status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : (rawAtt.checkOut ? 'COMPLETED' : 'Not Checked In')),
                 duration: rawAtt.duration
               };

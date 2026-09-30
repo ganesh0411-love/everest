@@ -970,7 +970,12 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
           
           if (pendingAction === 'check-in') {
             updatePayload.lastCheckInTime = now;
+            updatePayload.lastCheckOutTime = null;
+            updatePayload.lastCheckOutSelfieUrl = null;
             updatePayload[`attendance.${todayStr}.checkIn`] = now;
+            if (coords) {
+               updatePayload[`attendance.${todayStr}.checkInLocation`] = { latitude: coords.latitude, longitude: coords.longitude };
+            }
             if (base64Selfie) {
                updatePayload.lastSelfieUrl = base64Selfie;
                updatePayload[`attendance.${todayStr}.selfieUrl`] = base64Selfie;
@@ -987,6 +992,9 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
             const checkOutFormatted = checkOutDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
             updatePayload[`attendance.${todayStr}.checkOut`] = checkOutFormatted;
+            if (coords) {
+               updatePayload[`attendance.${todayStr}.checkOutLocation`] = { latitude: coords.latitude, longitude: coords.longitude };
+            }
             updatePayload[`attendance.${todayStr}.duration`] = Number(durationHours.toFixed(2));
             updatePayload[`attendance.${todayStr}.status`] = computedStatus;
             if (base64Selfie) {
