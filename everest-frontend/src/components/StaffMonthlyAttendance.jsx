@@ -324,9 +324,9 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
                     <div className="flex flex-col min-w-0 pt-0.5">
                       <div className="flex items-center gap-1 mb-0.5 text-slate-400">
                         <Clock size={10} strokeWidth={2.5} />
-                        <span className="text-[9px] font-black uppercase tracking-wider">Check-in</span>
+                        <span className="text-[9px] font-black uppercase tracking-wider whitespace-nowrap">Check-in</span>
                       </div>
-                      <span className="text-lg font-black text-slate-800 tracking-tight leading-none mb-1">
+                      <span className="text-base font-black text-slate-800 tracking-tight leading-none mb-1 whitespace-nowrap">
                         {formatTime(selectedAtt?.checkInTime)}
                       </span>
                     </div>
@@ -343,9 +343,9 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
                     <div className="flex flex-col min-w-0 pt-0.5">
                       <div className="flex items-center gap-1 mb-0.5 text-slate-400">
                         <Clock size={10} strokeWidth={2.5} />
-                        <span className="text-[9px] font-black uppercase tracking-wider">Check-out</span>
+                        <span className="text-[9px] font-black uppercase tracking-wider whitespace-nowrap">Check-out</span>
                       </div>
-                      <span className="text-lg font-black text-slate-800 tracking-tight leading-none mb-1">
+                      <span className="text-base font-black text-slate-800 tracking-tight leading-none mb-1 whitespace-nowrap">
                         {formatTime(selectedAtt?.checkOutTime)}
                       </span>
                     </div>
@@ -378,11 +378,7 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
                 </div>
              </div>
              
-             {/* Bottom timestamp */}
-             <div className="text-center mt-3 pt-3 border-t border-slate-100 mx-4">
-                <span className="text-[11px] font-medium text-slate-400">Checked in at {formatTime(selectedAtt?.checkInTime)}</span>
-             </div>
-          </div>
+           </div>
         </div>
       </div>
     </div>

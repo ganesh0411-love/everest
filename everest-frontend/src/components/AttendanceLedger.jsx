@@ -230,11 +230,11 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onC
                   </div>
                 )}
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5">
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5 whitespace-nowrap tracking-tight">
                   <Clock size={10}/> Check-In
                 </span>
-                <span className="font-bold text-slate-800 text-base whitespace-nowrap leading-tight">{formatTime(att?.checkInTime)}</span>
+                <span className="font-bold text-slate-800 text-sm whitespace-nowrap leading-tight">{formatTime(att?.checkInTime)}</span>
               </div>
             </div>
             
@@ -243,12 +243,12 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onC
 
           {/* RIGHT: Check-Out Column */}
           <div className="flex flex-col gap-3 pt-2 pl-4">
-            <div className="flex items-center gap-3 justify-end text-right">
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-end gap-1 mb-0.5">
+            <div className="flex items-center gap-3 justify-start text-left">
+              <div className="flex flex-col items-start">
+                <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5 whitespace-nowrap tracking-tight">
                   <Clock size={10}/> Check-Out
                 </span>
-                <span className="font-bold text-slate-800 text-base whitespace-nowrap leading-tight">{formatTime(att?.checkOutTime)}</span>
+                <span className="font-bold text-slate-800 text-sm whitespace-nowrap leading-tight">{formatTime(att?.checkOutTime)}</span>
               </div>
               <div 
                 className={`w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 ${coPhoto ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
