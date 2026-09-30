@@ -47,12 +47,25 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
 
   const formatTime = (timeString) => {
     if (!timeString) return '--:--';
-    if (typeof timeString === 'string' && !timeString.includes('T') && (timeString.includes(':') || timeString.includes('AM') || timeString.includes('PM'))) {
-        return timeString;
+    let d = new Date(timeString);
+    if (isNaN(d.getTime())) {
+        const match = String(timeString).match(/(\d+):(\d+)/);
+        if (match) {
+            const now = new Date();
+            let hour = parseInt(match[1], 10);
+            const minute = parseInt(match[2], 10);
+            const isPM = String(timeString).toUpperCase().includes('PM');
+            const isAM = String(timeString).toUpperCase().includes('AM');
+            
+            if (isPM && hour < 12) hour += 12;
+            if (isAM && hour === 12) hour = 0;
+            
+            d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
+        } else {
+            return String(timeString);
+        }
     }
-    const d = new Date(timeString);
-    if (isNaN(d.getTime())) return String(timeString);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
   };
 
   // Compute stats for the month
@@ -72,6 +85,21 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
     }
     const att = staff.attendance[dStr];
     if (att.status === 'Half Day') return 'half';
+    
+    if (att.checkOut || att.checkOutTime) {
+       let h = 0; let m = 0;
+       if (att.duration && typeof att.duration === 'string') {
+           const hm = att.duration.match(/(\d+)h/i);
+           const mm = att.duration.match(/(\d+)m/i);
+           if (hm) h = parseInt(hm[1], 10);
+           if (mm) m = parseInt(mm[1], 10);
+           const totalMins = (h * 60) + m;
+           if (totalMins > 0 && totalMins < 420) {
+               return 'half';
+           }
+       }
+    }
+    
     if (att.checkIn || att.checkInTime) return 'present';
     return 'absent';
   };
