@@ -5702,78 +5702,20 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              }
                              
                              return (
-                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col mt-2">
-                                  {/* Header Profile Section */}
-                                  <div className="p-3 flex items-center gap-3 border-b border-slate-100 bg-slate-50/50">
-                                    <div className="relative shrink-0">
-                                      {userProfile?.photoBase64 ? (
-                                        <img src={userProfile.photoBase64} alt={userProfile.name} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
-                                      ) : (
-                                        <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 font-bold border border-indigo-100 text-sm">
-                                          {(userProfile?.name || 'S').substring(0,2).toUpperCase()}
-                                        </div>
-                                      )}
-                                      <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${parsed?.checkInTime && !parsed?.checkOutTime ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
-                                    </div>
-                                    <div className="flex-1 min-w-0 pt-0.5">
-                                      <h3 className="font-bold text-slate-800 text-sm truncate">{userProfile?.name || 'Staff Member'}</h3>
-                                      <p className="text-[10px] text-slate-500 font-medium truncate">{userProfile?.role || 'Staff'}</p>
-                                    </div>
-                                    <div className="shrink-0 text-center bg-blue-50/80 px-3 py-1.5 rounded-xl border border-blue-100/50">
-                                      <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider block mb-0.5">Duration</span>
-                                      <span className="text-xs font-black text-blue-600">{durStr}</span>
-                                    </div>
+                                <div className="bg-white border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] rounded-2xl p-3 flex flex-row items-center justify-between mt-2">
+                                  <div className="flex flex-col items-center flex-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Check-in</span>
+                                    <span className="text-xs font-bold text-slate-700">{inStr}</span>
                                   </div>
-
-                                  {/* Symmetrical Data Body */}
-                                  <div className="p-3">
-                                    <div className="grid grid-cols-2 gap-x-3 divide-x divide-slate-100">
-                                      
-                                      {/* LEFT: Check-In Column */}
-                                      <div className="flex items-center gap-3">
-                                        <div 
-                                          className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 cursor-pointer"
-                                          onClick={() => parsed?.checkInSelfie && setModalImage(parsed.checkInSelfie)}
-                                        >
-                                          {parsed?.checkInSelfie ? (
-                                            <img src={parsed.checkInSelfie} alt="Check-in" className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
-                                          ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-slate-300">
-                                              <User size={16} />
-                                            </div>
-                                          )}
-                                        </div>
-                                        <div className="flex flex-col">
-                                          <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5">
-                                            <Clock size={10}/> Check-In
-                                          </span>
-                                          <span className="font-bold text-slate-800 text-base leading-tight">{inStr}</span>
-                                        </div>
-                                      </div>
-
-                                      {/* RIGHT: Check-Out Column */}
-                                      <div className="flex items-center gap-3 justify-end text-right pl-3">
-                                        <div className="flex flex-col items-end">
-                                          <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center justify-end gap-1 mb-0.5">
-                                            <Clock size={10}/> Check-Out
-                                          </span>
-                                          <span className="font-bold text-slate-800 text-base leading-tight">{outStr}</span>
-                                        </div>
-                                        <div 
-                                          className={`w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 ${parsed?.checkOutSelfie ? 'cursor-pointer' : ''}`}
-                                          onClick={() => parsed?.checkOutSelfie && setModalImage(parsed.checkOutSelfie)}
-                                        >
-                                          {parsed?.checkOutSelfie ? (
-                                            <img src={parsed.checkOutSelfie} alt="Check-out" className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
-                                          ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-slate-300 border-2 border-dashed border-slate-200">
-                                              <User size={16} />
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                      
-                                    </div>
+                                  <div className="w-px h-8 bg-slate-100"></div>
+                                  <div className="flex flex-col items-center flex-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Check-out</span>
+                                    <span className="text-xs font-bold text-slate-700">{outStr}</span>
+                                  </div>
+                                  <div className="w-px h-8 bg-slate-100"></div>
+                                  <div className="flex flex-col items-center flex-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Duration</span>
+                                    <span className="text-xs font-bold text-blue-600">{durStr}</span>
                                   </div>
                                 </div>
                               );
