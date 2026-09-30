@@ -79,8 +79,8 @@ export function useLiveTracking(userProfile) {
       try {
         watchIdRef.current = await BackgroundGeolocation.addWatcher(
           {
-            backgroundMessage: "Everest Field Service running in background",
-            backgroundTitle: "Active Tracking",
+            backgroundTitle: "Everest Micro Finance",
+            backgroundMessage: "Field Operations Sync Active",
             requestPermissions: true,
             stale: false,
             distanceFilter: distanceFilter,

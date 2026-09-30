@@ -2,20 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { Geolocation } from '@capacitor/geolocation';
 import { App } from '@capacitor/app';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { MapPin, BatteryCharging, ChevronRight, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { MapPin, ChevronRight } from 'lucide-react';
 
 const NativeSettings = registerPlugin('NativeSettings');
 
 const PermissionGate = ({ children }) => {
-  const [isLocationGranted, setIsLocationGranted] = useState(true); // default true for web
+  const [isOnboarded, setIsOnboarded] = useState(() => {
+    return localStorage.getItem('field_sync_onboarded') === 'true';
+  });
+  
+  const [isLocationGranted, setIsLocationGranted] = useState(true); // Default true
   const [isChecking, setIsChecking] = useState(false);
-  const [batteryOptimizationRequested, setBatteryOptimizationRequested] = useState(false);
 
   const checkPermissions = async () => {
     if (!Capacitor.isNativePlatform()) {
       setIsLocationGranted(true);
       return;
     }
+    
+    // Check persistence lock first
+    if (localStorage.getItem('field_sync_onboarded') === 'true') {
+      setIsOnboarded(true);
+      setIsLocationGranted(true);
+      return;
+    }
+
     try {
       setIsChecking(true);
       // Check native background location explicitly
@@ -23,6 +34,7 @@ const PermissionGate = ({ children }) => {
       
       if (result && result.granted) {
           setIsLocationGranted(true);
+          completeOnboarding();
       } else {
           setIsLocationGranted(false);
       }
@@ -34,37 +46,49 @@ const PermissionGate = ({ children }) => {
     }
   };
 
+  const completeOnboarding = () => {
+    localStorage.setItem('field_sync_onboarded', 'true');
+    setIsOnboarded(true);
+    setIsLocationGranted(true);
+  };
+
   useEffect(() => {
-    checkPermissions();
+    if (!isOnboarded) {
+      checkPermissions();
 
-    // Re-check when app resumes
-    const appStateListener = App.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) {
-        checkPermissions();
-      }
-    });
+      // Re-check when app resumes
+      const appStateListener = App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive && !isOnboarded) {
+          checkPermissions();
+        }
+      });
 
-    return () => {
-      appStateListener.then(listener => listener.remove());
-    };
-  }, []);
+      return () => {
+        appStateListener.then(listener => listener.remove());
+      };
+    }
+  }, [isOnboarded]);
 
-  const handleOpenSettings = async () => {
+  const handleContinue = async () => {
     try {
+      // First attempt to open app settings to allow the user to enable permissions
       await NativeSettings.openAppSettings();
+      // We do not call battery exemption here anymore to avoid native battery drain dialogs!
     } catch (error) {
       console.error('Error opening settings:', error);
     }
+    // We let the appStateListener pick up when they return from settings, or they can just complete onboarding if we want.
+    // However, if the user continues, we want to make sure it actually opens settings.
   };
 
-  const handleRequestBatteryExemption = async () => {
-    try {
-      await NativeSettings.requestBatteryOptimizationExemption();
-      setBatteryOptimizationRequested(true);
-    } catch (error) {
-      console.error('Error requesting battery exemption:', error);
-    }
+  const handleSkip = () => {
+      // Even if they skip or close, we can lock it so they are never bothered again.
+      completeOnboarding();
   };
+
+  if (isOnboarded) {
+    return <>{children}</>;
+  }
 
   if (isChecking) {
     return (
@@ -79,68 +103,31 @@ const PermissionGate = ({ children }) => {
       <div className="fixed inset-0 z-[9999] bg-white flex flex-col">
         <div className="flex-1 overflow-y-auto px-6 py-12 flex flex-col items-center justify-center">
           
-          <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center mb-8">
+          <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-8">
             <MapPin size={48} className="text-indigo-600" />
           </div>
 
           <h2 className="text-2xl font-bold text-slate-800 text-center mb-4">
-            Location Permission Required
+            Everest Field Operations
           </h2>
           
           <p className="text-slate-600 text-center text-lg mb-10 leading-relaxed">
-            To enable seamless field synchronization and background attendance tracking, please grant <span className="font-bold text-indigo-700">"Allow all the time"</span> in app settings.
+            Enable daily field synchronization and offline attendance updates with the branch.
           </p>
 
           <div className="w-full max-w-sm space-y-4">
             <button
-              onClick={handleOpenSettings}
+              onClick={handleContinue}
               className="w-full bg-indigo-600 text-white font-semibold text-lg py-4 px-6 rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              Enable in Settings
+              Continue to Dashboard
               <ChevronRight size={20} />
             </button>
-            
-            <p className="text-xs text-slate-400 text-center mt-6">
-              You will need to select "Permissions" <br/>then "Location" and choose "Allow all the time".
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // If location is granted but we haven't asked for battery optimization yet
-  if (isLocationGranted && !batteryOptimizationRequested) {
-    return (
-      <div className="fixed inset-0 z-[9999] bg-white flex flex-col">
-        <div className="flex-1 overflow-y-auto px-6 py-12 flex flex-col items-center justify-center">
-          
-          <div className="w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mb-8">
-            <BatteryCharging size={48} className="text-orange-600" />
-          </div>
-
-          <h2 className="text-2xl font-bold text-slate-800 text-center mb-4">
-            Battery Optimization
-          </h2>
-          
-          <p className="text-slate-600 text-center text-lg mb-10 leading-relaxed">
-            To ensure background tracking is not killed by the system (especially on Oppo/Vivo/Xiaomi devices), please allow the app to run without battery restrictions.
-          </p>
-
-          <div className="w-full max-w-sm space-y-4">
             <button
-              onClick={handleRequestBatteryExemption}
-              className="w-full bg-orange-600 text-white font-semibold text-lg py-4 px-6 rounded-xl shadow-lg shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-            >
-              Exempt from Restrictions
-              <ChevronRight size={20} />
-            </button>
-            
-            <button
-              onClick={() => setBatteryOptimizationRequested(true)}
+              onClick={handleSkip}
               className="w-full bg-slate-100 text-slate-600 font-medium text-base py-3 px-6 rounded-xl active:scale-95 transition-all mt-2"
             >
-              I've already done this
+              Maybe Later
             </button>
           </div>
         </div>
