@@ -77,26 +77,70 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
   const now = new Date();
   const todayVal = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   
+  const getElapsedMins = (att) => {
+    if (!att) return 0;
+    if (att.duration !== undefined && att.duration !== null) {
+      if (typeof att.duration === 'number') {
+         return Math.round(att.duration * 60);
+      }
+      if (typeof att.duration === 'string') {
+         const hm = att.duration.match(/(\d+)h/i);
+         const mm = att.duration.match(/(\d+)m/i);
+         let h = hm ? parseInt(hm[1], 10) : 0;
+         let m = mm ? parseInt(mm[1], 10) : 0;
+         if (h > 0 || m > 0) return (h * 60) + m;
+      }
+    }
+    const checkIn = att.checkInTime || att.checkIn;
+    const checkOut = att.checkOutTime || att.checkOut;
+    if (checkIn && checkOut) {
+      const parse = (ts) => {
+        let d = new Date(ts);
+        if (!isNaN(d.getTime())) return d.getTime();
+        const m = String(ts).match(/(\d+):(\d+)/);
+        if (m) {
+           const now = new Date();
+           let h = parseInt(m[1], 10);
+           const min = parseInt(m[2], 10);
+           const isPM = String(ts).toUpperCase().includes('PM');
+           if (isPM && h < 12) h += 12;
+           if (String(ts).toUpperCase().includes('AM') && h === 12) h = 0;
+           return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min).getTime();
+        }
+        return 0;
+      };
+      const inTime = parse(checkIn);
+      const outTime = parse(checkOut);
+      if (inTime > 0 && outTime > 0 && outTime >= inTime) {
+         return Math.floor((outTime - inTime) / 60000);
+      }
+    }
+    return 0;
+  };
+
   const getDayStatus = (dStr) => {
-    if (!staff?.attendance || !staff.attendance[dStr]) {
+    const isToday = dStr === todayStr;
+    const fallbackAtt = (isToday && staff?.lastCheckInTime?.startsWith(dStr)) ? {
+        checkInTime: staff.lastCheckInTime,
+        checkOutTime: staff.lastCheckOutTime,
+        status: staff.lastAttendanceStatus,
+        duration: null
+    } : null;
+    
+    let att = (staff?.attendance && staff.attendance[dStr]) ? staff.attendance[dStr] : fallbackAtt;
+    
+    if (!att) {
       const dObj = new Date(dStr + 'T12:00:00').getTime();
       if (dObj <= todayVal) return 'absent';
       return 'future';
     }
-    const att = staff.attendance[dStr];
+    
     if (att.status === 'Half Day') return 'half';
     
     if (att.checkOut || att.checkOutTime) {
-       let h = 0; let m = 0;
-       if (att.duration && typeof att.duration === 'string') {
-           const hm = att.duration.match(/(\d+)h/i);
-           const mm = att.duration.match(/(\d+)m/i);
-           if (hm) h = parseInt(hm[1], 10);
-           if (mm) m = parseInt(mm[1], 10);
-           const totalMins = (h * 60) + m;
-           if (totalMins > 0 && totalMins < 420) {
-               return 'half';
-           }
+       const totalMins = getElapsedMins(att);
+       if (totalMins > 0 && totalMins < 420) {
+           return 'half';
        }
     }
     

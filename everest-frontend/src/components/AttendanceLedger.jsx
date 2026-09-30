@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { X, MapPin, Clock, User, ChevronDown, Calendar } from 'lucide-react';
@@ -299,14 +299,25 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
   const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
   const [selectedDateStr, setSelectedDateStr] = useState(todayStr);
 
+  const modalImageRef = useRef(modalImage);
+  const selectedStaffRef = useRef(selectedStaffForModal);
+
+  useEffect(() => {
+    modalImageRef.current = modalImage;
+  }, [modalImage]);
+
+  useEffect(() => {
+    selectedStaffRef.current = selectedStaffForModal;
+  }, [selectedStaffForModal]);
+
   useEffect(() => {
     let listener = null;
     const setupListener = async () => {
       try {
         listener = await App.addListener('backButton', () => {
-          if (modalImage) {
+          if (modalImageRef.current) {
             setModalImage(null);
-          } else if (selectedStaffForModal) {
+          } else if (selectedStaffRef.current) {
             setSelectedStaffForModal(null);
           } else {
             window.history.back();
@@ -322,7 +333,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
     return () => {
       if (listener && listener.remove) listener.remove();
     };
-  }, [modalImage, selectedStaffForModal]);
+  }, []);
 
   const dates = [];
   const now = new Date();
@@ -402,6 +413,47 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
     };
   }, [selectedBranch, selectedDateStr, todayStr]);
 
+  const getElapsedMins = (att) => {
+    if (!att) return 0;
+    if (att.duration !== undefined && att.duration !== null) {
+      if (typeof att.duration === 'number') {
+         return Math.round(att.duration * 60);
+      }
+      if (typeof att.duration === 'string') {
+         const hm = att.duration.match(/(\d+)h/i);
+         const mm = att.duration.match(/(\d+)m/i);
+         let h = hm ? parseInt(hm[1], 10) : 0;
+         let m = mm ? parseInt(mm[1], 10) : 0;
+         if (h > 0 || m > 0) return (h * 60) + m;
+      }
+    }
+    const checkIn = att.checkInTime || att.checkIn;
+    const checkOut = att.checkOutTime || att.checkOut;
+    if (checkIn && checkOut) {
+      const parse = (ts) => {
+        let d = new Date(ts);
+        if (!isNaN(d.getTime())) return d.getTime();
+        const m = String(ts).match(/(\d+):(\d+)/);
+        if (m) {
+           const now = new Date();
+           let h = parseInt(m[1], 10);
+           const min = parseInt(m[2], 10);
+           const isPM = String(ts).toUpperCase().includes('PM');
+           if (isPM && h < 12) h += 12;
+           if (String(ts).toUpperCase().includes('AM') && h === 12) h = 0;
+           return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min).getTime();
+        }
+        return 0;
+      };
+      const inTime = parse(checkIn);
+      const outTime = parse(checkOut);
+      if (inTime > 0 && outTime > 0 && outTime >= inTime) {
+         return Math.floor((outTime - inTime) / 60000);
+      }
+    }
+    return 0;
+  };
+
   const getStatusInfo = (att) => {
     if (!att) return { label: 'Not Checked In', color: 'bg-slate-100 text-slate-500', dot: 'bg-slate-400' };
     
@@ -409,26 +461,19 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
       return { label: att.status === 'leave' ? 'On Leave' : 'Permission', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' };
     }
     
-    if (att.checkInTime && !att.checkOutTime) {
-      return { label: 'Active', color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' };
-    }
-    
     if (att.checkInTime && att.checkOutTime) {
-      let h = 0; let m = 0;
-      if (att.duration && typeof att.duration === 'string') {
-          const hm = att.duration.match(/(\d+)h/i);
-          const mm = att.duration.match(/(\d+)m/i);
-          if (hm) h = parseInt(hm[1], 10);
-          if (mm) m = parseInt(mm[1], 10);
-          const totalMins = (h * 60) + m;
-          if (totalMins > 0 && totalMins < 420) {
-              return { label: 'Half Day', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' };
-          }
+      const totalMins = getElapsedMins(att);
+      if (totalMins > 0 && totalMins < 420) {
+          return { label: 'Half Day', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' };
       }
       if (att.status === 'Half Day') {
           return { label: 'Half Day', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' };
       }
       return { label: 'Completed', color: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' };
+    }
+    
+    if (att.checkInTime && !att.checkOutTime) {
+      return { label: 'Active', color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' };
     }
     
     return { label: 'Not Checked In', color: 'bg-slate-100 text-slate-500', dot: 'bg-slate-400' };
