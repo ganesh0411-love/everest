@@ -335,7 +335,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
   }, [selectedStaffForModal]);
 
   useEffect(() => {
-    window.handleAndroidBack = () => {
+    window.handleAttendanceLedgerBack = () => {
       // Level 4: If an enlarged/zoom selfie preview is open
       if (modalImageRef.current) {
         setModalImage(null);
@@ -348,12 +348,12 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
         return true;
       }
       
-      // Let the global listener in App.jsx handle Level 2 and Level 1
+      // Return false to let AdminDashboard handle closing the ledger
       return false;
     };
 
     return () => {
-      window.handleAndroidBack = null;
+      window.handleAttendanceLedgerBack = null;
     };
   }, []);
 

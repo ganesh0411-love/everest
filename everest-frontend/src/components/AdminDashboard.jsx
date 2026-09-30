@@ -4854,7 +4854,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   React.useEffect(() => {
     window.handleAndroidBack = () => {
       // 0. Attendance Hierarchy
-      if (showAttendanceLedger) { setShowAttendanceLedger(false); return true; }
+      if (showAttendanceLedger) {
+          if (window.handleAttendanceLedgerBack && window.handleAttendanceLedgerBack()) {
+              return true;
+          }
+          setShowAttendanceLedger(false);
+          return true;
+      }
       if (showMarkAttendanceCalendar) { setShowMarkAttendanceCalendar(false); return true; }
       if (showAttendanceOverlay) { setShowAttendanceOverlay(false); return true; }
 
