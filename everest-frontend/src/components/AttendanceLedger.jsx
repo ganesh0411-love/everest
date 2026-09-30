@@ -322,27 +322,25 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
   }, [selectedStaffForModal]);
 
   useEffect(() => {
-    let listener = null;
-    const setupListener = async () => {
-      try {
-        listener = await App.addListener('backButton', () => {
-          if (modalImageRef.current) {
-            setModalImage(null);
-          } else if (selectedStaffRef.current) {
-            setSelectedStaffForModal(null);
-          } else {
-            window.history.back();
-          }
-        });
-      } catch (err) {
-        console.log('App back button listener error:', err);
+    window.handleAndroidBack = () => {
+      // Level 4: If an enlarged/zoom selfie preview is open
+      if (modalImageRef.current) {
+        setModalImage(null);
+        return true;
       }
+      
+      // Level 3: If Staff Monthly Attendance calendar modal is open
+      if (selectedStaffRef.current) {
+        setSelectedStaffForModal(null);
+        return true;
+      }
+      
+      // Let the global listener in App.jsx handle Level 2 and Level 1
+      return false;
     };
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-      setupListener();
-    }
+
     return () => {
-      if (listener && listener.remove) listener.remove();
+      window.handleAndroidBack = null;
     };
   }, []);
 
