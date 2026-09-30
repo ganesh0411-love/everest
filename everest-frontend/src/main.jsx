@@ -5,9 +5,13 @@ import App from './App.jsx'
 import { defineCustomElements } from '@ionic/pwa-elements/loader'
 import { migrateToBatlagundu, repairAndMergeBatlagundu, restoreTirunelveliStaff, fixTirunelveliMerge, purgeTirunelveliComplete, nukeAllTirunelveli } from './utils/migration.js'
 
+import ErrorBoundary from './components/ErrorBoundary.jsx'
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )
 

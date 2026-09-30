@@ -758,10 +758,16 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
 
   // Re-initialize state if user changes
   React.useEffect(() => {
-    const saved = localStorage.getItem(attendanceKey);
-    if (saved) {
-      setAttendanceState(JSON.parse(saved));
-    } else {
+    try {
+      const saved = localStorage.getItem(attendanceKey);
+      if (saved) {
+        setAttendanceState(JSON.parse(saved));
+      } else {
+        setAttendanceState({ checkInTime: null, checkOutTime: null, status: null });
+        setShiftElapsed('00h 00m 00s');
+      }
+    } catch (e) {
+      console.warn("Error parsing local attendance state", e);
       setAttendanceState({ checkInTime: null, checkOutTime: null, status: null });
       setShiftElapsed('00h 00m 00s');
     }
@@ -775,33 +781,39 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
           const q = query(collection(db, 'staff'), where('uid', '==', userProfile.uid));
           unsub = onSnapshot(q, (snapshot) => {
              if (!snapshot.empty) {
-                const staffDoc = snapshot.docs[0].data();
-                if (staffDoc.attendance && staffDoc.attendance[todayStr]) {
-                   const att = staffDoc.attendance[todayStr];
-                   setAttendanceState(prev => {
-                      if (prev.checkInTime === att.checkInTime && prev.checkOutTime === att.checkOutTime) return prev;
-                      const newState = {
-                         checkInTime: att.checkInTime || prev.checkInTime,
-                         checkOutTime: att.checkOutTime || prev.checkOutTime,
-                         status: att.status || prev.status,
-                         checkInSelfie: att.selfieUrl || att.checkInSelfie || prev.checkInSelfie,
-                         checkOutSelfie: att.checkOutSelfieUrl || att.checkOutSelfie || prev.checkOutSelfie
-                      };
-                      localStorage.setItem(attendanceKey, JSON.stringify(newState));
-                      return newState;
-                   });
-                } else if (staffDoc.lastCheckInTime && staffDoc.lastCheckInTime.startsWith(todayStr)) {
-                   setAttendanceState(prev => {
-                      const newState = {
-                         checkInTime: staffDoc.lastCheckInTime || prev.checkInTime,
-                         checkOutTime: staffDoc.lastCheckOutTime || prev.checkOutTime,
-                         status: staffDoc.lastAttendanceStatus || prev.status,
-                         checkInSelfie: staffDoc.lastSelfieUrl || prev.checkInSelfie,
-                         checkOutSelfie: staffDoc.lastCheckOutSelfieUrl || prev.checkOutSelfie
-                      };
-                      localStorage.setItem(attendanceKey, JSON.stringify(newState));
-                      return newState;
-                   });
+                try {
+                  const staffDoc = snapshot.docs[0]?.data();
+                  if (!staffDoc) return;
+                  
+                  if (staffDoc?.attendance && staffDoc?.attendance[todayStr]) {
+                     const att = staffDoc.attendance[todayStr];
+                     setAttendanceState(prev => {
+                        if (prev?.checkInTime === att?.checkInTime && prev?.checkOutTime === att?.checkOutTime) return prev;
+                        const newState = {
+                           checkInTime: att?.checkInTime || prev?.checkInTime,
+                           checkOutTime: att?.checkOutTime || prev?.checkOutTime,
+                           status: att?.status || prev?.status,
+                           checkInSelfie: att?.selfieUrl || att?.checkInSelfie || prev?.checkInSelfie,
+                           checkOutSelfie: att?.checkOutSelfieUrl || att?.checkOutSelfie || prev?.checkOutSelfie
+                        };
+                        try { localStorage.setItem(attendanceKey, JSON.stringify(newState)); } catch(e){}
+                        return newState;
+                     });
+                  } else if (staffDoc?.lastCheckInTime && String(staffDoc.lastCheckInTime).startsWith(todayStr)) {
+                     setAttendanceState(prev => {
+                        const newState = {
+                           checkInTime: staffDoc?.lastCheckInTime || prev?.checkInTime,
+                           checkOutTime: staffDoc?.lastCheckOutTime || prev?.checkOutTime,
+                           status: staffDoc?.lastAttendanceStatus || prev?.status,
+                           checkInSelfie: staffDoc?.lastSelfieUrl || prev?.checkInSelfie,
+                           checkOutSelfie: staffDoc?.lastCheckOutSelfieUrl || prev?.checkOutSelfie
+                        };
+                        try { localStorage.setItem(attendanceKey, JSON.stringify(newState)); } catch(e){}
+                        return newState;
+                     });
+                  }
+                } catch(err) {
+                  console.error("Error safely extracting attendance data from Firestore:", err);
                 }
              }
           });
@@ -811,7 +823,11 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   }, [userProfile?.uid, todayStr, attendanceKey, showAttendanceOverlay]);
 
   React.useEffect(() => {
-    localStorage.setItem(attendanceKey, JSON.stringify(attendanceState));
+    try {
+      localStorage.setItem(attendanceKey, JSON.stringify(attendanceState));
+    } catch(e) {
+      console.warn("Failed to stringify/save attendance state:", e);
+    }
     let timer;
     if (attendanceState.checkInTime && !attendanceState.checkOutTime) {
       const updateTimer = () => {
