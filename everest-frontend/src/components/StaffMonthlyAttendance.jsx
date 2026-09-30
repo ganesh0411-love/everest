@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, User, MapPin, Clock } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, User, MapPin, Clock, Calendar } from 'lucide-react';
 
 export default function StaffMonthlyAttendance({ staff, onClose, onImageClick }) {
   const todayStr = new Date().toLocaleDateString('en-CA');
@@ -161,7 +161,7 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
           </button>
           <div className="min-w-0 flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-               <CalendarIcon />
+               <Calendar size={18} strokeWidth={2.5} />
             </div>
             <div>
               <h1 className="text-lg md:text-xl font-black text-slate-800 tracking-tight whitespace-nowrap truncate">Attendance</h1>

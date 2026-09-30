@@ -117,13 +117,11 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onC
   // NOTE: If checkIn selfie doesn't exist, we do NOT fallback to the profile avatar here, 
   // because the user says "Display the actual selfie photo... The check-in photo placeholder currently renders an empty user outline icon".
   const ciPhoto = getValidUrl(
-    att?.checkInPhoto, att?.checkInPhotoUrl, att?.selfieUrl, att?.checkInSelfie, att?.selfie, att?.checkInImage, att?.photoUrl, att?.photo, att?.image, att?.picture, att?.checkin_selfie, att?.selfie_url,
-    staff.lastSelfieUrl, staff.checkInSelfie, staff.selfieUrl // fallback to root staff fields if attendance object is missing it
+    att?.checkInPhoto, att?.checkInPhotoUrl, att?.selfieUrl, att?.checkInSelfie, att?.selfie, att?.checkInImage, att?.photoUrl, att?.photo, att?.image, att?.picture, att?.checkin_selfie, att?.selfie_url
   );
   
   const coPhoto = getValidUrl(
-    att?.checkOutPhoto, att?.checkOutPhotoUrl, att?.checkOutSelfieUrl, att?.checkOutSelfie, att?.checkOutImage, 
-    staff.lastCheckOutSelfieUrl
+    att?.checkOutPhoto, att?.checkOutPhotoUrl, att?.checkOutSelfieUrl, att?.checkOutSelfie, att?.checkOutImage
   );
 
   const getInitials = (name) => {
