@@ -5410,23 +5410,43 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
               {/* Responsive Grid: Column on Mobile, Row on Desktop */}
               <div className="flex flex-col md:grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 w-full">
                 
-                {/* Action Card 1: Mark Attendance */}
-                <div 
-                  onClick={() => setShowMarkAttendanceCalendar(true)}
-                  className="bg-white border-2 border-[#10637c]/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-[#10637c] hover:shadow-lg transition-all active:scale-[0.98] group"
-                >
-                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-blue-50 text-[#10637c] flex items-center justify-center shrink-0 group-hover:bg-[#10637c] group-hover:text-white transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
-                    </svg>
+                {/* Admin-only: Attendance Ledger (Position 1) */}
+                {isAdmin && (
+                  <div 
+                    onClick={() => setShowAttendanceLedger(true)}
+                    className="bg-white border-2 border-indigo-500/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-indigo-500 hover:shadow-lg transition-all active:scale-[0.98] group"
+                  >
+                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex flex-col flex-1 md:items-center">
+                      <h3 className="text-base md:text-lg font-bold text-slate-800">Attendance Ledger</h3>
+                      <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5 md:mt-2 line-clamp-2">View daily staff tracking records.</p>
+                    </div>
                   </div>
-                  <div className="flex flex-col flex-1 md:items-center">
-                    <h3 className="text-base md:text-lg font-bold text-slate-800">Mark Attendance</h3>
-                    <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5 md:mt-2 line-clamp-2">Log today's check-in / check-out.</p>
+                )}
+                
+                {/* Staff-only: Mark Attendance (Position 1) */}
+                {!isAdmin && (
+                  <div 
+                    onClick={() => setShowMarkAttendanceCalendar(true)}
+                    className="bg-white border-2 border-[#10637c]/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-[#10637c] hover:shadow-lg transition-all active:scale-[0.98] group"
+                  >
+                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-blue-50 text-[#10637c] flex items-center justify-center shrink-0 group-hover:bg-[#10637c] group-hover:text-white transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                      </svg>
+                    </div>
+                    <div className="flex flex-col flex-1 md:items-center">
+                      <h3 className="text-base md:text-lg font-bold text-slate-800">Mark Attendance</h3>
+                      <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5 md:mt-2 line-clamp-2">Log today's check-in / check-out.</p>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Action Card 2: Permission */}
+                {/* Common: Permission */}
                 <div className="bg-white border-2 border-orange-500/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-orange-500 hover:shadow-lg transition-all active:scale-[0.98] group">
                   <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 group-hover:bg-orange-500 group-hover:text-white transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -5439,7 +5459,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   </div>
                 </div>
 
-                {/* Action Card 3: Ask Leave */}
+                {/* Common: Ask Leave */}
                 <div className="bg-white border-2 border-rose-500/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-rose-500 hover:shadow-lg transition-all active:scale-[0.98] group">
                   <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0 group-hover:bg-rose-500 group-hover:text-white transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -5449,22 +5469,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   <div className="flex flex-col flex-1 md:items-center">
                     <h3 className="text-base md:text-lg font-bold text-slate-800">Ask Leave</h3>
                     <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5 md:mt-2 line-clamp-2">Submit formal leave application.</p>
-                  </div>
-                </div>
-
-                {/* Action Card 4: Attendance Ledger */}
-                <div 
-                  onClick={() => setShowAttendanceLedger(true)}
-                  className="bg-white border-2 border-indigo-500/10 rounded-2xl p-5 md:p-6 flex flex-row md:flex-col items-center md:text-center gap-4 cursor-pointer hover:border-indigo-500 hover:shadow-lg transition-all active:scale-[0.98] group"
-                >
-                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div className="flex flex-col flex-1 md:items-center">
-                    <h3 className="text-base md:text-lg font-bold text-slate-800">Attendance Ledger</h3>
-                    <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5 md:mt-2 line-clamp-2">View daily staff tracking records.</p>
                   </div>
                 </div>
 
