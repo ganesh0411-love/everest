@@ -777,7 +777,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   // Hydrate attendanceState from Firestore to prevent reset bug
   React.useEffect(() => {
     let unsub = () => {};
-    if (userProfile?.uid && showAttendanceOverlay) {
+    if (userProfile?.uid) {
        import('firebase/firestore').then(({ collection, query, where, onSnapshot }) => {
           const q = query(collection(db, 'staff'), where('uid', '==', userProfile.uid));
           unsub = onSnapshot(q, (snapshot) => {
@@ -821,7 +821,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
        });
     }
     return () => unsub();
-  }, [userProfile?.uid, todayStr, attendanceKey, showAttendanceOverlay]);
+  }, [userProfile?.uid, todayStr, attendanceKey]);
 
   React.useEffect(() => {
     try {
@@ -5734,7 +5734,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 <input type="file" accept="image/*" capture="user" ref={selfieInputRef} className="hidden" onChange={handleSelfieCapture} />
                 
                 {attendanceState.checkInTime && (
-                  <div className="text-center text-xs font-bold text-slate-500">
+                  <div className={`text-center text-xs ${attendanceState.checkOutTime ? 'text-blue-600 font-medium' : 'font-bold text-slate-500'}`}>
                     Checked in at {new Date(attendanceState.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     {attendanceState.checkOutTime && ` • Checked out at ${new Date(attendanceState.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} (Shift Closed)`}
                   </div>
@@ -5759,7 +5759,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                   </div>
 
                   {!!attendanceState.checkOutTime ? (
-                    <div className="flex-1 h-14 rounded-2xl flex items-center justify-center bg-slate-100 border border-slate-200 text-slate-400 font-bold text-xs uppercase tracking-wide">
+                    <div className="flex-1 h-14 rounded-2xl flex items-center justify-center bg-blue-50 border border-blue-200 text-blue-600 font-bold text-xs uppercase tracking-wide">
                       Shift Closed
                     </div>
                   ) : (
