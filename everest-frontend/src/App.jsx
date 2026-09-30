@@ -70,6 +70,38 @@ const parseGlobalDate = (dStr) => {
   return new Date(dStr);
 };
 
+export const safeSetItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      console.warn(`Storage quota exceeded for key "${key}". Purging non-critical keys.`);
+      // If we hit quota on the profile, it might mean old heavy data is stuck.
+      if (key === 'everest_user_profile') {
+         try {
+            localStorage.removeItem('everest_customers'); // Clear some space
+            localStorage.setItem(key, value);
+         } catch (retryErr) {
+            console.error('Retry failed for safeSetItem', retryErr);
+         }
+      }
+    }
+  }
+};
+
+const sanitizeProfile = (profileData) => {
+  if (!profileData) return profileData;
+  const sanitized = { ...profileData };
+  // Remove heavy image fields to prevent QuotaExceededError
+  delete sanitized.photoBase64;
+  delete sanitized.profileImage;
+  delete sanitized.avatarUrl;
+  delete sanitized.photoUrl;
+  delete sanitized.attendance;
+  delete sanitized.historicalAttendance;
+  return sanitized;
+};
+
 function App() {
   const [activeBranch, setActiveBranch] = useState({ id: 'main', name: 'Main Branch' });
   const [branches, setBranches] = useState([{ id: 'main', name: 'Main Branch' }]);
@@ -78,8 +110,14 @@ function App() {
   const [isEditBranchModalOpen, setIsEditBranchModalOpen] = useState(false);
 
   const [userProfile, setUserProfile] = useState(() => {
-    const saved = localStorage.getItem('everest_user_profile');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('everest_user_profile');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.warn("Failed to parse everest_user_profile from local storage, purging.");
+      localStorage.removeItem('everest_user_profile');
+      return null;
+    }
   });
 
   const [user, setUser] = useState(() => {
@@ -206,7 +244,7 @@ function App() {
               }
             
             setUserProfile(profileData);
-            localStorage.setItem('everest_user_profile', JSON.stringify(profileData));
+            safeSetItem('everest_user_profile', JSON.stringify(sanitizeProfile(profileData)));
           })
           .catch(err => console.error("Error fetching profile:", err));
       } else {
@@ -272,7 +310,7 @@ function App() {
                 branchId: staffData.branchId,
                 permissions: staffData.permissions || prev.permissions
               };
-              localStorage.setItem('everest_user_profile', JSON.stringify(newProfile));
+              safeSetItem('everest_user_profile', JSON.stringify(sanitizeProfile(newProfile)));
               return newProfile;
             });
 
