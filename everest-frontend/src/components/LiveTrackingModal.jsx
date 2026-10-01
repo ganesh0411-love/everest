@@ -41,7 +41,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   const markerRef = useRef(null);
   const polylineRef = useRef(null);
   const tileLayerRef = useRef(null);
-
+  const [routeTrail, setRouteTrail] = useState([]);
   useEffect(() => {
     if (!staffId) return;
 
@@ -130,7 +130,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       attributionControl: false
     }).setView([0, 0], 17);
 
-    // Rapido-style Motorbike SVG Marker
+    // Rapido-style Motorbike Rider Image Marker
     const motorbikeSvg = `
       <style>
         .leaflet-marker-icon.custom-bike-marker {
@@ -140,24 +140,23 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
           filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.8));
         }
       </style>
-      <div class="bike-icon-wrapper" style="transition: transform 0.5s ease-out;">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M15.5 11l-.9-2.2c-.3-.7-1-1.1-1.8-1.1H9.8c-.8 0-1.5.4-1.8 1.1L7.1 11H3v2h2.2l1.6 4.1c.3.8 1.1 1.4 2 1.4h6.4c.9 0 1.7-.6 2-1.4l1.6-4.1H21v-2h-5.5zM5.5 15.5c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5zm13 0c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5z" fill="#0284c7"/>
-        </svg>
+      <div class="bike-icon-wrapper" style="transition: transform 0.5s ease-out; display: flex; align-items: center; justify-content: center;">
+        <img src="/assets/bike-rider.png" style="width: 48px; height: 48px; object-fit: contain;" />
       </div>`;
 
     const icon = L.divIcon({
       html: motorbikeSvg,
       className: 'custom-bike-marker',
-      iconSize: [36, 36],
-      iconAnchor: [18, 18]
+      iconSize: [48, 48],
+      iconAnchor: [24, 24]
     });
 
     markerRef.current = L.marker([0, 0], { icon }).addTo(mapInstance.current);
     polylineRef.current = L.polyline([], { 
-      color: '#0ea5e9', 
-      weight: 5, 
-      opacity: 0.9,
+      color: '#0284c7', 
+      weight: 4, 
+      opacity: 0.8,
+      dashArray: '5, 10',
       lineCap: 'round',
       lineJoin: 'round',
       className: 'glowing-polyline'
@@ -189,7 +188,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       loc = {
         lat: liveLocationData.latitude,
         lng: liveLocationData.longitude,
-        updatedAt: liveLocationData.updatedAt
+        updatedAt: liveLocationData.updatedAt || new Date().toISOString()
       };
       heading = liveLocationData.heading || 0;
     } else {
@@ -200,6 +199,13 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     const route = trackingData?.liveSession?.routePath || [];
     
     if (!loc?.lat || !mapInstance.current || !markerRef.current) return;
+
+    // Accumulate locally to immediately render trail without waiting for Firestore path arrays
+    setRouteTrail(prev => {
+      const isDuplicate = prev.length > 0 && prev[prev.length - 1][0] === loc.lat && prev[prev.length - 1][1] === loc.lng;
+      if (isDuplicate) return prev;
+      return [...prev, [loc.lat, loc.lng]];
+    });
 
     // Smoothly update marker (CSS transition handles interpolation)
     markerRef.current.setLatLng([loc.lat, loc.lng]);
@@ -214,9 +220,9 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }
 
     // Draw Polyline & Pan
-    if (isLiveActive && route.length > 0) {
-      const latLngs = route.map(pt => [pt.lat, pt.lng]);
-      polylineRef.current.setLatLngs(latLngs);
+    if (isLiveActive) {
+      // Use local routeTrail which is guaranteed to have immediate updates
+      polylineRef.current.setLatLngs(routeTrail);
       mapInstance.current.panTo([loc.lat, loc.lng], { animate: true, duration: 1.5 });
     } else {
       polylineRef.current.setLatLngs([]);
@@ -240,7 +246,8 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     try {
       await updateDoc(doc(db, 'staff_tracking', staffId), {
         isLiveTrackingActive: true,
-        forcePingAt: serverTimestamp()
+        forcePingAt: Date.now(),
+        requestedAt: serverTimestamp()
       });
       
       // Auto clear loading spinner after 10s max if location doesn't update

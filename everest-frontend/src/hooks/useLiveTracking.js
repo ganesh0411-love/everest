@@ -59,7 +59,7 @@ export function useLiveTracking(userProfile) {
     // High Priority GPS Fetch Dispatcher
     const dispatchImmediateGPSFetch = async (isForced = false) => {
       try {
-        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 5000 });
         const now = new Date().toISOString();
         
         // 1. Write to live_locations immediately
@@ -67,11 +67,9 @@ export function useLiveTracking(userProfile) {
         await setDoc(liveLocRef, {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          heading: position.coords.heading || 0,
           updatedAt: serverTimestamp(),
-          batteryLevel: null,
-          isLive: true,
-          speed: position.coords.speed != null ? Math.round(position.coords.speed * 3.6) : 0,
-          heading: position.coords.heading || 0
+          isLive: true
         }, { merge: true });
 
         // 2. Update staff_tracking state
