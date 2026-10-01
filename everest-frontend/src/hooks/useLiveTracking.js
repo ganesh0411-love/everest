@@ -2,13 +2,16 @@ import { useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Geolocation } from '@capacitor/geolocation';
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
+
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 export function useLiveTracking(userProfile) {
   const watchIdRef = useRef(null);
   const isLiveStreamActiveRef = useRef(false);
   const watchdogTimeoutRef = useRef(null);
+  const throttleTimerRef = useRef(null);
 
   useEffect(() => {
     if (!userProfile || userProfile?.role === 'admin' || userProfile?.isAdmin) {
@@ -18,19 +21,26 @@ export function useLiveTracking(userProfile) {
     const staffId = String(userProfile.staffId || userProfile.id || userProfile.uid);
     if (!staffId || staffId === 'undefined') return;
     
+    // Phase 2: Request POST_NOTIFICATIONS for Android 13+ Foreground Service
+    const requestNotificationPermission = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          await LocalNotifications.requestPermissions();
+        }
+      } catch (err) {
+        console.error("Error requesting POST_NOTIFICATIONS:", err);
+      }
+    };
+    requestNotificationPermission();
+
     const trackingDocRef = doc(db, 'staff_tracking', staffId);
 
     const initializeTrackingDoc = async () => {
       try {
         await setDoc(trackingDocRef, {
           currentLocation: null,
+          isLiveTrackingActive: false,
           liveSession: {
-            isActive: false,
-            requestedBy: null,
-            lastPingAt: null,
-            currentSpeed: 0,
-            heading: 0,
-            routePath: [],
             forcePing: false
           }
         }, { merge: true });
@@ -55,8 +65,6 @@ export function useLiveTracking(userProfile) {
         if (isForced) {
           console.log('[GPS DAEMON] Pushed coords (Forced):', position.coords.latitude, position.coords.longitude, 'at', now);
           updateData['liveSession.forcePing'] = false;
-          updateData['liveSession.currentSpeed'] = Math.round((position.coords.speed || 0) * 3.6);
-          updateData['liveSession.heading'] = position.coords.heading || 0;
         }
         await updateDoc(trackingDocRef, updateData);
       } catch (err) {
@@ -67,7 +75,6 @@ export function useLiveTracking(userProfile) {
       }
     };
 
-    // Initial setup ping
     pingCurrentLocation();
 
     const startWatcher = async (distanceFilter = 0) => {
@@ -95,7 +102,6 @@ export function useLiveTracking(userProfile) {
             }
             if (!position) return;
             
-            // Accept all coords including mock locations in debug builds
             const speedInKmH = position.speed != null && position.speed > 0 
               ? Math.round(position.speed * 3.6) 
               : 0;
@@ -103,31 +109,37 @@ export function useLiveTracking(userProfile) {
             
             console.log(`[GPS DAEMON] Pushed coords: ${position.latitude}, ${position.longitude} at ${now}`);
 
-            const point = {
-              lat: position.latitude,
-              lng: position.longitude,
-              speed: speedInKmH,
-              timestamp: now
-            };
-
-            try {
-              let updatePayload = {
-                currentLocation: {
-                  lat: position.latitude,
-                  lng: position.longitude,
-                  updatedAt: now
-                }
-              };
-              
-              if (isLiveStreamActiveRef.current) {
-                updatePayload['liveSession.currentSpeed'] = speedInKmH;
-                updatePayload['liveSession.heading'] = position.bearing || 0;
-                updatePayload['liveSession.lastPingAt'] = now;
-                updatePayload['liveSession.routePath'] = arrayUnion(point);
+            // Standard low-power update payload
+            let updatePayload = {
+              currentLocation: {
+                lat: position.latitude,
+                lng: position.longitude,
+                updatedAt: now
               }
+            };
+            
+            // Apply standard update
+            try {
               await updateDoc(trackingDocRef, updatePayload);
             } catch (e) {
               console.error("Error updating tracking doc:", e);
+            }
+
+            // Phase 3: On-Demand Tracking (Throttle writes to ~10s)
+            if (isLiveStreamActiveRef.current) {
+              if (throttleTimerRef.current) return;
+              throttleTimerRef.current = setTimeout(() => {
+                throttleTimerRef.current = null;
+              }, 10000); // 10-second throttle
+
+              const liveLocRef = doc(db, 'live_locations', staffId);
+              setDoc(liveLocRef, {
+                lat: position.latitude,
+                lng: position.longitude,
+                speed: speedInKmH,
+                timestamp: now,
+                batteryLevel: null // Capacitor device battery plugin not installed, skipping
+              }, { merge: true }).catch(console.error);
             }
           }
         );
@@ -139,46 +151,47 @@ export function useLiveTracking(userProfile) {
     // Start default 50m battery-saving continuous watcher
     startWatcher(50);
 
-    // Watch for Admin live tracking triggers
+    // Watch for Admin live tracking triggers (Phase 3)
     const unsubscribe = onSnapshot(trackingDocRef, async (snapshot) => {
       if (!snapshot.exists()) return;
-      const liveSession = snapshot.data().liveSession || {};
+      const data = snapshot.data();
+      const liveSession = data.liveSession || {};
+      const isLiveTrackingActive = data.isLiveTrackingActive === true;
 
       if (liveSession.forcePing) {
         await pingCurrentLocation(true);
       }
 
-      // Switch to 0m aggressive filter if Admin requests it and manage watchdog
-      if (liveSession.isActive) {
+      // Admin enabled live tracking -> Aggressive mode (0m filter)
+      if (isLiveTrackingActive) {
         if (!isLiveStreamActiveRef.current) {
           isLiveStreamActiveRef.current = true;
-          // Re-init watcher with 0m filter for fluid streaming
-          startWatcher(0);
+          startWatcher(0); // Wakes up GPS Engine with aggressive 0m distance filter
         }
         
-        // Rolling 60s heartbeat watchdog: Every snapshot (including heartbeat) resets this timer.
-        // If no heartbeat arrives for 60 seconds, gracefully fallback.
+        // 10-minute timeout for live tracking safety
         if (watchdogTimeoutRef.current) clearTimeout(watchdogTimeoutRef.current);
         watchdogTimeoutRef.current = setTimeout(() => {
-          console.log('[Daemon] 60-second watchdog triggered (Admin disconnected). Stopping live stream.');
-          updateDoc(trackingDocRef, { 'liveSession.isActive': false }).catch(console.error);
-        }, 60 * 1000);
+          console.log('[Daemon] 10-minute tracking timeout triggered. Returning to standby.');
+          updateDoc(trackingDocRef, { isLiveTrackingActive: false }).catch(console.error);
+        }, 10 * 60 * 1000);
       } 
       
-      // Admin turns off live tracking -> fallback to 50m filter
-      if (!liveSession.isActive && isLiveStreamActiveRef.current) {
+      // Admin turns off live tracking -> Return to low-power standby mode
+      if (!isLiveTrackingActive && isLiveStreamActiveRef.current) {
         isLiveStreamActiveRef.current = false;
         if (watchdogTimeoutRef.current) {
           clearTimeout(watchdogTimeoutRef.current);
           watchdogTimeoutRef.current = null;
         }
-        startWatcher(50);
+        startWatcher(50); // Restore 50m filter
       }
     });
 
     return () => {
       unsubscribe();
       if (watchdogTimeoutRef.current) clearTimeout(watchdogTimeoutRef.current);
+      if (throttleTimerRef.current) clearTimeout(throttleTimerRef.current);
       if (watchIdRef.current != null) {
         BackgroundGeolocation.removeWatcher({ id: watchIdRef.current }).catch(console.error);
         watchIdRef.current = null;
