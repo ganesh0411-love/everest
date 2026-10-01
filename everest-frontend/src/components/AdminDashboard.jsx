@@ -3,6 +3,8 @@ import { flushSync } from 'react-dom';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Geolocation } from '@capacitor/geolocation';
 import { App } from '@capacitor/app';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+const NativeLocation = registerPlugin('NativeLocation');
 import { area as turfArea } from '@turf/area';
 import { length as turfLength } from '@turf/length';
 import { db } from '../firebase';
@@ -763,6 +765,23 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [shiftElapsed, setShiftElapsed] = React.useState('00h 00m 00s');
   const selfieInputRef = React.useRef(null);
   const [pendingAction, setPendingAction] = React.useState(null);
+  const [showPermissionGate, setShowPermissionGate] = React.useState(false);
+
+  const handleCheckInAttempt = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { hasBackgroundLocation, isBatteryIgnored } = await NativeLocation.checkPermissions();
+        if (!hasBackgroundLocation || !isBatteryIgnored) {
+          setShowPermissionGate(true);
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking permissions natively:", err);
+      }
+    }
+    setPendingAction('check-in');
+    selfieInputRef.current?.click();
+  };
   const [selectedCalendarDate, setSelectedCalendarDate] = React.useState(new Date().toLocaleDateString('en-CA'));
   const [calendarDate, setCalendarDate] = React.useState(new Date());
 
@@ -5910,6 +5929,45 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
               {/* Bottom Action Area */}
               <div className="flex flex-col gap-2">
+                {showPermissionGate && (
+                  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+                    <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center animate-scale-in">
+                      <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-800 mb-2">களப்பணி வருகைப் பதிவு & கண்காணிப்பு (Field Attendance Setup)</h3>
+                      <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
+                        முழு நாள் களப்பணியை உறுதிப்படுத்தவும் கலெக்ஷன் விவரங்களை உடனுக்குடன் பதிவு செய்யவும் பின்னணி இருப்பிடம் (Background Location) மற்றும் பேட்டரி அனுமதி (Unrestricted Battery) அவசியம்.
+                      </p>
+                      <button
+                        onClick={async () => {
+                          setShowPermissionGate(false);
+                          if (Capacitor.isNativePlatform()) {
+                            try {
+                              const { hasBackgroundLocation, isBatteryIgnored } = await NativeLocation.checkPermissions();
+                              if (!isBatteryIgnored) {
+                                await NativeLocation.requestBatteryOptimization();
+                              }
+                              // Add a small delay to ensure intent starts
+                              setTimeout(async () => {
+                                if (!hasBackgroundLocation) {
+                                  alert("செட்டிங்ஸில் 'Allow all the time' என்பதைத் தேர்வு செய்யவும் (Please select 'Allow all the time' in the next screen).");
+                                  await NativeLocation.openAppSettings();
+                                }
+                              }, 1500);
+                            } catch (e) { console.error(e); }
+                          }
+                        }}
+                        className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-blue-600/30 active:scale-95 transition-all"
+                      >
+                        அனுமதிக்க தொடரவும் (Proceed)
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <input type="file" accept="image/*" capture="user" ref={selfieInputRef} className="hidden" onChange={handleSelfieCapture} />
                 
                 {attendanceState.checkInTime && (
@@ -5968,7 +6026,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                     <>
                       {/* Check-in Button */}
                       <button 
-                        onClick={() => { setPendingAction('check-in'); selfieInputRef.current?.click(); }}
+                        onClick={handleCheckInAttempt}
                         disabled={!!attendanceState.checkInTime}
                         className={`flex-1 h-14 rounded-2xl flex flex-col items-center justify-center text-white shadow-lg transition-all active:scale-95 ${attendanceState.checkInTime ? 'bg-slate-300 shadow-none text-white' : 'bg-gradient-to-br from-[#10b981] to-[#047857] hover:from-[#34d399] hover:to-[#059669] shadow-[#10b981]/20'}`}
                       >

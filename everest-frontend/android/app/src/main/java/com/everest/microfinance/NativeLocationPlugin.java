@@ -48,4 +48,49 @@ public class NativeLocationPlugin extends Plugin {
         context.startService(intent);
         call.resolve();
     }
+
+    @PluginMethod
+    public void checkPermissions(PluginCall call) {
+        Context context = getContext();
+        boolean hasBackgroundLocation = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            hasBackgroundLocation = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        } else {
+            hasBackgroundLocation = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        }
+
+        android.os.PowerManager pm = (android.os.PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        boolean isBatteryIgnored = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            isBatteryIgnored = pm.isIgnoringBatteryOptimizations(context.getPackageName());
+        } else {
+            isBatteryIgnored = true;
+        }
+
+        com.getcapacitor.JSObject ret = new com.getcapacitor.JSObject();
+        ret.put("hasBackgroundLocation", hasBackgroundLocation);
+        ret.put("isBatteryIgnored", isBatteryIgnored);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void requestBatteryOptimization(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent intent = new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            intent.setData(android.net.Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        android.net.Uri uri = android.net.Uri.fromParts("package", getContext().getPackageName(), null);
+        intent.setData(uri);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        call.resolve();
+    }
 }
