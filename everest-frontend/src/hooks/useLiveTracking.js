@@ -81,6 +81,8 @@ export function useLiveTracking(userProfile) {
           {
             backgroundTitle: "Everest Microfinance",
             backgroundMessage: "Field attendance & collection sync active",
+            notificationChannelName: "Field Operations Service",
+            notificationChannelId: "everest_field_attendance",
             requestPermissions: true,
             stale: false,
             distanceFilter: distanceFilter,

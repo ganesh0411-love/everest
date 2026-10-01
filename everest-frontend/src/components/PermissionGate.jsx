@@ -8,7 +8,7 @@ const NativeSettings = registerPlugin('NativeSettings');
 
 const PermissionGate = ({ children }) => {
   const [isOnboarded, setIsOnboarded] = useState(() => {
-    return localStorage.getItem('field_onboarding_completed') === 'true';
+    return localStorage.getItem('field_disclosure_ack') === 'true';
   });
   
   const [isLocationGranted, setIsLocationGranted] = useState(true); // Default true
@@ -21,7 +21,7 @@ const PermissionGate = ({ children }) => {
     }
     
     // Check persistence lock first
-    if (localStorage.getItem('field_onboarding_completed') === 'true') {
+    if (localStorage.getItem('field_disclosure_ack') === 'true') {
       setIsOnboarded(true);
       setIsLocationGranted(true);
       return;
@@ -47,7 +47,7 @@ const PermissionGate = ({ children }) => {
   };
 
   const completeOnboarding = () => {
-    localStorage.setItem('field_onboarding_completed', 'true');
+    localStorage.setItem('field_disclosure_ack', 'true');
     setIsOnboarded(true);
     setIsLocationGranted(true);
   };
@@ -81,11 +81,6 @@ const PermissionGate = ({ children }) => {
     }
   };
 
-  const handleSkip = () => {
-      // Even if they skip or close, we can lock it so they are never bothered again.
-      completeOnboarding();
-  };
-
   if (isOnboarded) {
     return <>{children}</>;
   }
@@ -112,7 +107,7 @@ const PermissionGate = ({ children }) => {
           </h2>
           
           <p className="text-slate-600 text-center text-lg mb-10 leading-relaxed">
-            To verify daily field attendance and sync real-time collection entries with the branch, please allow location access.
+            To verify daily field attendance and sync real-time collection entries with the branch, location access is required during operational duty.
           </p>
 
           <div className="w-full max-w-sm space-y-4">
@@ -122,12 +117,6 @@ const PermissionGate = ({ children }) => {
             >
               Grant Permission
               <ChevronRight size={20} />
-            </button>
-            <button
-              onClick={handleSkip}
-              className="w-full bg-slate-100 text-slate-600 font-medium text-base py-3 px-6 rounded-xl active:scale-95 transition-all mt-2"
-            >
-              Maybe Later
             </button>
           </div>
         </div>
