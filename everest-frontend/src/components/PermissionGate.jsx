@@ -8,7 +8,7 @@ const NativeSettings = registerPlugin('NativeSettings');
 
 const PermissionGate = ({ children }) => {
   const [isOnboarded, setIsOnboarded] = useState(() => {
-    return localStorage.getItem('field_sync_onboarded') === 'true';
+    return localStorage.getItem('field_onboarding_completed') === 'true';
   });
   
   const [isLocationGranted, setIsLocationGranted] = useState(true); // Default true
@@ -21,7 +21,7 @@ const PermissionGate = ({ children }) => {
     }
     
     // Check persistence lock first
-    if (localStorage.getItem('field_sync_onboarded') === 'true') {
+    if (localStorage.getItem('field_onboarding_completed') === 'true') {
       setIsOnboarded(true);
       setIsLocationGranted(true);
       return;
@@ -47,7 +47,7 @@ const PermissionGate = ({ children }) => {
   };
 
   const completeOnboarding = () => {
-    localStorage.setItem('field_sync_onboarded', 'true');
+    localStorage.setItem('field_onboarding_completed', 'true');
     setIsOnboarded(true);
     setIsLocationGranted(true);
   };
@@ -71,14 +71,14 @@ const PermissionGate = ({ children }) => {
 
   const handleContinue = async () => {
     try {
-      // First attempt to open app settings to allow the user to enable permissions
-      await NativeSettings.openAppSettings();
-      // We do not call battery exemption here anymore to avoid native battery drain dialogs!
+      if (Capacitor.isNativePlatform()) {
+        await Geolocation.requestPermissions();
+      }
+      completeOnboarding();
     } catch (error) {
-      console.error('Error opening settings:', error);
+      console.error('Error requesting permissions:', error);
+      completeOnboarding();
     }
-    // We let the appStateListener pick up when they return from settings, or they can just complete onboarding if we want.
-    // However, if the user continues, we want to make sure it actually opens settings.
   };
 
   const handleSkip = () => {
@@ -108,11 +108,11 @@ const PermissionGate = ({ children }) => {
           </div>
 
           <h2 className="text-2xl font-bold text-slate-800 text-center mb-4">
-            Everest Field Operations
+            Everest Field Attendance & Sync
           </h2>
           
           <p className="text-slate-600 text-center text-lg mb-10 leading-relaxed">
-            Enable daily field synchronization and offline attendance updates with the branch.
+            To verify daily field attendance and sync real-time collection entries with the branch, please allow location access.
           </p>
 
           <div className="w-full max-w-sm space-y-4">
@@ -120,7 +120,7 @@ const PermissionGate = ({ children }) => {
               onClick={handleContinue}
               className="w-full bg-indigo-600 text-white font-semibold text-lg py-4 px-6 rounded-xl shadow-lg shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              Continue to Dashboard
+              Grant Permission
               <ChevronRight size={20} />
             </button>
             <button
