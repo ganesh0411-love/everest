@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { MapPin, Loader2 } from 'lucide-react';
 import L from 'leaflet';
@@ -225,7 +225,8 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     console.log('[Admin] Force Ping dispatched to staffId:', staffId);
     try {
       await updateDoc(doc(db, 'staff_tracking', staffId), {
-        'liveSession.forcePing': Date.now()
+        isLiveTrackingActive: true,
+        forcePingAt: serverTimestamp()
       });
       
       // Auto clear loading spinner after 10s max if location doesn't update
@@ -245,13 +246,13 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
           isLiveTrackingActive: true,
           'liveSession.isActive': true,
           'liveSession.routePath': [], // reset on new session
-          'liveSession.forcePing': false // Reset any stuck pings
+          forcePingAt: null // Reset any stuck pings
         });
       } else {
         await updateDoc(doc(db, 'staff_tracking', staffId), {
           isLiveTrackingActive: false,
           'liveSession.isActive': false,
-          'liveSession.forcePing': false
+          forcePingAt: null
         });
         setIsPinging(false); // Reset buttons instantly
       }

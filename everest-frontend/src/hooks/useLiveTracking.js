@@ -27,13 +27,15 @@ export function useLiveTracking(userProfile) {
         if (Capacitor.isNativePlatform()) {
           await ForegroundService.requestPermissions().catch(console.error);
           await ForegroundService.startForegroundService({
-            id: 999,
+            id: 9001,
             title: 'Everest Microfinance',
             body: 'Field attendance & collection sync active',
+            smallIcon: 'ic_launcher_background',
           });
+          console.log("Foreground service successfully started");
         }
       } catch (err) {
-        console.error("Error starting ForegroundService:", err);
+        console.error("Foreground service failed to start:", err);
       }
     };
     startTrueForegroundService();
@@ -45,9 +47,7 @@ export function useLiveTracking(userProfile) {
         await setDoc(trackingDocRef, {
           currentLocation: null,
           isLiveTrackingActive: false,
-          liveSession: {
-            forcePing: false
-          }
+          forcePingAt: null
         }, { merge: true });
       } catch (err) {
         console.error("Error initializing tracking doc:", err);
@@ -91,9 +91,6 @@ export function useLiveTracking(userProfile) {
         console.log('[GPS DISPATCH] Dispatched high-priority ping to Firestore');
       } catch (err) {
         console.error("Error dispatching immediate GPS fetch:", err);
-        if (isForced) {
-          await updateDoc(trackingDocRef, { 'liveSession.forcePing': false }).catch(console.error);
-        }
       }
     };
 
@@ -173,14 +170,17 @@ export function useLiveTracking(userProfile) {
     startWatcher(50);
 
     // Watch for Admin live tracking triggers (Phase 3)
+    let lastForcePingRef = 0;
+    
     const unsubscribe = onSnapshot(trackingDocRef, async (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
-      const liveSession = data.liveSession || {};
       const isLiveTrackingActive = data.isLiveTrackingActive === true;
 
       // React to Force Ping Trigger immediately
-      if (liveSession.forcePing) {
+      const forcePingTime = data.forcePingAt?.toMillis ? data.forcePingAt.toMillis() : data.forcePingAt;
+      if (forcePingTime && forcePingTime > lastForcePingRef) {
+        lastForcePingRef = forcePingTime;
         await dispatchImmediateGPSFetch(true);
       }
 
