@@ -14,7 +14,9 @@ dependencies {
     implementation project(':capacitor-camera')
     implementation project(':capacitor-filesystem')
     implementation project(':capacitor-geolocation')
+    implementation project(':capacitor-local-notifications')
     implementation project(':capacitor-share')
+    implementation project(':capawesome-team-capacitor-android-foreground-service')
     implementation project(':capgo-capacitor-printer')
 
 }

@@ -5,20 +5,29 @@ import { MapPin, Loader2 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-function getRelativeTime(isoString) {
-  if (!isoString) return 'Unknown';
-  const diff = Date.now() - new Date(isoString).getTime();
+function getRelativeTime(isoStringOrTimestamp) {
+  if (!isoStringOrTimestamp) return 'Unknown';
+  let timeMs = 0;
+  if (isoStringOrTimestamp.toMillis) {
+    timeMs = isoStringOrTimestamp.toMillis();
+  } else {
+    timeMs = new Date(isoStringOrTimestamp).getTime();
+  }
+  
+  if (isNaN(timeMs)) return 'Unknown';
+  const diff = Date.now() - timeMs;
   const seconds = Math.floor(diff / 1000);
   if (seconds < 30) return 'Just now';
   if (seconds < 60) return 'A few seconds ago';
   if (seconds < 120) return '1 minute ago';
   if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-  return new Date(isoString).toLocaleString();
+  return new Date(timeMs).toLocaleString();
 }
 
 export default function LiveTrackingModal({ staffId, staffName, onClose, initialMode = 'current' }) {
   const [mapLayer, setMapLayer] = useState('street'); // 'street' | 'satellite'
   const [trackingData, setTrackingData] = useState(null);
+  const [liveLocationData, setLiveLocationData] = useState(null);
   const [isLiveActive, setIsLiveActive] = useState(initialMode === 'live');
   const [loading, setLoading] = useState(true);
   
@@ -37,7 +46,9 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     if (!staffId) return;
 
     const trackingRef = doc(db, 'staff_tracking', staffId);
-    let unsubscribe = null;
+    const liveLocRef = doc(db, 'live_locations', staffId);
+    let unsubscribeTracking = null;
+    let unsubscribeLiveLoc = null;
 
     if (!isLiveActive && !isPinging) {
       // Static Mode (Current Location): Fetch once
@@ -51,22 +62,30 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       }).catch(console.error);
     } else {
       // Stream Mode: Subscribe to live updates
-      unsubscribe = onSnapshot(trackingRef, (docSnap) => {
+      unsubscribeTracking = onSnapshot(trackingRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setTrackingData(data);
           
-          if (isPinging && data.currentLocation?.updatedAt !== lastUpdatedAtRef.current) {
+          if (isPinging && data.lastPingReceivedAt?.toMillis() !== lastUpdatedAtRef.current) {
             setIsPinging(false);
           }
-          lastUpdatedAtRef.current = data.currentLocation?.updatedAt;
+          lastUpdatedAtRef.current = data.lastPingReceivedAt?.toMillis();
         }
         setLoading(false);
+      });
+
+      // Stream Mode: Subscribe to live_locations updates
+      unsubscribeLiveLoc = onSnapshot(liveLocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setLiveLocationData(docSnap.data());
+        }
       });
     }
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeTracking) unsubscribeTracking();
+      if (unsubscribeLiveLoc) unsubscribeLiveLoc();
     };
   }, [staffId, isLiveActive, isPinging]);
 
@@ -79,6 +98,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       // Emit initial heartbeat immediately to activate/resume session
       updateDoc(trackingRef, {
         lastAdminHeartbeat: Date.now(),
+        isLiveTrackingActive: true,
         'liveSession.isActive': true,
         'liveSession.forcePing': false
       }).catch(console.error);
@@ -93,6 +113,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       if (isLiveActive && staffId) {
         updateDoc(doc(db, 'staff_tracking', staffId), {
+          isLiveTrackingActive: false,
           'liveSession.isActive': false,
           'liveSession.forcePing': false
         }).catch(console.error);
@@ -145,7 +166,22 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
 
   // 3. Dynamic Telemetry Updates (No Flicker)
   useEffect(() => {
-    const loc = trackingData?.currentLocation;
+    // Prefer live_locations payload if active, else fallback to trackingData.currentLocation
+    let loc = null;
+    let heading = 0;
+    
+    if (isLiveActive && liveLocationData) {
+      loc = {
+        lat: liveLocationData.latitude,
+        lng: liveLocationData.longitude,
+        updatedAt: liveLocationData.updatedAt
+      };
+      heading = liveLocationData.heading || 0;
+    } else {
+      loc = trackingData?.currentLocation;
+      heading = trackingData?.liveSession?.heading || 0;
+    }
+    
     const route = trackingData?.liveSession?.routePath || [];
     
     if (!loc?.lat || !mapInstance.current || !markerRef.current) return;
@@ -159,7 +195,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       el.style.transition = 'transform 1s linear';
       const svg = el.querySelector('svg');
       if (svg) {
-        svg.style.transform = `rotate(${trackingData?.liveSession?.heading || 0}deg)`;
+        svg.style.transform = `rotate(${heading}deg)`;
       }
     }
 
@@ -172,7 +208,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       polylineRef.current.setLatLngs([]);
       mapInstance.current.setView([loc.lat, loc.lng], 17);
     }
-  }, [trackingData, isLiveActive, loading]);
+  }, [trackingData, liveLocationData, isLiveActive, loading]);
 
   // Destroy map instance on unmount
   useEffect(() => {
@@ -192,8 +228,8 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         'liveSession.forcePing': Date.now()
       });
       
-      // Auto clear loading spinner after 5s max if location doesn't update
-      setTimeout(() => setIsPinging(false), 5000);
+      // Auto clear loading spinner after 10s max if location doesn't update
+      setTimeout(() => setIsPinging(false), 10000);
     } catch (e) {
       console.error(e);
       setIsPinging(false);
@@ -206,12 +242,14 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     try {
       if (newState) {
         await updateDoc(doc(db, 'staff_tracking', staffId), {
+          isLiveTrackingActive: true,
           'liveSession.isActive': true,
           'liveSession.routePath': [], // reset on new session
           'liveSession.forcePing': false // Reset any stuck pings
         });
       } else {
         await updateDoc(doc(db, 'staff_tracking', staffId), {
+          isLiveTrackingActive: false,
           'liveSession.isActive': false,
           'liveSession.forcePing': false
         });
@@ -222,8 +260,21 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }
   };
 
-  const loc = trackingData?.currentLocation;
-  const speed = trackingData?.liveSession?.currentSpeed || 0;
+  // Resolve current active location data
+  let loc = null;
+  let speed = 0;
+  if (isLiveActive && liveLocationData) {
+    loc = {
+      lat: liveLocationData.latitude,
+      lng: liveLocationData.longitude,
+      updatedAt: liveLocationData.updatedAt
+    };
+    speed = liveLocationData.speed || 0;
+  } else {
+    loc = trackingData?.currentLocation;
+    speed = trackingData?.liveSession?.currentSpeed || 0;
+  }
+  
   const isMoving = speed > 2;
 
   return (
@@ -321,7 +372,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             
             <button 
                 onClick={() => {
-                  const url = `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
+                  const url = `https://www.google.com/maps/search/?api=1&query=${loc?.lat},${loc?.lng}`;
                   window.open(url, '_blank');
                 }}
                 disabled={!loc?.lat}
