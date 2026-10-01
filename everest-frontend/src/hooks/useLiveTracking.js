@@ -12,6 +12,7 @@ export function useLiveTracking(userProfile) {
   const isLiveStreamActiveRef = useRef(false);
   const watchdogTimeoutRef = useRef(null);
   const throttleTimerRef = useRef(null);
+  const lastLiveUpdateRef = useRef(0);
 
   useEffect(() => {
     if (!userProfile || userProfile?.role === 'admin' || userProfile?.isAdmin) {
@@ -141,12 +142,11 @@ export function useLiveTracking(userProfile) {
               console.error("Error updating tracking doc:", e);
             }
 
-            // Phase 3: On-Demand Tracking (Throttle background watcher writes to ~10s)
+            // Phase 3 & 4: On-Demand Tracking (Throttle background watcher writes to ~10s using timestamps to avoid WebView background throttling of setTimeout)
             if (isLiveStreamActiveRef.current) {
-              if (throttleTimerRef.current) return;
-              throttleTimerRef.current = setTimeout(() => {
-                throttleTimerRef.current = null;
-              }, 10000);
+              const currentTime = Date.now();
+              if (currentTime - lastLiveUpdateRef.current < 10000) return;
+              lastLiveUpdateRef.current = currentTime;
 
               const liveLocRef = doc(db, 'live_locations', staffId);
               setDoc(liveLocRef, {
@@ -158,6 +158,11 @@ export function useLiveTracking(userProfile) {
                 isLive: true,
                 heading: position.bearing || 0
               }, { merge: true }).catch(console.error);
+
+              // Maintain a running history of points in staff_tracking for the glowing trail
+              updateDoc(trackingDocRef, {
+                'liveSession.routePath': arrayUnion({ lat: position.latitude, lng: position.longitude })
+              }).catch(e => console.error("Error updating route path:", e));
             }
           }
         );

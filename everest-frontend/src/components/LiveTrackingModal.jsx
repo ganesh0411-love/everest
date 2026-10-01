@@ -130,23 +130,38 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       attributionControl: false
     }).setView([0, 0], 17);
 
-    // Motorbike SVG Marker
+    // Rapido-style Motorbike SVG Marker
     const motorbikeSvg = `
-      <div style="background: white; border-radius: 50%; padding: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #3b82f6; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; transition: transform 0.3s ease;">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; transition: transform 0.5s ease-out;">
-          <path d="M5 16a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M19 16a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M5 14h3l1.5-3"/><path d="M9.5 11 12 7h4"/><path d="m11 14 1.5-3 3 3H19"/><path d="M16 14v-2"/><path d="M12 7v-2"/><path d="M10 5h4"/>
+      <style>
+        .leaflet-marker-icon.custom-bike-marker {
+          transition: transform 1.5s linear !important;
+        }
+        .glowing-polyline {
+          filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.8));
+        }
+      </style>
+      <div class="bike-icon-wrapper" style="transition: transform 0.5s ease-out;">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15.5 11l-.9-2.2c-.3-.7-1-1.1-1.8-1.1H9.8c-.8 0-1.5.4-1.8 1.1L7.1 11H3v2h2.2l1.6 4.1c.3.8 1.1 1.4 2 1.4h6.4c.9 0 1.7-.6 2-1.4l1.6-4.1H21v-2h-5.5zM5.5 15.5c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5zm13 0c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5z" fill="#0284c7"/>
         </svg>
       </div>`;
 
     const icon = L.divIcon({
       html: motorbikeSvg,
-      className: '',
+      className: 'custom-bike-marker',
       iconSize: [36, 36],
       iconAnchor: [18, 18]
     });
 
     markerRef.current = L.marker([0, 0], { icon }).addTo(mapInstance.current);
-    polylineRef.current = L.polyline([], { color: '#3b82f6', weight: 4, opacity: 0.8 }).addTo(mapInstance.current);
+    polylineRef.current = L.polyline([], { 
+      color: '#0ea5e9', 
+      weight: 5, 
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round',
+      className: 'glowing-polyline'
+    }).addTo(mapInstance.current);
   }, [loading]);
 
   // 2. Tile Layer Update
@@ -186,16 +201,15 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     
     if (!loc?.lat || !mapInstance.current || !markerRef.current) return;
 
-    // Smoothly update marker
+    // Smoothly update marker (CSS transition handles interpolation)
     markerRef.current.setLatLng([loc.lat, loc.lng]);
 
-    // Apply rotation
+    // Apply rotation dynamically to the wrapper
     const el = markerRef.current.getElement();
     if (el) {
-      el.style.transition = 'transform 1s linear';
-      const svg = el.querySelector('svg');
-      if (svg) {
-        svg.style.transform = `rotate(${heading}deg)`;
+      const wrapper = el.querySelector('.bike-icon-wrapper');
+      if (wrapper) {
+        wrapper.style.transform = `rotate(${heading}deg)`;
       }
     }
 
@@ -203,7 +217,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     if (isLiveActive && route.length > 0) {
       const latLngs = route.map(pt => [pt.lat, pt.lng]);
       polylineRef.current.setLatLngs(latLngs);
-      mapInstance.current.panTo([loc.lat, loc.lng], { animate: true, duration: 1 });
+      mapInstance.current.panTo([loc.lat, loc.lng], { animate: true, duration: 1.5 });
     } else {
       polylineRef.current.setLatLngs([]);
       mapInstance.current.setView([loc.lat, loc.lng], 17);
