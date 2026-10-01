@@ -770,8 +770,8 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const handleCheckInAttempt = async () => {
     if (Capacitor.isNativePlatform()) {
       try {
-        const { hasBackgroundLocation, isBatteryIgnored } = await NativeLocation.checkPermissions();
-        if (!hasBackgroundLocation || !isBatteryIgnored) {
+        const { hasBackgroundLocation } = await NativeLocation.checkPermissions();
+        if (!hasBackgroundLocation) {
           setShowPermissionGate(true);
           return;
         }
@@ -5932,38 +5932,35 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                 {showPermissionGate && (
                   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
                     <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center animate-scale-in">
-                      <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                      <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                       </div>
-                      <h3 className="text-lg font-bold text-slate-800 mb-2">களப்பணி வருகைப் பதிவு & கண்காணிப்பு (Field Attendance Setup)</h3>
+                      <h3 className="text-lg font-bold text-slate-800 mb-2">அனுமதி தேவை (Permission Required)</h3>
                       <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
-                        முழு நாள் களப்பணியை உறுதிப்படுத்தவும் கலெக்ஷன் விவரங்களை உடனுக்குடன் பதிவு செய்யவும் பின்னணி இருப்பிடம் (Background Location) மற்றும் பேட்டரி அனுமதி (Unrestricted Battery) அவசியம்.
+                        களப்பணி வருகைப் பதிவை முடிக்க 'Allow all the time' (எப்போதும் அனுமதி) கட்டாயம் தேவை. தயவுசெய்து செட்டிங்ஸில் 'Allow all the time' என்பதைத் தேர்வு செய்யவும்.
                       </p>
-                      <button
-                        onClick={async () => {
-                          setShowPermissionGate(false);
-                          if (Capacitor.isNativePlatform()) {
-                            try {
-                              const { hasBackgroundLocation, isBatteryIgnored } = await NativeLocation.checkPermissions();
-                              if (!isBatteryIgnored) {
-                                await NativeLocation.requestBatteryOptimization();
-                              }
-                              // Add a small delay to ensure intent starts
-                              setTimeout(async () => {
-                                if (!hasBackgroundLocation) {
-                                  alert("செட்டிங்ஸில் 'Allow all the time' என்பதைத் தேர்வு செய்யவும் (Please select 'Allow all the time' in the next screen).");
-                                  await NativeLocation.openAppSettings();
-                                }
-                              }, 1500);
-                            } catch (e) { console.error(e); }
-                          }
-                        }}
-                        className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-blue-600/30 active:scale-95 transition-all"
-                      >
-                        அனுமதிக்க தொடரவும் (Proceed)
-                      </button>
+                      <div className="w-full space-y-3">
+                        <button
+                          onClick={async () => {
+                            if (Capacitor.isNativePlatform()) {
+                              try {
+                                await NativeLocation.openAppSettings();
+                              } catch (e) { console.error(e); }
+                            }
+                          }}
+                          className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-blue-600/30 active:scale-95 transition-all"
+                        >
+                          செட்டிங்ஸ் திறக்கவும் (Open Settings)
+                        </button>
+                        <button
+                          onClick={() => setShowPermissionGate(false)}
+                          className="w-full bg-slate-100 text-slate-600 font-bold py-3.5 rounded-2xl active:scale-95 transition-all"
+                        >
+                          ரத்து செய் (Cancel)
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

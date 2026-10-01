@@ -86,11 +86,18 @@ public class NativeLocationPlugin extends Plugin {
 
     @PluginMethod
     public void openAppSettings(PluginCall call) {
-        Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        android.net.Uri uri = android.net.Uri.fromParts("package", getContext().getPackageName(), null);
-        intent.setData(uri);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        getContext().startActivity(intent);
+        try {
+            Intent intent = new Intent("android.intent.action.MANAGE_APP_PERMISSIONS");
+            intent.putExtra("android.intent.extra.PACKAGE_NAME", getContext().getPackageName());
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+        } catch (Exception e) {
+            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            android.net.Uri uri = android.net.Uri.fromParts("package", getContext().getPackageName(), null);
+            intent.setData(uri);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+        }
         call.resolve();
     }
 }
