@@ -117,7 +117,7 @@ public class LocationForegroundService extends Service {
 
         return new NotificationCompat.Builder(this, channelId)
                 .setContentTitle("Everest Microfinance")
-                .setContentText("Field attendance & live tracking active")
+                .setContentText("Everest Field Tracking Active")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)

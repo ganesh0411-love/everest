@@ -75,13 +75,25 @@ public class NativeLocationPlugin extends Plugin {
 
     @PluginMethod
     public void requestBatteryOptimization(PluginCall call) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Intent intent = new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-            intent.setData(android.net.Uri.parse("package:" + getContext().getPackageName()));
+        try {
+            // Direct to battery optimization ignore list
+            Intent intent = new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             getContext().startActivity(intent);
+            call.resolve();
+        } catch (Exception e) {
+            // Fallback to application details
+            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(android.net.Uri.fromParts("package", getContext().getPackageName(), null));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            call.resolve();
         }
-        call.resolve();
+    }
+
+    @PluginMethod
+    public void openBatterySettings(PluginCall call) {
+        requestBatteryOptimization(call);
     }
 
     @PluginMethod
