@@ -130,25 +130,38 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       attributionControl: false
     }).setView([0, 0], 17);
 
-    // Rapido-style Motorbike Rider Image Marker
     const motorbikeSvg = `
       <style>
-        .leaflet-marker-icon.custom-bike-marker {
-          transition: transform 1.5s linear !important;
+        .rapido-scooter-marker {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          transition: margin 1.8s linear, top 1.8s linear, left 1.8s linear !important;
         }
         .glowing-polyline {
           filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.8));
         }
       </style>
-      <div class="bike-icon-wrapper" style="transition: transform 0.5s ease-out; display: flex; align-items: center; justify-content: center;">
-        <img src="/assets/bike-rider.png" style="width: 48px; height: 48px; object-fit: contain;" />
+      <div class="bike-icon-wrapper" style="
+        width: 44px; 
+        height: 44px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        transition: transform 0.4s ease-out;
+      ">
+        <img 
+          src="/assets/bike-rider.png" 
+          alt="Rider" 
+          style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); pointer-events: none;" 
+        />
       </div>`;
 
     const icon = L.divIcon({
       html: motorbikeSvg,
-      className: 'custom-bike-marker',
-      iconSize: [48, 48],
-      iconAnchor: [24, 24]
+      className: 'rapido-scooter-marker',
+      iconSize: [44, 44],
+      iconAnchor: [22, 22]
     });
 
     markerRef.current = L.marker([0, 0], { icon }).addTo(mapInstance.current);
@@ -267,7 +280,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
           isLiveTrackingActive: true,
           'liveSession.isActive': true,
           'liveSession.routePath': [], // reset on new session
-          forcePingAt: null // Reset any stuck pings
+          forcePingAt: Date.now() // Wake client immediately
         });
       } else {
         await updateDoc(doc(db, 'staff_tracking', staffId), {

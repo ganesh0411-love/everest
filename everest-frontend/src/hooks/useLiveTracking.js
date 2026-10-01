@@ -7,12 +7,15 @@ import { ForegroundService } from '@capawesome-team/capacitor-android-foreground
 
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
+// Global state to persist background service across component unmounts
+let globalWatchId = null;
+let globalIsLiveStreamActive = false;
+let globalWatchdogTimeout = null;
+let globalThrottleTimer = null;
+let globalLastLiveUpdate = 0;
+let globalUnsubscribe = null;
+
 export function useLiveTracking(userProfile) {
-  const watchIdRef = useRef(null);
-  const isLiveStreamActiveRef = useRef(false);
-  const watchdogTimeoutRef = useRef(null);
-  const throttleTimerRef = useRef(null);
-  const lastLiveUpdateRef = useRef(0);
 
   useEffect(() => {
     if (!userProfile || userProfile?.role === 'admin' || userProfile?.isAdmin) {
@@ -96,13 +99,13 @@ export function useLiveTracking(userProfile) {
     dispatchImmediateGPSFetch();
 
     const startWatcher = async (distanceFilter = 0) => {
-      if (watchIdRef.current != null) {
-        await BackgroundGeolocation.removeWatcher({ id: watchIdRef.current });
-        watchIdRef.current = null;
+      if (globalWatchId != null) {
+        await BackgroundGeolocation.removeWatcher({ id: globalWatchId });
+        globalWatchId = null;
       }
       
       try {
-        watchIdRef.current = await BackgroundGeolocation.addWatcher(
+        globalWatchId = await BackgroundGeolocation.addWatcher(
           {
             backgroundTitle: "Everest Microfinance",
             backgroundMessage: "Field attendance & collection sync active",
@@ -111,6 +114,8 @@ export function useLiveTracking(userProfile) {
             requestPermissions: true,
             stale: false,
             distanceFilter: distanceFilter,
+            interval: 2000,
+            enableHighAccuracy: true,
             autoStart: true
           },
           async (position, err) => {
@@ -140,11 +145,11 @@ export function useLiveTracking(userProfile) {
               console.error("Error updating tracking doc:", e);
             }
 
-            // Phase 3 & 4: On-Demand Tracking (Throttle background watcher writes to ~10s using timestamps to avoid WebView background throttling of setTimeout)
-            if (isLiveStreamActiveRef.current) {
+            // Phase 3 & 4: On-Demand Tracking (Throttle background watcher writes to ~2s)
+            if (globalIsLiveStreamActive) {
               const currentTime = Date.now();
-              if (currentTime - lastLiveUpdateRef.current < 10000) return;
-              lastLiveUpdateRef.current = currentTime;
+              if (currentTime - globalLastLiveUpdate < 2000) return;
+              globalLastLiveUpdate = currentTime;
 
               const liveLocRef = doc(db, 'live_locations', staffId);
               setDoc(liveLocRef, {
@@ -175,7 +180,11 @@ export function useLiveTracking(userProfile) {
     // Watch for Admin live tracking triggers (Phase 3)
     let lastForcePingRef = 0;
     
-    const unsubscribe = onSnapshot(trackingDocRef, async (snapshot) => {
+    if (globalUnsubscribe) {
+      globalUnsubscribe();
+    }
+    
+    globalUnsubscribe = onSnapshot(trackingDocRef, async (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
       const isLiveTrackingActive = data.isLiveTrackingActive === true;
@@ -189,8 +198,8 @@ export function useLiveTracking(userProfile) {
 
       // Admin enabled live tracking -> Aggressive mode
       if (isLiveTrackingActive) {
-        if (!isLiveStreamActiveRef.current) {
-          isLiveStreamActiveRef.current = true;
+        if (!globalIsLiveStreamActive) {
+          globalIsLiveStreamActive = true;
           // Immediate ping upon activation
           dispatchImmediateGPSFetch(false);
           // Wakes up GPS Engine with aggressive 0m distance filter
@@ -198,32 +207,32 @@ export function useLiveTracking(userProfile) {
         }
         
         // 10-minute timeout for live tracking safety
-        if (watchdogTimeoutRef.current) clearTimeout(watchdogTimeoutRef.current);
-        watchdogTimeoutRef.current = setTimeout(() => {
+        if (globalWatchdogTimeout) clearTimeout(globalWatchdogTimeout);
+        globalWatchdogTimeout = setTimeout(() => {
           console.log('[Daemon] 10-minute tracking timeout triggered. Returning to standby.');
           updateDoc(trackingDocRef, { isLiveTrackingActive: false }).catch(console.error);
         }, 10 * 60 * 1000);
       } 
       
       // Admin turns off live tracking -> Return to low-power standby mode
-      if (!isLiveTrackingActive && isLiveStreamActiveRef.current) {
-        isLiveStreamActiveRef.current = false;
-        if (watchdogTimeoutRef.current) {
-          clearTimeout(watchdogTimeoutRef.current);
-          watchdogTimeoutRef.current = null;
+      if (!isLiveTrackingActive && globalIsLiveStreamActive) {
+        globalIsLiveStreamActive = false;
+        if (globalWatchdogTimeout) {
+          clearTimeout(globalWatchdogTimeout);
+          globalWatchdogTimeout = null;
         }
         startWatcher(50); // Restore 50m filter
       }
     });
 
     return () => {
-      unsubscribe();
-      if (watchdogTimeoutRef.current) clearTimeout(watchdogTimeoutRef.current);
-      if (throttleTimerRef.current) clearTimeout(throttleTimerRef.current);
-      if (watchIdRef.current != null) {
-        BackgroundGeolocation.removeWatcher({ id: watchIdRef.current }).catch(console.error);
-        watchIdRef.current = null;
-      }
+      // Intentionally NOT stopping BackgroundGeolocation so the service persists!
+      // unsubscribe() can be called to avoid multiple listeners if remounted,
+      // but if the service stays alive, we want it to keep updating when Admin forces ping!
+      // We will only clear timeouts to prevent memory leaks on unmount.
+      if (globalWatchdogTimeout) clearTimeout(globalWatchdogTimeout);
+      if (globalThrottleTimer) clearTimeout(globalThrottleTimer);
+      // Removed unsubscribe() so the listener doesn't die!
     };
   }, [userProfile]);
 }
