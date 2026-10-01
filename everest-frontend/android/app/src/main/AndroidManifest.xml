@@ -31,7 +31,7 @@
 
         <receiver android:name="io.capawesome.capacitorjs.plugins.foregroundservice.NotificationActionBroadcastReceiver" />
         <service 
-            android:name="io.capawesome.capacitorjs.plugins.foregroundservice.AndroidForegroundService" 
+            android:name=".LocationForegroundService" 
             android:foregroundServiceType="location" 
             android:stopWithTask="false"
             android:exported="false" />

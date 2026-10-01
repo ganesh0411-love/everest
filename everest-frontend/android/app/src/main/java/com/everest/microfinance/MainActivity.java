@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(NativeSettingsPlugin.class);
+        registerPlugin(NativeLocationPlugin.class);
         super.onCreate(savedInstanceState);
     }
     

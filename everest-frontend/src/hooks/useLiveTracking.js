@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth, firebaseConfig } from '../firebase';
 import { Geolocation } from '@capacitor/geolocation';
 import { registerPlugin, Capacitor } from '@capacitor/core';
-import { ForegroundService } from '@capawesome-team/capacitor-android-foreground-service';
+
+const NativeLocation = registerPlugin('NativeLocation');
 
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
@@ -25,24 +26,30 @@ export function useLiveTracking(userProfile) {
     const staffId = String(userProfile.staffId || userProfile.id || userProfile.uid);
     if (!staffId || staffId === 'undefined') return;
     
-    // Phase 1: True Android Foreground Service to keep WebView alive
-    const startTrueForegroundService = async () => {
+    // Phase 1: True Android Foreground Service for REST API Dispatch
+    const startNativeLocation = async () => {
       try {
         if (Capacitor.isNativePlatform()) {
-          await ForegroundService.requestPermissions().catch(console.error);
-          await ForegroundService.startForegroundService({
-            id: 9001,
-            title: 'Everest Microfinance',
-            body: 'Field attendance & collection sync active',
-            smallIcon: 'ic_launcher_background',
+          const token = await auth.currentUser?.getIdToken();
+          await NativeLocation.startService({
+            staffId: staffId,
+            projectId: firebaseConfig.projectId,
+            apiKey: firebaseConfig.apiKey,
+            authToken: token || ''
           });
-          console.log("Foreground service successfully started");
+          console.log("Native location foreground service started");
         }
       } catch (err) {
         console.error("Foreground service failed to start:", err);
       }
     };
-    startTrueForegroundService();
+    const stopNativeLocation = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          await NativeLocation.stopService();
+        }
+      } catch (err) {}
+    };
 
     const trackingDocRef = doc(db, 'staff_tracking', staffId);
 
@@ -204,6 +211,8 @@ export function useLiveTracking(userProfile) {
           dispatchImmediateGPSFetch(false);
           // Wakes up GPS Engine with aggressive 0m distance filter
           startWatcher(0);
+          // Trigger the true headless native service
+          startNativeLocation();
         }
         
         // 10-minute timeout for live tracking safety
@@ -222,6 +231,8 @@ export function useLiveTracking(userProfile) {
           globalWatchdogTimeout = null;
         }
         startWatcher(50); // Restore 50m filter
+        // Stop the native location service
+        stopNativeLocation();
       }
     });
 
