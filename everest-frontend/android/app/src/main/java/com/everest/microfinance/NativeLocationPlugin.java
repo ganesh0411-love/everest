@@ -31,6 +31,20 @@ public class NativeLocationPlugin extends Plugin {
         intent.putExtra("apiKey", apiKey);
         intent.putExtra("authToken", authToken);
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.POST_NOTIFICATIONS) 
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                android.app.Activity activity = getActivity();
+                if (activity != null) {
+                    androidx.core.app.ActivityCompat.requestPermissions(
+                        activity,
+                        new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                        1002
+                    );
+                }
+            }
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent);
         } else {

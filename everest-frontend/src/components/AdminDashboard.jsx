@@ -767,6 +767,22 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [pendingAction, setPendingAction] = React.useState(null);
   const [showPermissionGate, setShowPermissionGate] = React.useState(false);
 
+  React.useEffect(() => {
+    let resumeListener;
+    if (Capacitor.isNativePlatform()) {
+      resumeListener = App.addListener('appStateChange', async (state) => {
+        if (state.isActive) {
+          setShowPermissionGate(false);
+        }
+      });
+    }
+    return () => {
+      if (resumeListener) {
+        resumeListener.then(l => l.remove());
+      }
+    };
+  }, []);
+
   const handleCheckInAttempt = async () => {
     if (Capacitor.isNativePlatform()) {
       try {
@@ -774,6 +790,8 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
         if (!hasBackgroundLocation) {
           setShowPermissionGate(true);
           return;
+        } else {
+          setShowPermissionGate(false);
         }
       } catch (err) {
         console.error("Error checking permissions natively:", err);
