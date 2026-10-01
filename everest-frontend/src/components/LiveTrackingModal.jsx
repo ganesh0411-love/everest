@@ -132,36 +132,44 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
 
     const motorbikeSvg = `
       <style>
-        .rapido-scooter-marker {
+        .nav-bike-rider-marker {
           background: transparent !important;
           border: none !important;
           box-shadow: none !important;
-          transition: margin 1.8s linear, top 1.8s linear, left 1.8s linear !important;
         }
         .glowing-polyline {
           filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.8));
         }
       </style>
       <div class="bike-icon-wrapper" style="
-        width: 44px; 
-        height: 44px; 
-        display: flex; 
-        align-items: center; 
+        width: 36px;
+        height: 60px;
+        display: flex;
+        align-items: center;
         justify-content: center;
-        transition: transform 0.4s ease-out;
+        transform: rotate(0deg);
+        transition: transform 0.3s ease-out;
+        will-change: transform;
       ">
-        <img 
-          src="/assets/bike-rider.png" 
-          alt="Rider" 
-          style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); pointer-events: none;" 
-        />
+        <svg width="36" height="60" viewBox="0 0 36 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Top-down motorcycle body, handlebars, rider helmet & jacket -->
+          <ellipse cx="18" cy="10" rx="3.5" ry="9" fill="#1e293b" />
+          <rect x="15" y="14" width="6" height="22" rx="3" fill="#eab308" />
+          <ellipse cx="18" cy="48" rx="4" ry="10" fill="#0f172a" />
+          <path d="M6 19 L30 19" stroke="#334155" stroke-width="3" stroke-linecap="round" />
+          <circle cx="6" cy="19" r="2.5" fill="#f8fafc" />
+          <circle cx="30" cy="19" r="2.5" fill="#f8fafc" />
+          <ellipse cx="18" cy="27" rx="8" ry="6" fill="#3b82f6" />
+          <circle cx="18" cy="24" r="6" fill="#f8fafc" stroke="#0284c7" stroke-width="1.5" />
+          <path d="M15 22 Q18 20 21 22" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />
+        </svg>
       </div>`;
 
     const icon = L.divIcon({
       html: motorbikeSvg,
-      className: 'rapido-scooter-marker',
-      iconSize: [44, 44],
-      iconAnchor: [22, 22]
+      className: 'nav-bike-rider-marker',
+      iconSize: [36, 60],
+      iconAnchor: [18, 30]
     });
 
     markerRef.current = L.marker([0, 0], { icon }).addTo(mapInstance.current);
