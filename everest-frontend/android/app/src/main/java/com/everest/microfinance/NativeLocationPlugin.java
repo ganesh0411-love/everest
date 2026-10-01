@@ -86,18 +86,27 @@ public class NativeLocationPlugin extends Plugin {
 
     @PluginMethod
     public void openAppSettings(PluginCall call) {
-        try {
-            Intent intent = new Intent("android.intent.action.MANAGE_APP_PERMISSIONS");
-            intent.putExtra("android.intent.extra.PACKAGE_NAME", getContext().getPackageName());
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
-        } catch (Exception e) {
-            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            android.net.Uri uri = android.net.Uri.fromParts("package", getContext().getPackageName(), null);
-            intent.setData(uri);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+        android.app.Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("Activity is null");
+            return;
         }
-        call.resolve();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Requesting ACCESS_BACKGROUND_LOCATION directly opens the system page 
+            // with the "Allow all the time" radio button on Android 11+
+            androidx.core.app.ActivityCompat.requestPermissions(
+                activity,
+                new String[]{android.Manifest.permission.ACCESS_BACKGROUND_LOCATION},
+                1001
+            );
+            call.resolve();
+        } else {
+            // Fallback for older Android
+            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(android.net.Uri.fromParts("package", getContext().getPackageName(), null));
+            activity.startActivity(intent);
+            call.resolve();
+        }
     }
 }

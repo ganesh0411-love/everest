@@ -5954,12 +5954,6 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                         >
                           செட்டிங்ஸ் திறக்கவும் (Open Settings)
                         </button>
-                        <button
-                          onClick={() => setShowPermissionGate(false)}
-                          className="w-full bg-slate-100 text-slate-600 font-bold py-3.5 rounded-2xl active:scale-95 transition-all"
-                        >
-                          ரத்து செய் (Cancel)
-                        </button>
                       </div>
                     </div>
                   </div>
