@@ -58,6 +58,8 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   const animCurrentPosRef = useRef(null);
   const animLastTimeRef = useRef(null);
   const animFrameRef = useRef(null);
+  
+  const [uiSpeed, setUiSpeed] = useState(0);
   useEffect(() => {
     if (!staffId) return;
 
@@ -291,19 +293,21 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     const isStaleLoc = isLiveActive && sessionStartTimeRef.current && locTime > 0 && locTime < sessionStartTimeRef.current;
     if (isStaleLoc) return;
 
-    // Resolve Speed & Radar Toggle
+    // Resolve live speed and update state
     let currentSpeed = 0;
     if (isLiveActive && liveLocationData) {
       currentSpeed = liveLocationData.speed || 0;
-    } else {
+      setUiSpeed(currentSpeed);
+    } else if (!isLiveActive) {
       currentSpeed = trackingData?.liveSession?.currentSpeed || 0;
+      setUiSpeed(currentSpeed);
     }
     
     if (markerRef.current) {
         const el = markerRef.current.getElement();
         if (el) {
             const radar = el.querySelector('.stationary-radar');
-            if (radar) radar.style.opacity = currentSpeed < 1.5 ? '1' : '0';
+            if (radar) radar.style.opacity = currentSpeed < 5 ? '1' : '0';
         }
     }
 
@@ -333,12 +337,15 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         const lastTarget = animQueueRef.current.length > 0 ? animQueueRef.current[animQueueRef.current.length - 1] : animCurrentPosRef.current;
         const dist = getDistanceFromLatLonInM(targetPoint.lat, targetPoint.lng, lastTarget.lat, lastTarget.lng);
         
-        if (dist > 2 || currentSpeed >= 1.5) {
+        if (dist > 2 || currentSpeed >= 2) {
             if (animQueueRef.current.length === 0) {
                 routeTrailRef.current.push([animCurrentPosRef.current.lat, animCurrentPosRef.current.lng]);
             }
+            // Real-time stream: cap queue to prevent lagging behind on long trips
+            if (animQueueRef.current.length > 2) {
+                animQueueRef.current = [animQueueRef.current[animQueueRef.current.length - 1]];
+            }
             animQueueRef.current.push(targetPoint);
-            mapInstance.current.panTo([targetPoint.lat, targetPoint.lng], { animate: true, duration: 1.5 });
         }
     }
   }, [trackingData, liveLocationData, isLiveActive, loading]);
@@ -354,27 +361,29 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         const target = animQueueRef.current[0];
         
         if (animCurrentPosRef.current.progress === undefined) {
-             animCurrentPosRef.current.startLat = animCurrentPosRef.current.lat;
-             animCurrentPosRef.current.startLng = animCurrentPosRef.current.lng;
+             animCurrentPosRef.current.startLat = animCurrentPosRef.current.lat || 0;
+             animCurrentPosRef.current.startLng = animCurrentPosRef.current.lng || 0;
              animCurrentPosRef.current.startHeading = animCurrentPosRef.current.heading || target.heading || 0;
              animCurrentPosRef.current.progress = 0;
         }
 
-        let duration = 2100;
-        if (animQueueRef.current.length > 1) duration = 1900;
-        if (animQueueRef.current.length > 2) duration = 1000;
-
-        animCurrentPosRef.current.progress += (delta / duration);
+        // Cap maximum duration to prevent freezing, speed up if queue is building
+        let duration = 2000;
+        if (animQueueRef.current.length > 1) duration = 1000;
+        
+        // Prevent delta spikes (e.g. tab backgrounded) from breaking progress
+        const safeDelta = Math.min(delta, 100);
+        animCurrentPosRef.current.progress += (safeDelta / duration);
         const progress = Math.min(1, animCurrentPosRef.current.progress);
 
-        const latDiff = target.lat - animCurrentPosRef.current.startLat;
-        const lngDiff = target.lng - animCurrentPosRef.current.startLng;
+        const latDiff = (target.lat || 0) - animCurrentPosRef.current.startLat;
+        const lngDiff = (target.lng || 0) - animCurrentPosRef.current.startLng;
 
         const newLat = animCurrentPosRef.current.startLat + latDiff * progress;
         const newLng = animCurrentPosRef.current.startLng + lngDiff * progress;
 
         const startHeading = animCurrentPosRef.current.startHeading;
-        const targetHeading = target.heading || 0;
+        const targetHeading = target.heading || startHeading;
         const shortest_angle = ((((targetHeading - startHeading) % 360) + 540) % 360) - 180;
         const newHeading = startHeading + shortest_angle * progress;
 
@@ -450,6 +459,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     setIsLiveActive(newState);
     try {
       if (newState) {
+        setUiSpeed(0.0); // Reset speed instantly
         sessionStartTimeRef.current = Date.now();
         routeTrailRef.current = []; // immediately purge the current coordinates array
         animQueueRef.current = [];
@@ -477,20 +487,37 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
 
   // Resolve current active location data
   let loc = null;
-  let speed = 0;
   if (isLiveActive && liveLocationData) {
     loc = {
       lat: liveLocationData.latitude,
       lng: liveLocationData.longitude,
       updatedAt: liveLocationData.updatedAt
     };
-    speed = liveLocationData.speed || 0;
   } else {
     loc = trackingData?.currentLocation;
-    speed = trackingData?.liveSession?.currentSpeed || 0;
   }
   
-  const isMoving = speed > 2;
+  let statusText = 'Stopped';
+  let statusColor = 'text-amber-600';
+  let dotColor = 'bg-amber-500';
+  let pulse = false;
+
+  if (uiSpeed >= 20) {
+    statusText = 'Moving';
+    statusColor = 'text-emerald-700';
+    dotColor = 'bg-emerald-500';
+    pulse = true;
+  } else if (uiSpeed >= 5) {
+    statusText = 'Walking';
+    statusColor = 'text-blue-600';
+    dotColor = 'bg-blue-500';
+    pulse = true;
+  } else {
+    statusText = 'Stopped';
+    statusColor = 'text-red-600';
+    dotColor = 'bg-red-500';
+    pulse = false;
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
@@ -522,11 +549,11 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
                 <>
                   <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-indigo-700 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                    Speed: {speed.toFixed(1)} km/h
+                    Speed: {uiSpeed.toFixed(1)} km/h
                   </div>
-                  <div className={`bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold flex items-center gap-1.5 ${isMoving ? 'text-emerald-700' : 'text-slate-500'}`}>
-                    <span className={`w-2 h-2 rounded-full ${isMoving ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
-                    Status: {isMoving ? 'Moving' : 'Stationary'}
+                  <div className={`bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold flex items-center gap-1.5 ${statusColor}`}>
+                    <span className={`w-2 h-2 rounded-full ${dotColor} ${pulse ? 'animate-pulse' : ''}`}></span>
+                    Status: {statusText}
                   </div>
                 </>
               )}
