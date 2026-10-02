@@ -42,9 +42,51 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   const [isLiveActive, setIsLiveActive] = useState(initialMode === 'live');
   const [loading, setLoading] = useState(true);
   
+  // 3-Tier Viewport State ('normal' | 'workspace' | 'fullscreen')
+  const [modalViewMode, setModalViewMode] = useState('normal');
+
+  const cycleViewMode = () => {
+    setModalViewMode(prev => {
+      if (prev === 'normal') return 'workspace';
+      if (prev === 'workspace') return 'fullscreen';
+      return 'normal';
+    });
+  };
+
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    const t1 = setTimeout(() => {
+      if (mapInstance.current) mapInstance.current.invalidateSize();
+    }, 100);
+    const t2 = setTimeout(() => {
+      if (mapInstance.current) mapInstance.current.invalidateSize();
+    }, 300);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [modalViewMode]);
+
   // New State for "Force Ping" loading state
   const [isPinging, setIsPinging] = useState(false);
   const lastUpdatedAtRef = useRef(null);
+
+  // Follow Mode & Camera Control State
+  const [isFollowMode, setIsFollowMode] = useState(true);
+  const isFollowModeRef = useRef(true);
+
+  const handleRecenter = () => {
+    setIsFollowMode(true);
+    isFollowModeRef.current = true;
+    let targetLat = animCurrentPosRef.current?.lat || loc?.lat;
+    let targetLng = animCurrentPosRef.current?.lng || loc?.lng;
+    if (targetLat && targetLng && mapInstance.current) {
+      mapInstance.current.flyTo([targetLat, targetLng], 18, {
+        animate: true,
+        duration: 1
+      });
+    }
+  };
 
   // Map Refs
   const mapRef = useRef(null);
@@ -155,6 +197,11 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       attributionControl: false
     }).setView([0, 0], 17);
 
+    mapInstance.current.on('dragstart', () => {
+      setIsFollowMode(false);
+      isFollowModeRef.current = false;
+    });
+
     const motorbikeSvg = `
       <style>
         .nav-bike-rider-marker {
@@ -237,7 +284,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }, 200);
   }, [loading]);
 
-  // 2. Tile Layer Update
+  // 2. Tile Layer Update (Mapbox HD Vector Tiles)
   useEffect(() => {
     if (!mapInstance.current) return;
     
@@ -245,11 +292,19 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       mapInstance.current.removeLayer(tileLayerRef.current);
     }
     
-    const layerUrl = mapLayer === 'street' 
-      ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-      : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "pk.eyJ1IjoiOTY1OTAzMDE0NCIsImEiOiJjbXVyYWFmOHYwM3Q5MzJwb21hNmxidWhsIn0.1_yyUGCDI_FtaFykmOJojw";
     
-    tileLayerRef.current = L.tileLayer(layerUrl, { maxZoom: 19 }).addTo(mapInstance.current);
+    const isStreet = mapLayer === 'street';
+    const layerUrl = isStreet 
+      ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
+      : `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`;
+    
+    tileLayerRef.current = L.tileLayer(layerUrl, { 
+      tileSize: 512,
+      zoomOffset: -1,
+      maxZoom: 20,
+      attribution: '© Mapbox © OpenStreetMap'
+    }).addTo(mapInstance.current);
   }, [mapLayer, loading]);
 
   // 3. Dynamic Telemetry Enqueue (No Flicker)
@@ -288,10 +343,20 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       if (i === 0) {
         formattedBackendRoute.push(rawCoords[i]);
       } else {
-        const prev = formattedBackendRoute[formattedBackendRoute.length - 1];
+        const lastIdx = formattedBackendRoute.length - 1;
+        const prev = formattedBackendRoute[lastIdx];
         const dist = getDistanceFromLatLonInM(rawCoords[i][0], rawCoords[i][1], prev[0], prev[1]);
-        if (dist >= 3.0) {
-          formattedBackendRoute.push(rawCoords[i]);
+        if (dist > 4.0) {
+          if (lastIdx > 0) {
+            const prevPrev = formattedBackendRoute[lastIdx - 1];
+            const distPrevPrevToPrev = getDistanceFromLatLonInM(prev[0], prev[1], prevPrev[0], prevPrev[1]);
+            const distPrevPrevToNew = getDistanceFromLatLonInM(rawCoords[i][0], rawCoords[i][1], prevPrev[0], prevPrev[1]);
+            if (distPrevPrevToNew >= distPrevPrevToPrev) {
+              formattedBackendRoute.push(rawCoords[i]);
+            }
+          } else {
+            formattedBackendRoute.push(rawCoords[i]);
+          }
         }
       }
     }
@@ -366,7 +431,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             animCurrentPosRef.current = { lat: lastRoutePt[0], lng: lastRoutePt[1], heading: targetPoint.heading };
             
             const dist = getDistanceFromLatLonInM(targetPoint.lat, targetPoint.lng, lastRoutePt[0], lastRoutePt[1]);
-            if (dist >= 3.0) {
+            if (dist > 4.0) {
                 animQueueRef.current.push(targetPoint);
             }
         } else {
@@ -379,11 +444,11 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         mapInstance.current.setView([targetPoint.lat, targetPoint.lng], 17); // instant snap
         mapInstance.current.invalidateSize();
     } else {
-        // We are already initialized. Enqueue the new target if it's different and meaningful (>= 3m distance).
+        // We are already initialized. Enqueue the new target if it's different and meaningful (> 4m distance).
         const lastTarget = animQueueRef.current.length > 0 ? animQueueRef.current[animQueueRef.current.length - 1] : animCurrentPosRef.current;
         const dist = getDistanceFromLatLonInM(targetPoint.lat, targetPoint.lng, lastTarget.lat, lastTarget.lng);
         
-        if (dist >= 3.0) {
+        if (dist > 4.0) {
             // Real-time stream: cap queue to prevent lagging behind on long trips
             if (animQueueRef.current.length > 2) {
                 animQueueRef.current = [animQueueRef.current[animQueueRef.current.length - 1]];
@@ -443,6 +508,10 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             }
         }
 
+        if (isFollowModeRef.current && mapInstance.current) {
+            mapInstance.current.panTo([newLat, newLng], { animate: true, duration: 0.3 });
+        }
+
         if (polylineRef.current && routeTrailRef.current.length > 0) {
             const drawTrail = [...routeTrailRef.current];
             drawTrail[drawTrail.length - 1] = [newLat, newLng];
@@ -450,12 +519,29 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         }
 
         if (progress >= 1) {
-            const lastTrailPt = routeTrailRef.current[routeTrailRef.current.length - 1];
-            const distFromLast = lastTrailPt ? getDistanceFromLatLonInM(target.lat, target.lng, lastTrailPt[0], lastTrailPt[1]) : 0;
-            if (distFromLast >= 3.0) {
-                routeTrailRef.current.push([target.lat, target.lng]);
-            } else if (lastTrailPt) {
-                routeTrailRef.current[routeTrailRef.current.length - 1] = [target.lat, target.lng];
+            const trailLen = routeTrailRef.current.length;
+            if (trailLen > 0) {
+                const lastPt = routeTrailRef.current[trailLen - 1];
+                const distFromLast = getDistanceFromLatLonInM(target.lat, target.lng, lastPt[0], lastPt[1]);
+                
+                if (distFromLast > 4.0) {
+                    if (trailLen > 1) {
+                        const prevPt = routeTrailRef.current[trailLen - 2];
+                        const distPrevToLast = getDistanceFromLatLonInM(lastPt[0], lastPt[1], prevPt[0], prevPt[1]);
+                        const distPrevToTarget = getDistanceFromLatLonInM(target.lat, target.lng, prevPt[0], prevPt[1]);
+                        
+                        // Strict Forward Polyline Guard: push only if advancing forward along trajectory
+                        if (distPrevToTarget >= distPrevToLast) {
+                            routeTrailRef.current.push([target.lat, target.lng]);
+                        } else {
+                            routeTrailRef.current[trailLen - 1] = [target.lat, target.lng];
+                        }
+                    } else {
+                        routeTrailRef.current.push([target.lat, target.lng]);
+                    }
+                } else {
+                    routeTrailRef.current[trailLen - 1] = [target.lat, target.lng];
+                }
             } else {
                 routeTrailRef.current.push([target.lat, target.lng]);
             }
@@ -591,131 +677,209 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     pulse = false;
   }
 
+  let containerOuterClass = "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in transition-all duration-300";
+  let windowClass = "bg-white rounded-2xl shadow-2xl w-full max-w-xl h-[520px] md:h-[620px] overflow-hidden flex flex-col relative transition-all duration-300";
+
+  if (modalViewMode === 'workspace') {
+    containerOuterClass = "fixed inset-0 top-16 md:left-64 z-[90] p-4 bg-slate-900/30 backdrop-blur-xs flex items-center justify-center animate-in fade-in transition-all duration-300";
+    windowClass = "bg-white rounded-2xl shadow-2xl w-full h-full overflow-hidden flex flex-col relative transition-all duration-300";
+  } else if (modalViewMode === 'fullscreen') {
+    containerOuterClass = "fixed inset-0 z-[110] flex items-center justify-center p-0 bg-slate-900 animate-in fade-in transition-all duration-300";
+    windowClass = "bg-white w-screen h-screen overflow-hidden flex flex-col relative transition-all duration-300 rounded-none shadow-none";
+  }
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex flex-col">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                  {staffName}'s Location
-                  {isLiveActive && (
-                    <span className="flex items-center gap-1 text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
-                      Live
-                    </span>
-                  )}
-                </h3>
-                <span className="text-xs text-slate-500">
-                  Updated: {
-                    isLiveActive && (!hasValidCoords || isStaleLoc)
-                      ? 'Acquiring signal...'
-                      : isLiveActive && isFreshLivePoint
-                      ? 'Just now'
-                      : getRelativeTime(loc?.updatedAt)
-                  }
-                </span>
-            </div>
-            <button onClick={onClose} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
-          </div>
-          <div className="p-0 bg-slate-50 h-[300px] md:h-[400px] relative">
-            
-            {/* Acquiring Signal Overlay */}
-            {isLiveActive && (!hasValidCoords || isStaleLoc) && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-xs text-white p-4 text-center">
-                <div className="relative mb-3 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full border-4 border-sky-400/30 border-t-sky-400 animate-spin"></div>
-                  <Loader2 className="w-6 h-6 text-sky-400 absolute animate-pulse" />
-                </div>
-                <h4 className="font-bold text-sm tracking-wide text-white">Acquiring live satellite signal...</h4>
-                <p className="text-xs text-slate-300 mt-1 max-w-xs">
-                  Connecting to handset background daemon. Coordinates will auto-center on road map immediately.
-                </p>
-              </div>
-            )}
-            
-            {/* Speed & Distance Badges */}
-            <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+    <div className={containerOuterClass}>
+      <div className={windowClass}>
+        {/* Full-Bleed Map Canvas Container */}
+        <div className="w-full h-full relative flex-1 bg-slate-900 overflow-hidden">
+          
+          {/* 1. Top-Left Floating Glass Pill (Staff Info & Live Telemetry) */}
+          <div className="absolute top-4 left-4 z-20 flex items-center gap-2.5 bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-full shadow-lg border border-slate-200/80 text-xs max-w-[calc(100%-180px)] md:max-w-none overflow-hidden">
+            <span className="font-bold text-slate-800 flex items-center gap-1.5 whitespace-nowrap">
+              {staffName}
               {isLiveActive && (
-                <>
-                  <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold text-indigo-700 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                    Speed: {uiSpeed.toFixed(1)} km/h
-                  </div>
-                  <div className={`bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-slate-200 text-xs font-bold flex items-center gap-1.5 ${statusColor}`}>
-                    <span className={`w-2 h-2 rounded-full ${dotColor} ${pulse ? 'animate-pulse' : ''}`}></span>
-                    Status: {statusText}
-                  </div>
-                </>
+                <span className="flex items-center gap-1 text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+                  Live
+                </span>
               )}
-            </div>
-            
-            {/* Layer Toggle Button */}
+            </span>
+            {isLiveActive && (
+              <>
+                <span className="text-slate-300 hidden md:inline">•</span>
+                <span className="font-bold text-indigo-600 hidden md:inline whitespace-nowrap">
+                  {uiSpeed.toFixed(1)} km/h
+                </span>
+                <span className="text-slate-300 hidden md:inline">•</span>
+                <span className={`font-semibold hidden md:flex items-center gap-1 whitespace-nowrap ${statusColor}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${pulse ? 'animate-pulse' : ''}`}></span>
+                  {statusText}
+                </span>
+              </>
+            )}
+            <span className="text-slate-300 hidden sm:inline">•</span>
+            <span className="text-[11px] text-slate-500 hidden sm:inline whitespace-nowrap">
+              {isLiveActive && (!hasValidCoords || isStaleLoc)
+                ? 'Acquiring signal...'
+                : isLiveActive && isFreshLivePoint
+                ? 'Just now'
+                : getRelativeTime(loc?.updatedAt)}
+            </span>
+          </div>
+
+          {/* 2. Top-Right Floating Actions Cluster (Round Circular Buttons) */}
+          <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
+            {/* Layer Toggle */}
             <button 
               onClick={() => setMapLayer(prev => prev === 'street' ? 'satellite' : 'street')}
-              className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur-sm p-2 rounded-lg shadow-sm border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
-              title="Toggle Map Layer"
+              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center"
+              title={mapLayer === 'street' ? 'Switch to Satellite View' : 'Switch to High-Res Street Map'}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
             </button>
 
-            {loading ? (
-              <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400 mb-2"></div>
-                <p>Loading location data...</p>
-              </div>
-            ) : loc?.lat && loc?.lng ? (
-              <div ref={mapRef} className="w-full h-full z-0" style={{ isolation: 'isolate' }}></div>
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                  <MapPin size={48} className="mb-2 opacity-30" />
-                  <p>Awaiting staff mobile GPS signal</p>
-              </div>
-            )}
+            {/* Recenter Compass */}
+            <button 
+              onClick={handleRecenter}
+              className={`p-2.5 rounded-full shadow-md border transition-all active:scale-95 flex items-center justify-center ${
+                isFollowMode 
+                  ? 'bg-blue-600 border-blue-600 text-white shadow-blue-500/30' 
+                  : 'bg-white/90 backdrop-blur-md border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+              title={isFollowMode ? "Follow mode active (Click to recenter at zoom 18)" : "Recenter on staff location (Zoom 18)"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 19 21 12 17 5 21 12 2" />
+              </svg>
+            </button>
+
+            {/* 3-Tier Viewport Resize */}
+            <button 
+              onClick={cycleViewMode} 
+              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center"
+              title={
+                modalViewMode === 'normal' 
+                  ? 'Expand to Workspace Canvas' 
+                  : modalViewMode === 'workspace' 
+                  ? 'Expand to Fullscreen' 
+                  : 'Restore Compact Floating Window'
+              }
+            >
+              {modalViewMode === 'normal' && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 3 21 3 21 9" />
+                  <polyline points="9 21 3 21 3 15" />
+                  <line x1="21" y1="3" x2="14" y2="10" />
+                  <line x1="3" y1="21" x2="10" y2="14" />
+                </svg>
+              )}
+              {modalViewMode === 'workspace' && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                </svg>
+              )}
+              {modalViewMode === 'fullscreen' && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 14h6v6" />
+                  <path d="M20 10h-6V4" />
+                  <path d="M14 10l7-7" />
+                  <path d="M3 21l7-7" />
+                </svg>
+              )}
+            </button>
+
+            {/* Close Button [ ✕ ] */}
+            <button 
+              onClick={onClose} 
+              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all flex items-center justify-center"
+              title="Close Live Tracking"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
           </div>
-          <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
-            {!isLiveActive ? (
-              <button 
+
+          {/* Acquiring Signal Overlay */}
+          {isLiveActive && (!hasValidCoords || isStaleLoc) && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-xs text-white p-4 text-center">
+              <div className="relative mb-3 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full border-4 border-sky-400/30 border-t-sky-400 animate-spin"></div>
+                <Loader2 className="w-6 h-6 text-sky-400 absolute animate-pulse" />
+              </div>
+              <h4 className="font-bold text-sm tracking-wide text-white">Acquiring live satellite signal...</h4>
+              <p className="text-xs text-slate-300 mt-1 max-w-xs">
+                Connecting to handset background daemon. Coordinates will auto-center on road map immediately.
+              </p>
+            </div>
+          )}
+
+          {/* Map Container */}
+          {loading ? (
+            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400 mb-2"></div>
+              <p>Loading location data...</p>
+            </div>
+          ) : loc?.lat && loc?.lng ? (
+            <div ref={mapRef} className="w-full h-full z-0" style={{ isolation: 'isolate' }}></div>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                <MapPin size={48} className="mb-2 opacity-30" />
+                <p>Awaiting staff mobile GPS signal</p>
+            </div>
+          )}
+
+          {/* 3. Bottom Floating Action Controls */}
+          <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
+            {/* Bottom Left: Stop Tracking / Force Ping */}
+            <div className="pointer-events-auto">
+              {!isLiveActive ? (
+                <button 
                   onClick={handleForcePing}
                   disabled={isPinging}
-                  className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-              >
+                  className="px-4 py-2 bg-white/95 hover:bg-white text-slate-700 font-semibold text-xs rounded-full shadow-lg border border-slate-200/80 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-70"
+                >
                   {isPinging ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
                       Pinging...
                     </>
                   ) : (
                     <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                       Force Ping
                     </>
                   )}
-              </button>
-            ) : (
-              <button 
+                </button>
+              ) : (
+                <button 
                   onClick={handleStopTracking}
-                  className="flex-1 py-2.5 bg-red-50 border border-red-200 rounded-xl text-red-700 font-semibold shadow-sm flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
-              >
+                  className="px-4 py-2 bg-red-600/90 hover:bg-red-600 text-white font-semibold text-xs rounded-full shadow-lg border border-red-500/50 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all"
+                >
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                   Stop Live Tracking
-              </button>
-            )}
-            
-            <button 
+                </button>
+              )}
+            </div>
+
+            {/* Bottom Right: Get Directions */}
+            <div className="pointer-events-auto">
+              <button 
                 onClick={() => {
                   const url = `https://www.google.com/maps/search/?api=1&query=${loc?.lat},${loc?.lng}`;
                   window.open(url, '_blank');
                 }}
                 disabled={!loc?.lat}
-                className="flex-1 py-2.5 bg-blue-600 border border-blue-600 rounded-xl text-white font-semibold shadow-sm flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                className="px-4 py-2 bg-blue-600/90 hover:bg-blue-600 text-white font-semibold text-xs rounded-full shadow-lg border border-blue-500/50 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
                 Get Directions
-            </button>
+              </button>
+            </div>
           </div>
+
+        </div>
       </div>
     </div>
   );
