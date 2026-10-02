@@ -54,6 +54,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   const tileLayerRef = useRef(null);
   const routeTrailRef = useRef([]);
   const sessionStartTimeRef = useRef(initialMode === 'live' ? Date.now() : null);
+  const lastAcceptedTimeRef = useRef(initialMode === 'live' ? Date.now() : 0);
   const animQueueRef = useRef([]);
   const animCurrentPosRef = useRef(null);
   const animLastTimeRef = useRef(null);
@@ -113,18 +114,24 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     if (isLiveActive && staffId) {
       const trackingRef = doc(db, 'staff_tracking', staffId);
       
-      // Emit initial heartbeat immediately to activate/resume session
+      // Emit initial heartbeat immediately to activate/resume session & wake handset daemon
       updateDoc(trackingRef, {
-        lastAdminHeartbeat: Date.now(),
         isLiveTrackingActive: true,
+        isLiveTracking: true,
+        lastAdminHeartbeat: Date.now(),
+        liveSessionStartedAt: new Date().toISOString(),
+        forcePingAt: Date.now(),
         'liveSession.isActive': true,
         'liveSession.forcePing': false
       }).catch(console.error);
 
-      // Keep handset daemon alive every 20s
+      // Keep handset daemon alive every 15s
       heartbeatInterval = setInterval(() => {
-        updateDoc(trackingRef, { lastAdminHeartbeat: Date.now() }).catch(console.error);
-      }, 20000);
+        updateDoc(trackingRef, { 
+          lastAdminHeartbeat: Date.now(),
+          forcePingAt: Date.now()
+        }).catch(console.error);
+      }, 15000);
     }
 
     return () => {
@@ -213,7 +220,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       iconAnchor: [18, 30]
     });
 
-    markerRef.current = L.marker([0, 0], { icon }).addTo(mapInstance.current);
+    markerRef.current = L.marker([0, 0], { icon, opacity: 0 }).addTo(mapInstance.current);
     polylineRef.current = L.polyline([], { 
       color: '#0284c7', 
       weight: 4, 
@@ -222,6 +229,12 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       lineJoin: 'round',
       className: 'glowing-polyline'
     }).addTo(mapInstance.current);
+
+    setTimeout(() => {
+      if (mapInstance.current) {
+        mapInstance.current.invalidateSize();
+      }
+    }, 200);
   }, [loading]);
 
   // 2. Tile Layer Update
@@ -269,9 +282,22 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       });
     }
 
-    const formattedBackendRoute = validBackendRoute.map(p => [p.lat || p.latitude, p.lng || p.longitude]).filter(p => p[0] && p[1]);
+    const rawCoords = validBackendRoute.map(p => [p.lat || p.latitude, p.lng || p.longitude]).filter(p => p[0] && p[1]);
+    const formattedBackendRoute = [];
+    for (let i = 0; i < rawCoords.length; i++) {
+      if (i === 0) {
+        formattedBackendRoute.push(rawCoords[i]);
+      } else {
+        const prev = formattedBackendRoute[formattedBackendRoute.length - 1];
+        const dist = getDistanceFromLatLonInM(rawCoords[i][0], rawCoords[i][1], prev[0], prev[1]);
+        if (dist >= 3.0) {
+          formattedBackendRoute.push(rawCoords[i]);
+        }
+      }
+    }
     
-    if (!loc?.lat || !mapInstance.current || !markerRef.current) return;
+    const hasValidCoords = loc && typeof loc.lat === 'number' && typeof loc.lng === 'number' && (loc.lat !== 0 || loc.lng !== 0) && !isNaN(loc.lat) && !isNaN(loc.lng);
+    if (!hasValidCoords || !mapInstance.current || !markerRef.current) return;
 
     if (!isLiveActive) {
         // Handle static offline viewing
@@ -280,16 +306,34 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         animCurrentPosRef.current = null;
         if (polylineRef.current) polylineRef.current.setLatLngs([]);
         markerRef.current.setLatLng([loc.lat, loc.lng]);
+        markerRef.current.setOpacity(1);
         mapInstance.current.setView([loc.lat, loc.lng], 17);
+        mapInstance.current.invalidateSize();
         return;
     }
 
-    // Check if the current loc is stale
+    // Discard initial low-accuracy readings (ignore if accuracy > 25m during satellite lock)
+    if (liveLocationData?.accuracy && liveLocationData.accuracy > 25) {
+      console.warn('[Telemetry] Discarded low-accuracy reading:', liveLocationData.accuracy, 'm');
+      return;
+    }
+
+    // Check if the current loc is stale or out-of-order
     let locTime = 0;
     if (loc?.updatedAt) {
       if (loc.updatedAt.toMillis) locTime = loc.updatedAt.toMillis();
       else locTime = new Date(loc.updatedAt).getTime();
     }
+
+    // Strict Monotonic Timestamp Validation: Only accept incoming coordinates if incomingPoint.timestamp >= lastAcceptedPoint.timestamp
+    if (isLiveActive && locTime > 0) {
+      if (lastAcceptedTimeRef.current > 0 && locTime < lastAcceptedTimeRef.current) {
+        console.warn('[Telemetry] Rejected out-of-order timestamp:', locTime, '<', lastAcceptedTimeRef.current);
+        return;
+      }
+      lastAcceptedTimeRef.current = locTime;
+    }
+
     const isStaleLoc = isLiveActive && sessionStartTimeRef.current && locTime > 0 && locTime < sessionStartTimeRef.current;
     if (isStaleLoc) return;
 
@@ -304,6 +348,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }
     
     if (markerRef.current) {
+        markerRef.current.setOpacity(1);
         const el = markerRef.current.getElement();
         if (el) {
             const radar = el.querySelector('.stationary-radar');
@@ -321,26 +366,24 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             animCurrentPosRef.current = { lat: lastRoutePt[0], lng: lastRoutePt[1], heading: targetPoint.heading };
             
             const dist = getDistanceFromLatLonInM(targetPoint.lat, targetPoint.lng, lastRoutePt[0], lastRoutePt[1]);
-            if (dist > 2) {
+            if (dist >= 3.0) {
                 animQueueRef.current.push(targetPoint);
-                routeTrailRef.current.push([animCurrentPosRef.current.lat, animCurrentPosRef.current.lng]);
             }
         } else {
             routeTrailRef.current = [[targetPoint.lat, targetPoint.lng]];
             animCurrentPosRef.current = { lat: targetPoint.lat, lng: targetPoint.lng, heading: targetPoint.heading };
         }
         markerRef.current.setLatLng([animCurrentPosRef.current.lat, animCurrentPosRef.current.lng]);
+        markerRef.current.setOpacity(1);
         if (polylineRef.current) polylineRef.current.setLatLngs(routeTrailRef.current);
         mapInstance.current.setView([targetPoint.lat, targetPoint.lng], 17); // instant snap
+        mapInstance.current.invalidateSize();
     } else {
-        // We are already initialized. Enqueue the new target if it's different and meaningful (>2m drift).
+        // We are already initialized. Enqueue the new target if it's different and meaningful (>= 3m distance).
         const lastTarget = animQueueRef.current.length > 0 ? animQueueRef.current[animQueueRef.current.length - 1] : animCurrentPosRef.current;
         const dist = getDistanceFromLatLonInM(targetPoint.lat, targetPoint.lng, lastTarget.lat, lastTarget.lng);
         
-        if (dist > 2 || currentSpeed >= 2) {
-            if (animQueueRef.current.length === 0) {
-                routeTrailRef.current.push([animCurrentPosRef.current.lat, animCurrentPosRef.current.lng]);
-            }
+        if (dist >= 3.0) {
             // Real-time stream: cap queue to prevent lagging behind on long trips
             if (animQueueRef.current.length > 2) {
                 animQueueRef.current = [animQueueRef.current[animQueueRef.current.length - 1]];
@@ -407,14 +450,17 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         }
 
         if (progress >= 1) {
-            if (routeTrailRef.current.length > 0) {
+            const lastTrailPt = routeTrailRef.current[routeTrailRef.current.length - 1];
+            const distFromLast = lastTrailPt ? getDistanceFromLatLonInM(target.lat, target.lng, lastTrailPt[0], lastTrailPt[1]) : 0;
+            if (distFromLast >= 3.0) {
+                routeTrailRef.current.push([target.lat, target.lng]);
+            } else if (lastTrailPt) {
                 routeTrailRef.current[routeTrailRef.current.length - 1] = [target.lat, target.lng];
+            } else {
+                routeTrailRef.current.push([target.lat, target.lng]);
             }
             animQueueRef.current.shift();
             animCurrentPosRef.current.progress = undefined; 
-            if (animQueueRef.current.length > 0) {
-                routeTrailRef.current.push([target.lat, target.lng]);
-            }
         }
       }
       animFrameRef.current = requestAnimationFrame(animate);
@@ -454,32 +500,47 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }
   };
 
+  const handleStopTracking = async () => {
+    try {
+      setIsLiveActive(false);
+      await updateDoc(doc(db, 'staff_tracking', staffId), {
+        isLiveTrackingActive: false,
+        isLiveTracking: false,
+        'liveSession.isActive': false,
+        status: "standby",
+        forcePingAt: null
+      }).catch(console.error);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      if (onClose) onClose();
+    }
+  };
+
   const toggleLiveTracking = async () => {
     const newState = !isLiveActive;
-    setIsLiveActive(newState);
+    if (!newState) {
+      return handleStopTracking();
+    }
+    setIsLiveActive(true);
     try {
-      if (newState) {
-        setUiSpeed(0.0); // Reset speed instantly
-        sessionStartTimeRef.current = Date.now();
-        routeTrailRef.current = []; // immediately purge the current coordinates array
-        animQueueRef.current = [];
-        animCurrentPosRef.current = null;
-        if (polylineRef.current) polylineRef.current.setLatLngs([]);
-        
-        await updateDoc(doc(db, 'staff_tracking', staffId), {
-          isLiveTrackingActive: true,
-          'liveSession.isActive': true,
-          'liveSession.routePath': [], // reset on new session
-          forcePingAt: Date.now() // Wake client immediately
-        });
-      } else {
-        await updateDoc(doc(db, 'staff_tracking', staffId), {
-          isLiveTrackingActive: false,
-          'liveSession.isActive': false,
-          forcePingAt: null
-        });
-        setIsPinging(false); // Reset buttons instantly
-      }
+      setUiSpeed(0.0); // Reset speed instantly
+      sessionStartTimeRef.current = Date.now();
+      lastAcceptedTimeRef.current = Date.now();
+      routeTrailRef.current = []; // immediately purge the current coordinates array
+      animQueueRef.current = [];
+      animCurrentPosRef.current = null;
+      if (polylineRef.current) polylineRef.current.setLatLngs([]);
+      
+      await updateDoc(doc(db, 'staff_tracking', staffId), {
+        isLiveTrackingActive: true,
+        isLiveTracking: true,
+        lastAdminHeartbeat: Date.now(),
+        liveSessionStartedAt: new Date().toISOString(),
+        'liveSession.isActive': true,
+        'liveSession.routePath': [], // reset on new session
+        forcePingAt: Date.now() // Wake client immediately
+      });
     } catch (e) {
       console.error(e);
     }
@@ -487,15 +548,26 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
 
   // Resolve current active location data
   let loc = null;
+  let isFreshLivePoint = false;
   if (isLiveActive && liveLocationData) {
     loc = {
       lat: liveLocationData.latitude,
       lng: liveLocationData.longitude,
       updatedAt: liveLocationData.updatedAt
     };
+    isFreshLivePoint = true;
   } else {
     loc = trackingData?.currentLocation;
   }
+  
+  const hasValidCoords = loc && typeof loc.lat === 'number' && typeof loc.lng === 'number' && (loc.lat !== 0 || loc.lng !== 0) && !isNaN(loc.lat) && !isNaN(loc.lng);
+  
+  let locTime = 0;
+  if (loc?.updatedAt) {
+    if (loc.updatedAt.toMillis) locTime = loc.updatedAt.toMillis();
+    else locTime = new Date(loc.updatedAt).getTime();
+  }
+  const isStaleLoc = isLiveActive && (!isFreshLivePoint || (sessionStartTimeRef.current && locTime > 0 && locTime < sessionStartTimeRef.current));
   
   let statusText = 'Stopped';
   let statusColor = 'text-amber-600';
@@ -534,7 +606,13 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
                   )}
                 </h3>
                 <span className="text-xs text-slate-500">
-                  Updated: {getRelativeTime(loc?.updatedAt)}
+                  Updated: {
+                    isLiveActive && (!hasValidCoords || isStaleLoc)
+                      ? 'Acquiring signal...'
+                      : isLiveActive && isFreshLivePoint
+                      ? 'Just now'
+                      : getRelativeTime(loc?.updatedAt)
+                  }
                 </span>
             </div>
             <button onClick={onClose} className="p-2 bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
@@ -542,6 +620,20 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             </button>
           </div>
           <div className="p-0 bg-slate-50 h-[300px] md:h-[400px] relative">
+            
+            {/* Acquiring Signal Overlay */}
+            {isLiveActive && (!hasValidCoords || isStaleLoc) && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-xs text-white p-4 text-center">
+                <div className="relative mb-3 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full border-4 border-sky-400/30 border-t-sky-400 animate-spin"></div>
+                  <Loader2 className="w-6 h-6 text-sky-400 absolute animate-pulse" />
+                </div>
+                <h4 className="font-bold text-sm tracking-wide text-white">Acquiring live satellite signal...</h4>
+                <p className="text-xs text-slate-300 mt-1 max-w-xs">
+                  Connecting to handset background daemon. Coordinates will auto-center on road map immediately.
+                </p>
+              </div>
+            )}
             
             {/* Speed & Distance Badges */}
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
@@ -605,7 +697,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
               </button>
             ) : (
               <button 
-                  onClick={toggleLiveTracking}
+                  onClick={handleStopTracking}
                   className="flex-1 py-2.5 bg-red-50 border border-red-200 rounded-xl text-red-700 font-semibold shadow-sm flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
               >
                   Stop Live Tracking

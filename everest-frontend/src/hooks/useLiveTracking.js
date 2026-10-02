@@ -171,7 +171,7 @@ export function useLiveTracking(userProfile) {
 
               // Maintain a running history of points in staff_tracking for the glowing trail
               updateDoc(trackingDocRef, {
-                'liveSession.routePath': arrayUnion({ lat: position.latitude, lng: position.longitude })
+                'liveSession.routePath': arrayUnion({ lat: position.latitude, lng: position.longitude, timestamp: now })
               }).catch(e => console.error("Error updating route path:", e));
             }
           }
@@ -194,12 +194,15 @@ export function useLiveTracking(userProfile) {
     globalUnsubscribe = onSnapshot(trackingDocRef, async (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
-      const isLiveTrackingActive = data.isLiveTrackingActive === true;
+      const isLiveTrackingActive = data.isLiveTrackingActive === true || data.isLiveTracking === true;
 
-      // React to Force Ping Trigger immediately
+      // React to Force Ping Trigger or Admin Heartbeat immediately
       const forcePingTime = data.forcePingAt?.toMillis ? data.forcePingAt.toMillis() : data.forcePingAt;
-      if (forcePingTime && forcePingTime > lastForcePingRef) {
-        lastForcePingRef = forcePingTime;
+      const heartbeatTime = data.lastAdminHeartbeat?.toMillis ? data.lastAdminHeartbeat.toMillis() : data.lastAdminHeartbeat;
+      const triggerTime = Math.max(forcePingTime || 0, heartbeatTime || 0);
+
+      if (triggerTime && triggerTime > lastForcePingRef) {
+        lastForcePingRef = triggerTime;
         await dispatchImmediateGPSFetch(true);
       }
 

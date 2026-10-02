@@ -92,6 +92,17 @@ public class LocationForegroundService extends Service {
 
         startForeground(9001, createNotification());
 
+        try {
+            fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+                if (location != null) {
+                    Log.i(TAG, "Immediate Native GPS Fix on Start: lat=" + location.getLatitude() + " lng=" + location.getLongitude());
+                    uploadToFirestore(location);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching last location on start", e);
+        }
+
         LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
                 .setMinUpdateIntervalMillis(2000)
                 .setMinUpdateDistanceMeters(0)
