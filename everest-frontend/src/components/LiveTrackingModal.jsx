@@ -24,6 +24,17 @@ function getRelativeTime(isoStringOrTimestamp) {
   return new Date(timeMs).toLocaleString();
 }
 
+function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const dLat = (lat2-lat1) * (Math.PI/180);
+  const dLon = (lon2-lon1) * (Math.PI/180); 
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
+          Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c;
+}
+
 export default function LiveTrackingModal({ staffId, staffName, onClose, initialMode = 'current' }) {
   const [mapLayer, setMapLayer] = useState('street'); // 'street' | 'satellite'
   const [trackingData, setTrackingData] = useState(null);
@@ -41,7 +52,12 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   const markerRef = useRef(null);
   const polylineRef = useRef(null);
   const tileLayerRef = useRef(null);
-  const [routeTrail, setRouteTrail] = useState([]);
+  const routeTrailRef = useRef([]);
+  const sessionStartTimeRef = useRef(initialMode === 'live' ? Date.now() : null);
+  const animQueueRef = useRef([]);
+  const animCurrentPosRef = useRef(null);
+  const animLastTimeRef = useRef(null);
+  const animFrameRef = useRef(null);
   useEffect(() => {
     if (!staffId) return;
 
@@ -140,29 +156,52 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         .glowing-polyline {
           filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.8));
         }
+        .stationary-radar {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 80px;
+          height: 80px;
+          margin-top: -40px;
+          margin-left: -40px;
+          background: rgba(59, 130, 246, 0.35);
+          border-radius: 50%;
+          animation: radar-pulse 2.5s infinite ease-out;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.5s ease;
+          z-index: -1;
+        }
+        @keyframes radar-pulse {
+          0% { transform: scale(0.3); opacity: 1; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
       </style>
-      <div class="bike-icon-wrapper" style="
-        width: 36px;
-        height: 60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transform: rotate(0deg);
-        transition: transform 0.3s ease-out;
-        will-change: transform;
-      ">
-        <svg width="36" height="60" viewBox="0 0 36 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Top-down motorcycle body, handlebars, rider helmet & jacket -->
-          <ellipse cx="18" cy="10" rx="3.5" ry="9" fill="#1e293b" />
-          <rect x="15" y="14" width="6" height="22" rx="3" fill="#eab308" />
-          <ellipse cx="18" cy="48" rx="4" ry="10" fill="#0f172a" />
-          <path d="M6 19 L30 19" stroke="#334155" stroke-width="3" stroke-linecap="round" />
-          <circle cx="6" cy="19" r="2.5" fill="#f8fafc" />
-          <circle cx="30" cy="19" r="2.5" fill="#f8fafc" />
-          <ellipse cx="18" cy="27" rx="8" ry="6" fill="#3b82f6" />
-          <circle cx="18" cy="24" r="6" fill="#f8fafc" stroke="#0284c7" stroke-width="1.5" />
-          <path d="M15 22 Q18 20 21 22" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />
-        </svg>
+      <div style="position: relative;">
+        <div class="stationary-radar"></div>
+        <div class="bike-icon-wrapper" style="
+          width: 36px;
+          height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transform: rotate(0deg);
+          transition: transform 0.3s ease-out;
+          will-change: transform;
+        ">
+          <svg width="36" height="60" viewBox="0 0 36 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Top-down motorcycle body, handlebars, rider helmet & jacket -->
+            <ellipse cx="18" cy="10" rx="3.5" ry="9" fill="#1e293b" />
+            <rect x="15" y="14" width="6" height="22" rx="3" fill="#eab308" />
+            <ellipse cx="18" cy="48" rx="4" ry="10" fill="#0f172a" />
+            <path d="M6 19 L30 19" stroke="#334155" stroke-width="3" stroke-linecap="round" />
+            <circle cx="6" cy="19" r="2.5" fill="#f8fafc" />
+            <circle cx="30" cy="19" r="2.5" fill="#f8fafc" />
+            <ellipse cx="18" cy="27" rx="8" ry="6" fill="#3b82f6" />
+            <circle cx="18" cy="24" r="6" fill="#f8fafc" stroke="#0284c7" stroke-width="1.5" />
+            <path d="M15 22 Q18 20 21 22" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </div>
       </div>`;
 
     const icon = L.divIcon({
@@ -177,7 +216,6 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       color: '#0284c7', 
       weight: 4, 
       opacity: 0.8,
-      dashArray: '5, 10',
       lineCap: 'round',
       lineJoin: 'round',
       className: 'glowing-polyline'
@@ -199,9 +237,8 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     tileLayerRef.current = L.tileLayer(layerUrl, { maxZoom: 19 }).addTo(mapInstance.current);
   }, [mapLayer, loading]);
 
-  // 3. Dynamic Telemetry Updates (No Flicker)
+  // 3. Dynamic Telemetry Enqueue (No Flicker)
   useEffect(() => {
-    // Prefer live_locations payload if active, else fallback to trackingData.currentLocation
     let loc = null;
     let heading = 0;
     
@@ -217,39 +254,168 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       heading = trackingData?.liveSession?.heading || 0;
     }
     
-    const route = trackingData?.liveSession?.routePath || [];
+    const backendRoute = trackingData?.liveSession?.routePath || [];
+    
+    // 1. Strict Session Boundary Filter
+    let validBackendRoute = backendRoute;
+    if (isLiveActive && sessionStartTimeRef.current) {
+      validBackendRoute = backendRoute.filter(p => {
+        let t = 0;
+        if (p.timestamp?.toMillis) t = p.timestamp.toMillis();
+        else if (p.timestamp) t = new Date(p.timestamp).getTime();
+        return t > 0 && t >= sessionStartTimeRef.current; // STRICT: discard unknown or old timestamps
+      });
+    }
+
+    const formattedBackendRoute = validBackendRoute.map(p => [p.lat || p.latitude, p.lng || p.longitude]).filter(p => p[0] && p[1]);
     
     if (!loc?.lat || !mapInstance.current || !markerRef.current) return;
 
-    // Accumulate locally to immediately render trail without waiting for Firestore path arrays
-    setRouteTrail(prev => {
-      const isDuplicate = prev.length > 0 && prev[prev.length - 1][0] === loc.lat && prev[prev.length - 1][1] === loc.lng;
-      if (isDuplicate) return prev;
-      return [...prev, [loc.lat, loc.lng]];
-    });
-
-    // Smoothly update marker (CSS transition handles interpolation)
-    markerRef.current.setLatLng([loc.lat, loc.lng]);
-
-    // Apply rotation dynamically to the wrapper
-    const el = markerRef.current.getElement();
-    if (el) {
-      const wrapper = el.querySelector('.bike-icon-wrapper');
-      if (wrapper) {
-        wrapper.style.transform = `rotate(${heading}deg)`;
-      }
+    if (!isLiveActive) {
+        // Handle static offline viewing
+        routeTrailRef.current = [];
+        animQueueRef.current = [];
+        animCurrentPosRef.current = null;
+        if (polylineRef.current) polylineRef.current.setLatLngs([]);
+        markerRef.current.setLatLng([loc.lat, loc.lng]);
+        mapInstance.current.setView([loc.lat, loc.lng], 17);
+        return;
     }
 
-    // Draw Polyline & Pan
-    if (isLiveActive) {
-      // Use local routeTrail which is guaranteed to have immediate updates
-      polylineRef.current.setLatLngs(routeTrail);
-      mapInstance.current.panTo([loc.lat, loc.lng], { animate: true, duration: 1.5 });
+    // Check if the current loc is stale
+    let locTime = 0;
+    if (loc?.updatedAt) {
+      if (loc.updatedAt.toMillis) locTime = loc.updatedAt.toMillis();
+      else locTime = new Date(loc.updatedAt).getTime();
+    }
+    const isStaleLoc = isLiveActive && sessionStartTimeRef.current && locTime > 0 && locTime < sessionStartTimeRef.current;
+    if (isStaleLoc) return;
+
+    // Resolve Speed & Radar Toggle
+    let currentSpeed = 0;
+    if (isLiveActive && liveLocationData) {
+      currentSpeed = liveLocationData.speed || 0;
     } else {
-      polylineRef.current.setLatLngs([]);
-      mapInstance.current.setView([loc.lat, loc.lng], 17);
+      currentSpeed = trackingData?.liveSession?.currentSpeed || 0;
+    }
+    
+    if (markerRef.current) {
+        const el = markerRef.current.getElement();
+        if (el) {
+            const radar = el.querySelector('.stationary-radar');
+            if (radar) radar.style.opacity = currentSpeed < 1.5 ? '1' : '0';
+        }
+    }
+
+    const targetPoint = { lat: loc.lat, lng: loc.lng, heading };
+
+    // Initialization: If we have no current position, snap instantly to the starting coordinate
+    if (!animCurrentPosRef.current) {
+        if (formattedBackendRoute.length > 0) {
+            routeTrailRef.current = [...formattedBackendRoute];
+            const lastRoutePt = formattedBackendRoute[formattedBackendRoute.length - 1];
+            animCurrentPosRef.current = { lat: lastRoutePt[0], lng: lastRoutePt[1], heading: targetPoint.heading };
+            
+            const dist = getDistanceFromLatLonInM(targetPoint.lat, targetPoint.lng, lastRoutePt[0], lastRoutePt[1]);
+            if (dist > 2) {
+                animQueueRef.current.push(targetPoint);
+                routeTrailRef.current.push([animCurrentPosRef.current.lat, animCurrentPosRef.current.lng]);
+            }
+        } else {
+            routeTrailRef.current = [[targetPoint.lat, targetPoint.lng]];
+            animCurrentPosRef.current = { lat: targetPoint.lat, lng: targetPoint.lng, heading: targetPoint.heading };
+        }
+        markerRef.current.setLatLng([animCurrentPosRef.current.lat, animCurrentPosRef.current.lng]);
+        if (polylineRef.current) polylineRef.current.setLatLngs(routeTrailRef.current);
+        mapInstance.current.setView([targetPoint.lat, targetPoint.lng], 17); // instant snap
+    } else {
+        // We are already initialized. Enqueue the new target if it's different and meaningful (>2m drift).
+        const lastTarget = animQueueRef.current.length > 0 ? animQueueRef.current[animQueueRef.current.length - 1] : animCurrentPosRef.current;
+        const dist = getDistanceFromLatLonInM(targetPoint.lat, targetPoint.lng, lastTarget.lat, lastTarget.lng);
+        
+        if (dist > 2 || currentSpeed >= 1.5) {
+            if (animQueueRef.current.length === 0) {
+                routeTrailRef.current.push([animCurrentPosRef.current.lat, animCurrentPosRef.current.lng]);
+            }
+            animQueueRef.current.push(targetPoint);
+            mapInstance.current.panTo([targetPoint.lat, targetPoint.lng], { animate: true, duration: 1.5 });
+        }
     }
   }, [trackingData, liveLocationData, isLiveActive, loading]);
+
+  // 4. Animation Loop for Smooth Gliding & Trailing Polyline
+  useEffect(() => {
+    const animate = (time) => {
+      if (!animLastTimeRef.current) animLastTimeRef.current = time;
+      const delta = time - animLastTimeRef.current;
+      animLastTimeRef.current = time;
+
+      if (animQueueRef.current.length > 0 && animCurrentPosRef.current && isLiveActive) {
+        const target = animQueueRef.current[0];
+        
+        if (animCurrentPosRef.current.progress === undefined) {
+             animCurrentPosRef.current.startLat = animCurrentPosRef.current.lat;
+             animCurrentPosRef.current.startLng = animCurrentPosRef.current.lng;
+             animCurrentPosRef.current.startHeading = animCurrentPosRef.current.heading || target.heading || 0;
+             animCurrentPosRef.current.progress = 0;
+        }
+
+        let duration = 2100;
+        if (animQueueRef.current.length > 1) duration = 1900;
+        if (animQueueRef.current.length > 2) duration = 1000;
+
+        animCurrentPosRef.current.progress += (delta / duration);
+        const progress = Math.min(1, animCurrentPosRef.current.progress);
+
+        const latDiff = target.lat - animCurrentPosRef.current.startLat;
+        const lngDiff = target.lng - animCurrentPosRef.current.startLng;
+
+        const newLat = animCurrentPosRef.current.startLat + latDiff * progress;
+        const newLng = animCurrentPosRef.current.startLng + lngDiff * progress;
+
+        const startHeading = animCurrentPosRef.current.startHeading;
+        const targetHeading = target.heading || 0;
+        const shortest_angle = ((((targetHeading - startHeading) % 360) + 540) % 360) - 180;
+        const newHeading = startHeading + shortest_angle * progress;
+
+        animCurrentPosRef.current.lat = newLat;
+        animCurrentPosRef.current.lng = newLng;
+        animCurrentPosRef.current.heading = newHeading;
+
+        if (markerRef.current) {
+            markerRef.current.setLatLng([newLat, newLng]);
+            const el = markerRef.current.getElement();
+            if (el) {
+                const wrapper = el.querySelector('.bike-icon-wrapper');
+                if (wrapper) wrapper.style.transform = `rotate(${newHeading}deg)`;
+            }
+        }
+
+        if (polylineRef.current && routeTrailRef.current.length > 0) {
+            const drawTrail = [...routeTrailRef.current];
+            drawTrail[drawTrail.length - 1] = [newLat, newLng];
+            polylineRef.current.setLatLngs(drawTrail);
+        }
+
+        if (progress >= 1) {
+            if (routeTrailRef.current.length > 0) {
+                routeTrailRef.current[routeTrailRef.current.length - 1] = [target.lat, target.lng];
+            }
+            animQueueRef.current.shift();
+            animCurrentPosRef.current.progress = undefined; 
+            if (animQueueRef.current.length > 0) {
+                routeTrailRef.current.push([target.lat, target.lng]);
+            }
+        }
+      }
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [isLiveActive]);
 
   // Destroy map instance on unmount
   useEffect(() => {
@@ -284,6 +450,12 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     setIsLiveActive(newState);
     try {
       if (newState) {
+        sessionStartTimeRef.current = Date.now();
+        routeTrailRef.current = []; // immediately purge the current coordinates array
+        animQueueRef.current = [];
+        animCurrentPosRef.current = null;
+        if (polylineRef.current) polylineRef.current.setLatLngs([]);
+        
         await updateDoc(doc(db, 'staff_tracking', staffId), {
           isLiveTrackingActive: true,
           'liveSession.isActive': true,

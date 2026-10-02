@@ -23,8 +23,8 @@ allprojects {
         mavenCentral()
     }
     tasks.withType(JavaCompile).configureEach {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
@@ -39,6 +39,17 @@ subprojects {
                 compileOptions {
                     sourceCompatibility JavaVersion.VERSION_17
                     targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+        project.tasks.configureEach { task ->
+            if (task.name.contains("Kotlin")) {
+                try {
+                    task.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                } catch (Exception e1) {
+                    try {
+                        task.kotlinOptions.jvmTarget = "17"
+                    } catch (Exception e2) {}
                 }
             }
         }
