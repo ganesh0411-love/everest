@@ -34,12 +34,19 @@ import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkRequest;
+
 public class LocationForegroundService extends Service {
     private static final String TAG = "LocationService";
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
     private PowerManager.WakeLock wakeLock;
     private ExecutorService networkExecutor = Executors.newSingleThreadExecutor();
+
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     private String staffId;
     private String projectId;
@@ -73,6 +80,44 @@ public class LocationForegroundService extends Service {
                 }
             }
         };
+
+        // Register NetworkCallback for automatic network reconnection recovery
+        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager != null) {
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @SuppressLint("MissingPermission")
+                @Override
+                public void onAvailable(Network network) {
+                    super.onAvailable(network);
+                    Log.i(TAG, "Network connection restored. Re-triggering native location fix...");
+                    try {
+                        fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+                            if (location != null) {
+                                Log.i(TAG, "Immediate location fix on network reconnect");
+                                uploadToFirestore(location);
+                            }
+                        });
+                        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000)
+                                .setMinUpdateIntervalMillis(2000)
+                                .setMinUpdateDistanceMeters(0)
+                                .build();
+                        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error re-triggering location updates on network reconnect", e);
+                    }
+                }
+            };
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    connectivityManager.registerDefaultNetworkCallback(networkCallback);
+                } else {
+                    NetworkRequest request = new NetworkRequest.Builder().build();
+                    connectivityManager.registerNetworkCallback(request, networkCallback);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error registering network callback", e);
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -197,6 +242,13 @@ public class LocationForegroundService extends Service {
         super.onDestroy();
         if (fusedLocationClient != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
+        }
+        if (connectivityManager != null && networkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            } catch (Exception e) {
+                Log.e(TAG, "Error unregistering network callback", e);
+            }
         }
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
