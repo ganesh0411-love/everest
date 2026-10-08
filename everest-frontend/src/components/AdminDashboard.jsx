@@ -1261,23 +1261,28 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
       if (!dStr) return new Date();
       if (dStr && typeof dStr.toDate === 'function') return dStr.toDate();
       if (dStr && typeof dStr === 'object' && dStr.seconds !== undefined) return new Date(dStr.seconds * 1000);
+      if (typeof dStr === 'number') return new Date(dStr);
       if (typeof dStr === 'string') {
-        if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
-          const parts = dStr.split('-');
+        const trimmed = dStr.trim();
+        if (trimmed.includes('-') && trimmed.split('-')[0].length === 2) {
+          const parts = trimmed.split('-');
           const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
-          return new Date(`${year}-${parts[1]}-${parts[0]}`);
+          return new Date(parseInt(year), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
         }
-        if (dStr.includes('/') && dStr.split('/')[0].length === 2) {
-          const parts = dStr.split('/');
+        if (trimmed.includes('/') && trimmed.split('/')[0].length === 2) {
+          const parts = trimmed.split('/');
           const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
-          return new Date(`${year}-${parts[1]}-${parts[0]}`);
+          return new Date(parseInt(year), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+        }
+        if (trimmed.length === 10 && trimmed.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          const parts = trimmed.split('-');
+          return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
         }
       }
       return new Date(dStr);
     };
 
     const now = new Date();
-    now.setHours(23, 59, 59, 999);
     const buckets = [];
     const bucketCount = isMobileViewport ? 6 : 12;
     
@@ -1285,10 +1290,13 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
       for (let i = bucketCount - 1; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        const dt = d.getDate();
         buckets.push({
           label: d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
-          start: new Date(d.setHours(0, 0, 0, 0)).getTime(),
-          end: new Date(d.setHours(23, 59, 59, 999)).getTime(),
+          start: new Date(y, m, dt, 0, 0, 0, 0).getTime(),
+          end: new Date(y, m, dt, 23, 59, 59, 999).getTime(),
           loanAmount: 0, disbursements: 0, collections: 0
         });
       }
@@ -1298,23 +1306,24 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
         dEnd.setDate(dEnd.getDate() - (i * 7));
         const dStart = new Date(dEnd);
         dStart.setDate(dStart.getDate() - 6);
-        dStart.setHours(0,0,0,0);
-        dEnd.setHours(23,59,59,999);
+        const start = new Date(dStart.getFullYear(), dStart.getMonth(), dStart.getDate(), 0, 0, 0, 0).getTime();
+        const end = new Date(dEnd.getFullYear(), dEnd.getMonth(), dEnd.getDate(), 23, 59, 59, 999).getTime();
         buckets.push({
           label: `W${bucketCount - i}`,
-          start: dStart.getTime(),
-          end: dEnd.getTime(),
+          start,
+          end,
           loanAmount: 0, disbursements: 0, collections: 0
         });
       }
     } else { 
       for (let i = bucketCount - 1; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const endMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+        const start = new Date(now.getFullYear(), now.getMonth() - i, 1, 0, 0, 0, 0).getTime();
+        const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999).getTime();
+        const labelDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
         buckets.push({
-          label: d.toLocaleDateString('en-US', { month: 'short' }),
-          start: d.getTime(),
-          end: endMonth.getTime(),
+          label: labelDate.toLocaleDateString('en-US', { month: 'short' }),
+          start,
+          end,
           loanAmount: 0, disbursements: 0, collections: 0
         });
       }
@@ -1327,10 +1336,23 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
     customers.forEach(c => {
       if (c.status !== 'Approved' && c.status !== 'approved' && c.status !== 'Live' && c.status !== 'live') return;
       
-      const cDate = parseGlobalDate(c.date || c.appDate || c.approvalDate || c.createdAt);
+      // MICROFINANCE DISBURSEMENT DIRECTIVE:
+      // Always prioritize official approvalDate / disbursementDate over application submission date (c.date / c.appDate)
+      const rawDate = c.approvalDate || 
+                      c.disbursementDate || 
+                      c.disbursedAt || 
+                      c.loanApprovedDate || 
+                      c.approvedDate || 
+                      c.approvedAt || 
+                      c.disbursedDate || 
+                      c.date || 
+                      c.appDate || 
+                      c.createdAt;
+
+      const cDate = parseGlobalDate(rawDate);
       const cTime = cDate.getTime();
       const lAmt = parseFloat(c.loanAmount || c.principalAmount || c.amount || 0);
-      const dAmt = parseFloat(c.disbursedAmount || 0);
+      const dAmt = parseFloat(c.disbursedAmount || c.disbursementAmount || c.loanAmount || c.principalAmount || c.amount || 0);
       
       buckets.forEach(b => {
         if (cTime >= b.start && cTime <= b.end) {
@@ -1344,7 +1366,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
       const insts = Array.isArray(c.installments) ? c.installments : [];
       insts.forEach(inst => {
         if (inst.status !== 'BOUNCED') {
-          const iDate = parseGlobalDate(inst.date);
+          const iDate = parseGlobalDate(inst.date || inst.paymentDate || inst.createdAt);
           const iTime = iDate.getTime();
           const iAmt = parseFloat(inst.amount || 0);
           
