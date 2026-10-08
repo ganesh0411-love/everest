@@ -728,12 +728,12 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             </span>
           </div>
 
-          {/* 2. Top-Right Floating Actions Cluster (Round Circular Buttons) */}
-          <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
+          {/* 2. Top-Right Floating Actions Cluster (Round Circular Buttons) - z-50 so Close button is always clickable above overlays */}
+          <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 pointer-events-auto">
             {/* Layer Toggle */}
             <button 
               onClick={() => setMapLayer(prev => prev === 'street' ? 'satellite' : 'street')}
-              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center"
+              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
               title={mapLayer === 'street' ? 'Switch to Satellite View' : 'Switch to High-Res Street Map'}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
@@ -742,7 +742,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             {/* Recenter Compass */}
             <button 
               onClick={handleRecenter}
-              className={`p-2.5 rounded-full shadow-md border transition-all active:scale-95 flex items-center justify-center ${
+              className={`p-2.5 rounded-full shadow-md border transition-all active:scale-95 flex items-center justify-center cursor-pointer ${
                 isFollowMode 
                   ? 'bg-blue-600 border-blue-600 text-white shadow-blue-500/30' 
                   : 'bg-white/90 backdrop-blur-md border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -757,7 +757,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             {/* 3-Tier Viewport Resize */}
             <button 
               onClick={cycleViewMode} 
-              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center"
+              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
               title={
                 modalViewMode === 'normal' 
                   ? 'Expand to Workspace Canvas' 
@@ -789,17 +789,17 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
               )}
             </button>
 
-            {/* Close Button [ ✕ ] */}
+            {/* Close Button [ ✕ ] - Uses handleStopTracking to cleanly terminate session */}
             <button 
-              onClick={onClose} 
-              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all flex items-center justify-center"
+              onClick={handleStopTracking} 
+              className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all flex items-center justify-center cursor-pointer pointer-events-auto"
               title="Close Live Tracking"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
 
-          {/* Acquiring Signal Overlay */}
+          {/* Acquiring Signal Overlay (z-30) */}
           {isLiveActive && (!hasValidCoords || isStaleLoc) && (
             <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-xs text-white p-4 text-center">
               <div className="relative mb-3 flex items-center justify-center">
@@ -807,9 +807,16 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
                 <Loader2 className="w-6 h-6 text-sky-400 absolute animate-pulse" />
               </div>
               <h4 className="font-bold text-sm tracking-wide text-white">Acquiring live satellite signal...</h4>
-              <p className="text-xs text-slate-300 mt-1 max-w-xs">
+              <p className="text-xs text-slate-300 mt-1 max-w-xs mb-4">
                 Connecting to handset background daemon. Coordinates will auto-center on road map immediately.
               </p>
+              <button 
+                onClick={handleStopTracking}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white border border-white/20 font-bold text-xs rounded-full backdrop-blur-md transition-all flex items-center gap-1.5 shadow-md cursor-pointer pointer-events-auto"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                Cancel & Close Tracking
+              </button>
             </div>
           )}
 
