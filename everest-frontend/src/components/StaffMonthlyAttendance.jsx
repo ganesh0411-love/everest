@@ -77,8 +77,33 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
   const now = new Date();
   const todayVal = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   
-  const getElapsedMins = (att) => {
+  const getElapsedMins = (att, dateStr) => {
     if (!att) return 0;
+    const checkIn = att.checkInTime || att.checkIn;
+    const checkOut = att.checkOutTime || att.checkOut;
+    if (checkIn && checkOut) {
+      const parseTS = (ts) => {
+        let d = new Date(ts);
+        if (!isNaN(d.getTime())) return d.getTime();
+        const m = String(ts).match(/(\d+):(\d+)/);
+        if (m) {
+           let h = parseInt(m[1], 10);
+           const min = parseInt(m[2], 10);
+           const isPM = String(ts).toUpperCase().includes('PM');
+           const isAM = String(ts).toUpperCase().includes('AM');
+           if (isPM && h < 12) h += 12;
+           if (isAM && h === 12) h = 0;
+           const base = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
+           return new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, min).getTime();
+        }
+        return 0;
+      };
+      const inTime = parseTS(checkIn);
+      const outTime = parseTS(checkOut);
+      if (inTime > 0 && outTime > 0 && outTime >= inTime) {
+         return Math.floor((outTime - inTime) / 60000);
+      }
+    }
     if (att.duration !== undefined && att.duration !== null) {
       if (typeof att.duration === 'number') {
          return Math.round(att.duration * 60);
@@ -91,35 +116,12 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
          if (h > 0 || m > 0) return (h * 60) + m;
       }
     }
-    const checkIn = att.checkInTime || att.checkIn;
-    const checkOut = att.checkOutTime || att.checkOut;
-    if (checkIn && checkOut) {
-      const parse = (ts) => {
-        let d = new Date(ts);
-        if (!isNaN(d.getTime())) return d.getTime();
-        const m = String(ts).match(/(\d+):(\d+)/);
-        if (m) {
-           const now = new Date();
-           let h = parseInt(m[1], 10);
-           const min = parseInt(m[2], 10);
-           const isPM = String(ts).toUpperCase().includes('PM');
-           if (isPM && h < 12) h += 12;
-           if (String(ts).toUpperCase().includes('AM') && h === 12) h = 0;
-           return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min).getTime();
-        }
-        return 0;
-      };
-      const inTime = parse(checkIn);
-      const outTime = parse(checkOut);
-      if (inTime > 0 && outTime > 0 && outTime >= inTime) {
-         return Math.floor((outTime - inTime) / 60000);
-      }
-    }
     return 0;
   };
 
   const getDayStatus = (dStr) => {
     const isToday = dStr === todayStr;
+    const isPastDate = dStr < todayStr;
     const fallbackAtt = (isToday && staff?.lastCheckInTime?.startsWith(dStr)) ? {
         checkInTime: staff.lastCheckInTime,
         checkOutTime: staff.lastCheckOutTime,
@@ -135,13 +137,20 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
       return 'future';
     }
     
-    const hasCheckIn = !!(att.checkIn || att.checkInTime);
-    const hasCheckOut = !!(att.checkOut || att.checkOutTime);
+    let ci = att.checkIn || att.checkInTime;
+    let co = att.checkOut || att.checkOutTime;
+
+    if (ci && !co && isPastDate) {
+      co = `${dStr}T23:59:59`;
+    }
+
+    const hasCheckIn = !!ci;
+    const hasCheckOut = !!co;
     
     if (att.status === 'Half Day') return 'half';
     
     if (hasCheckIn && hasCheckOut) {
-       const totalMins = getElapsedMins(att);
+       const totalMins = getElapsedMins({ ...att, checkInTime: ci, checkOutTime: co }, dStr);
        if (totalMins > 0 && totalMins < 420) {
            return 'half';
        }
@@ -160,6 +169,7 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
   // Build the selected day's detailed data exactly like the ledger strictly guarding against cross-date leaks
   let selectedAtt = null;
   const isToday = selectedDateStr === todayStr;
+  const isPastDate = selectedDateStr < todayStr;
 
   if (staff?.attendance && staff.attendance[selectedDateStr]) {
     const rawAtt = staff.attendance[selectedDateStr];
@@ -183,16 +193,29 @@ export default function StaffMonthlyAttendance({ staff, onClose, onImageClick })
        return null;
     };
 
+    let ciTime = rawAtt.checkInTime || rawAtt.checkIn || (isToday && staff.lastCheckInTime?.startsWith(selectedDateStr) ? staff.lastCheckInTime : null);
+    let coTime = rawAtt.checkOutTime || rawAtt.checkOut || (isToday && staff.lastCheckOutTime?.startsWith(selectedDateStr) ? staff.lastCheckOutTime : null);
+    let isAutoCheckedOut = false;
+
+    if (ciTime && !coTime && isPastDate) {
+       isAutoCheckedOut = true;
+       coTime = `${selectedDateStr}T23:59:59`;
+    }
+
+    let ciLoc = extractLoc('checkIn') || (isToday && staff.lastLatitude ? { latitude: staff.lastLatitude, longitude: staff.lastLongitude } : null);
+    let coLoc = isAutoCheckedOut ? null : (extractLoc('checkOut') || ((coTime || (isToday && staff.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && staff.lastLatitude ? { latitude: staff.lastLatitude, longitude: staff.lastLongitude } : null) : null));
+
     selectedAtt = {
       ...rawAtt,
-      checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (isToday && staff.lastCheckInTime?.startsWith(selectedDateStr) ? staff.lastCheckInTime : null),
-      checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (isToday && staff.lastCheckOutTime?.startsWith(selectedDateStr) ? staff.lastCheckOutTime : null),
+      checkInTime: ciTime,
+      checkOutTime: coTime,
       selfieUrl: getValidUrl(rawAtt.selfieUrl) || (isToday ? getValidUrl(staff.lastSelfieUrl) : null),
-      checkOutSelfieUrl: getValidUrl(rawAtt.checkOutSelfieUrl) || null,
+      checkOutSelfieUrl: isAutoCheckedOut ? null : getValidUrl(rawAtt.checkOutSelfieUrl),
       duration: rawAtt.duration,
-      status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : (rawAtt.checkOut ? 'COMPLETED' : 'Not Checked In')),
-      checkInLocation: extractLoc('checkIn') || (isToday && staff.lastLatitude ? { latitude: staff.lastLatitude, longitude: staff.lastLongitude } : null),
-      checkOutLocation: extractLoc('checkOut') || ((rawAtt.checkOut || (isToday && staff.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && staff.lastLatitude ? { latitude: staff.lastLatitude, longitude: staff.lastLongitude } : null) : null),
+      status: rawAtt.status || (coTime ? 'COMPLETED' : (ciTime ? 'active' : 'Not Checked In')),
+      checkInLocation: ciLoc,
+      checkOutLocation: coLoc,
+      isAutoCheckedOut
     };
   } else if (isToday && staff?.lastCheckInTime && staff.lastCheckInTime.startsWith(selectedDateStr)) {
     // Fallback strictly for TODAY if app updated root fields first

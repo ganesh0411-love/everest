@@ -5,6 +5,28 @@ import { X, MapPin, Clock, User, ChevronDown, Calendar } from 'lucide-react';
 import { App } from '@capacitor/app';
 import StaffMonthlyAttendance from './StaffMonthlyAttendance';
 
+const parseTS = (timeString, dateStr) => {
+  if (!timeString) return NaN;
+  let d = new Date(timeString);
+  if (!isNaN(d.getTime())) return d.getTime();
+  
+  if (typeof timeString === 'string') {
+    const match = timeString.match(/(\d+):(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+    if (match) {
+      let hour = parseInt(match[1], 10);
+      const minute = parseInt(match[2], 10);
+      const second = match[3] ? parseInt(match[3], 10) : 0;
+      const ampm = match[4] ? match[4].toUpperCase() : null;
+      if (ampm === 'PM' && hour < 12) hour += 12;
+      if (ampm === 'AM' && hour === 12) hour = 0;
+      
+      const base = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
+      return new Date(base.getFullYear(), base.getMonth(), base.getDate(), hour, minute, second).getTime();
+    }
+  }
+  return NaN;
+};
+
 const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onCalendarClick }) => {
   const [elapsed, setElapsed] = useState('--h --m --s');
   
@@ -12,6 +34,22 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onC
      .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   useEffect(() => {
+    if (att?.checkInTime && att?.checkOutTime) {
+      let inTime = parseTS(att.checkInTime, selectedDateStr);
+      let outTime = parseTS(att.checkOutTime, selectedDateStr);
+
+      if (!isNaN(inTime) && !isNaN(outTime)) {
+        const diff = outTime - inTime;
+        if (diff >= 0) {
+          const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+          const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+          const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+          setElapsed(`${h}h ${m}m ${s}s`);
+          return;
+        }
+      }
+    }
+
     if (att?.duration !== undefined && att?.duration !== null) {
       if (typeof att.duration === 'string') {
          setElapsed(att.duration);
@@ -27,15 +65,7 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onC
 
     if (statusInfo.label === 'Active' && att?.checkInTime) {
       const interval = setInterval(() => {
-        let inTime = new Date(att.checkInTime).getTime();
-        if (isNaN(inTime)) {
-            const match = String(att.checkInTime).match(/(\d+):(\d+)/);
-            if (match) {
-                const now = new Date();
-                inTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(match[1]), parseInt(match[2])).getTime();
-            }
-        }
-        
+        let inTime = parseTS(att.checkInTime, selectedDateStr);
         if (!isNaN(inTime)) {
             const diff = Date.now() - inTime;
             if (diff >= 0) {
@@ -47,42 +77,10 @@ const LedgerCard = ({ staff, att, statusInfo, onImageClick, selectedDateStr, onC
         }
       }, 1000);
       return () => clearInterval(interval);
-    } else if (att?.checkInTime && att?.checkOutTime) {
-       let inTime = new Date(att.checkInTime).getTime();
-       let outTime = new Date(att.checkOutTime).getTime();
-       
-       if (isNaN(inTime)) {
-           const match = String(att.checkInTime).match(/(\d+):(\d+)/);
-           if (match) {
-               const now = new Date();
-               inTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(match[1]), parseInt(match[2])).getTime();
-           }
-       }
-       if (isNaN(outTime)) {
-           const match = String(att.checkOutTime).match(/(\d+):(\d+)/);
-           if (match) {
-               const now = new Date();
-               outTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(match[1]), parseInt(match[2])).getTime();
-           }
-       }
-       
-       if (!isNaN(inTime) && !isNaN(outTime)) {
-           const diff = outTime - inTime;
-           if (diff >= 0) {
-               const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-               const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-               const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-               setElapsed(`${h}h ${m}m ${s}s`);
-           } else {
-               setElapsed('--h --m --s');
-           }
-       } else {
-           setElapsed('--h --m --s');
-       }
     } else {
        setElapsed('--h --m --s');
     }
-  }, [att, statusInfo.label]);
+  }, [att, statusInfo.label, selectedDateStr]);
 
   const formatTime = (timeString) => {
     if (!timeString) return '--:--';
@@ -383,9 +381,10 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
         unsubscribeStaff = onSnapshot(staffQuery, (staffSnap) => {
           let staffList = staffSnap.docs.map(d => {
             const data = d.data();
-            // Parse attendance map for today
+            // Parse attendance map for selected date
             let todayAtt = null;
             const isToday = selectedDateStr === todayStr;
+            const isPastDate = selectedDateStr < todayStr;
 
             if (data.attendance && data.attendance[selectedDateStr]) {
               const rawAtt = data.attendance[selectedDateStr];
@@ -413,17 +412,33 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
                  return null;
               };
 
+              let ciTime = rawAtt.checkInTime || rawAtt.checkIn || (isToday && data.lastCheckInTime?.startsWith(selectedDateStr) ? data.lastCheckInTime : null);
+              let coTime = rawAtt.checkOutTime || rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr) ? data.lastCheckOutTime : null);
+              let isAutoCheckedOut = false;
+
+              // AUTO CHECK-OUT EVALUATION:
+              // If checkInTime exists but checkOutTime is empty AND (it is a past date OR past 23:59:59 of check-in date)
+              if (ciTime && !coTime && isPastDate) {
+                 isAutoCheckedOut = true;
+                 coTime = `${selectedDateStr}T23:59:59`;
+              }
+
+              let ciLoc = extractLoc('checkIn') || (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null);
+              let coLoc = isAutoCheckedOut ? null : (extractLoc('checkOut') || ((coTime || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null));
+
               todayAtt = {
                 ...rawAtt,
-                checkInTime: rawAtt.checkInTime || rawAtt.checkIn || (isToday && data.lastCheckInTime?.startsWith(selectedDateStr) ? data.lastCheckInTime : null),
-                checkOutTime: rawAtt.checkOutTime || rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr) ? data.lastCheckOutTime : null),
-                checkInLocation: extractLoc('checkIn') || (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null),
-                checkOutLocation: extractLoc('checkOut') || ((rawAtt.checkOut || (isToday && data.lastCheckOutTime?.startsWith(selectedDateStr))) ? (isToday && data.lastLatitude ? { latitude: data.lastLatitude, longitude: data.lastLongitude } : null) : null),
+                checkInTime: ciTime,
+                checkOutTime: coTime,
+                checkInLocation: ciLoc,
+                checkOutLocation: coLoc,
                 selfieUrl: rawAtt.selfieUrl || (isToday ? data.lastSelfieUrl : null),
-                checkOutSelfieUrl: rawAtt.checkOutSelfieUrl || null,
-                status: rawAtt.status || (rawAtt.checkIn && !rawAtt.checkOut ? 'active' : (rawAtt.checkOut ? 'COMPLETED' : 'Not Checked In')),
-                duration: rawAtt.duration
+                checkOutSelfieUrl: isAutoCheckedOut ? null : (rawAtt.checkOutSelfieUrl || null),
+                status: rawAtt.status || (coTime ? 'COMPLETED' : (ciTime ? 'active' : 'Not Checked In')),
+                duration: rawAtt.duration,
+                isAutoCheckedOut
               };
+
               if (todayAtt.checkInTime && !todayAtt.checkOutTime) {
                 todayAtt.status = 'active';
               }
@@ -475,6 +490,15 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
 
   const getElapsedMins = (att) => {
     if (!att) return 0;
+    const checkIn = att.checkInTime || att.checkIn;
+    const checkOut = att.checkOutTime || att.checkOut;
+    if (checkIn && checkOut) {
+      const inTime = parseTS(checkIn, selectedDateStr);
+      const outTime = parseTS(checkOut, selectedDateStr);
+      if (!isNaN(inTime) && !isNaN(outTime) && outTime >= inTime) {
+         return Math.floor((outTime - inTime) / 60000);
+      }
+    }
     if (att.duration !== undefined && att.duration !== null) {
       if (typeof att.duration === 'number') {
          return Math.round(att.duration * 60);
@@ -485,30 +509,6 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
          let h = hm ? parseInt(hm[1], 10) : 0;
          let m = mm ? parseInt(mm[1], 10) : 0;
          if (h > 0 || m > 0) return (h * 60) + m;
-      }
-    }
-    const checkIn = att.checkInTime || att.checkIn;
-    const checkOut = att.checkOutTime || att.checkOut;
-    if (checkIn && checkOut) {
-      const parse = (ts) => {
-        let d = new Date(ts);
-        if (!isNaN(d.getTime())) return d.getTime();
-        const m = String(ts).match(/(\d+):(\d+)/);
-        if (m) {
-           const now = new Date();
-           let h = parseInt(m[1], 10);
-           const min = parseInt(m[2], 10);
-           const isPM = String(ts).toUpperCase().includes('PM');
-           if (isPM && h < 12) h += 12;
-           if (String(ts).toUpperCase().includes('AM') && h === 12) h = 0;
-           return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min).getTime();
-        }
-        return 0;
-      };
-      const inTime = parse(checkIn);
-      const outTime = parse(checkOut);
-      if (inTime > 0 && outTime > 0 && outTime >= inTime) {
-         return Math.floor((outTime - inTime) / 60000);
       }
     }
     return 0;
@@ -529,7 +529,7 @@ export default function AttendanceLedger({ onClose, branches = [], activeBranch 
       if (att.status === 'Half Day') {
           return { label: 'Half Day', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' };
       }
-      return { label: 'Completed', color: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' };
+      return { label: 'PRESENT', color: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' };
     }
     
     if (att.checkInTime && !att.checkOutTime) {

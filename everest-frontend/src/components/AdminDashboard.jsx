@@ -715,7 +715,34 @@ const SearchableDropdown = ({ value, onChange, options, placeholder, loadingText
   );
 };
 
-const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, customers = [], branches = [] }) => {
+const DashboardOverviewSkeleton = () => (
+  <div className="flex-1 w-full max-w-full overflow-x-hidden bg-[#f8fafc] p-3 font-sans pb-4 space-y-3 animate-pulse min-h-[80vh]">
+    <div className="bg-white rounded-xl p-4 h-20 shadow-sm border border-slate-100 flex items-center justify-between">
+      <div className="space-y-2 w-1/3">
+        <div className="h-4 bg-slate-200 rounded w-full"></div>
+        <div className="h-3 bg-slate-200 rounded w-2/3"></div>
+      </div>
+      <div className="h-8 w-24 bg-slate-200 rounded-lg"></div>
+    </div>
+    
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className="bg-white rounded-xl p-4 h-28 shadow-sm border border-slate-100 flex flex-col justify-between">
+          <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+          <div className="h-7 bg-slate-200 rounded w-3/4"></div>
+          <div className="h-2 bg-slate-200 rounded w-full"></div>
+        </div>
+      ))}
+    </div>
+
+    <div className="bg-white rounded-xl p-4 h-44 shadow-sm border border-slate-100 flex flex-col justify-between">
+      <div className="h-4 bg-slate-200 rounded w-1/4"></div>
+      <div className="h-24 bg-slate-100 rounded-lg w-full"></div>
+    </div>
+  </div>
+);
+
+const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, customers = [], branches = [], isRoleResolving = false, isBranchLoading = false }) => {
   const isAdmin = userProfile?.role === 'admin';
   const showStaffCard = isAdmin || userProfile?.permissions?.dashboardStaffCard === true;
   const showLandSurveyCard = isAdmin || userProfile?.permissions?.dashboardLandSurveyCard === true;
@@ -4933,6 +4960,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
     };
   });
 
+  if (isRoleResolving || isBranchLoading || !userProfile) {
+    return <DashboardOverviewSkeleton />;
+  }
+
   return (
     <div 
       className="flex-1 w-full max-w-full overflow-x-hidden bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto"
@@ -5707,11 +5738,14 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                           }
 
                           if (att) {
-                             const ci = att.checkInTime || att.checkIn;
-                             const co = att.checkOutTime || att.checkOut;
+                             let ci = att.checkInTime || att.checkIn;
+                             let co = att.checkOutTime || att.checkOut;
+                             if (isPastDay && ci && !co) {
+                                co = `${dateStr}T23:59:59`;
+                             }
                              
                              if (ci && co) {
-                                const mins = getElapsedMins(att);
+                                const mins = getElapsedMins({ ...att, checkInTime: ci, checkOutTime: co });
                                 if (mins > 0 && mins < 420) status = 'half-day';
                                 else status = 'present';
                              } else if (ci && !co) {
@@ -5878,6 +5912,8 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                              let targetCo = null;
                              let targetDur = null;
 
+                             const isSelectedPastDay = selectedDateStr < `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+
                              if (isTodaySelected && attendanceState.checkInTime) {
                                 targetCi = attendanceState.checkInTime;
                                 targetCo = attendanceState.checkOutTime;
@@ -5898,6 +5934,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
                                    targetDur = parsed.duration;
                                  } catch (e) {}
                                }
+                             }
+
+                             if (isSelectedPastDay && targetCi && !targetCo) {
+                                targetCo = `${selectedDateStr}T23:59:59`;
                              }
 
                              if (targetCi) {

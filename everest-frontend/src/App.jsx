@@ -136,6 +136,9 @@ function App() {
     return !localStorage.getItem('everest_user_profile');
   });
 
+  const [isRoleResolving, setIsRoleResolving] = useState(true);
+  const [isBranchLoading, setIsBranchLoading] = useState(true);
+
   // Fetch Branches Globally
   useEffect(() => {
     if (user && userProfile) {
@@ -153,6 +156,8 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
+        setIsRoleResolving(true);
+        setIsBranchLoading(true);
         setAuthChecking(false); // Unblock UI immediately
         
         // Fetch fresh profile in background
@@ -244,14 +249,31 @@ function App() {
                 }
               }
             
-            setUserProfile(profileData);
+            // If switching to a different user, purge stale customer cache immediately
+            setUserProfile(prev => {
+              if (prev && prev.uid && profileData.uid && prev.uid !== profileData.uid) {
+                setCustomers([]);
+                localStorage.removeItem('everest_customers');
+              }
+              return profileData;
+            });
             safeSetItem('everest_user_profile', JSON.stringify(sanitizeProfile(profileData)));
+            setIsRoleResolving(false);
+            setIsBranchLoading(false);
           })
-          .catch(err => console.error("Error fetching profile:", err));
+          .catch(err => {
+            console.error("Error fetching profile:", err);
+            setIsRoleResolving(false);
+            setIsBranchLoading(false);
+          });
       } else {
         setUser(null);
         setUserProfile(null);
+        setCustomers([]);
         localStorage.removeItem('everest_user_profile');
+        localStorage.removeItem('everest_customers');
+        setIsRoleResolving(false);
+        setIsBranchLoading(false);
         setAuthChecking(false);
       }
     });
@@ -930,19 +952,22 @@ function App() {
   };
 
   const rbacDashboardCustomers = useMemo(() => {
+    if (isRoleResolving || isBranchLoading || !userProfile) return [];
     if (userProfile?.role === 'admin' || String(customerManagementMode).toLowerCase() === 'admin') return baseMappedCustomers;
     return baseMappedCustomers.filter(isStaffAssigned);
-  }, [baseMappedCustomers, userProfile, customerManagementMode, user]);
+  }, [baseMappedCustomers, userProfile, customerManagementMode, user, isRoleResolving, isBranchLoading]);
 
   const rbacManagementCustomers = useMemo(() => {
+    if (isRoleResolving || isBranchLoading || !userProfile) return [];
     if (userProfile?.role === 'admin' || String(customerManagementMode).toLowerCase() === 'admin') return processedCustomers;
     return processedCustomers.filter(isStaffAssigned);
-  }, [processedCustomers, userProfile, customerManagementMode, user]);
+  }, [processedCustomers, userProfile, customerManagementMode, user, isRoleResolving, isBranchLoading]);
 
   const rbacApplicationCustomers = useMemo(() => {
+    if (isRoleResolving || isBranchLoading || !userProfile) return [];
     if (userProfile?.role === 'admin' || String(applicationStatusMode).toLowerCase() === 'admin') return baseMappedCustomers;
     return baseMappedCustomers.filter(isStaffAssigned);
-  }, [baseMappedCustomers, userProfile, applicationStatusMode, user]);
+  }, [baseMappedCustomers, userProfile, applicationStatusMode, user, isRoleResolving, isBranchLoading]);
 
   // Select appropriate dataset based on current view to ensure metrics match tabular data
   const activeMetricsCustomers = currentView === 'Customer' ? rbacManagementCustomers : rbacDashboardCustomers;
@@ -1075,7 +1100,7 @@ function App() {
 
   const renderView = () => {
     switch(currentView) {
-      case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} onDrillDown={handleDrillDown} activeBranch={activeBranch} userProfile={userProfile} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} branches={branches} /></div>;
+      case 'Home': return <div className="flex-1 overflow-y-auto"><AdminDashboard setCurrentView={setCurrentView} onDrillDown={handleDrillDown} activeBranch={activeBranch} userProfile={userProfile} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} branches={branches} isRoleResolving={isRoleResolving} isBranchLoading={isBranchLoading} /></div>;
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
       case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} branches={branches} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
