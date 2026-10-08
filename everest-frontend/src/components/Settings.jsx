@@ -1,14 +1,35 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { Settings as SettingsIcon, Building2, MapPin, Eye, EyeOff, Calculator } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, MapPin, Eye, EyeOff, Calculator, ShieldAlert } from 'lucide-react';
 
-const Settings = ({ branches = [] }) => {
+const Settings = ({ branches = [], userProfile = null, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
   // We only list sub-branches (exclude Main Branch from configuration).
   const subBranches = branches.filter(b => b.id !== 'main' && b.name?.toLowerCase() !== 'main branch');
   const [toastMsg, setToastMsg] = useState(null);
 
+  // Enforce strict access control:
+  // Must be Admin / Super Admin (not staff) AND active branch must be Main Branch
+  const isStaff = userProfile?.role?.toLowerCase() === 'staff';
+  const isAdminRole = userProfile?.role === 'admin' || 
+                      userProfile?.role === 'Admin' || 
+                      userProfile?.role === 'main_admin' || 
+                      userProfile?.role === 'super_admin' || 
+                      userProfile?.isSuperAdmin === true ||
+                      (!userProfile?.role && userProfile !== null);
+  const isAdmin = isAdminRole && !isStaff;
+
+  const isMainBranch = activeBranch?.id === 'main' || 
+                       activeBranch?.name?.toLowerCase().includes('main') || 
+                       activeBranch?.isMainBranch === true;
+
+  const canManageConsolidation = isAdmin && isMainBranch;
+
   const handleToggle = async (branchId, field, currentValue) => {
+    if (!canManageConsolidation) {
+      alert('Unauthorized: Only Main Branch Administrators can update branch consolidation settings.');
+      return;
+    }
     try {
       const branchRef = doc(db, 'branches', branchId);
       await updateDoc(branchRef, {
@@ -35,94 +56,110 @@ const Settings = ({ branches = [] }) => {
               <SettingsIcon className="w-7 h-7 text-brand-blue" />
               Settings
             </h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">
-              Branch Visibility & Consolidation Controls
-            </p>
-          </div>
-          <div className="hidden md:flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-            <span className="text-xs font-bold text-blue-700">Main Branch Root</span>
-          </div>
-        </div>
-
-        {/* Configuration Card (Desktop Table / Mobile Stacked) */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-slate-400" />
-              Active Sub-Branches ({subBranches.length})
-            </h2>
-          </div>
-
-          <div className="flex flex-col">
-            {subBranches.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 font-medium">No sub-branches found.</div>
-            ) : (
-              subBranches.map((branch, idx) => {
-                const isVisible = branch.isVisibleInDropdown !== false; // Default true
-                const isIncluded = branch.includeInConsolidatedTotals !== false; // Default true
-
-                return (
-                  <div key={branch.id} className={`p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 ${idx !== subBranches.length - 1 ? 'border-b border-slate-100' : ''} hover:bg-slate-50/50 transition-colors`}>
-                    
-                    {/* Branch Info */}
-                    <div className="flex flex-col gap-1 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-slate-800">{branch.name}</h3>
-                        <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          {branch.branchCode || branch.id}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {branch.location || 'Location unassigned'}
-                      </div>
-                    </div>
-
-                    {/* Toggles Container */}
-                    <div className="flex flex-col md:flex-row gap-3 md:gap-8">
-                      
-                      {/* Toggle 1: Show in Dropdown */}
-                      <div className="flex items-center justify-between md:justify-end gap-3 md:w-48 bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-xl border border-slate-100 md:border-none">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                            {isVisible ? <Eye className="w-4 h-4 text-blue-500" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
-                            Dropdown Menu
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-medium hidden md:block">Show in top header</span>
-                        </div>
-                        <button 
-                          onClick={() => handleToggle(branch.id, 'isVisibleInDropdown', isVisible)}
-                          className={`w-[44px] h-[24px] rounded-full flex items-center transition-colors shrink-0 ${isVisible ? 'bg-blue-500' : 'bg-slate-300'}`}
-                        >
-                          <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transform transition-transform mx-[2px] ${isVisible ? 'translate-x-[20px]' : 'translate-x-0'}`}></div>
-                        </button>
-                      </div>
-
-                      {/* Toggle 2: Include in Totals */}
-                      <div className="flex items-center justify-between md:justify-end gap-3 md:w-56 bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-xl border border-slate-100 md:border-none">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                            <Calculator className={`w-4 h-4 ${isIncluded ? 'text-emerald-500' : 'text-slate-400'}`} />
-                            Main Totals
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-medium hidden md:block">Include in dashboard</span>
-                        </div>
-                        <button 
-                          onClick={() => handleToggle(branch.id, 'includeInConsolidatedTotals', isIncluded)}
-                          className={`w-[44px] h-[24px] rounded-full flex items-center transition-colors shrink-0 ${isIncluded ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                        >
-                          <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transform transition-transform mx-[2px] ${isIncluded ? 'translate-x-[20px]' : 'translate-x-0'}`}></div>
-                        </button>
-                      </div>
-
-                    </div>
-                  </div>
-                );
-              })
+            {canManageConsolidation && (
+              <p className="text-sm font-medium text-slate-500 mt-1">
+                Branch Visibility & Consolidation Controls
+              </p>
             )}
           </div>
+          {canManageConsolidation && (
+            <div className="hidden md:flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              <span className="text-xs font-bold text-blue-700">Main Branch Root</span>
+            </div>
+          )}
         </div>
+
+        {/* Configuration Card (Desktop Table / Mobile Stacked) - Guarded for Main Branch Admins Only */}
+        {!canManageConsolidation ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center max-w-lg mx-auto mt-6">
+            <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100">
+              <ShieldAlert className="w-6 h-6 text-amber-600" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 mb-1">Access Restricted</h3>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+              Branch Visibility & Consolidation Controls are restricted strictly to Main Branch Administrators.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-slate-400" />
+                Active Sub-Branches ({subBranches.length})
+              </h2>
+            </div>
+
+            <div className="flex flex-col">
+              {subBranches.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 font-medium">No sub-branches found.</div>
+              ) : (
+                subBranches.map((branch, idx) => {
+                  const isVisible = branch.isVisibleInDropdown !== false; // Default true
+                  const isIncluded = branch.includeInConsolidatedTotals !== false; // Default true
+
+                  return (
+                    <div key={branch.id} className={`p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 ${idx !== subBranches.length - 1 ? 'border-b border-slate-100' : ''} hover:bg-slate-50/50 transition-colors`}>
+                      
+                      {/* Branch Info */}
+                      <div className="flex flex-col gap-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-slate-800">{branch.name}</h3>
+                          <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            {branch.branchCode || branch.id}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                          <MapPin className="w-3.5 h-3.5" />
+                          {branch.location || 'Location unassigned'}
+                        </div>
+                      </div>
+
+                      {/* Toggles Container */}
+                      <div className="flex flex-col md:flex-row gap-3 md:gap-8">
+                        
+                        {/* Toggle 1: Show in Dropdown */}
+                        <div className="flex items-center justify-between md:justify-end gap-3 md:w-48 bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-xl border border-slate-100 md:border-none">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                              {isVisible ? <Eye className="w-4 h-4 text-blue-500" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
+                              Dropdown Menu
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-medium hidden md:block">Show in top header</span>
+                          </div>
+                          <button 
+                            onClick={() => handleToggle(branch.id, 'isVisibleInDropdown', isVisible)}
+                            className={`w-[44px] h-[24px] rounded-full flex items-center transition-colors shrink-0 ${isVisible ? 'bg-blue-500' : 'bg-slate-300'}`}
+                          >
+                            <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transform transition-transform mx-[2px] ${isVisible ? 'translate-x-[20px]' : 'translate-x-0'}`}></div>
+                          </button>
+                        </div>
+
+                        {/* Toggle 2: Include in Totals */}
+                        <div className="flex items-center justify-between md:justify-end gap-3 md:w-56 bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-xl border border-slate-100 md:border-none">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                              <Calculator className={`w-4 h-4 ${isIncluded ? 'text-emerald-500' : 'text-slate-400'}`} />
+                              Main Totals
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-medium hidden md:block">Include in dashboard</span>
+                          </div>
+                          <button 
+                            onClick={() => handleToggle(branch.id, 'includeInConsolidatedTotals', isIncluded)}
+                            className={`w-[44px] h-[24px] rounded-full flex items-center transition-colors shrink-0 ${isIncluded ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                          >
+                            <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transform transition-transform mx-[2px] ${isIncluded ? 'translate-x-[20px]' : 'translate-x-0'}`}></div>
+                          </button>
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
 
       </div>
 
