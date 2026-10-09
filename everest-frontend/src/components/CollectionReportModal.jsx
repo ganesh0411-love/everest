@@ -90,6 +90,61 @@ const resolvePaymentMode = (inst) => {
   return 'Cash';
 };
 
+const formatTransactionSubtext = (dateStr, timeStr, createdAt) => {
+  let day = '09';
+  let monthStr = 'OCT';
+  let yearStr = '26';
+  let timeFormatted = timeStr || '';
+
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+  let dateObj = null;
+
+  if (createdAt) {
+    const d = new Date(createdAt);
+    if (!isNaN(d.getTime())) dateObj = d;
+  }
+
+  if (!dateObj && dateStr) {
+    const ts = parseDateToTimestamp(dateStr);
+    if (ts) dateObj = new Date(ts);
+  }
+
+  if (dateObj) {
+    day = String(dateObj.getDate()).padStart(2, '0');
+    monthStr = months[dateObj.getMonth()];
+    yearStr = String(dateObj.getFullYear()).slice(-2);
+    if (!timeFormatted) {
+      timeFormatted = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+    }
+  } else if (dateStr && typeof dateStr === 'string') {
+    const parts = dateStr.trim().split(/[\.\-\/]/);
+    if (parts.length === 3) {
+      if (parts[0].length === 4) { // YYYY-MM-DD
+        yearStr = parts[0].slice(-2);
+        const mIdx = parseInt(parts[1], 10) - 1;
+        if (mIdx >= 0 && mIdx < 12) monthStr = months[mIdx];
+        day = parts[2].padStart(2, '0');
+      } else { // DD-MM-YYYY
+        day = parts[0].padStart(2, '0');
+        const mIdx = parseInt(parts[1], 10) - 1;
+        if (mIdx >= 0 && mIdx < 12) monthStr = months[mIdx];
+        if (parts[2].length === 4) yearStr = parts[2].slice(-2);
+        else yearStr = parts[2];
+      }
+    }
+  }
+
+  const dateFormatted = `${day} ${monthStr} ${yearStr}`;
+
+  if (timeFormatted) {
+    timeFormatted = timeFormatted.toUpperCase().replace(/\.\s*/g, '');
+    return `${dateFormatted} • ${timeFormatted}`;
+  }
+
+  return dateFormatted;
+};
+
 export default function CollectionReportModal({ 
   isOpen = true, 
   onClose,
@@ -239,6 +294,7 @@ export default function CollectionReportModal({
     // Calculate number of calendar days in selected date range
     const diffMs = Math.max(0, endTs - startTs);
     const daysInRange = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+    const isSingleDay = fromDate === toDate;
 
     let totalTarget = 0;
     let totalSanctionedLoanAmtForDisbursed = 0;
@@ -270,15 +326,54 @@ export default function CollectionReportModal({
             customerTargetInPeriod += instDue;
 
             if (amount > 0 && status !== 'BOUNCED' && status !== 'CANCELLED') {
-              const mode = resolvePaymentMode(inst);
+              const upiAmt = Number(inst.upiAmount || 0);
+              const cashAmt = Number(inst.cashAmount || 0);
+              const rawMode = (inst.mode || inst.paymentMode || inst.instrument || '').toString().trim().toUpperCase();
+
+              let isSplit = false;
+              let finalUpi = 0;
+              let finalCash = 0;
+              let resolvedMode = 'Cash';
+
+              if (upiAmt > 0 && cashAmt > 0) {
+                isSplit = true;
+                finalUpi = upiAmt;
+                finalCash = cashAmt;
+                resolvedMode = 'Split';
+              } else if (rawMode === 'SPLIT' || rawMode === 'UPI/CASH' || rawMode === 'BOTH') {
+                isSplit = true;
+                if (upiAmt > 0 || cashAmt > 0) {
+                  finalUpi = upiAmt;
+                  finalCash = cashAmt;
+                } else {
+                  finalUpi = Math.round(amount / 2);
+                  finalCash = amount - finalUpi;
+                }
+                resolvedMode = 'Split';
+              } else {
+                resolvedMode = resolvePaymentMode(inst);
+                if (resolvedMode === 'UPI') {
+                  finalUpi = amount;
+                  finalCash = 0;
+                } else {
+                  finalCash = amount;
+                  finalUpi = 0;
+                }
+              }
+
               const key = `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`;
               entriesMap.set(key, {
                 id: key,
                 name: custName,
-                mode: mode,
+                mode: resolvedMode,
+                isSplit: isSplit,
+                upiAmount: finalUpi,
+                cashAmount: finalCash,
                 credit: amount,
                 debit: Number(cust.debit || 0),
-                date: instDate
+                date: instDate,
+                timeStr: inst.timeStr || inst.time,
+                createdAt: inst.createdAt || inst.date
               });
             }
           }
@@ -292,7 +387,14 @@ export default function CollectionReportModal({
         const custStatus = String(cust.status || '').toLowerCase();
         const isActiveCust = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
         if (isActiveCust && custTargetPerDay > 0) {
-          totalTarget += (daysInRange * custTargetPerDay);
+          if (isSingleDay) {
+            const custNextDueDate = cust.nextDueDate || cust.dueDate || cust.scheduledDate;
+            if (custNextDueDate && isInDateRange(custNextDueDate)) {
+              totalTarget += custTargetPerDay;
+            }
+          } else {
+            totalTarget += (daysInRange * custTargetPerDay);
+          }
         }
       }
 
@@ -313,9 +415,14 @@ export default function CollectionReportModal({
             id: key,
             name: custName,
             mode: 'Cash',
+            isSplit: false,
+            upiAmount: 0,
+            cashAmount: disbAmount,
             credit: 0,
             debit: disbAmount,
-            date: disbDate
+            date: disbDate,
+            timeStr: cust.timeStr || '',
+            createdAt: disbDate
           });
         }
       }
@@ -577,8 +684,8 @@ export default function CollectionReportModal({
             </div>
           ) : (
             /* Case C: Card 1 = Collection */
-            <div className="flex-1 flex items-center justify-between lg:justify-start gap-2 pr-2 sm:pr-3 min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
+            <div className="flex-1 flex items-center justify-between gap-1.5 sm:gap-2 pr-1 sm:pr-3 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
                   <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
                 </div>
@@ -589,8 +696,8 @@ export default function CollectionReportModal({
                   </span>
                 </div>
               </div>
-              {/* Desktop Only: UPI & Cash Breakdown */}
-              <div className="hidden lg:flex border-l border-sky-200/70 pl-2.5 flex-col justify-center text-[10px] leading-tight space-y-0.5 ml-auto">
+              {/* UPI & Cash Breakdown (Visible on Mobile & Desktop) */}
+              <div className="flex border-l border-sky-200/70 pl-2 flex-col justify-center text-[9px] sm:text-[10px] leading-tight space-y-0.5 ml-auto shrink-0">
                 <div className="flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0"></span>
                   <span className="text-slate-500">UPI:</span>
@@ -608,15 +715,30 @@ export default function CollectionReportModal({
           {/* Card 2 (Right 50%) */}
           {isCreditActive && !isDebitActive ? (
             /* Case A: Card 2 = Collection */
-            <div className="flex-1 flex items-center gap-2 pl-2 sm:pl-3 min-w-0">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
-                <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+            <div className="flex-1 flex items-center justify-between gap-1.5 sm:gap-2 pl-2 sm:pl-3 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
+                  <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
+                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                    ₹ {totalCollection.toLocaleString('en-IN')}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
-                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
-                  ₹ {totalCollection.toLocaleString('en-IN')}
-                </span>
+              {/* UPI & Cash Breakdown */}
+              <div className="flex border-l border-sky-200/70 pl-2 flex-col justify-center text-[9px] sm:text-[10px] leading-tight space-y-0.5 ml-auto shrink-0">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0"></span>
+                  <span className="text-slate-500">UPI:</span>
+                  <span className="font-bold text-blue-700">₹ {onlineCollection.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
+                  <span className="text-slate-500">Cash:</span>
+                  <span className="font-bold text-emerald-700">₹ {cashCollection.toLocaleString('en-IN')}</span>
+                </div>
               </div>
             </div>
           ) : !isCreditActive && isDebitActive ? (
@@ -666,9 +788,9 @@ export default function CollectionReportModal({
                 
                 {/* MODE Header Column */}
                 {isCreditActive && !isDebitActive ? (
-                  <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-20 sm:w-24">MODE</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-24 sm:w-28">MODE</th>
                 ) : isCreditActive && isDebitActive ? (
-                  <th className="hidden lg:table-cell py-2.5 px-4 text-center text-[11px] font-semibold text-slate-500 w-28 lg:w-32">Mode</th>
+                  <th className="hidden lg:table-cell py-2.5 px-4 text-center text-[11px] font-semibold text-slate-500 w-28 lg:w-36">Mode</th>
                 ) : null}
 
                 {/* Credit Header Column */}
@@ -688,12 +810,26 @@ export default function CollectionReportModal({
                   {filteredData.map((item, index) => (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium text-slate-400">{index + 1}</td>
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 font-semibold text-slate-800">{item.name}</td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                        <div className="font-semibold text-slate-800 leading-tight">{item.name}</div>
+                        <div className="text-[10px] font-medium text-slate-400 mt-0.5">
+                          {formatTransactionSubtext(item.date, item.timeStr, item.createdAt)}
+                        </div>
+                      </td>
                       
                       {/* MODE Data Cell */}
                       {isCreditActive && !isDebitActive ? (
                         <td className="py-2.5 sm:py-3 px-2 text-center">
-                          {item.mode === 'UPI' || item.mode === 'Online' ? (
+                          {item.isSplit ? (
+                            <div className="flex flex-col items-center justify-center gap-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
+                                UPI: ₹{item.upiAmount}
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+                                Cash: ₹{item.cashAmount}
+                              </span>
+                            </div>
+                          ) : item.mode === 'UPI' || item.mode === 'Online' ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
                               UPI
                             </span>
@@ -705,7 +841,16 @@ export default function CollectionReportModal({
                         </td>
                       ) : isCreditActive && isDebitActive ? (
                         <td className="hidden lg:table-cell py-3 px-4 text-center">
-                          {item.mode === 'UPI' || item.mode === 'Online' ? (
+                          {item.isSplit ? (
+                            <div className="flex flex-col items-center justify-center gap-1">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
+                                UPI: ₹{item.upiAmount}
+                              </span>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+                                Cash: ₹{item.cashAmount}
+                              </span>
+                            </div>
+                          ) : item.mode === 'UPI' || item.mode === 'Online' ? (
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
                               UPI
                             </span>
@@ -720,7 +865,12 @@ export default function CollectionReportModal({
                       {/* Credit Data Cell */}
                       {isCreditActive && (
                         <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
-                          ₹ {item.credit.toLocaleString('en-IN')}
+                          <div>₹ {item.credit.toLocaleString('en-IN')}</div>
+                          {item.isSplit && (
+                            <div className="text-[9px] font-medium text-slate-400 mt-0.5">
+                              (UPI: ₹{item.upiAmount} • Cash: ₹{item.cashAmount})
+                            </div>
+                          )}
                         </td>
                       )}
 

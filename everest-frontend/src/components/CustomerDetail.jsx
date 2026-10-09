@@ -442,17 +442,33 @@ const CustomerDetail = ({ customer, onBack }) => {
   const handleManualQuickPay = () => {
     if (isModalFutureDate) return;
     const nextId = installments.length + 1;
-    const mode = (Number(manualUpi || 0) > 0 || upiPhoto) ? 'UPI' : 'Cash';
-    
+    const cashAmt = Number(manualCash || 0);
+    const upiAmt = Number(manualUpi || 0);
+    const totalAmt = (cashAmt + upiAmt > 0) ? (cashAmt + upiAmt) : currentDueAmount;
+
+    let mode = 'Cash';
+    if (upiAmt > 0 && cashAmt > 0) {
+      mode = 'Split';
+    } else if (upiAmt > 0 || upiPhoto) {
+      mode = 'UPI';
+    } else {
+      mode = 'Cash';
+    }
+
+    const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+
     const newInstallment = {
       id: nextId,
       date: collectionDate || nextFormattedDueDate,
       number: nextNumber,
       status: 'PAID',
-      amount: grandTotal,
+      amount: totalAmt,
       mode: mode,
       paymentMode: mode,
-      timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase(),
+      cashAmount: cashAmt,
+      upiAmount: upiAmt,
+      timeStr: timeStr,
+      createdAt: new Date().toISOString(),
       upiPhoto: upiPhoto,
       denomCounts: denomCounts
     };
