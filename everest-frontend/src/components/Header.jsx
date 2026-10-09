@@ -289,7 +289,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             <span className="text-blue-600 text-[11px] font-black tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Manage & Monitor Staff Profiles</span>
           </div>
         )}
-        {currentView !== 'Customer' && currentView !== 'Application Status' && currentView !== 'Staff Management' && currentView !== 'Home' && currentView !== 'HOME' && currentView !== 'Dashboard Overview' && (
+        {currentView !== 'Customer' && currentView !== 'Application Status' && currentView !== 'Staff Management' && currentView !== 'Home' && currentView !== 'HOME' && currentView !== 'Dashboard Overview' && !isCollectionReportOpen && (
           <h1 className="text-[24px] font-black text-slate-900 tracking-wider leading-tight whitespace-nowrap uppercase" style={{ fontFamily: 'Georgia, serif' }}>
             {currentView}
           </h1>

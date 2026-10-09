@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Wallet } from 'lucide-react';
 
 // Mock Ledger Data strictly matching reference specs
@@ -25,6 +25,15 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
 
   // Active quick pill selection
   const [activePill, setActivePill] = useState('All'); // 'All', 'Credit', 'Debit'
+
+  // Scroll ref to reset scroll to top on modal open
+  const tableScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && tableScrollRef.current) {
+      tableScrollRef.current.scrollTop = 0;
+    }
+  }, [isOpen]);
 
   // Date period preset selection handler
   const handlePeriodSelect = (option) => {
@@ -259,7 +268,7 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
 
       {/* True Collection Data Ledger Table - Flex-1 with Dedicated Scroll */}
       <div className="flex-1 min-h-0 bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
+        <div ref={tableScrollRef} className="flex-1 overflow-y-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/90 border-b border-slate-200 sticky top-0 z-10 select-none backdrop-blur-xs">
               <tr>
