@@ -88,6 +88,23 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }
   };
 
+  const handlePan = (dx, dy) => {
+    if (!mapInstance.current) return;
+    setIsFollowMode(false);
+    isFollowModeRef.current = false;
+    mapInstance.current.panBy([dx, dy], { animate: true, duration: 0.25 });
+  };
+
+  const handleZoomIn = () => {
+    if (!mapInstance.current) return;
+    mapInstance.current.zoomIn(1);
+  };
+
+  const handleZoomOut = () => {
+    if (!mapInstance.current) return;
+    mapInstance.current.zoomOut(1);
+  };
+
   // Map Refs
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
@@ -842,6 +859,85 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
                 <p>Awaiting staff mobile GPS signal</p>
             </div>
           )}
+
+          {/* Floating Pan-Joystick D-pad Navigation & Zoom Controls (z-40) */}
+          <div className="absolute bottom-20 right-4 z-40 flex flex-col items-center gap-2.5 pointer-events-auto">
+            {/* Circular D-pad Joystick Wheel */}
+            <div className="bg-slate-900/85 backdrop-blur-md p-1.5 rounded-full border border-slate-700/80 shadow-2xl flex flex-col items-center gap-1 select-none">
+              {/* Up Arrow (North) */}
+              <button
+                onClick={() => handlePan(0, -150)}
+                className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 active:bg-blue-600 text-slate-200 hover:text-white flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer"
+                title="Pan North (Up)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+              </button>
+              
+              <div className="flex items-center gap-1">
+                {/* Left Arrow (West) */}
+                <button
+                  onClick={() => handlePan(-150, 0)}
+                  className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 active:bg-blue-600 text-slate-200 hover:text-white flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer"
+                  title="Pan West (Left)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+
+                {/* Center Target Lock / Re-center Button */}
+                <button
+                  onClick={handleRecenter}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer ${
+                    isFollowMode 
+                      ? 'bg-blue-600 text-white border border-blue-400 shadow-blue-500/50' 
+                      : 'bg-slate-800/90 text-sky-400 hover:bg-slate-700 border border-slate-600'
+                  }`}
+                  title={isFollowMode ? "Target locked (Recenter at zoom 18)" : "Recenter on staff target (Zoom 18)"}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="8" />
+                    <circle cx="12" cy="12" r="3" fill="currentColor" />
+                  </svg>
+                </button>
+
+                {/* Right Arrow (East) */}
+                <button
+                  onClick={() => handlePan(150, 0)}
+                  className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 active:bg-blue-600 text-slate-200 hover:text-white flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer"
+                  title="Pan East (Right)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+
+              {/* Down Arrow (South) */}
+              <button
+                onClick={() => handlePan(0, 150)}
+                className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 active:bg-blue-600 text-slate-200 hover:text-white flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer"
+                title="Pan South (Down)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+
+            {/* Step Zoom Controls (+ / -) */}
+            <div className="bg-slate-900/85 backdrop-blur-md p-1 rounded-full border border-slate-700/80 shadow-2xl flex flex-col items-center gap-1 select-none">
+              <button
+                onClick={handleZoomIn}
+                className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 active:bg-blue-600 text-slate-200 hover:text-white flex items-center justify-center font-bold text-base transition-all active:scale-90 cursor-pointer"
+                title="Zoom In"
+              >
+                +
+              </button>
+              <div className="w-5 h-[1px] bg-slate-700/80"></div>
+              <button
+                onClick={handleZoomOut}
+                className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 active:bg-blue-600 text-slate-200 hover:text-white flex items-center justify-center font-bold text-base transition-all active:scale-90 cursor-pointer"
+                title="Zoom Out"
+              >
+                −
+              </button>
+            </div>
+          </div>
 
           {/* 3. Bottom Floating Action Controls */}
           <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
