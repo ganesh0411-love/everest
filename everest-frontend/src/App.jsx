@@ -47,6 +47,7 @@ const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 
 const parseGlobalDate = (dStr) => {
   if (!dStr) return new Date();
+  if (dStr instanceof Date) return new Date(dStr.getTime());
   
   // Handle Firebase Timestamps
   if (dStr && typeof dStr.toDate === 'function') {
@@ -57,18 +58,29 @@ const parseGlobalDate = (dStr) => {
   }
 
   if (typeof dStr === 'string') {
-    if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
-      const parts = dStr.split('-');
-      const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
-      return new Date(`${year}-${parts[1]}-${parts[0]}`);
+    const cleanStr = dStr.replace(/\s*[\(\[]?[A-Za-z]{3,9}[\)\]]?/i, '').trim();
+
+    // Check for DD-MM-YYYY, DD.MM.YYYY, DD/MM/YYYY
+    const dmyMatch = cleanStr.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})$/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10);
+      let year = parseInt(dmyMatch[3], 10);
+      if (year < 100) year += 2000;
+      return new Date(year, month - 1, day);
     }
-    if (dStr.includes('/') && dStr.split('/')[0].length === 2) {
-      const parts = dStr.split('/');
-      const year = (parts[2] && parts[2].length === 2) ? '20' + parts[2] : (parts[2] || new Date().getFullYear());
-      return new Date(`${year}-${parts[1]}-${parts[0]}`);
+
+    // Check for YYYY-MM-DD
+    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})$/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10);
+      const day = parseInt(ymdMatch[3], 10);
+      return new Date(year, month - 1, day);
     }
   }
-  return new Date(dStr);
+  const parsed = new Date(dStr);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
 };
 
 export const safeSetItem = (key, value) => {

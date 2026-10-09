@@ -125,11 +125,32 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const parseDate = (dStr) => {
     if (!dStr) return new Date();
-    if (dStr.includes('-') && dStr.split('-')[0].length === 2) {
-      const parts = dStr.split('-');
-      return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    if (dStr instanceof Date) return new Date(dStr.getTime());
+    if (typeof dStr === 'object' && dStr.seconds !== undefined) {
+      return new Date(dStr.seconds * 1000);
     }
-    return new Date(dStr);
+    const str = String(dStr).trim();
+    const cleanStr = str.replace(/\s*[\(\[]?[A-Za-z]{3,9}[\)\]]?/i, '').trim();
+
+    const dmyMatch = cleanStr.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})$/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10);
+      let year = parseInt(dmyMatch[3], 10);
+      if (year < 100) year += 2000;
+      return new Date(year, month - 1, day);
+    }
+
+    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})$/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10);
+      const day = parseInt(ymdMatch[3], 10);
+      return new Date(year, month - 1, day);
+    }
+
+    const parsed = new Date(cleanStr);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
   };
 
   const getNumberSuffix = (num) => {
@@ -250,20 +271,44 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const latePaymentCount = calculateLatePayments(installments);
 
-  const nextDueDateObj = new Date(baseDateObj);
-  if (planToken === 'DAY') {
-    nextDueDateObj.setDate(nextDueDateObj.getDate() + effectiveInstallmentCount);
-  } else if (planToken === 'MONTH') {
-    nextDueDateObj.setMonth(nextDueDateObj.getMonth() + effectiveInstallmentCount);
-  } else { // WEEK
-    nextDueDateObj.setDate(nextDueDateObj.getDate() + (effectiveInstallmentCount * 7));
-  }
+  const nextDueDateObj = (() => {
+    if (!lastValidInst || !lastValidInst.date) {
+      const startObj = new Date(baseDateObj);
+      if (planToken === 'DAY') {
+        startObj.setDate(startObj.getDate() + effectiveInstallmentCount);
+      } else if (planToken === 'MONTH') {
+        startObj.setMonth(startObj.getMonth() + effectiveInstallmentCount);
+      } else { // WEEK
+        startObj.setDate(startObj.getDate() + (effectiveInstallmentCount * 7));
+      }
+      return startObj;
+    }
+    
+    const lastDate = parseDate(lastValidInst.date);
+    if (isLastPending) {
+      return lastDate;
+    }
+
+    const nextDate = new Date(lastDate);
+    const isDaily = planToken === 'DAY' || (customer?.loanType && customer.loanType.toLowerCase().includes('daily'));
+    const isMonthly = planToken === 'MONTH' || (customer?.loanType && customer.loanType.toLowerCase().includes('month'));
+    
+    if (isDaily) {
+      nextDate.setDate(nextDate.getDate() + 1);
+    } else if (isMonthly) {
+      nextDate.setMonth(nextDate.getMonth() + 1);
+    } else { // WEEK
+      nextDate.setDate(nextDate.getDate() + 7);
+    }
+    return nextDate;
+  })();
 
   const dd = String(nextDueDateObj.getDate()).padStart(2, '0');
   const mm = String(nextDueDateObj.getMonth() + 1).padStart(2, '0');
   const yyyy = nextDueDateObj.getFullYear();
   const nextFormattedDueDate = `${dd}-${mm}-${yyyy}`;
-  const nextFormattedWeekday = nextDueDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  const activeModalDateObj = parseDate(collectionDate || nextFormattedDueDate);
+  const nextFormattedWeekday = activeModalDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
 
   const now = new Date();
   now.setHours(0,0,0,0);
@@ -349,30 +394,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       alert(`This loan account is already closed and fully settled. Further entries cannot be recorded.`);
       return;
     }
-    const today = new Date();
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
-    const todayFormatted = `${dd}-${mm}-${yyyy}`;
 
-    let defaultDate = isLastPending ? todayFormatted : nextFormattedDueDate;
-
-    if (customer?.loanType && customer.loanType.toLowerCase() === 'daily') {
-      const insts = Array.isArray(customer?.installments) ? customer.installments : [];
-      if (insts.length > 0) {
-        const sortedInsts = [...insts].sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime());
-        const lastInst = sortedInsts[sortedInsts.length - 1];
-        if (lastInst && lastInst.date) {
-          const lastDateObj = parseDate(lastInst.date);
-          if (!isNaN(lastDateObj.getTime())) {
-            lastDateObj.setDate(lastDateObj.getDate() + 1);
-            defaultDate = `${String(lastDateObj.getDate()).padStart(2, '0')}-${String(lastDateObj.getMonth() + 1).padStart(2, '0')}-${lastDateObj.getFullYear()}`;
-          }
-        }
-      }
-    }
-
-    setCollectionDate(defaultDate);
+    setCollectionDate(nextFormattedDueDate);
     setIsManualEntryMode(false);
     setIsDenominationMode(false);
     setIsUpiPhotoSelectionMode(false);
