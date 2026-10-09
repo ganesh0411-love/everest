@@ -5633,6 +5633,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           setShowCollectionReportModal(false);
           setIsCollectionReportOpen?.(false);
         }}
+        userProfile={userProfile}
+        activeBranch={activeBranch}
+        branches={branches}
+        customers={customers}
       />
 
       {/* Mark Attendance Calendar Overlay */}

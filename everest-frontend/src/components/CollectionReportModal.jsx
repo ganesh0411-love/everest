@@ -1,20 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Wallet, Target, HandCoins } from 'lucide-react';
 
-// Mock Ledger Data with Branch & Staff metadata for RBAC validation
-const MOCK_LEDGER_DATA = [
-  { id: 1, name: 'Lakshmi Devi', mode: 'UPI', credit: 5000, debit: 1000, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
-  { id: 2, name: 'Meena Kumari', mode: 'Cash', credit: 3500, debit: 500, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Sita', staffId: 'ST02' },
-  { id: 3, name: 'Selvam', mode: 'UPI', credit: 7200, debit: 1200, branchId: 'b2', branchName: 'Madurai Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
-  { id: 4, name: 'Ravi Kumar', mode: 'Cash', credit: 4800, debit: 800, branchId: 'b2', branchName: 'Madurai Branch', assignedStaff: 'Kumar', staffId: 'ST03' },
-  { id: 5, name: 'Kavitha', mode: 'UPI', credit: 6300, debit: 700, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
-  { id: 6, name: 'Murugan', mode: 'Cash', credit: 5600, debit: 1100, branchId: 'b3', branchName: 'Dindigul Branch', assignedStaff: 'Sita', staffId: 'ST02' },
-  { id: 7, name: 'Priya', mode: 'UPI', credit: 3200, debit: 600, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
-  { id: 8, name: 'Suresh', mode: 'UPI', credit: 8400, debit: 1500, branchId: 'b2', branchName: 'Madurai Branch', assignedStaff: 'Kumar', staffId: 'ST03' },
-  { id: 9, name: 'Anitha', mode: 'Cash', credit: 4900, debit: 900, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Sita', staffId: 'ST02' },
-  { id: 10, name: 'Babu', mode: 'UPI', credit: 6700, debit: 1300, branchId: 'b3', branchName: 'Dindigul Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
-];
-
 const getTodayStr = () => {
   const today = new Date();
   const year = today.getFullYear();
@@ -41,12 +27,42 @@ const formatFromNativeDate = (yyyyMmDd) => {
   return yyyyMmDd;
 };
 
+const parseDateToTimestamp = (dStr) => {
+  if (!dStr) return null;
+  if (dStr instanceof Date) return dStr.getTime();
+  if (typeof dStr === 'object' && dStr.seconds !== undefined) return dStr.seconds * 1000;
+
+  if (typeof dStr === 'string') {
+    const cleanStr = dStr.trim();
+    // DD-MM-YYYY or DD.MM.YYYY or DD/MM/YYYY
+    const dmyMatch = cleanStr.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})$/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10);
+      let year = parseInt(dmyMatch[3], 10);
+      if (year < 100) year += 2000;
+      return new Date(year, month - 1, day).getTime();
+    }
+    // YYYY-MM-DD
+    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})$/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10);
+      const day = parseInt(ymdMatch[3], 10);
+      return new Date(year, month - 1, day).getTime();
+    }
+  }
+  const parsed = new Date(dStr);
+  return isNaN(parsed.getTime()) ? null : parsed.getTime();
+};
+
 export default function CollectionReportModal({ 
   isOpen = true, 
   onClose,
   userProfile = null,
   activeBranch = { id: 'main', name: 'Main Branch' },
   branches = [],
+  customers = [],
   customLedgerData = null
 }) {
   const [fromDate, setFromDate] = useState(() => getTodayStr());
@@ -104,8 +120,9 @@ export default function CollectionReportModal({
       setFromDate(formatDate(lastMonth));
       setToDate(formatDate(today));
     } else {
-      setFromDate('01-09-2025');
-      setToDate('30-09-2025');
+      const dateStr = formatDate(today);
+      setFromDate(dateStr);
+      setToDate(dateStr);
     }
   };
 
@@ -118,8 +135,15 @@ export default function CollectionReportModal({
     );
   }, [branches]);
 
-  const scopedData = useMemo(() => {
-    const rawData = customLedgerData || MOCK_LEDGER_DATA;
+  // Real Customer Ledger Extraction & Metric Summaries
+  const { ledgerEntries, targetCollection, targetLoanAmount } = useMemo(() => {
+    const rawCustomers = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
+      try {
+        const saved = localStorage.getItem('everest_customers');
+        return saved ? JSON.parse(saved) : [];
+      } catch(e) { return []; }
+    })());
+
     const userRole = userProfile?.role || 'admin';
     const isStaff = userRole === 'staff' || userRole === 'Staff' || userRole === 'agent';
     const staffAdminOverride = Boolean(
@@ -132,27 +156,31 @@ export default function CollectionReportModal({
     const staffName = userProfile?.staffName || userProfile?.name || userProfile?.displayName || '';
     const staffId = userProfile?.staffId || userProfile?.employeeId || userProfile?.uid || '';
 
-    return rawData.filter((item) => {
-      // 1. Branch scoping & Consolidation check
+    // 1. Scope Customers by Branch & Staff RBAC
+    const scopedCustomers = (rawCustomers || []).filter((customer) => {
+      if (!customer) return false;
+      const custBranchId = customer.branchId || customer.branchCode;
+      const custBranchName = customer.branch || customer.branchName;
+
+      // Branch scoping & Consolidation check
       if (isMainBranch) {
-        // Exclude disabled/hidden branches in consolidation settings
-        if (item.branchId && disabledBranchIds.has(item.branchId)) {
+        if (custBranchId && disabledBranchIds.has(custBranchId)) {
           return false;
         }
       } else {
-        // Sub-branch users strictly restricted to their assigned branch
-        if (item.branchId && item.branchId !== userBranchId && item.branchName !== activeBranch?.name) {
+        if (custBranchId && custBranchId !== userBranchId && custBranchName !== activeBranch?.name) {
           return false;
         }
       }
 
-      // 2. Staff Scoping
+      // Staff Scoping
       if (isStaff && !staffAdminOverride) {
-        if (item.assignedStaff || item.staffId || item.staffName) {
+        const custStaff = customer.assignedStaff || customer.staffName || customer.staff;
+        const custStaffId = customer.staffId;
+        if (custStaff || custStaffId) {
           const matchesStaff = (
-            (staffName && item.assignedStaff === staffName) ||
-            (staffName && item.staffName === staffName) ||
-            (staffId && item.staffId === staffId)
+            (staffName && custStaff === staffName) ||
+            (staffId && custStaffId === staffId)
           );
           if (!matchesStaff) return false;
         }
@@ -160,22 +188,111 @@ export default function CollectionReportModal({
 
       return true;
     });
-  }, [customLedgerData, userProfile, activeBranch, disabledBranchIds]);
 
-  const targetCollection = useMemo(() => {
-    return scopedData.reduce((acc, item) => acc + (Number(item.credit) || 0), 0);
-  }, [scopedData]);
+    // 2. Compute Target & Loan Amount Metrics across scoped customers
+    let totalTarget = 0;
+    let totalLoanAmt = 0;
 
-  const targetLoanAmount = useMemo(() => {
-    return scopedData.reduce((acc, item) => acc + (Number(item.debit) || 0), 0);
-  }, [scopedData]);
+    scopedCustomers.forEach((cust) => {
+      const targetVal = Number(cust.perDayAmount || cust.dailyInstallment || cust.installmentAmount || cust.targetAmount || 0) ||
+        (cust.repayAmount ? Math.round(Number(cust.repayAmount) / Math.max(1, Number(cust.tenure || cust.weeks || cust.days || 100))) : 0);
+      totalTarget += targetVal;
+
+      const loanVal = Number(cust.loanAmount || cust.amount || 0);
+      totalLoanAmt += loanVal;
+    });
+
+    // 3. Date Boundary Range
+    const fromTs = parseDateToTimestamp(fromDate);
+    const toTs = parseDateToTimestamp(toDate);
+    const startTs = fromTs ? new Date(fromTs).setHours(0, 0, 0, 0) : 0;
+    const endTs = toTs ? new Date(toTs).setHours(23, 59, 59, 999) : Date.now();
+
+    const isInDateRange = (dStr) => {
+      if (!dStr) return false;
+      const ts = parseDateToTimestamp(dStr);
+      if (!ts) return false;
+      return ts >= startTs && ts <= endTs;
+    };
+
+    const entriesMap = new Map(); // uniqueKey -> ledger row
+
+    scopedCustomers.forEach((cust) => {
+      const custName = cust.name || cust.customerName || 'Customer';
+
+      // Credit Entries from Customer Installments/Ledger
+      const rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
+      if (Array.isArray(rawInstallments) && rawInstallments.length > 0) {
+        rawInstallments.forEach((inst, index) => {
+          const instDate = inst.date || inst.paymentDate || inst.createdAt;
+          const status = String(inst.status || '').toUpperCase();
+          const amount = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
+
+          if (amount > 0 && status !== 'BOUNCED' && status !== 'CANCELLED' && isInDateRange(instDate)) {
+            const mode = inst.mode || inst.paymentMode || (Number(inst.upiAmount || 0) > 0 ? 'UPI' : 'Cash');
+            const key = `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`;
+            entriesMap.set(key, {
+              id: key,
+              name: custName,
+              mode: mode,
+              credit: amount,
+              debit: Number(cust.debit || 0),
+              date: instDate
+            });
+          }
+        });
+      } else if (Number(cust.credit) > 0) {
+        // Fallback for flat ledger items
+        const cDate = cust.date || cust.createdAt;
+        if (!cDate || isInDateRange(cDate)) {
+          const key = `${cust.id}_flat_credit`;
+          entriesMap.set(key, {
+            id: key,
+            name: custName,
+            mode: cust.mode || 'Cash',
+            credit: Number(cust.credit),
+            debit: Number(cust.debit || 0),
+            date: cDate
+          });
+        }
+      }
+
+      // Debit Entries from Customer Loan Disbursements
+      const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.approvalDate || cust.loanDate || cust.date || cust.createdAt;
+      const custStatus = String(cust.status || '').toLowerCase();
+      const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
+      const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
+
+      if (isApprovedOrDisbursed && disbAmount > 0 && isInDateRange(disbDate)) {
+        const key = `${cust.id}_debit_${disbDate}`;
+        if (!entriesMap.has(key)) {
+          entriesMap.set(key, {
+            id: key,
+            name: custName,
+            mode: 'Cash',
+            credit: 0,
+            debit: disbAmount,
+            date: disbDate
+          });
+        }
+      }
+    });
+
+    const entries = Array.from(entriesMap.values());
+
+    return {
+      ledgerEntries: entries,
+      targetCollection: totalTarget,
+      targetLoanAmount: totalLoanAmt
+    };
+  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate]);
 
   // Dual-Mode Search: Partial text match vs Exact Number equality match
   const filteredData = useMemo(() => {
     const query = searchTerm.trim();
     const isNumeric = query !== '' && !/[a-zA-Z]/.test(query) && !isNaN(Number(query));
 
-    return scopedData.filter((item) => {
+    return ledgerEntries.filter((item) => {
       let matchesSearch = true;
       if (query !== '') {
         if (isNumeric) {
@@ -200,7 +317,7 @@ export default function CollectionReportModal({
 
       return matchesSearch && matchesType;
     });
-  }, [scopedData, searchTerm, isCreditActive, isDebitActive]);
+  }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive]);
 
   // Dynamic Metrics Recalculation strictly bound to active scoped data & toggles
   const { totalCollection, totalDisbursement, onlineCollection, cashCollection } = useMemo(() => {
@@ -595,4 +712,5 @@ export default function CollectionReportModal({
     </div>
   );
 }
+
 
