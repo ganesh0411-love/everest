@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Wallet } from 'lucide-react';
+import { Wallet, Target, HandCoins } from 'lucide-react';
 
 // Mock Ledger Data with Branch & Staff metadata for RBAC validation
 const MOCK_LEDGER_DATA = [
@@ -23,6 +23,24 @@ const getTodayStr = () => {
   return `${day}-${month}-${year}`;
 };
 
+const parseToNativeDate = (ddMmYyyy) => {
+  if (!ddMmYyyy) return '';
+  const parts = ddMmYyyy.split('-');
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  return '';
+};
+
+const formatFromNativeDate = (yyyyMmDd) => {
+  if (!yyyyMmDd) return '';
+  const parts = yyyyMmDd.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return yyyyMmDd;
+};
+
 export default function CollectionReportModal({ 
   isOpen = true, 
   onClose,
@@ -41,7 +59,9 @@ export default function CollectionReportModal({
   const [isCreditActive, setIsCreditActive] = useState(true);
   const [isDebitActive, setIsDebitActive] = useState(true);
 
-  // Scroll ref to reset scroll to top on modal open
+  // Refs for Date inputs & Scroll
+  const fromDateInputRef = useRef(null);
+  const toDateInputRef = useRef(null);
   const tableScrollRef = useRef(null);
 
   useEffect(() => {
@@ -142,11 +162,31 @@ export default function CollectionReportModal({
     });
   }, [customLedgerData, userProfile, activeBranch, disabledBranchIds]);
 
-  // Filtered ledger data with search and independent multi-toggle support
+  const targetCollection = useMemo(() => {
+    return scopedData.reduce((acc, item) => acc + (Number(item.credit) || 0), 0);
+  }, [scopedData]);
+
+  const targetLoanAmount = useMemo(() => {
+    return scopedData.reduce((acc, item) => acc + (Number(item.debit) || 0), 0);
+  }, [scopedData]);
+
+  // Dual-Mode Search: Partial text match vs Exact Number equality match
   const filteredData = useMemo(() => {
+    const query = searchTerm.trim();
+    const isNumeric = query !== '' && !/[a-zA-Z]/.test(query) && !isNaN(Number(query));
+
     return scopedData.filter((item) => {
-      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-      
+      let matchesSearch = true;
+      if (query !== '') {
+        if (isNumeric) {
+          const numQuery = Number(query);
+          // Exact number equality match against Credit or Debit amounts
+          matchesSearch = (Number(item.credit) === numQuery || Number(item.debit) === numQuery);
+        } else {
+          matchesSearch = item.name.toLowerCase().includes(query.toLowerCase());
+        }
+      }
+
       let matchesType = false;
       if (isCreditActive && isDebitActive) {
         matchesType = item.credit > 0 || item.debit > 0;
@@ -192,7 +232,7 @@ export default function CollectionReportModal({
   }, [filteredData, isCreditActive, isDebitActive]);
 
   // Dynamic table column counts for responsive empty state colSpan
-  const colCountMobile = 2 + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
+  const colCountMobile = 2 + (isCreditActive && !isDebitActive ? 1 : 0) + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
   const colCountDesktop = 3 + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
 
   if (!isOpen) return null;
@@ -206,33 +246,63 @@ export default function CollectionReportModal({
         {/* LINE 1: Date Range & Period (Side-by-Side in 1 Horizontal Row) */}
         <div className="flex items-center gap-1.5 sm:gap-2 w-full shrink-0">
           {/* From Date */}
-          <div className="flex-1 min-w-0 bg-white border border-slate-200/90 rounded-xl px-2 sm:px-2.5 h-[38px] flex items-center gap-1.5 sm:gap-2 shadow-2xs">
+          <div 
+            onClick={() => {
+              try { fromDateInputRef.current?.showPicker?.(); } catch(e) { fromDateInputRef.current?.click?.(); }
+            }}
+            className="flex-1 min-w-0 bg-white border border-slate-200/90 rounded-xl px-2 sm:px-2.5 h-[38px] flex items-center gap-1.5 sm:gap-2 shadow-2xs cursor-pointer"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <div className="flex flex-col justify-center min-w-0">
+            <div className="flex flex-col justify-center min-w-0 flex-1 relative">
               <span className="text-[8px] sm:text-[9px] font-medium text-slate-400 leading-none truncate">From Date</span>
               <input
                 type="text"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="text-[11px] sm:text-xs font-semibold text-slate-700 bg-transparent outline-none truncate p-0 border-none leading-none w-full"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[11px] sm:text-xs font-semibold text-slate-700 bg-transparent outline-none truncate p-0 border-none leading-none w-full cursor-text"
+              />
+              <input
+                ref={fromDateInputRef}
+                type="date"
+                value={parseToNativeDate(fromDate)}
+                onChange={(e) => {
+                  if (e.target.value) setFromDate(formatFromNativeDate(e.target.value));
+                }}
+                className="sr-only opacity-0 absolute w-0 h-0 pointer-events-none"
               />
             </div>
           </div>
 
           {/* To Date */}
-          <div className="flex-1 min-w-0 bg-white border border-slate-200/90 rounded-xl px-2 sm:px-2.5 h-[38px] flex items-center gap-1.5 sm:gap-2 shadow-2xs">
+          <div 
+            onClick={() => {
+              try { toDateInputRef.current?.showPicker?.(); } catch(e) { toDateInputRef.current?.click?.(); }
+            }}
+            className="flex-1 min-w-0 bg-white border border-slate-200/90 rounded-xl px-2 sm:px-2.5 h-[38px] flex items-center gap-1.5 sm:gap-2 shadow-2xs cursor-pointer"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <div className="flex flex-col justify-center min-w-0">
+            <div className="flex flex-col justify-center min-w-0 flex-1 relative">
               <span className="text-[8px] sm:text-[9px] font-medium text-slate-400 leading-none truncate">To Date</span>
               <input
                 type="text"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="text-[11px] sm:text-xs font-semibold text-slate-700 bg-transparent outline-none truncate p-0 border-none leading-none w-full"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[11px] sm:text-xs font-semibold text-slate-700 bg-transparent outline-none truncate p-0 border-none leading-none w-full cursor-text"
+              />
+              <input
+                ref={toDateInputRef}
+                type="date"
+                value={parseToNativeDate(toDate)}
+                onChange={(e) => {
+                  if (e.target.value) setToDate(formatFromNativeDate(e.target.value));
+                }}
+                className="sr-only opacity-0 absolute w-0 h-0 pointer-events-none"
               />
             </div>
           </div>
@@ -315,11 +385,70 @@ export default function CollectionReportModal({
           </div>
         </div>
 
-        {/* LINE 3: Unified Summary Card (50/50 Equal Balance with Middle Vertical Divider) */}
+        {/* LINE 3: Dynamic Summary Metric Cards (50/50 Equal Balance with Middle Vertical Divider) */}
         <div className="w-full bg-[#f0f7ff] border border-sky-100 rounded-xl px-3 py-2 flex items-center justify-between shadow-2xs divide-x divide-sky-200/70 shrink-0">
-          {/* Left 50%: Collection */}
-          <div className="flex-1 flex items-center justify-between lg:justify-start gap-2 pr-2 sm:pr-3">
-            <div className="flex items-center gap-2 min-w-0">
+          
+          {/* Card 1 (Left 50%) */}
+          {isCreditActive && !isDebitActive ? (
+            /* Case A: Card 1 = Target */
+            <div className="flex-1 flex items-center gap-2 pr-2 sm:pr-3 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Target</span>
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                  ₹ {targetCollection.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+          ) : !isCreditActive && isDebitActive ? (
+            /* Case B: Card 1 = Loan Amount */
+            <div className="flex-1 flex items-center gap-2 pr-2 sm:pr-3 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <HandCoins className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Loan Amount</span>
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                  ₹ {targetLoanAmount.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* Case C: Card 1 = Collection */
+            <div className="flex-1 flex items-center justify-between lg:justify-start gap-2 pr-2 sm:pr-3 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
+                  <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
+                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                    ₹ {totalCollection.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+              {/* Desktop Only: UPI & Cash Breakdown */}
+              <div className="hidden lg:flex border-l border-sky-200/70 pl-2.5 flex-col justify-center text-[10px] leading-tight space-y-0.5 ml-auto">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0"></span>
+                  <span className="text-slate-500">UPI:</span>
+                  <span className="font-bold text-blue-700">₹ {onlineCollection.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
+                  <span className="text-slate-500">Cash:</span>
+                  <span className="font-bold text-emerald-700">₹ {cashCollection.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Card 2 (Right 50%) */}
+          {isCreditActive && !isDebitActive ? (
+            /* Case A: Card 2 = Collection */
+            <div className="flex-1 flex items-center gap-2 pl-2 sm:pl-3 min-w-0">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
                 <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
               </div>
@@ -330,51 +459,64 @@ export default function CollectionReportModal({
                 </span>
               </div>
             </div>
-            {/* Desktop Only: UPI & Cash Breakdown */}
-            <div className="hidden lg:flex border-l border-sky-200/70 pl-2.5 flex-col justify-center text-[10px] leading-tight space-y-0.5 ml-auto">
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0"></span>
-                <span className="text-slate-500">UPI:</span>
-                <span className="font-bold text-blue-700">₹ {onlineCollection.toLocaleString('en-IN')}</span>
+          ) : !isCreditActive && isDebitActive ? (
+            /* Case B: Card 2 = Disbursement */
+            <div className="flex-1 flex items-center gap-2 pl-2 sm:pl-3 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#f3e8ff] text-[#7e22ce] flex items-center justify-center shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25-9 5.25m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                </svg>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
-                <span className="text-slate-500">Cash:</span>
-                <span className="font-bold text-emerald-700">₹ {cashCollection.toLocaleString('en-IN')}</span>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Disbursement</span>
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                  ₹ {totalDisbursement.toLocaleString('en-IN')}
+                </span>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Case C: Card 2 = Disbursement */
+            <div className="flex-1 flex items-center gap-2 pl-2 sm:pl-3 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#f3e8ff] text-[#7e22ce] flex items-center justify-center shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25-9 5.25m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                </svg>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Disbursement</span>
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                  ₹ {totalDisbursement.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+          )}
 
-          {/* Right 50%: Disbursement */}
-          <div className="flex-1 flex items-center gap-2 pl-2 sm:pl-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#f3e8ff] text-[#7e22ce] flex items-center justify-center shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25-9 5.25m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-              </svg>
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Disbursement</span>
-              <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
-                ₹ {totalDisbursement.toLocaleString('en-IN')}
-              </span>
-            </div>
-          </div>
         </div>
 
       </div>
 
-      {/* True Collection Data Ledger Table - Dynamic Columns & Dedicated Scroll */}
+      {/* True Collection Data Ledger Table - Dynamic Columns & Dedicated Touch Scroll */}
       <div className="flex-1 min-h-0 bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
-        <div ref={tableScrollRef} className="flex-1 min-h-0 overflow-y-auto">
+        <div ref={tableScrollRef} className="flex-1 min-h-0 overflow-y-auto pb-24" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-100 border-b border-slate-200 sticky top-0 z-10 select-none shadow-2xs">
               <tr>
                 <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-12 sm:w-14">S.No</th>
                 <th className="py-2.5 px-3 sm:px-4 text-left text-[11px] font-semibold text-slate-500">Name</th>
-                <th className="hidden lg:table-cell py-2.5 px-4 text-center text-[11px] font-semibold text-slate-500 w-28 lg:w-32">Mode</th>
+                
+                {/* MODE Header Column */}
+                {isCreditActive && !isDebitActive ? (
+                  <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-20 sm:w-24">MODE</th>
+                ) : isCreditActive && isDebitActive ? (
+                  <th className="hidden lg:table-cell py-2.5 px-4 text-center text-[11px] font-semibold text-slate-500 w-28 lg:w-32">Mode</th>
+                ) : null}
+
+                {/* Credit Header Column */}
                 {isCreditActive && (
                   <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-emerald-600 bg-emerald-50/70 w-24 sm:w-36">Credit</th>
                 )}
+
+                {/* Debit Header Column */}
                 {isDebitActive && (
                   <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-rose-600 bg-rose-50/70 w-24 sm:w-36">Debit</th>
                 )}
@@ -382,33 +524,59 @@ export default function CollectionReportModal({
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredData.length > 0 ? (
-                filteredData.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium text-slate-400">{index + 1}</td>
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4 font-semibold text-slate-800">{item.name}</td>
-                    <td className="hidden lg:table-cell py-3 px-4 text-center">
-                      {item.mode === 'UPI' || item.mode === 'Online' ? (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
-                          UPI
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
-                          Cash
-                        </span>
+                <>
+                  {filteredData.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium text-slate-400">{index + 1}</td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 font-semibold text-slate-800">{item.name}</td>
+                      
+                      {/* MODE Data Cell */}
+                      {isCreditActive && !isDebitActive ? (
+                        <td className="py-2.5 sm:py-3 px-2 text-center">
+                          {item.mode === 'UPI' || item.mode === 'Online' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
+                              UPI
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+                              Cash
+                            </span>
+                          )}
+                        </td>
+                      ) : isCreditActive && isDebitActive ? (
+                        <td className="hidden lg:table-cell py-3 px-4 text-center">
+                          {item.mode === 'UPI' || item.mode === 'Online' ? (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
+                              UPI
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+                              Cash
+                            </span>
+                          )}
+                        </td>
+                      ) : null}
+
+                      {/* Credit Data Cell */}
+                      {isCreditActive && (
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
+                          ₹ {item.credit.toLocaleString('en-IN')}
+                        </td>
                       )}
-                    </td>
-                    {isCreditActive && (
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
-                        ₹ {item.credit.toLocaleString('en-IN')}
-                      </td>
-                    )}
-                    {isDebitActive && (
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-rose-600">
-                        ₹ {item.debit.toLocaleString('en-IN')}
-                      </td>
-                    )}
+
+                      {/* Debit Data Cell */}
+                      {isDebitActive && (
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-rose-600">
+                          ₹ {item.debit.toLocaleString('en-IN')}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {/* Bottom Clearance Spacer Row so 10th+ entries are fully clear of bottom navigation bar */}
+                  <tr className="h-24 border-none pointer-events-none">
+                    <td colSpan={6} className="py-0 border-none"></td>
                   </tr>
-                ))
+                </>
               ) : (
                 <tr>
                   <td colSpan={colCountMobile} className="lg:hidden py-8 text-center text-slate-400 font-medium">
@@ -427,3 +595,4 @@ export default function CollectionReportModal({
     </div>
   );
 }
+

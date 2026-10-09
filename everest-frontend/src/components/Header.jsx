@@ -298,7 +298,11 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
 
       {/* Unified Mobile Title / Brand */}
       <div className="md:hidden w-full flex justify-center mt-1 pb-1">
-        {(currentView === 'Home' || currentView === 'HOME') ? (
+        {isCollectionReportOpen ? (
+          <h1 className="text-[20px] font-black text-slate-900 tracking-wider uppercase leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+            Collection Report
+          </h1>
+        ) : (currentView === 'Home' || currentView === 'HOME') ? (
           <h1 className="text-[24px] font-black text-slate-900 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
             Everest Micro<span style={{ fontSize: '19px' }}>Finance</span>
           </h1>
