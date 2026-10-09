@@ -169,6 +169,16 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
               </div>
             </div>
           </div>
+
+          {/* Centered Page Title when viewing Collection Report */}
+          {(currentView === 'Collection Report' || currentView === 'Collection') && (
+            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 items-center justify-center pointer-events-none">
+              <h1 className="text-base md:text-lg lg:text-xl font-black text-slate-900 tracking-wider uppercase">
+                Collection Report
+              </h1>
+            </div>
+          )}
+
         <div className="flex items-center gap-2 relative" ref={menuRef}>
             {userProfile?.role === 'staff' ? (
               <div className="flex items-center gap-1.5">
