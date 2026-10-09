@@ -1,18 +1,18 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Wallet } from 'lucide-react';
 
-// Mock Ledger Data strictly matching reference specs
+// Mock Ledger Data with Branch & Staff metadata for RBAC validation
 const MOCK_LEDGER_DATA = [
-  { id: 1, name: 'Lakshmi Devi', mode: 'UPI', credit: 5000, debit: 1000 },
-  { id: 2, name: 'Meena Kumari', mode: 'Cash', credit: 3500, debit: 500 },
-  { id: 3, name: 'Selvam', mode: 'UPI', credit: 7200, debit: 1200 },
-  { id: 4, name: 'Ravi Kumar', mode: 'Cash', credit: 4800, debit: 800 },
-  { id: 5, name: 'Kavitha', mode: 'UPI', credit: 6300, debit: 700 },
-  { id: 6, name: 'Murugan', mode: 'Cash', credit: 5600, debit: 1100 },
-  { id: 7, name: 'Priya', mode: 'UPI', credit: 3200, debit: 600 },
-  { id: 8, name: 'Suresh', mode: 'UPI', credit: 8400, debit: 1500 },
-  { id: 9, name: 'Anitha', mode: 'Cash', credit: 4900, debit: 900 },
-  { id: 10, name: 'Babu', mode: 'UPI', credit: 6700, debit: 1300 },
+  { id: 1, name: 'Lakshmi Devi', mode: 'UPI', credit: 5000, debit: 1000, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
+  { id: 2, name: 'Meena Kumari', mode: 'Cash', credit: 3500, debit: 500, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Sita', staffId: 'ST02' },
+  { id: 3, name: 'Selvam', mode: 'UPI', credit: 7200, debit: 1200, branchId: 'b2', branchName: 'Madurai Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
+  { id: 4, name: 'Ravi Kumar', mode: 'Cash', credit: 4800, debit: 800, branchId: 'b2', branchName: 'Madurai Branch', assignedStaff: 'Kumar', staffId: 'ST03' },
+  { id: 5, name: 'Kavitha', mode: 'UPI', credit: 6300, debit: 700, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
+  { id: 6, name: 'Murugan', mode: 'Cash', credit: 5600, debit: 1100, branchId: 'b3', branchName: 'Dindigul Branch', assignedStaff: 'Sita', staffId: 'ST02' },
+  { id: 7, name: 'Priya', mode: 'UPI', credit: 3200, debit: 600, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
+  { id: 8, name: 'Suresh', mode: 'UPI', credit: 8400, debit: 1500, branchId: 'b2', branchName: 'Madurai Branch', assignedStaff: 'Kumar', staffId: 'ST03' },
+  { id: 9, name: 'Anitha', mode: 'Cash', credit: 4900, debit: 900, branchId: 'main', branchName: 'Main Branch', assignedStaff: 'Sita', staffId: 'ST02' },
+  { id: 10, name: 'Babu', mode: 'UPI', credit: 6700, debit: 1300, branchId: 'b3', branchName: 'Dindigul Branch', assignedStaff: 'Ramesh', staffId: 'ST01' },
 ];
 
 const getTodayStr = () => {
@@ -23,7 +23,14 @@ const getTodayStr = () => {
   return `${day}-${month}-${year}`;
 };
 
-export default function CollectionReportModal({ isOpen = true, onClose }) {
+export default function CollectionReportModal({ 
+  isOpen = true, 
+  onClose,
+  userProfile = null,
+  activeBranch = { id: 'main', name: 'Main Branch' },
+  branches = [],
+  customLedgerData = null
+}) {
   const [fromDate, setFromDate] = useState(() => getTodayStr());
   const [toDate, setToDate] = useState(() => getTodayStr());
   const [periodPreset, setPeriodPreset] = useState('Today'); // Default 'Today'
@@ -82,9 +89,62 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
     }
   };
 
-  // Filtered ledger data with independent multi-toggle support
+  // Branch Consolidation & RBAC Scoping Engine
+  const disabledBranchIds = useMemo(() => {
+    return new Set(
+      (branches || [])
+        .filter(b => b.disabled === true || b.consolidationEnabled === false || b.enabled === false || b.status === 'Disabled' || b.hidden === true)
+        .map(b => b.id)
+    );
+  }, [branches]);
+
+  const scopedData = useMemo(() => {
+    const rawData = customLedgerData || MOCK_LEDGER_DATA;
+    const userRole = userProfile?.role || 'admin';
+    const isStaff = userRole === 'staff' || userRole === 'Staff' || userRole === 'agent';
+    const staffAdminOverride = Boolean(
+      userProfile?.permissions?.collectionReportAdmin ||
+      userProfile?.permissions?.fullBranchAccess ||
+      userProfile?.permissions?.adminOverride
+    );
+    const userBranchId = activeBranch?.id || userProfile?.branchId || 'main';
+    const isMainBranch = userBranchId === 'main' || activeBranch?.name === 'Main Branch';
+    const staffName = userProfile?.staffName || userProfile?.name || userProfile?.displayName || '';
+    const staffId = userProfile?.staffId || userProfile?.employeeId || userProfile?.uid || '';
+
+    return rawData.filter((item) => {
+      // 1. Branch scoping & Consolidation check
+      if (isMainBranch) {
+        // Exclude disabled/hidden branches in consolidation settings
+        if (item.branchId && disabledBranchIds.has(item.branchId)) {
+          return false;
+        }
+      } else {
+        // Sub-branch users strictly restricted to their assigned branch
+        if (item.branchId && item.branchId !== userBranchId && item.branchName !== activeBranch?.name) {
+          return false;
+        }
+      }
+
+      // 2. Staff Scoping
+      if (isStaff && !staffAdminOverride) {
+        if (item.assignedStaff || item.staffId || item.staffName) {
+          const matchesStaff = (
+            (staffName && item.assignedStaff === staffName) ||
+            (staffName && item.staffName === staffName) ||
+            (staffId && item.staffId === staffId)
+          );
+          if (!matchesStaff) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [customLedgerData, userProfile, activeBranch, disabledBranchIds]);
+
+  // Filtered ledger data with search and independent multi-toggle support
   const filteredData = useMemo(() => {
-    return MOCK_LEDGER_DATA.filter((item) => {
+    return scopedData.filter((item) => {
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       
       let matchesType = false;
@@ -100,12 +160,40 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
 
       return matchesSearch && matchesType;
     });
-  }, [searchTerm, isCreditActive, isDebitActive]);
+  }, [scopedData, searchTerm, isCreditActive, isDebitActive]);
 
-  const totalCollection = useMemo(() => 45750, []);
-  const totalDisbursement = useMemo(() => 12300, []);
-  const onlineCollection = useMemo(() => 31250, []);
-  const cashCollection = useMemo(() => 14500, []);
+  // Dynamic Metrics Recalculation strictly bound to active scoped data & toggles
+  const { totalCollection, totalDisbursement, onlineCollection, cashCollection } = useMemo(() => {
+    let coll = 0;
+    let disb = 0;
+    let upi = 0;
+    let cash = 0;
+
+    filteredData.forEach((item) => {
+      if (isCreditActive && item.credit > 0) {
+        coll += item.credit;
+        if (item.mode === 'UPI' || item.mode === 'Online') {
+          upi += item.credit;
+        } else {
+          cash += item.credit;
+        }
+      }
+      if (isDebitActive && item.debit > 0) {
+        disb += item.debit;
+      }
+    });
+
+    return {
+      totalCollection: coll,
+      totalDisbursement: disb,
+      onlineCollection: upi,
+      cashCollection: cash
+    };
+  }, [filteredData, isCreditActive, isDebitActive]);
+
+  // Dynamic table column counts for responsive empty state colSpan
+  const colCountMobile = 2 + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
+  const colCountDesktop = 3 + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
 
   if (!isOpen) return null;
 
@@ -275,7 +363,7 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
 
       </div>
 
-      {/* True Collection Data Ledger Table - Flex-1 with Dedicated Scroll */}
+      {/* True Collection Data Ledger Table - Dynamic Columns & Dedicated Scroll */}
       <div className="flex-1 min-h-0 bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
         <div ref={tableScrollRef} className="flex-1 min-h-0 overflow-y-auto">
           <table className="w-full text-left border-collapse">
@@ -284,8 +372,12 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
                 <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-12 sm:w-14">S.No</th>
                 <th className="py-2.5 px-3 sm:px-4 text-left text-[11px] font-semibold text-slate-500">Name</th>
                 <th className="hidden lg:table-cell py-2.5 px-4 text-center text-[11px] font-semibold text-slate-500 w-28 lg:w-32">Mode</th>
-                <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-emerald-600 bg-emerald-50/70 w-24 sm:w-36">Credit</th>
-                <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-rose-600 bg-rose-50/70 w-24 sm:w-36">Debit</th>
+                {isCreditActive && (
+                  <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-emerald-600 bg-emerald-50/70 w-24 sm:w-36">Credit</th>
+                )}
+                {isDebitActive && (
+                  <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-rose-600 bg-rose-50/70 w-24 sm:w-36">Debit</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -305,17 +397,24 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
-                      ₹ {item.credit.toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-rose-600">
-                      ₹ {item.debit.toLocaleString('en-IN')}
-                    </td>
+                    {isCreditActive && (
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
+                        ₹ {item.credit.toLocaleString('en-IN')}
+                      </td>
+                    )}
+                    {isDebitActive && (
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-rose-600">
+                        ₹ {item.debit.toLocaleString('en-IN')}
+                      </td>
+                    )}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="lg:colSpan-5 py-8 text-center text-slate-400 font-medium">
+                  <td colSpan={colCountMobile} className="lg:hidden py-8 text-center text-slate-400 font-medium">
+                    No transactions found matching "{searchTerm}"
+                  </td>
+                  <td colSpan={colCountDesktop} className="hidden lg:table-cell py-8 text-center text-slate-400 font-medium">
                     No transactions found matching "{searchTerm}"
                   </td>
                 </tr>
