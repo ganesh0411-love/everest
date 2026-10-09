@@ -4991,7 +4991,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
   return (
     <div 
-      className="flex-1 w-full max-w-full overflow-x-hidden bg-[#f8fafc] p-3 font-sans pb-4 overflow-y-auto"
+      className={`flex-1 w-full max-w-full overflow-x-hidden bg-[#f8fafc] font-sans ${showCollectionReportModal ? 'h-full overflow-hidden p-0' : 'p-3 pb-4 overflow-y-auto'}`}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
