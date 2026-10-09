@@ -4997,8 +4997,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
     >
-      {/* Total Collections Progress */}
-      <div className={`bg-white rounded-xl px-4 py-2.5 md:p-4 mb-3 ${cardShadowClass}`}>
+      {!showCollectionReportModal ? (
+        <>
+          {/* Total Collections Progress */}
+          <div className={`bg-white rounded-xl px-4 py-2.5 md:p-4 mb-3 ${cardShadowClass}`}>
         {todayMetrics.target === 0 && todayMetrics.collection === 0 ? (
           <div className="text-center text-slate-500 font-bold text-[11px] py-1 uppercase tracking-wider">
             No Collection Today
@@ -5478,10 +5480,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
 
         {/* Collection Reports */}
         <div 
-          onClick={() => {
-            setShowCollectionReportModal(true);
-            if (typeof setCurrentView === 'function') setCurrentView('Collection Report');
-          }}
+          onClick={() => setShowCollectionReportModal(true)}
           className={`${totalCards === 4 ? 'col-span-3' : 'col-span-2'} sm:col-span-1 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer hover:bg-slate-50 transition-colors`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -5617,14 +5616,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           activeBranch={activeBranch}
         />
       )}
+        </>
+      ) : null}
 
       {/* Collection Report Modal */}
       <CollectionReportModal 
         isOpen={showCollectionReportModal}
-        onClose={() => {
-          setShowCollectionReportModal(false);
-          if (typeof setCurrentView === 'function') setCurrentView('Home');
-        }}
+        onClose={() => setShowCollectionReportModal(false)}
       />
 
       {/* Mark Attendance Calendar Overlay */}

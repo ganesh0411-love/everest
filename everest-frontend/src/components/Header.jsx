@@ -4,7 +4,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2 } from 'lucide-react';
 
-const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile }) => {
+const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile, isCollectionReportOpen }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
@@ -171,9 +171,9 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
           </div>
 
           {/* Centered Page Title when viewing Collection Report */}
-          {(currentView === 'Collection Report' || currentView === 'Collection') && (
+          {(isCollectionReportOpen || currentView === 'Collection Report' || currentView === 'Collection') && (
             <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 items-center justify-center pointer-events-none">
-              <h1 className="text-base md:text-lg lg:text-xl font-black text-slate-900 tracking-wider uppercase">
+              <h1 className="text-base md:text-lg font-black text-slate-900 tracking-wider uppercase">
                 Collection Report
               </h1>
             </div>
