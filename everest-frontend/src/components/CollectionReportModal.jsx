@@ -694,8 +694,8 @@ export default function CollectionReportModal({
             </div>
           ) : (
             /* Case C: Card 1 = Collection */
-            <div className="flex-[1.3] sm:flex-1 flex items-center justify-between gap-1.5 sm:gap-2 pr-1 sm:pr-3 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className="flex-1 flex items-center justify-between gap-2 pr-2 sm:pr-3 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
                   <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
                 </div>
@@ -706,17 +706,17 @@ export default function CollectionReportModal({
                   </span>
                 </div>
               </div>
-              {/* UPI & Cash Breakdown (Vertically Aligned Colons) */}
-              <div className="flex border-l border-sky-200/70 pl-2 flex-col justify-center text-[10px] sm:text-[11px] leading-tight space-y-0.5 ml-auto shrink-0">
-                <div className="flex items-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 shrink-0"></span>
-                  <span className="w-8 sm:w-10 shrink-0 text-slate-500 font-medium">UPI:</span>
-                  <span className="font-semibold text-blue-600 whitespace-nowrap">₹ {onlineCollection.toLocaleString('en-IN')}</span>
+              {/* UPI & Cash Breakdown (Clean, Non-overlapping Dot Rows) */}
+              <div className="flex flex-col justify-center text-[9px] sm:text-[10px] leading-tight space-y-0.5 ml-auto shrink-0 border-l border-sky-200/70 pl-2">
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                  <span className="text-slate-500 font-medium">UPI:</span>
+                  <span className="font-bold text-blue-700">₹{onlineCollection.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex items-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 shrink-0"></span>
-                  <span className="w-8 sm:w-10 shrink-0 text-slate-500 font-medium">Cash:</span>
-                  <span className="font-semibold text-emerald-600 whitespace-nowrap">₹ {cashCollection.toLocaleString('en-IN')}</span>
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span className="text-slate-500 font-medium">Cash:</span>
+                  <span className="font-bold text-emerald-700">₹{cashCollection.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -725,8 +725,8 @@ export default function CollectionReportModal({
           {/* Card 2 (Right 50%) */}
           {isCreditActive && !isDebitActive ? (
             /* Case A: Card 2 = Collection */
-            <div className="flex-1 flex items-center justify-between gap-1.5 sm:gap-2 pl-2 sm:pl-3 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className="flex-1 flex items-center justify-between gap-2 pl-2 sm:pl-3 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
                   <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
                 </div>
@@ -738,16 +738,16 @@ export default function CollectionReportModal({
                 </div>
               </div>
               {/* UPI & Cash Breakdown */}
-              <div className="flex border-l border-sky-200/70 pl-2 flex-col justify-center text-[10px] sm:text-[11px] leading-tight space-y-0.5 ml-auto shrink-0">
-                <div className="flex items-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 shrink-0"></span>
-                  <span className="w-8 sm:w-10 shrink-0 text-slate-500 font-medium">UPI:</span>
-                  <span className="font-semibold text-blue-600 whitespace-nowrap">₹ {onlineCollection.toLocaleString('en-IN')}</span>
+              <div className="flex flex-col justify-center text-[9px] sm:text-[10px] leading-tight space-y-0.5 ml-auto shrink-0 border-l border-sky-200/70 pl-2">
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                  <span className="text-slate-500 font-medium">UPI:</span>
+                  <span className="font-bold text-blue-700">₹{onlineCollection.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex items-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 shrink-0"></span>
-                  <span className="w-8 sm:w-10 shrink-0 text-slate-500 font-medium">Cash:</span>
-                  <span className="font-semibold text-emerald-600 whitespace-nowrap">₹ {cashCollection.toLocaleString('en-IN')}</span>
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span className="text-slate-500 font-medium">Cash:</span>
+                  <span className="font-bold text-emerald-700">₹{cashCollection.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -768,7 +768,7 @@ export default function CollectionReportModal({
             </div>
           ) : (
             /* Case C: Card 2 = Disbursement */
-            <div className="flex-[0.8] sm:flex-1 flex items-center gap-2 pl-2 sm:pl-3 min-w-0">
+            <div className="flex-1 flex items-center gap-2 pl-2 sm:pl-3 min-w-0">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#f3e8ff] text-[#7e22ce] flex items-center justify-center shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25-9 5.25m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
@@ -827,24 +827,26 @@ export default function CollectionReportModal({
                         </div>
                       </td>
                       
-                      {/* MODE Data Cell */}
+                      {/* MODE Data Cell (Compact Dot Badges - Single Line) */}
                       {isCreditActive && !isDebitActive ? (
                         <td className="py-2.5 sm:py-3 px-2 text-center">
                           {item.isSplit ? (
                             <div className="flex flex-col items-center justify-center gap-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
-                                UPI: ₹{item.upiAmount}
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap border border-blue-200/60 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                                ₹{item.upiAmount.toLocaleString('en-IN')}
                               </span>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
-                                Cash: ₹{item.cashAmount}
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap border border-emerald-200/60 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                ₹{item.cashAmount.toLocaleString('en-IN')}
                               </span>
                             </div>
                           ) : item.mode === 'UPI' || item.mode === 'Online' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs whitespace-nowrap">
                               UPI
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs whitespace-nowrap">
                               Cash
                             </span>
                           )}
@@ -853,19 +855,21 @@ export default function CollectionReportModal({
                         <td className="hidden lg:table-cell py-3 px-4 text-center">
                           {item.isSplit ? (
                             <div className="flex flex-col items-center justify-center gap-1">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
-                                UPI: ₹{item.upiAmount}
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold whitespace-nowrap border border-blue-200/60 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                                ₹{item.upiAmount.toLocaleString('en-IN')}
                               </span>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
-                                Cash: ₹{item.cashAmount}
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold whitespace-nowrap border border-emerald-200/60 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                ₹{item.cashAmount.toLocaleString('en-IN')}
                               </span>
                             </div>
                           ) : item.mode === 'UPI' || item.mode === 'Online' ? (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs whitespace-nowrap">
                               UPI
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs whitespace-nowrap">
                               Cash
                             </span>
                           )}
