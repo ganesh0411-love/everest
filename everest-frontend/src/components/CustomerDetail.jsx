@@ -442,6 +442,7 @@ const CustomerDetail = ({ customer, onBack }) => {
   const handleManualQuickPay = () => {
     if (isModalFutureDate) return;
     const nextId = installments.length + 1;
+    const mode = (Number(manualUpi || 0) > 0 || upiPhoto) ? 'UPI' : 'Cash';
     
     const newInstallment = {
       id: nextId,
@@ -449,6 +450,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       number: nextNumber,
       status: 'PAID',
       amount: grandTotal,
+      mode: mode,
+      paymentMode: mode,
       timeStr: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase(),
       upiPhoto: upiPhoto,
       denomCounts: denomCounts

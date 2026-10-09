@@ -56,6 +56,40 @@ const parseDateToTimestamp = (dStr) => {
   return isNaN(parsed.getTime()) ? null : parsed.getTime();
 };
 
+const resolvePaymentMode = (inst) => {
+  if (!inst) return 'Cash';
+  const rawMode = (
+    inst.mode || 
+    inst.paymentMode || 
+    inst.instrument || 
+    inst.paymentType || 
+    inst.type || 
+    inst.payMode || 
+    inst.method ||
+    ''
+  ).toString().trim();
+
+  if (rawMode) {
+    const lower = rawMode.toLowerCase();
+    if (lower.includes('upi') || lower.includes('online') || lower.includes('gpay') || lower.includes('phonepe') || lower.includes('paytm') || lower.includes('qr') || lower.includes('bank')) {
+      return 'UPI';
+    }
+    if (lower.includes('cash')) {
+      return 'Cash';
+    }
+    return rawMode.toUpperCase();
+  }
+
+  if (inst.upiPhoto || (Number(inst.upiAmount || 0) > 0 && Number(inst.cashAmount || 0) === 0)) {
+    return 'UPI';
+  }
+  if (Number(inst.cashAmount || 0) > 0 && Number(inst.upiAmount || 0) === 0) {
+    return 'Cash';
+  }
+
+  return 'Cash';
+};
+
 export default function CollectionReportModal({ 
   isOpen = true, 
   onClose,
@@ -189,20 +223,7 @@ export default function CollectionReportModal({
       return true;
     });
 
-    // 2. Compute Target & Loan Amount Metrics across scoped customers
-    let totalTarget = 0;
-    let totalLoanAmt = 0;
-
-    scopedCustomers.forEach((cust) => {
-      const targetVal = Number(cust.perDayAmount || cust.dailyInstallment || cust.installmentAmount || cust.targetAmount || 0) ||
-        (cust.repayAmount ? Math.round(Number(cust.repayAmount) / Math.max(1, Number(cust.tenure || cust.weeks || cust.days || 100))) : 0);
-      totalTarget += targetVal;
-
-      const loanVal = Number(cust.loanAmount || cust.amount || 0);
-      totalLoanAmt += loanVal;
-    });
-
-    // 3. Date Boundary Range
+    // 2. Date Boundary Range
     const fromTs = parseDateToTimestamp(fromDate);
     const toTs = parseDateToTimestamp(toDate);
     const startTs = fromTs ? new Date(fromTs).setHours(0, 0, 0, 0) : 0;
@@ -215,55 +236,77 @@ export default function CollectionReportModal({
       return ts >= startTs && ts <= endTs;
     };
 
+    // Calculate number of calendar days in selected date range
+    const diffMs = Math.max(0, endTs - startTs);
+    const daysInRange = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+
+    let totalTarget = 0;
+    let totalSanctionedLoanAmtForDisbursed = 0;
+
     const entriesMap = new Map(); // uniqueKey -> ledger row
 
     scopedCustomers.forEach((cust) => {
       const custName = cust.name || cust.customerName || 'Customer';
 
-      // Credit Entries from Customer Installments/Ledger
+      // Daily installment target per customer
+      const custTargetPerDay = Number(cust.perDayAmount || cust.dailyInstallment || cust.installmentAmount || cust.targetAmount || 0) ||
+        (cust.repayAmount ? Math.round(Number(cust.repayAmount) / Math.max(1, Number(cust.tenure || cust.weeks || cust.days || 100))) : 0);
+
       const rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
+      let customerHasCollectionInPeriod = false;
+      let customerTargetInPeriod = 0;
+
       if (Array.isArray(rawInstallments) && rawInstallments.length > 0) {
         rawInstallments.forEach((inst, index) => {
           const instDate = inst.date || inst.paymentDate || inst.createdAt;
           const status = String(inst.status || '').toUpperCase();
           const amount = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
 
-          if (amount > 0 && status !== 'BOUNCED' && status !== 'CANCELLED' && isInDateRange(instDate)) {
-            const mode = inst.mode || inst.paymentMode || (Number(inst.upiAmount || 0) > 0 ? 'UPI' : 'Cash');
-            const key = `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`;
-            entriesMap.set(key, {
-              id: key,
-              name: custName,
-              mode: mode,
-              credit: amount,
-              debit: Number(cust.debit || 0),
-              date: instDate
-            });
+          if (isInDateRange(instDate)) {
+            customerHasCollectionInPeriod = true;
+            
+            // Add to Target: if installment has scheduled due amount, use it, else custTargetPerDay
+            const instDue = Number(inst.dueAmount || inst.targetAmount || inst.target || custTargetPerDay);
+            customerTargetInPeriod += instDue;
+
+            if (amount > 0 && status !== 'BOUNCED' && status !== 'CANCELLED') {
+              const mode = resolvePaymentMode(inst);
+              const key = `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`;
+              entriesMap.set(key, {
+                id: key,
+                name: custName,
+                mode: mode,
+                credit: amount,
+                debit: Number(cust.debit || 0),
+                date: instDate
+              });
+            }
           }
         });
-      } else if (Number(cust.credit) > 0) {
-        // Fallback for flat ledger items
-        const cDate = cust.date || cust.createdAt;
-        if (!cDate || isInDateRange(cDate)) {
-          const key = `${cust.id}_flat_credit`;
-          entriesMap.set(key, {
-            id: key,
-            name: custName,
-            mode: cust.mode || 'Cash',
-            credit: Number(cust.credit),
-            debit: Number(cust.debit || 0),
-            date: cDate
-          });
+      }
+
+      // Target summation for date range:
+      if (customerHasCollectionInPeriod && customerTargetInPeriod > 0) {
+        totalTarget += customerTargetInPeriod;
+      } else {
+        const custStatus = String(cust.status || '').toLowerCase();
+        const isActiveCust = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
+        if (isActiveCust && custTargetPerDay > 0) {
+          totalTarget += (daysInRange * custTargetPerDay);
         }
       }
 
-      // Debit Entries from Customer Loan Disbursements
+      // Loan Amount & Disbursement for Date Range:
       const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.approvalDate || cust.loanDate || cust.date || cust.createdAt;
       const custStatus = String(cust.status || '').toLowerCase();
       const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
       const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
+      const sanctionedLoanAmt = Number(cust.loanAmount || cust.amount || cust.sanctionedAmount || 0);
 
       if (isApprovedOrDisbursed && disbAmount > 0 && isInDateRange(disbDate)) {
+        // Loan was actually DISBURSED in selected date range!
+        totalSanctionedLoanAmtForDisbursed += sanctionedLoanAmt;
+
         const key = `${cust.id}_debit_${disbDate}`;
         if (!entriesMap.has(key)) {
           entriesMap.set(key, {
@@ -283,7 +326,7 @@ export default function CollectionReportModal({
     return {
       ledgerEntries: entries,
       targetCollection: totalTarget,
-      targetLoanAmount: totalLoanAmt
+      targetLoanAmount: totalSanctionedLoanAmtForDisbursed
     };
   }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate]);
 
