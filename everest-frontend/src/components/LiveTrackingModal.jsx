@@ -284,7 +284,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }, 200);
   }, [loading]);
 
-  // 2. Tile Layer Update (Mapbox HD Vector Tiles)
+  // 2. Tile Layer Update (Mapbox HD Vector Tiles & High-Res Satellite)
   useEffect(() => {
     if (!mapInstance.current) return;
     
@@ -295,14 +295,17 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "pk.eyJ1IjoiOTY1OTAzMDE0NCIsImEiOiJjbXVyYWFmOHYwM3Q5MzJwb21hNmxidWhsIn0.1_yyUGCDI_FtaFykmOJojw";
     
     const isStreet = mapLayer === 'street';
+    // Request 512px retina tiles (@2x) for crisp HD satellite and vector rendering on mobile screens
     const layerUrl = isStreet 
-      ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
-      : `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`;
+      ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
+      : `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`;
     
     tileLayerRef.current = L.tileLayer(layerUrl, { 
       tileSize: 512,
       zoomOffset: -1,
+      maxNativeZoom: 19,
       maxZoom: 20,
+      crossOrigin: true,
       attribution: '© Mapbox © OpenStreetMap'
     }).addTo(mapInstance.current);
   }, [mapLayer, loading]);
@@ -660,20 +663,22 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   let dotColor = 'bg-amber-500';
   let pulse = false;
 
-  if (uiSpeed >= 20) {
-    statusText = 'Moving';
+  const speedKmH = Math.round(uiSpeed);
+
+  if (uiSpeed >= 6) {
+    statusText = 'MOVING';
     statusColor = 'text-emerald-700';
     dotColor = 'bg-emerald-500';
     pulse = true;
-  } else if (uiSpeed >= 5) {
-    statusText = 'Walking';
+  } else if (uiSpeed > 0) {
+    statusText = 'WALKING';
     statusColor = 'text-blue-600';
     dotColor = 'bg-blue-500';
     pulse = true;
   } else {
-    statusText = 'Stopped';
-    statusColor = 'text-red-600';
-    dotColor = 'bg-red-500';
+    statusText = 'STOPPED';
+    statusColor = 'text-amber-600';
+    dotColor = 'bg-amber-500';
     pulse = false;
   }
 
@@ -695,11 +700,14 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         <div className="w-full h-full relative flex-1 bg-slate-900 overflow-hidden">
           
           {/* 1. Top-Left Floating Glass Pill (Staff Info & Live Telemetry) */}
-          <div className="absolute top-4 left-4 z-20 flex items-center gap-2.5 bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-full shadow-lg border border-slate-200/80 text-xs max-w-[calc(100%-180px)] md:max-w-none overflow-hidden">
+          <div 
+            className="absolute top-4 left-4 z-20 flex items-center gap-1.5 sm:gap-2 bg-white/95 backdrop-blur-md px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full shadow-lg border border-slate-200/80 text-[11px] sm:text-xs max-w-[calc(100%-170px)] sm:max-w-none overflow-x-auto"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             <span className="font-bold text-slate-800 flex items-center gap-1.5 whitespace-nowrap">
               {staffName}
               {isLiveActive && (
-                <span className="flex items-center gap-1 text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                <span className="flex items-center gap-1 text-[9px] sm:text-[10px] bg-red-100 text-red-600 px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                   <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
                   Live
                 </span>
@@ -707,12 +715,12 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             </span>
             {isLiveActive && (
               <>
-                <span className="text-slate-300 hidden md:inline">•</span>
-                <span className="font-bold text-indigo-600 hidden md:inline whitespace-nowrap">
-                  {uiSpeed.toFixed(1)} km/h
+                <span className="text-slate-300 font-medium">•</span>
+                <span className="font-bold text-indigo-600 whitespace-nowrap">
+                  {speedKmH} km/h
                 </span>
-                <span className="text-slate-300 hidden md:inline">•</span>
-                <span className={`font-semibold hidden md:flex items-center gap-1 whitespace-nowrap ${statusColor}`}>
+                <span className="text-slate-300 font-medium">•</span>
+                <span className={`font-bold flex items-center gap-1 whitespace-nowrap uppercase tracking-wider text-[10px] sm:text-[11px] ${statusColor}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${pulse ? 'animate-pulse' : ''}`}></span>
                   {statusText}
                 </span>
