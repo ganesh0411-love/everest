@@ -15,16 +15,24 @@ const MOCK_LEDGER_DATA = [
   { id: 10, name: 'Babu', mode: 'UPI', credit: 6700, debit: 1300 },
 ];
 
+const getTodayStr = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${day}-${month}-${year}`;
+};
+
 export default function CollectionReportModal({ isOpen = true, onClose }) {
-  const [fromDate, setFromDate] = useState('01-09-2025');
-  const [toDate, setToDate] = useState('30-09-2025');
-  const [typeFilter, setTypeFilter] = useState('All'); // 'All', 'Credit', 'Debit'
-  const [periodPreset, setPeriodPreset] = useState('All'); // 'All', 'Today', 'Yesterday', 'Last Week', 'Last Month'
+  const [fromDate, setFromDate] = useState(() => getTodayStr());
+  const [toDate, setToDate] = useState(() => getTodayStr());
+  const [periodPreset, setPeriodPreset] = useState('Today'); // Default 'Today'
   const [searchTerm, setSearchTerm] = useState('');
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
 
-  // Active quick pill selection
-  const [activePill, setActivePill] = useState('All'); // 'All', 'Credit', 'Debit'
+  // Independent Credit & Debit multi-toggle boolean states
+  const [isCreditActive, setIsCreditActive] = useState(true);
+  const [isDebitActive, setIsDebitActive] = useState(true);
 
   // Scroll ref to reset scroll to top on modal open
   const tableScrollRef = useRef(null);
@@ -74,20 +82,25 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
     }
   };
 
-  // Filtered ledger data
+  // Filtered ledger data with independent multi-toggle support
   const filteredData = useMemo(() => {
     return MOCK_LEDGER_DATA.filter((item) => {
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const effectiveType = activePill !== 'All' ? activePill : typeFilter;
-      let matchesType = true;
-      if (effectiveType === 'Credit') {
+      
+      let matchesType = false;
+      if (isCreditActive && isDebitActive) {
+        matchesType = item.credit > 0 || item.debit > 0;
+      } else if (isCreditActive) {
         matchesType = item.credit > 0;
-      } else if (effectiveType === 'Debit') {
+      } else if (isDebitActive) {
         matchesType = item.debit > 0;
+      } else {
+        matchesType = false;
       }
+
       return matchesSearch && matchesType;
     });
-  }, [searchTerm, typeFilter, activePill]);
+  }, [searchTerm, isCreditActive, isDebitActive]);
 
   const totalCollection = useMemo(() => 45750, []);
   const totalDisbursement = useMemo(() => 12300, []);
@@ -185,15 +198,11 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
           {/* Credit & Debit Action Pills */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 h-10">
             <button
-              onClick={() => {
-                const next = activePill === 'Credit' ? 'All' : 'Credit';
-                setActivePill(next);
-                setTypeFilter(next);
-              }}
+              onClick={() => setIsCreditActive((prev) => !prev)}
               className={`rounded-xl px-2.5 sm:px-3 h-full flex items-center gap-1 sm:gap-1.5 font-bold text-xs transition-all cursor-pointer border select-none ${
-                activePill === 'Credit'
+                isCreditActive
                   ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                  : 'bg-[#ecfdf5] text-emerald-600 border-emerald-100 hover:bg-emerald-100/70'
+                  : 'bg-slate-100 text-slate-400 border-slate-200/80 opacity-60 hover:opacity-80'
               }`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -203,15 +212,11 @@ export default function CollectionReportModal({ isOpen = true, onClose }) {
             </button>
 
             <button
-              onClick={() => {
-                const next = activePill === 'Debit' ? 'All' : 'Debit';
-                setActivePill(next);
-                setTypeFilter(next);
-              }}
+              onClick={() => setIsDebitActive((prev) => !prev)}
               className={`rounded-xl px-2.5 sm:px-3 h-full flex items-center gap-1 sm:gap-1.5 font-bold text-xs transition-all cursor-pointer border select-none ${
-                activePill === 'Debit'
+                isDebitActive
                   ? 'bg-rose-600 text-white border-rose-600 shadow-md'
-                  : 'bg-[#fef2f2] text-rose-600 border-rose-100 hover:bg-rose-100/70'
+                  : 'bg-slate-100 text-slate-400 border-slate-200/80 opacity-60 hover:opacity-80'
               }`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
