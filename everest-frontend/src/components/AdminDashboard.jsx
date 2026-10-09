@@ -11,6 +11,7 @@ import { db } from '../firebase';
 import { Clock, User } from 'lucide-react';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 import AttendanceLedger from './AttendanceLedger';
+import CollectionReportModal from './CollectionReportModal';
 
 // ============================================================================
 // DUAL-ENVIRONMENT API CONFIGURATION & AUTOMATIC FALLBACK MECHANISM (WITH FLOW)
@@ -779,6 +780,7 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [showAttendanceOverlay, setShowAttendanceOverlay] = React.useState(false);
   const [showMarkAttendanceCalendar, setShowMarkAttendanceCalendar] = React.useState(false);
   const [showAttendanceLedger, setShowAttendanceLedger] = React.useState(false);
+  const [showCollectionReportModal, setShowCollectionReportModal] = React.useState(false);
 
   // --- ATTENDANCE SELFIE & TIMER ENGINE ---
   const todayStr = new Date().toLocaleDateString('en-CA');
@@ -4949,6 +4951,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       }
       if (showMarkAttendanceCalendar) { setShowMarkAttendanceCalendar(false); return true; }
       if (showAttendanceOverlay) { setShowAttendanceOverlay(false); return true; }
+      if (showCollectionReportModal) { setShowCollectionReportModal(false); return true; }
 
       // 1. Modals & Popups
       if (isLandSearchModalOpen) { setIsLandSearchModalOpen(false); return true; }
@@ -5474,7 +5477,10 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         </div>
 
         {/* Collection Reports */}
-        <div className={`${totalCards === 4 ? 'col-span-3' : 'col-span-2'} sm:col-span-1 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer`}>
+        <div 
+          onClick={() => setShowCollectionReportModal(true)}
+          className={`${totalCards === 4 ? 'col-span-3' : 'col-span-2'} sm:col-span-1 bg-white rounded-xl p-2 flex flex-col items-center justify-center text-center gap-1.5 py-3 ${cardShadowClass} cursor-pointer hover:bg-slate-50 transition-colors`}
+        >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
@@ -5608,6 +5614,12 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
           activeBranch={activeBranch}
         />
       )}
+
+      {/* Collection Report Modal */}
+      <CollectionReportModal 
+        isOpen={showCollectionReportModal}
+        onClose={() => setShowCollectionReportModal(false)}
+      />
 
       {/* Mark Attendance Calendar Overlay */}
       {showMarkAttendanceCalendar && (
