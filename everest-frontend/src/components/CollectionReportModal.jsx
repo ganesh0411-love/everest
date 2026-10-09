@@ -674,7 +674,7 @@ export default function CollectionReportModal({
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Target</span>
-                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 whitespace-nowrap">
                   ₹ {targetCollection.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -687,36 +687,36 @@ export default function CollectionReportModal({
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Loan Amount</span>
-                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 whitespace-nowrap">
                   ₹ {targetLoanAmount.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
           ) : (
             /* Case C: Card 1 = Collection */
-            <div className="flex-1 flex items-center justify-between gap-1.5 sm:gap-2 pr-1 sm:pr-3 min-w-0">
+            <div className="flex-[1.3] sm:flex-1 flex items-center justify-between gap-1.5 sm:gap-2 pr-1 sm:pr-3 min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
                   <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
-                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 whitespace-nowrap">
                     ₹ {totalCollection.toLocaleString('en-IN')}
                   </span>
                 </div>
               </div>
-              {/* UPI & Cash Breakdown (Visible on Mobile & Desktop) */}
-              <div className="flex border-l border-sky-200/70 pl-2 flex-col justify-center text-[9px] sm:text-[10px] leading-tight space-y-0.5 ml-auto shrink-0">
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0"></span>
-                  <span className="text-slate-500">UPI:</span>
-                  <span className="font-bold text-blue-700">₹ {onlineCollection.toLocaleString('en-IN')}</span>
+              {/* UPI & Cash Breakdown (Vertically Aligned Colons) */}
+              <div className="flex border-l border-sky-200/70 pl-2 flex-col justify-center text-[10px] sm:text-[11px] leading-tight space-y-0.5 ml-auto shrink-0">
+                <div className="flex items-center">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 shrink-0"></span>
+                  <span className="w-8 sm:w-10 shrink-0 text-slate-500 font-medium">UPI:</span>
+                  <span className="font-semibold text-blue-600 whitespace-nowrap">₹ {onlineCollection.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
-                  <span className="text-slate-500">Cash:</span>
-                  <span className="font-bold text-emerald-700">₹ {cashCollection.toLocaleString('en-IN')}</span>
+                <div className="flex items-center">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 shrink-0"></span>
+                  <span className="w-8 sm:w-10 shrink-0 text-slate-500 font-medium">Cash:</span>
+                  <span className="font-semibold text-emerald-600 whitespace-nowrap">₹ {cashCollection.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -732,22 +732,22 @@ export default function CollectionReportModal({
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
-                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 whitespace-nowrap">
                     ₹ {totalCollection.toLocaleString('en-IN')}
                   </span>
                 </div>
               </div>
               {/* UPI & Cash Breakdown */}
-              <div className="flex border-l border-sky-200/70 pl-2 flex-col justify-center text-[9px] sm:text-[10px] leading-tight space-y-0.5 ml-auto shrink-0">
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0"></span>
-                  <span className="text-slate-500">UPI:</span>
-                  <span className="font-bold text-blue-700">₹ {onlineCollection.toLocaleString('en-IN')}</span>
+              <div className="flex border-l border-sky-200/70 pl-2 flex-col justify-center text-[10px] sm:text-[11px] leading-tight space-y-0.5 ml-auto shrink-0">
+                <div className="flex items-center">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 shrink-0"></span>
+                  <span className="w-8 sm:w-10 shrink-0 text-slate-500 font-medium">UPI:</span>
+                  <span className="font-semibold text-blue-600 whitespace-nowrap">₹ {onlineCollection.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
-                  <span className="text-slate-500">Cash:</span>
-                  <span className="font-bold text-emerald-700">₹ {cashCollection.toLocaleString('en-IN')}</span>
+                <div className="flex items-center">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 shrink-0"></span>
+                  <span className="w-8 sm:w-10 shrink-0 text-slate-500 font-medium">Cash:</span>
+                  <span className="font-semibold text-emerald-600 whitespace-nowrap">₹ {cashCollection.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -761,14 +761,14 @@ export default function CollectionReportModal({
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Disbursement</span>
-                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 whitespace-nowrap">
                   ₹ {totalDisbursement.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
           ) : (
             /* Case C: Card 2 = Disbursement */
-            <div className="flex-1 flex items-center gap-2 pl-2 sm:pl-3 min-w-0">
+            <div className="flex-[0.8] sm:flex-1 flex items-center gap-2 pl-2 sm:pl-3 min-w-0">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#f3e8ff] text-[#7e22ce] flex items-center justify-center shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25-9 5.25m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
@@ -776,7 +776,7 @@ export default function CollectionReportModal({
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Disbursement</span>
-                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 whitespace-nowrap">
                   ₹ {totalDisbursement.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -822,7 +822,7 @@ export default function CollectionReportModal({
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium text-slate-400">{index + 1}</td>
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4">
                         <div className="font-semibold text-slate-800 leading-tight">{item.name}</div>
-                        <div className="text-[10px] font-medium text-slate-400 mt-0.5">
+                        <div className="text-[10px] sm:text-[11px] text-slate-400 font-normal mt-0.5 whitespace-nowrap">
                           {formatTransactionSubtext(item.date, item.timeStr, item.createdAt)}
                         </div>
                       </td>
