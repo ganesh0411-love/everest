@@ -479,7 +479,17 @@ export default function CollectionReportModal({
     filteredData.forEach((item) => {
       if (isCreditActive && item.credit > 0) {
         coll += item.credit;
-        if (item.mode === 'UPI' || item.mode === 'Online') {
+        const itemUpi = Number(item.upiAmount || 0);
+        const itemCash = Number(item.cashAmount || 0);
+
+        if (item.isSplit || (itemUpi > 0 && itemCash > 0)) {
+          upi += itemUpi;
+          cash += itemCash;
+        } else if (itemUpi > 0) {
+          upi += itemUpi;
+          if (itemCash > 0) cash += itemCash;
+          else if (item.credit > itemUpi) cash += (item.credit - itemUpi);
+        } else if (item.mode === 'UPI' || item.mode === 'Online') {
           upi += item.credit;
         } else {
           cash += item.credit;
@@ -865,12 +875,7 @@ export default function CollectionReportModal({
                       {/* Credit Data Cell */}
                       {isCreditActive && (
                         <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
-                          <div>₹ {item.credit.toLocaleString('en-IN')}</div>
-                          {item.isSplit && (
-                            <div className="text-[9px] font-medium text-slate-400 mt-0.5">
-                              (UPI: ₹{item.upiAmount} • Cash: ₹{item.cashAmount})
-                            </div>
-                          )}
+                          ₹ {item.credit.toLocaleString('en-IN')}
                         </td>
                       )}
 
