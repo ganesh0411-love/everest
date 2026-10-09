@@ -515,6 +515,7 @@ function App() {
   };
 
   const navigateToView = (newView) => {
+    setIsCollectionReportOpen(false);
     if (newView === 'Customer') {
       setActiveCategory('Active');
       setSearchQuery('');
@@ -531,6 +532,7 @@ function App() {
   };
   
   const handleDrillDown = (category) => {
+    setIsCollectionReportOpen(false);
     setActiveCategory(category);
     setSearchQuery('');
     setActiveSort('Recent');
@@ -539,6 +541,7 @@ function App() {
   };
 
   const switchTab = (newView) => {
+    setIsCollectionReportOpen(false);
     if (newView === 'Customer') {
       setActiveCategory('Active');
       setSearchQuery('');
@@ -553,6 +556,12 @@ function App() {
     }
     setCurrentView(newView);
   };
+
+  useEffect(() => {
+    if (currentView !== 'Home') {
+      setIsCollectionReportOpen(false);
+    }
+  }, [currentView]);
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);

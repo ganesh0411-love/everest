@@ -782,6 +782,10 @@ const AdminDashboard = ({ setCurrentView, onDrillDown, activeBranch = { id: 'mai
   const [showAttendanceLedger, setShowAttendanceLedger] = React.useState(false);
   const [showCollectionReportModal, setShowCollectionReportModal] = React.useState(false);
 
+  React.useEffect(() => {
+    setShowCollectionReportModal(Boolean(isCollectionReportOpen));
+  }, [isCollectionReportOpen]);
+
   // --- ATTENDANCE SELFIE & TIMER ENGINE ---
   const todayStr = new Date().toLocaleDateString('en-CA');
   const attendanceKey = `attendance_${userProfile?.uid || 'guest'}_${todayStr}`;
