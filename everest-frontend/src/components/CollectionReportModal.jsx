@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Wallet, Target, HandCoins } from 'lucide-react';
+import { Wallet, Target, HandCoins, ArrowUpDown } from 'lucide-react';
 
 const getTodayStr = () => {
   const today = new Date();
@@ -91,26 +91,30 @@ const resolvePaymentMode = (inst) => {
 };
 
 const formatTransactionSubtext = (dateStr, timeStr, createdAt) => {
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+  let ts = null;
+
+  // 1. Parse string or numeric timestamp safely using parseDateToTimestamp to avoid US date MM-DD-YYYY inversion
+  if (createdAt) {
+    if (typeof createdAt === 'number') {
+      ts = createdAt;
+    } else if (typeof createdAt === 'string') {
+      ts = parseDateToTimestamp(createdAt);
+    }
+  }
+
+  if (!ts && dateStr) {
+    ts = parseDateToTimestamp(dateStr);
+  }
+
+  let dateObj = ts ? new Date(ts) : null;
   let day = '09';
   let monthStr = 'OCT';
   let yearStr = '26';
   let timeFormatted = timeStr || '';
 
-  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-
-  let dateObj = null;
-
-  if (createdAt) {
-    const d = new Date(createdAt);
-    if (!isNaN(d.getTime())) dateObj = d;
-  }
-
-  if (!dateObj && dateStr) {
-    const ts = parseDateToTimestamp(dateStr);
-    if (ts) dateObj = new Date(ts);
-  }
-
-  if (dateObj) {
+  if (dateObj && !isNaN(dateObj.getTime())) {
     day = String(dateObj.getDate()).padStart(2, '0');
     monthStr = months[dateObj.getMonth()];
     yearStr = String(dateObj.getFullYear()).slice(-2);
@@ -159,6 +163,7 @@ export default function CollectionReportModal({
   const [periodPreset, setPeriodPreset] = useState('Today'); // Default 'Today'
   const [searchTerm, setSearchTerm] = useState('');
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' (newest first) or 'asc' (oldest first)
 
   // Independent Credit & Debit multi-toggle boolean states
   const [isCreditActive, setIsCreditActive] = useState(true);
@@ -437,12 +442,12 @@ export default function CollectionReportModal({
     };
   }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate]);
 
-  // Dual-Mode Search: Partial text match vs Exact Number equality match
+  // Dual-Mode Search & Chronological Date Sorting (Ascending / Descending)
   const filteredData = useMemo(() => {
     const query = searchTerm.trim();
     const isNumeric = query !== '' && !/[a-zA-Z]/.test(query) && !isNaN(Number(query));
 
-    return ledgerEntries.filter((item) => {
+    const result = ledgerEntries.filter((item) => {
       let matchesSearch = true;
       if (query !== '') {
         if (isNumeric) {
@@ -467,7 +472,18 @@ export default function CollectionReportModal({
 
       return matchesSearch && matchesType;
     });
-  }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive]);
+
+    result.sort((a, b) => {
+      const tsA = parseDateToTimestamp(a.createdAt || a.date) || 0;
+      const tsB = parseDateToTimestamp(b.createdAt || b.date) || 0;
+      if (tsA !== tsB) {
+        return sortOrder === 'asc' ? tsA - tsB : tsB - tsA;
+      }
+      return sortOrder === 'asc' ? String(a.id).localeCompare(String(b.id)) : String(b.id).localeCompare(String(a.id));
+    });
+
+    return result;
+  }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive, sortOrder]);
 
   // Dynamic Metrics Recalculation strictly bound to active scoped data & toggles
   const { totalCollection, totalDisbursement, onlineCollection, cashCollection } = useMemo(() => {
@@ -794,7 +810,19 @@ export default function CollectionReportModal({
             <thead className="bg-slate-100 border-b border-slate-200 sticky top-0 z-10 select-none shadow-2xs">
               <tr>
                 <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-12 sm:w-14">S.No</th>
-                <th className="py-2.5 px-3 sm:px-4 text-left text-[11px] font-semibold text-slate-500">Name</th>
+                <th className="py-2.5 px-3 sm:px-4 text-left text-[11px] font-semibold text-slate-500">
+                  <div className="flex items-center justify-between gap-1">
+                    <span>Name</span>
+                    <button
+                      onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+                      className="flex items-center gap-1 text-[10px] bg-slate-200/80 hover:bg-slate-300 active:bg-slate-400 text-slate-700 px-1.5 py-0.5 rounded-md transition-all cursor-pointer select-none border border-slate-300/60"
+                      title={sortOrder === 'desc' ? "Sorted Newest to Oldest. Click for Oldest first." : "Sorted Oldest to Newest. Click for Newest first."}
+                    >
+                      <ArrowUpDown className="w-3 h-3 text-slate-600 shrink-0" />
+                      <span className="font-bold text-[9px] sm:text-[10px] uppercase tracking-wide">{sortOrder === 'desc' ? 'Newest' : 'Oldest'}</span>
+                    </button>
+                  </div>
+                </th>
                 
                 {/* MODE Header Column */}
                 {isCreditActive && !isDebitActive ? (
