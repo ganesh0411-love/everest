@@ -511,7 +511,13 @@ export default function CollectionReportModal({
   };
 
   // Real Customer Ledger Extraction & Metric Summaries
-  const { ledgerEntries, targetCollection, targetLoanAmount, totalScopedOverdue } = useMemo(() => {
+  const { 
+    ledgerEntries = [], 
+    targetCollection = 0, 
+    targetLoanAmount = 0, 
+    totalScopedPending = 0, 
+    totalScopedOverdue = 0 
+  } = useMemo(() => {
     const rawCustomers = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
       try {
         const saved = localStorage.getItem('everest_customers');
@@ -928,6 +934,11 @@ export default function CollectionReportModal({
     return result;
   }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive, sortOrder]);
 
+  // Safely compute scoped pending, target, collection, and OD with default fallbacks
+  const totalScopedTarget = Number(targetCollection || 0);
+  const totalScopedPendingSafe = Number(totalScopedPending || 0);
+  const totalScopedOD = Number(totalScopedOverdue || 0);
+
   // Dynamic Metrics Recalculation strictly bound to active scoped data & toggles
   const { totalCollection, totalDisbursement, onlineCollection, cashCollection } = useMemo(() => {
     let coll = 0;
@@ -967,20 +978,22 @@ export default function CollectionReportModal({
     };
   }, [filteredData, isCreditActive, isDebitActive]);
 
+  const totalScopedCollection = Number(totalCollection || 0);
+
   const totalPendingAmount = useMemo(() => {
     if (searchTerm.trim() !== '') {
       return filteredData.reduce((acc, curr) => acc + (Number(curr.pending) || 0), 0);
     }
-    return Number(totalScopedPending || 0);
-  }, [filteredData, searchTerm, totalScopedPending]);
+    return Number(totalScopedPendingSafe || 0);
+  }, [filteredData, searchTerm, totalScopedPendingSafe]);
 
   const totalOverdueAmount = useMemo(() => {
     if (searchTerm.trim() !== '') {
       return filteredData.reduce((acc, curr) => acc + (Number(curr.od) || 0), 0);
     }
     const filteredOdSum = filteredData.reduce((acc, curr) => acc + (Number(curr.od) || 0), 0);
-    return Math.max(filteredOdSum, Number(totalScopedOverdue || 0));
-  }, [filteredData, searchTerm, totalScopedOverdue]);
+    return Math.max(filteredOdSum, Number(totalScopedOD || 0));
+  }, [filteredData, searchTerm, totalScopedOD]);
 
   // Dynamic table column counts for responsive empty state colSpan
   const colCountMobile = 2 + (isCreditActive && !isDebitActive ? 1 : 0) + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
