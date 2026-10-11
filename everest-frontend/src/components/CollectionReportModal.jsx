@@ -637,9 +637,18 @@ export default function CollectionReportModal({
       const custName = cust.name || cust.customerName || 'Customer';
 
       // Daily installment target per customer
-      const rawToken = String(cust.tenureUnit || cust.paymentFrequency || cust.frequency || cust.loanType || '').toUpperCase();
-      const planToken = rawToken.includes('MONTH') ? 'MONTH' : (rawToken.includes('DAY') || rawToken.includes('DAILY') ? 'DAY' : 'WEEK');
-      const planCount = Number(cust.tenureVal || cust.tenure || cust.weeks || cust.days || cust.months || 100);
+      const typeStr = String(cust.loanType || cust.scheme || cust.category || '').toLowerCase();
+      const unitStr = String(cust.tenureUnit || cust.paymentFrequency || cust.frequency || '').toLowerCase();
+      let planToken = 'WEEK';
+      if (unitStr.includes('month') || typeStr.includes('month') || typeStr.includes('personal') || typeStr.includes('agri')) {
+        planToken = 'MONTH';
+      } else if (unitStr.includes('day') || typeStr.includes('daily') || typeStr.includes('day') || cust.days) {
+        planToken = 'DAY';
+      } else if (unitStr.includes('week') || typeStr.includes('week') || typeStr.includes('micro') || cust.weeks) {
+        planToken = 'WEEK';
+      }
+
+      const planCount = Number(cust.tenureVal || cust.tenure || cust.weeks || cust.days || cust.months || (planToken === 'DAY' ? 100 : 12));
 
       const custTargetPerDay = Number(cust.perDayAmount || cust.dailyInstallment || cust.installmentAmount || cust.targetAmount || 0) ||
         (cust.repayAmount ? Math.round(Number(cust.repayAmount) / Math.max(1, planCount)) : 0);
@@ -649,14 +658,37 @@ export default function CollectionReportModal({
       if (Array.isArray(cust.scheduledDates) && cust.scheduledDates.length > 0) {
         scheduledTimestamps = cust.scheduledDates.map(ts => new Date(ts).setHours(0, 0, 0, 0));
       } else {
-        const rawDueDate = cust.firstDueDate || cust.dueDate || cust.startDate || cust.scheduledDate;
-        let baseTs = parseDateToTimestamp(rawDueDate);
-        if (!baseTs && Array.isArray(cust.installments) && cust.installments.length > 0) {
-          const dates = cust.installments.map(i => parseDateToTimestamp(i.date)).filter(Boolean);
-          if (dates.length > 0) baseTs = Math.min(...dates);
+        let firstDueTs = null;
+        if (cust.firstDueDate) {
+          const ts = parseDateToTimestamp(cust.firstDueDate);
+          if (ts) firstDueTs = new Date(ts).setHours(0, 0, 0, 0);
         }
-        if (baseTs && planCount > 0) {
-          const baseDateObj = new Date(baseTs);
+        if (!firstDueTs) {
+          const disbStr = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.approvalDate || cust.loanDate;
+          if (disbStr) {
+            const ts = parseDateToTimestamp(disbStr);
+            if (ts) {
+              const s = new Date(ts);
+              if (planToken === 'DAY') s.setDate(s.getDate() + 1);
+              else if (planToken === 'MONTH') s.setMonth(s.getMonth() + 1);
+              else s.setDate(s.getDate() + 7);
+              firstDueTs = s.setHours(0, 0, 0, 0);
+            }
+          }
+        }
+        if (!firstDueTs && Array.isArray(cust.installments) && cust.installments.length > 0) {
+          const dates = cust.installments.map(i => parseDateToTimestamp(i.date)).filter(Boolean);
+          if (dates.length > 0) firstDueTs = Math.min(...dates);
+        }
+        if (!firstDueTs) {
+          const fallbackStr = cust.startDate || cust.scheduledDate || cust.dueDate || cust.date || cust.createdAt;
+          if (fallbackStr) {
+            const ts = parseDateToTimestamp(fallbackStr);
+            if (ts) firstDueTs = new Date(ts).setHours(0, 0, 0, 0);
+          }
+        }
+        if (firstDueTs && planCount > 0) {
+          const baseDateObj = new Date(firstDueTs);
           for (let idx = 0; idx < planCount; idx++) {
             const sDate = new Date(baseDateObj);
             if (planToken === 'DAY') sDate.setDate(sDate.getDate() + idx);
@@ -746,26 +778,31 @@ export default function CollectionReportModal({
         totalPeriodPending += custPendingToday;
       }
 
-      // 3. Cumulative Active OD (Carry-Forward Logic):
-      // Active OD = Total past unpaid bounced dues up to ToDate - Total excess collections recovered towards OD.
-      let totalDeficitUpToDate = Math.max(0, totalExpectedUpToDate - totalCollectedUpToDate);
-      if (totalDeficitUpToDate === 0 && totalBouncedDuesUpToDate > 0) {
-        totalDeficitUpToDate = totalBouncedDuesUpToDate;
-      }
-
+      // 3. Strict Schedule-Date Bounded Active OD Computation:
+      // Active OD is strictly bounded to scheduled dates on or before today (capped by endTs if viewing a past report)
       let custActiveOd = 0;
-      if (todayStartTs <= endTs && isScheduledToday) {
-        custActiveOd = Math.max(0, totalDeficitUpToDate - custPendingToday);
+      if (endTs >= todayStartTs && cust.dynamicOverdue !== undefined && cust.dynamicOverdue !== null) {
+        custActiveOd = Number(cust.dynamicOverdue) || 0;
       } else {
-        custActiveOd = totalDeficitUpToDate;
-      }
+        const cutoffTs = Math.min(todayStartTs, endTs);
+        const pastScheduledDates = scheduledTimestamps.filter(ts => ts <= cutoffTs);
+        const pastExpectedDueSum = pastScheduledDates.length * custTargetPerDay;
 
-      if (custActiveOd === 0 && cust.dynamicOverdue !== undefined && cust.dynamicOverdue !== null) {
-        const dynOd = Number(cust.dynamicOverdue) || 0;
-        if (dynOd > 0) custActiveOd = dynOd;
-      }
-      if (custActiveOd === 0 && totalBouncedDuesUpToDate > 0) {
-        custActiveOd = totalBouncedDuesUpToDate;
+        let totalPaidToCutoff = 0;
+        rawInstallments.forEach(inst => {
+          const dStr = inst.date || inst.paymentDate || inst.createdAt;
+          const ts = parseDateToTimestamp(dStr);
+          if (ts && ts <= cutoffTs) {
+            const status = String(inst.status || '').toUpperCase();
+            const amt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
+            if (status !== 'BOUNCED' && status !== 'CANCELLED' && amt > 0) {
+              totalPaidToCutoff += amt;
+            }
+          }
+        });
+
+        const actualPaidToCutoff = Math.max(totalPaidToCutoff, Number(cust.paidAmount || cust.totalPaid || 0));
+        custActiveOd = Math.max(0, pastExpectedDueSum - actualPaidToCutoff);
       }
 
       totalPeriodOverdue += custActiveOd;

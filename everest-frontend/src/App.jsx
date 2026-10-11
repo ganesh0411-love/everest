@@ -791,41 +791,72 @@ function App() {
         const nonBouncedInsts = insts.filter(inst => {
           const status = String(inst.status || '').toUpperCase();
           const amt = parseFloat(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0))) || 0;
-          return status !== 'BOUNCED' && status !== 'CANCELLED' && inst.mode !== 'BOUNCED';
+          return status !== 'BOUNCED' && status !== 'CANCELLED' && inst.mode !== 'BOUNCED' && amt > 0;
         });
-        const sub = nonBouncedInsts.reduce((sum, inst) => sum + (parseFloat(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0))) || 0), 0);
-        
-        const rawToken = String(c.tenureUnit || c.paymentFrequency || c.frequency || c.loanType || '').toUpperCase();
-        const planToken = rawToken.includes('MONTH') ? 'MONTH' : (rawToken.includes('DAY') || rawToken.includes('DAILY') || c.days ? 'DAY' : 'WEEK');
-        const planCount = Number(c.tenureVal || c.tenure || c.weeks || c.days || c.months || 100);
+        const totalPaidToDate = nonBouncedInsts.reduce((sum, inst) => {
+          const amt = parseFloat(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0))) || 0;
+          return sum + amt;
+        }, 0);
+        const actualPaid = Math.max(totalPaidToDate, Number(c.paidAmount || c.totalPaid || 0));
+
+        // 1. Precise Frequency Detection (Monthly/Personal/Agri vs Daily vs Weekly/Microfinance)
+        const typeStr = String(c.loanType || c.scheme || c.category || '').toLowerCase();
+        const unitStr = String(c.tenureUnit || c.paymentFrequency || c.frequency || '').toLowerCase();
+        let planToken = 'WEEK';
+        if (unitStr.includes('month') || typeStr.includes('month') || typeStr.includes('personal') || typeStr.includes('agri')) {
+          planToken = 'MONTH';
+        } else if (unitStr.includes('day') || typeStr.includes('daily') || typeStr.includes('day') || c.days) {
+          planToken = 'DAY';
+        } else if (unitStr.includes('week') || typeStr.includes('week') || typeStr.includes('micro') || c.weeks) {
+          planToken = 'WEEK';
+        }
+
+        const planCount = Number(c.tenureVal || c.tenure || c.weeks || c.days || c.months || (planToken === 'DAY' ? 100 : 12));
         const emiAmount = Number(c.perDayAmount || c.dailyInstallment || c.installmentAmount || c.targetAmount || 0) ||
           (repay > 0 && planCount > 0 ? Math.round(repay / planCount) : 0);
 
-        // Schedule generation: base date must be the start/first due date of the loan, NOT the next upcoming due date
+        // 2. Schedule generation: base date is strictly the First Due Date (disbursement date + 1 step or explicit firstDueDate)
         let scheduledDates = [];
         if (Array.isArray(c.scheduledDates) && c.scheduledDates.length > 0) {
           scheduledDates = c.scheduledDates.map(ts => new Date(ts).setHours(0, 0, 0, 0));
         } else {
-          const rawDueDate = c.firstDueDate || c.startDate || c.loanDate || c.date || c.createdAt || c.dueDate;
-          let baseTs = null;
-          if (rawDueDate) {
-            const d = parseDate(rawDueDate);
-            if (d && !isNaN(d.getTime())) baseTs = d.getTime();
+          let firstDueTs = null;
+          if (c.firstDueDate) {
+            const d = parseDate(c.firstDueDate);
+            if (d && !isNaN(d.getTime())) firstDueTs = new Date(d).setHours(0, 0, 0, 0);
           }
-          if (insts.length > 0) {
-            const instTimestamps = insts.map(i => {
-              const d = parseDate(i.date || i.paymentDate || i.createdAt);
-              return d && !isNaN(d.getTime()) ? d.getTime() : null;
-            }).filter(Boolean);
-            if (instTimestamps.length > 0) {
-              const minInst = Math.min(...instTimestamps);
-              if (!baseTs || minInst < baseTs) {
-                baseTs = minInst;
+          if (!firstDueTs) {
+            const disbStr = c.disbursedAt || c.disbursedDate || c.loanApprovedDate || c.approvalDate || c.loanDate;
+            if (disbStr) {
+              const d = parseDate(disbStr);
+              if (d && !isNaN(d.getTime())) {
+                const s = new Date(d);
+                if (planToken === 'DAY') s.setDate(s.getDate() + 1);
+                else if (planToken === 'MONTH') s.setMonth(s.getMonth() + 1);
+                else s.setDate(s.getDate() + 7);
+                firstDueTs = s.setHours(0, 0, 0, 0);
               }
             }
           }
-          if (baseTs && planCount > 0) {
-            const baseDateObj = new Date(baseTs);
+          if (!firstDueTs && insts.length > 0) {
+            const instTimestamps = insts.map(i => {
+              const d = parseDate(i.date || i.paymentDate || i.createdAt);
+              return d && !isNaN(d.getTime()) ? new Date(d).setHours(0, 0, 0, 0) : null;
+            }).filter(Boolean);
+            if (instTimestamps.length > 0) {
+              firstDueTs = Math.min(...instTimestamps);
+            }
+          }
+          if (!firstDueTs) {
+            const fallbackStr = c.startDate || c.scheduledDate || c.dueDate || c.date || c.createdAt;
+            if (fallbackStr) {
+              const d = parseDate(fallbackStr);
+              if (d && !isNaN(d.getTime())) firstDueTs = new Date(d).setHours(0, 0, 0, 0);
+            }
+          }
+
+          if (firstDueTs && planCount > 0) {
+            const baseDateObj = new Date(firstDueTs);
             for (let idx = 0; idx < planCount; idx++) {
               const scheduledDateObj = new Date(baseDateObj);
               if (planToken === 'DAY') scheduledDateObj.setDate(scheduledDateObj.getDate() + idx);
@@ -837,73 +868,37 @@ function App() {
           }
         }
 
-        // Active Cumulative OD Calculation Engine:
-        // Any past scheduled installment date (installmentDate < currentDate) where status is BOUNCED or unpaid balance remains
-        // transitions permanently into OD.
-        // Payments made for subsequent days fulfill that specific day's installment only; they do NOT auto-clear past unsettled OD
-        // unless extra/excess amount is collected.
-        // Active OD = Sum of all past bounced / unpaid scheduled dues - Excess payments allocated to past arrears.
+        // 3. Strict Schedule-Date Bounded Active OD Computation:
+        // Only inspect installments scheduled ON or BEFORE today:
         const todayTs = today.getTime();
-        let paidToday = 0;
-        let paidPast = 0;
-        let pastBouncedDues = 0;
-        let hasBouncedInst = false;
+        const pastScheduledDates = scheduledDates.filter(ts => ts <= todayTs);
 
-        insts.forEach(inst => {
-          const dStr = inst.date || inst.paymentDate || inst.createdAt;
-          const dObj = parseDate(dStr);
-          if (!dObj || isNaN(dObj.getTime())) return;
-          const dayTs = new Date(dObj).setHours(0, 0, 0, 0);
-          const status = String(inst.status || '').toUpperCase();
-          const amt = parseFloat(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0))) || 0;
-          const due = Number(inst.dueAmount || inst.targetAmount || emiAmount || 250);
+        // Sum of expected dues from elapsed schedule dates
+        const pastExpectedDueSum = pastScheduledDates.length * emiAmount;
 
-          if (status === 'BOUNCED' || (amt === 0 && (inst.mode === 'BOUNCED' || status === 'BOUNCED'))) {
-            pastBouncedDues += due;
-            hasBouncedInst = true;
-          } else if (status !== 'CANCELLED' && amt > 0) {
-            if (dayTs === todayTs) {
-              paidToday += amt;
-            } else if (dayTs < todayTs) {
-              paidPast += amt;
-            }
-          }
-        });
+        // True Active OD:
+        // If total paid is less than what was due in past schedules, difference is OD.
+        // Once past dues are caught up, OD is strictly 0.
+        // Future installments (> today) are NEVER counted toward OD or pending dues!
+        let overdueAmount = Math.max(0, pastExpectedDueSum - actualPaid);
 
-        // 1. Past expected scheduled dues (dates < today)
-        const pastScheduledDates = scheduledDates.filter(ts => ts < todayTs);
-        let expectedPastDues = 0;
-        if (pastScheduledDates.length > 0) {
-          expectedPastDues = pastScheduledDates.length * emiAmount;
-        } else if (hasBouncedInst) {
-          expectedPastDues = pastBouncedDues;
+        // Pending Dues Count:
+        // Count ONLY past installments that remain unpaid or bounced. Never count future loan days.
+        let pendingDues = 0;
+        if (overdueAmount > 0) {
+          pendingDues = emiAmount > 0 ? Math.ceil(overdueAmount / emiAmount) : 1;
+          pendingDues = Math.min(pendingDues, pastScheduledDates.length);
         }
 
-        // 2. Today's scheduled installment and excess collection
-        const isScheduledToday = scheduledDates.includes(todayTs) || (scheduledDates.length === 0 && Boolean(String(c.status || '').match(/approved|disbursed|active/i)));
-        const todayTarget = isScheduledToday ? emiAmount : 0;
-        const excessPaidToday = Math.max(0, paidToday - todayTarget);
-        const todayPending = isScheduledToday ? Math.max(0, todayTarget - paidToday) : 0;
-
-        // 3. Past deficit up to midnight
-        let pastDeficit = Math.max(0, expectedPastDues - paidPast);
-        if (hasBouncedInst && pastDeficit < pastBouncedDues) {
-          pastDeficit = Math.max(pastDeficit, pastBouncedDues);
+        if (repay > 0 && (repay - actualPaid <= 0)) {
+          overdueAmount = 0;
+          pendingDues = 0;
         }
-
-        // 4. Cumulative Active OD
-        let overdueAmount = Math.max(0, pastDeficit - excessPaidToday);
-
-        if (overdueAmount === 0 && Number(c.dynamicOverdue || c.overdue || c.overdueAmount || 0) > 0) {
-          overdueAmount = Number(c.dynamicOverdue || c.overdue || c.overdueAmount);
-        }
-
-        const pendingDues = emiAmount > 0 ? Math.ceil(overdueAmount / emiAmount) : (overdueAmount > 0 ? 1 : 0);
 
         return { 
           ...c, 
-          dynamicOutstanding: Math.max(0, repay - sub),
-          dynamicTotalPaid: sub,
+          dynamicOutstanding: Math.max(0, repay - actualPaid),
+          dynamicTotalPaid: actualPaid,
           dynamicOverdue: overdueAmount,
           dynamicPendingDues: pendingDues,
           dynamicEmiAmount: emiAmount,

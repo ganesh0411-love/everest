@@ -17,7 +17,8 @@ const CustomerList = ({ customers, onSubmitApplication, activeBranch }) => {
   }, []);
 
   const totalPrincipal = customers.reduce((sum, c) => sum + (Number(c.loanAmount) || 0), 0);
-  const totalOutstanding = customers.reduce((sum, c) => sum + (Number(c.repayAmount) || 0), 0);
+  const totalOutstanding = customers.reduce((sum, c) => sum + (Number(c.dynamicOutstanding !== undefined ? c.dynamicOutstanding : (c.repayAmount || 0))), 0);
+  const totalOverdue = customers.reduce((sum, c) => sum + (Number(c.dynamicOverdue || c.overdue || 0)), 0);
 
   const filteredCustomers = customers.filter(c => {
     // Strictly show only approved profiles
