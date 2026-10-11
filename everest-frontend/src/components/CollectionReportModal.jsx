@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check } from 'lucide-react';
+import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, AlertTriangle } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 
@@ -511,7 +511,7 @@ export default function CollectionReportModal({
   };
 
   // Real Customer Ledger Extraction & Metric Summaries
-  const { ledgerEntries, targetCollection, targetLoanAmount } = useMemo(() => {
+  const { ledgerEntries, targetCollection, targetLoanAmount, totalScopedOverdue } = useMemo(() => {
     const rawCustomers = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
       try {
         const saved = localStorage.getItem('everest_customers');
@@ -628,6 +628,43 @@ export default function CollectionReportModal({
       const custTargetPerDay = Number(cust.perDayAmount || cust.dailyInstallment || cust.installmentAmount || cust.targetAmount || 0) ||
         (cust.repayAmount ? Math.round(Number(cust.repayAmount) / Math.max(1, Number(cust.tenure || cust.weeks || cust.days || 100))) : 0);
 
+      // Overdue (OD) calculation for customer
+      const custOd = (() => {
+        if (cust.dynamicOverdue !== undefined && cust.dynamicOverdue !== null) return Number(cust.dynamicOverdue) || 0;
+        if (cust.overdueAmount !== undefined) return Number(cust.overdueAmount) || 0;
+        if (cust.overdue !== undefined) return Number(cust.overdue) || 0;
+        if (cust.odAmount !== undefined) return Number(cust.odAmount) || 0;
+        if (cust.od !== undefined) return Number(cust.od) || 0;
+
+        const repay = Number(cust.repayAmount || cust.totalRepayAmount || 0);
+        const sub = Number(cust.dynamicTotalPaid || cust.paidAmount || cust.totalPaid || 0);
+        const emiAmount = Number(cust.perDayAmount || cust.dailyInstallment || cust.installmentAmount || 0);
+        const rawDueDate = cust.dueDate || cust.firstDueDate || cust.startDate;
+        if (rawDueDate && emiAmount > 0) {
+          const dueTs = parseDateToTimestamp(rawDueDate);
+          if (dueTs) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            let expectedCount = 0;
+            const planToken = (cust.paymentFrequency || cust.frequency || cust.loanType || '').toUpperCase().includes('WEEK') ? 'WEEK' : 
+                              (cust.paymentFrequency || cust.frequency || cust.loanType || '').toUpperCase().includes('MONTH') ? 'MONTH' : 'DAY';
+            const planCount = Number(cust.tenure || cust.weeks || cust.days || 100);
+            const baseDateObj = new Date(dueTs);
+            for (let idx = 0; idx < planCount; idx++) {
+              const sDate = new Date(baseDateObj);
+              if (planToken === 'DAY') sDate.setDate(sDate.getDate() + idx);
+              else if (planToken === 'MONTH') sDate.setMonth(sDate.getMonth() + idx);
+              else sDate.setDate(sDate.getDate() + (idx * 7));
+              sDate.setHours(0, 0, 0, 0);
+              if (sDate < today) expectedCount++;
+            }
+            const expectedPaid = Math.min(repay, expectedCount * emiAmount);
+            return Math.max(0, expectedPaid - sub);
+          }
+        }
+        return 0;
+      })();
+
       const rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
       let customerHasCollectionInPeriod = false;
       let customerTargetInPeriod = 0;
@@ -644,6 +681,17 @@ export default function CollectionReportModal({
             // Add to Target: if installment has scheduled due amount, use it, else custTargetPerDay
             const instDue = Number(inst.dueAmount || inst.targetAmount || inst.target || custTargetPerDay);
             customerTargetInPeriod += instDue;
+
+            let itemPending = 0;
+            if (cust.pendingAmount !== undefined && cust.pendingAmount !== null && Number(cust.pendingAmount) > 0) {
+              itemPending = Number(cust.pendingAmount);
+            } else if (cust.pendingDue !== undefined && cust.pendingDue !== null && Number(cust.pendingDue) > 0) {
+              itemPending = Number(cust.pendingDue);
+            } else if (instDue > 0) {
+              itemPending = Math.max(0, instDue - amount);
+            } else {
+              itemPending = Math.max(0, custTargetPerDay - amount);
+            }
 
             if (amount > 0 && status !== 'BOUNCED' && status !== 'CANCELLED') {
               const upiAmt = Number(inst.upiAmount || 0);
@@ -684,6 +732,7 @@ export default function CollectionReportModal({
               const key = `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`;
               entriesMap.set(key, {
                 id: key,
+                customerId: cust.id,
                 name: custName,
                 mode: resolvedMode,
                 isSplit: isSplit,
@@ -691,6 +740,8 @@ export default function CollectionReportModal({
                 cashAmount: finalCash,
                 credit: amount,
                 debit: Number(cust.debit || 0),
+                pending: itemPending,
+                od: custOd,
                 date: instDate,
                 timeStr: inst.timeStr || inst.time,
                 createdAt: inst.createdAt || inst.date
@@ -733,6 +784,7 @@ export default function CollectionReportModal({
         if (!entriesMap.has(key)) {
           entriesMap.set(key, {
             id: key,
+            customerId: cust.id,
             name: custName,
             mode: 'Cash',
             isSplit: false,
@@ -740,6 +792,8 @@ export default function CollectionReportModal({
             cashAmount: disbAmount,
             credit: 0,
             debit: disbAmount,
+            pending: 0,
+            od: custOd,
             date: disbDate,
             timeStr: cust.timeStr || '',
             createdAt: disbDate
@@ -750,10 +804,28 @@ export default function CollectionReportModal({
 
     const entries = Array.from(entriesMap.values());
 
+    let totalOd = 0;
+    const seenCusts = new Set();
+    scopedCustomers.forEach((c) => {
+      const cId = c.id || c.customerId || c.name;
+      if (seenCusts.has(cId)) return;
+      seenCusts.add(cId);
+      const od = (() => {
+        if (c.dynamicOverdue !== undefined && c.dynamicOverdue !== null) return Number(c.dynamicOverdue) || 0;
+        if (c.overdueAmount !== undefined) return Number(c.overdueAmount) || 0;
+        if (c.overdue !== undefined) return Number(c.overdue) || 0;
+        if (c.odAmount !== undefined) return Number(c.odAmount) || 0;
+        if (c.od !== undefined) return Number(c.od) || 0;
+        return 0;
+      })();
+      totalOd += od;
+    });
+
     return {
       ledgerEntries: entries,
       targetCollection: totalTarget,
-      targetLoanAmount: totalSanctionedLoanAmtForDisbursed
+      targetLoanAmount: totalSanctionedLoanAmtForDisbursed,
+      totalScopedOverdue: totalOd
     };
   }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedFilterIds, isAllSelected, isBranchFilterMode, canFilterByStaff, availableFilterItems, isMainBranch, userBranchId]);
 
@@ -839,9 +911,26 @@ export default function CollectionReportModal({
     };
   }, [filteredData, isCreditActive, isDebitActive]);
 
+  const totalPendingAmount = useMemo(() => {
+    const entriesPendingSum = filteredData.reduce((acc, curr) => acc + (Number(curr.pending) || 0), 0);
+    return Math.max(entriesPendingSum, Math.max(0, targetCollection - totalCollection));
+  }, [filteredData, targetCollection, totalCollection]);
+
+  const totalOverdueAmount = useMemo(() => {
+    let odSum = 0;
+    const seen = new Set();
+    filteredData.forEach((item) => {
+      const cId = item.customerId || item.name;
+      if (seen.has(cId)) return;
+      seen.add(cId);
+      odSum += (Number(item.od) || 0);
+    });
+    return odSum > 0 ? odSum : (Number(totalScopedOverdue) || 0);
+  }, [filteredData, totalScopedOverdue]);
+
   // Dynamic table column counts for responsive empty state colSpan
   const colCountMobile = 2 + (isCreditActive && !isDebitActive ? 1 : 0) + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
-  const colCountDesktop = 3 + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
+  const colCountDesktop = isCreditActive ? (7 + (isDebitActive ? 1 : 0)) : (3 + (isDebitActive ? 1 : 0));
 
   if (!isOpen) return null;
 
@@ -1093,8 +1182,101 @@ export default function CollectionReportModal({
           </div>
         </div>
 
-        {/* LINE 3: Dynamic Summary Metric Cards (50/50 Equal Balance with Middle Vertical Divider) */}
-        <div className="w-full bg-[#f0f7ff] border border-sky-100 rounded-xl px-3 py-2 flex items-center justify-between shadow-2xs divide-x divide-sky-200/70 shrink-0">
+        {/* DESKTOP VIEWPORT (lg: and above): 4 Dedicated Summary Cards when Credit is Active */}
+        {isCreditActive ? (
+          <div className="hidden lg:grid grid-cols-4 gap-3 xl:gap-4 w-full shrink-0">
+            {/* Card 1: Target */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 xl:p-3.5 flex items-center gap-3 min-w-0 hover:shadow-xs transition-shadow">
+              <div className="w-10 h-10 xl:w-11 xl:h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                <Target className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-[11px] xl:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Target</span>
+                <span className="text-base xl:text-lg font-black text-slate-800 tracking-tight whitespace-nowrap truncate mt-0.5">
+                  ₹ {targetCollection.toLocaleString('en-IN')}
+                </span>
+                <span className="text-[10px] font-medium text-slate-400 truncate mt-0.5">Scheduled Dues</span>
+              </div>
+            </div>
+
+            {/* Card 2: Collection */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 xl:p-3.5 flex items-center gap-3 min-w-0 hover:shadow-xs transition-shadow">
+              <div className="w-10 h-10 xl:w-11 xl:h-11 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+                <Wallet className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-[11px] xl:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Collection</span>
+                <span className="text-base xl:text-lg font-black text-sky-700 tracking-tight whitespace-nowrap truncate mt-0.5">
+                  ₹ {totalCollection.toLocaleString('en-IN')}
+                </span>
+                <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500 whitespace-nowrap mt-0.5 truncate">
+                  <span className="text-blue-600">UPI: ₹{onlineCollection.toLocaleString('en-IN')}</span>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-emerald-600">Cash: ₹{cashCollection.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Pending */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 xl:p-3.5 flex items-center gap-3 min-w-0 hover:shadow-xs transition-shadow">
+              <div className="w-10 h-10 xl:w-11 xl:h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                <Clock className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-[11px] xl:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Pending</span>
+                <span className="text-base xl:text-lg font-black text-amber-600 tracking-tight whitespace-nowrap truncate mt-0.5">
+                  ₹ {totalPendingAmount.toLocaleString('en-IN')}
+                </span>
+                <span className="text-[10px] font-medium text-slate-400 truncate mt-0.5">Balance Due</span>
+              </div>
+            </div>
+
+            {/* Card 4: OD (Overdue) */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 xl:p-3.5 flex items-center gap-3 min-w-0 hover:shadow-xs transition-shadow">
+              <div className="w-10 h-10 xl:w-11 xl:h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
+                <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-[11px] xl:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">OD (Overdue)</span>
+                <span className="text-base xl:text-lg font-black text-rose-600 tracking-tight whitespace-nowrap truncate mt-0.5">
+                  ₹ {totalOverdueAmount.toLocaleString('en-IN')}
+                </span>
+                <span className="text-[10px] font-medium text-slate-400 truncate mt-0.5">Installment Overdue</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Desktop Debit-Only View */
+          <div className="hidden lg:grid grid-cols-2 gap-4 w-full shrink-0">
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3.5 flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                <HandCoins className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Loan Amount</span>
+                <span className="text-base xl:text-lg font-black text-slate-800 tracking-tight whitespace-nowrap truncate mt-0.5">
+                  ₹ {targetLoanAmount.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3.5 flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25-9 5.25m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                </svg>
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Disbursement</span>
+                <span className="text-base xl:text-lg font-black text-slate-800 tracking-tight whitespace-nowrap truncate mt-0.5">
+                  ₹ {totalDisbursement.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MOBILE VIEWPORT (< lg:): Existing 2-Card Container 100% UNTOUCHED */}
+        <div className="lg:hidden w-full bg-[#f0f7ff] border border-sky-100 rounded-xl px-3 py-2 flex items-center justify-between shadow-2xs divide-x divide-sky-200/70 shrink-0">
           
           {/* Card 1 (Left 50%) */}
           {isCreditActive && !isDebitActive ? (
@@ -1239,16 +1421,30 @@ export default function CollectionReportModal({
                   </div>
                 </th>
                 
-                {/* MODE Header Column */}
+                {/* MOBILE-ONLY: MODE Header Column (< lg:) */}
                 {isCreditActive && !isDebitActive ? (
-                  <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-24 sm:w-28">MODE</th>
-                ) : isCreditActive && isDebitActive ? (
-                  <th className="hidden lg:table-cell py-2.5 px-4 text-center text-[11px] font-semibold text-slate-500 w-28 lg:w-36">Mode</th>
+                  <th className="lg:hidden py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-24 sm:w-28">MODE</th>
                 ) : null}
 
-                {/* Credit Header Column */}
+                {/* MOBILE-ONLY: Credit Header Column (< lg:) */}
                 {isCreditActive && (
-                  <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-emerald-600 bg-emerald-50/70 w-24 sm:w-36">Credit</th>
+                  <th className="lg:hidden py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-emerald-600 bg-emerald-50/70 w-24 sm:w-36">Credit</th>
+                )}
+
+                {/* DESKTOP-ONLY: Expanded Columns when Credit is Active (lg:) */}
+                {isCreditActive && (
+                  <>
+                    <th className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center text-[11px] font-bold text-emerald-700 bg-emerald-50/60 w-24 xl:w-28">Cash</th>
+                    <th className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center text-[11px] font-bold text-blue-700 bg-blue-50/60 w-24 xl:w-28">UPI</th>
+                    <th className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center text-[11px] font-bold text-slate-800 bg-slate-200/60 w-28 xl:w-32">Collection</th>
+                    <th className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center text-[11px] font-bold text-amber-700 bg-amber-50/60 w-24 xl:w-28">Pending</th>
+                    <th className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center text-[11px] font-bold text-rose-700 bg-rose-50/60 w-24 xl:w-28">OD</th>
+                  </>
+                )}
+
+                {/* DESKTOP-ONLY: Mode Header Column when Debit-Only is Active */}
+                {!isCreditActive && isDebitActive && (
+                  <th className="hidden lg:table-cell py-2.5 px-4 text-center text-[11px] font-semibold text-slate-500 w-28 lg:w-36">Mode</th>
                 )}
 
                 {/* Debit Header Column */}
@@ -1270,9 +1466,9 @@ export default function CollectionReportModal({
                         </div>
                       </td>
                       
-                      {/* MODE Data Cell (Compact Dot Badges - Single Line) */}
+                      {/* MOBILE-ONLY: MODE Data Cell (< lg:) */}
                       {isCreditActive && !isDebitActive ? (
-                        <td className="py-2.5 sm:py-3 px-2 text-center">
+                        <td className="lg:hidden py-2.5 sm:py-3 px-2 text-center">
                           {item.isSplit ? (
                             <div className="flex flex-col items-center justify-center gap-1">
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap border border-blue-200/60 shadow-2xs">
@@ -1294,35 +1490,40 @@ export default function CollectionReportModal({
                             </span>
                           )}
                         </td>
-                      ) : isCreditActive && isDebitActive ? (
-                        <td className="hidden lg:table-cell py-3 px-4 text-center">
-                          {item.isSplit ? (
-                            <div className="flex flex-col items-center justify-center gap-1">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold whitespace-nowrap border border-blue-200/60 shadow-2xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                                ₹{item.upiAmount.toLocaleString('en-IN')}
-                              </span>
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold whitespace-nowrap border border-emerald-200/60 shadow-2xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                                ₹{item.cashAmount.toLocaleString('en-IN')}
-                              </span>
-                            </div>
-                          ) : item.mode === 'UPI' || item.mode === 'Online' ? (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs whitespace-nowrap">
-                              UPI
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs whitespace-nowrap">
-                              Cash
-                            </span>
-                          )}
-                        </td>
                       ) : null}
 
-                      {/* Credit Data Cell */}
+                      {/* MOBILE-ONLY: Credit Data Cell (< lg:) */}
                       {isCreditActive && (
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
+                        <td className="lg:hidden py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
                           ₹ {item.credit.toLocaleString('en-IN')}
+                        </td>
+                      )}
+
+                      {/* DESKTOP-ONLY: Expanded Columns when Credit is Active (lg:) */}
+                      {isCreditActive && (
+                        <>
+                          <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold text-emerald-700">
+                            {item.cashAmount > 0 ? `₹ ${item.cashAmount.toLocaleString('en-IN')}` : '₹ 0'}
+                          </td>
+                          <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold text-blue-700">
+                            {item.upiAmount > 0 ? `₹ ${item.upiAmount.toLocaleString('en-IN')}` : '₹ 0'}
+                          </td>
+                          <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-black text-slate-800 bg-slate-50/50">
+                            ₹ {((item.cashAmount || 0) + (item.upiAmount || 0) || item.credit || 0).toLocaleString('en-IN')}
+                          </td>
+                          <td className={`hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold ${item.pending > 0 ? 'text-amber-600 bg-amber-50/30' : 'text-slate-400'}`}>
+                            {item.pending > 0 ? `₹ ${item.pending.toLocaleString('en-IN')}` : '₹ 0'}
+                          </td>
+                          <td className={`hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold ${item.od > 0 ? 'text-rose-600 bg-rose-50/30' : 'text-slate-400'}`}>
+                            {item.od > 0 ? `₹ ${item.od.toLocaleString('en-IN')}` : '₹ 0'}
+                          </td>
+                        </>
+                      )}
+
+                      {/* DESKTOP-ONLY: Mode Data Cell when Debit-Only is Active */}
+                      {!isCreditActive && isDebitActive && (
+                        <td className="hidden lg:table-cell py-3 px-4 text-center font-semibold text-slate-600">
+                          {item.mode}
                         </td>
                       )}
 
@@ -1336,7 +1537,8 @@ export default function CollectionReportModal({
                   ))}
                   {/* Bottom Clearance Spacer Row so 10th+ entries are fully clear of bottom navigation bar */}
                   <tr className="h-24 border-none pointer-events-none">
-                    <td colSpan={6} className="py-0 border-none"></td>
+                    <td colSpan={colCountMobile} className="lg:hidden py-0 border-none"></td>
+                    <td colSpan={colCountDesktop} className="hidden lg:table-cell py-0 border-none"></td>
                   </tr>
                 </>
               ) : (
