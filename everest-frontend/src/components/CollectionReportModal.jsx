@@ -184,7 +184,8 @@ export default function CollectionReportModal({
   branches = [],
   customers = [],
   customLedgerData = null,
-  staffList = []
+  staffList = [],
+  isStaff: isStaffProp
 }) {
   const [fromDate, setFromDate] = useState(() => getTodayStr());
   const [toDate, setToDate] = useState(() => getTodayStr());
@@ -260,6 +261,7 @@ export default function CollectionReportModal({
   // Visible to: Super Admin, Sub-Branch Admin, or any Staff user explicitly granted Admin privileges (where admin permission toggle/radio is enabled in Customer Management)
   // Hidden from: Regular Staff members who do NOT possess admin privileges.
   const userRole = String(userProfile?.role || 'admin').toLowerCase();
+  const isStaff = Boolean(isStaffProp !== undefined ? isStaffProp : (userRole === 'staff'));
   const isSuperOrBranchAdmin = 
     userRole === 'admin' || 
     userRole === 'super_admin' || 
@@ -340,9 +342,14 @@ export default function CollectionReportModal({
   }, [branches]);
 
   const userBranchId = activeBranch?.id || userProfile?.branchId || 'main';
-  const isMainBranch = userBranchId === 'main' || activeBranch?.name === 'Main Branch';
+  const isMainBranch = 
+    userBranchId === 'main' || 
+    String(activeBranch?.name || '').toLowerCase() === 'main branch' ||
+    String(activeBranch?.name || '').toLowerCase() === 'main';
 
   // Mode: Main Branch (BRANCH FILTER) vs Sub-Branch / Staff (STAFF FILTER)
+  // When inside Main Branch: Header reads "BRANCH FILTER" and lists Sub-Branches.
+  // When inside a Sub-Branch (or for Staff with Admin Privileges): Header reads "STAFF FILTER" and lists Staff members.
   const isBranchFilterMode = isMainBranch && !isStaff;
   const filterTitle = isBranchFilterMode ? 'BRANCH FILTER' : 'STAFF FILTER';
 
@@ -361,11 +368,32 @@ export default function CollectionReportModal({
       branchMap.set(bName.toLowerCase(), { id, name: bName });
     });
 
+    // Fallback from localStorage branches if needed
+    try {
+      const savedBranches = localStorage.getItem('everest_branches') || localStorage.getItem('branches');
+      if (savedBranches) {
+        const parsed = JSON.parse(savedBranches);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((b) => {
+            if (!b) return;
+            const bName = typeof b === 'string' ? b : (b.name || '');
+            const isMain = bName.toLowerCase() === 'main branch' || bName.toLowerCase() === 'main' || (b.id && String(b.id).toLowerCase() === 'main');
+            if (isMain) return;
+            if (b.disabled === true || b.status === 'Disabled' || b.hidden === true) return;
+            const id = typeof b === 'string' ? b : (b.id || bName);
+            if (!branchMap.has(bName.toLowerCase())) {
+              branchMap.set(bName.toLowerCase(), { id, name: bName });
+            }
+          });
+        }
+      }
+    } catch (_e) {}
+
     const rawCustomers = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
       try {
         const saved = localStorage.getItem('everest_customers');
         return saved ? JSON.parse(saved) : [];
-      } catch(e) { return []; }
+      } catch (_e) { return []; }
     })());
 
     (rawCustomers || []).forEach((c) => {
@@ -727,7 +755,7 @@ export default function CollectionReportModal({
       targetCollection: totalTarget,
       targetLoanAmount: totalSanctionedLoanAmtForDisbursed
     };
-  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedFilterIds, isAllSelected, isBranchFilterMode, canFilterByStaff, availableFilterItems]);
+  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedFilterIds, isAllSelected, isBranchFilterMode, canFilterByStaff, availableFilterItems, isMainBranch, userBranchId]);
 
   // Dual-Mode Search & Chronological Date Sorting (Ascending / Descending)
   const filteredData = useMemo(() => {
