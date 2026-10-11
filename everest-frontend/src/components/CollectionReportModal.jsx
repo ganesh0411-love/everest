@@ -193,10 +193,11 @@ export default function CollectionReportModal({
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' (newest first) or 'asc' (oldest first)
 
-  // Staff Funnel Filter states
-  const [selectedStaff, setSelectedStaff] = useState('All Staff');
-  const [showStaffDropdown, setShowStaffDropdown] = useState(false);
-  const staffDropdownRef = useRef(null);
+  // Multi-Select Funnel Filter states
+  const [selectedFilterIds, setSelectedFilterIds] = useState(new Set());
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const filterDropdownRef = useRef(null);
+  const searchContainerRef = useRef(null);
   const [firestoreStaff, setFirestoreStaff] = useState([]);
 
   // Independent Credit & Debit multi-toggle boolean states
@@ -214,14 +215,18 @@ export default function CollectionReportModal({
     }
   }, [isOpen]);
 
-  // Auto-close staff dropdown on click outside
+  // Auto-close filter dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (staffDropdownRef.current && !staffDropdownRef.current.contains(event.target)) {
-        setShowStaffDropdown(false);
+      if (
+        filterDropdownRef.current && 
+        !filterDropdownRef.current.contains(event.target) &&
+        !searchContainerRef.current?.contains(event.target)
+      ) {
+        setShowFilterDropdown(false);
       }
     };
-    if (showStaffDropdown) {
+    if (showFilterDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
     }
@@ -229,12 +234,11 @@ export default function CollectionReportModal({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [showStaffDropdown]);
+  }, [showFilterDropdown]);
 
-  // Reset staff filter whenever activeBranch changes
+  // Reset filter dropdown whenever activeBranch changes
   useEffect(() => {
-    setSelectedStaff('All Staff');
-    setShowStaffDropdown(false);
+    setShowFilterDropdown(false);
   }, [activeBranch?.id, activeBranch?.name]);
 
   // Real-time Firestore staff subscription with fallback to props
@@ -335,17 +339,58 @@ export default function CollectionReportModal({
     );
   }, [branches]);
 
-  // Derive scoped staff list strictly for the currently selected sub-branch
-  const branchStaffMembers = useMemo(() => {
-    const userBranchId = activeBranch?.id || userProfile?.branchId || 'main';
-    const isMainBranch = userBranchId === 'main' || activeBranch?.name === 'Main Branch';
+  const userBranchId = activeBranch?.id || userProfile?.branchId || 'main';
+  const isMainBranch = userBranchId === 'main' || activeBranch?.name === 'Main Branch';
+
+  // Mode: Main Branch (BRANCH FILTER) vs Sub-Branch / Staff (STAFF FILTER)
+  const isBranchFilterMode = isMainBranch && !isStaff;
+  const filterTitle = isBranchFilterMode ? 'BRANCH FILTER' : 'STAFF FILTER';
+
+  // 1. Available Sub-Branches when in Main Branch
+  const availableSubBranches = useMemo(() => {
+    const branchMap = new Map(); // key: lowercase name -> { id, name }
+
+    (branches || []).forEach((b) => {
+      if (!b) return;
+      const bName = typeof b === 'string' ? b : (b.name || '');
+      const isMain = bName.toLowerCase() === 'main branch' || bName.toLowerCase() === 'main' || (b.id && String(b.id).toLowerCase() === 'main');
+      if (isMain) return;
+      if (b.disabled === true || b.status === 'Disabled' || b.hidden === true) return;
+      if (b.id && disabledBranchIds.has(b.id)) return;
+      const id = typeof b === 'string' ? b : (b.id || bName);
+      branchMap.set(bName.toLowerCase(), { id, name: bName });
+    });
+
+    const rawCustomers = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
+      try {
+        const saved = localStorage.getItem('everest_customers');
+        return saved ? JSON.parse(saved) : [];
+      } catch(e) { return []; }
+    })());
+
+    (rawCustomers || []).forEach((c) => {
+      if (!c) return;
+      const bName = c.branch || c.branchName;
+      const bId = c.branchId || c.branchCode || bName;
+      if (bName && bName.toLowerCase() !== 'main branch' && bName.toLowerCase() !== 'main') {
+        if (!branchMap.has(bName.toLowerCase())) {
+          branchMap.set(bName.toLowerCase(), { id: bId, name: bName });
+        }
+      }
+    });
+
+    return Array.from(branchMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [branches, disabledBranchIds, customLedgerData, customers]);
+
+  // 2. Available Staff when in Sub-Branch (or staff view)
+  const availableBranchStaff = useMemo(() => {
     const activeBranchIdStr = String(activeBranch?.id || '').toLowerCase().trim();
     const activeBranchNameStr = String(activeBranch?.name || '').toLowerCase().trim();
 
-    const staffMap = new Map(); // key: lowercase trimmed name -> { name, id }
+    const staffMap = new Map(); // key: lowercase trimmed name -> { id, name }
     const combinedStaff = firestoreStaff.length > 0 ? firestoreStaff : (staffList || []);
 
-    // 1. From active staff in Firestore / props
+    // From active staff in Firestore / props
     combinedStaff.forEach((s) => {
       if (!s) return;
       if (s.status === 'Recycled' || s.status === 'Deleted' || s.status === 'Inactive' || s.disabled === true) return;
@@ -353,17 +398,11 @@ export default function CollectionReportModal({
       const sBranchId = String(s.branchId || s.branch || '').toLowerCase().trim();
       const sBranchName = String(s.branchName || s.branch || '').toLowerCase().trim();
 
-      let matchesBranch = false;
-      if (isMainBranch) {
-        if (sBranchId && disabledBranchIds.has(sBranchId)) return;
-        matchesBranch = true;
-      } else {
-        matchesBranch = 
-          sBranchId === activeBranchIdStr ||
-          sBranchName === activeBranchNameStr ||
-          (activeBranchNameStr && sBranchName.includes(activeBranchNameStr)) ||
-          (activeBranchIdStr && sBranchId.includes(activeBranchIdStr));
-      }
+      const matchesBranch = 
+        sBranchId === activeBranchIdStr ||
+        sBranchName === activeBranchNameStr ||
+        (activeBranchNameStr && sBranchName.includes(activeBranchNameStr)) ||
+        (activeBranchIdStr && sBranchId.includes(activeBranchIdStr));
 
       if (matchesBranch) {
         const name = (s.name || s.staffName || s.displayName || '').trim();
@@ -376,7 +415,7 @@ export default function CollectionReportModal({
       }
     });
 
-    // 2. Also inspect branch customers to capture all active assigned staff on current branch records
+    // Also inspect branch customers
     const rawCustomers = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
       try {
         const saved = localStorage.getItem('everest_customers');
@@ -388,11 +427,7 @@ export default function CollectionReportModal({
       if (!c) return;
       const custBranchId = c.branchId || c.branchCode;
       const custBranchName = c.branch || c.branchName;
-      if (isMainBranch) {
-        if (custBranchId && disabledBranchIds.has(custBranchId)) return;
-      } else {
-        if (custBranchId && custBranchId !== userBranchId && custBranchName !== activeBranch?.name) return;
-      }
+      if (custBranchId && custBranchId !== userBranchId && custBranchName !== activeBranch?.name) return;
 
       const name = (c.assignedStaff || c.assignedStaffName || c.staffName || c.staff || '').trim();
       if (name && !staffMap.has(name.toLowerCase())) {
@@ -404,7 +439,48 @@ export default function CollectionReportModal({
     });
 
     return Array.from(staffMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [firestoreStaff, staffList, activeBranch, userProfile, disabledBranchIds, customLedgerData, customers]);
+  }, [firestoreStaff, staffList, activeBranch, userBranchId, customLedgerData, customers]);
+
+  // Context-aware available filter items:
+  const availableFilterItems = useMemo(() => {
+    return isBranchFilterMode ? availableSubBranches : availableBranchStaff;
+  }, [isBranchFilterMode, availableSubBranches, availableBranchStaff]);
+
+  // Auto-select all items whenever availableFilterItems changes
+  const availableItemIdsKey = useMemo(() => {
+    return availableFilterItems.map(i => i.id).sort().join(',');
+  }, [availableFilterItems]);
+
+  useEffect(() => {
+    setSelectedFilterIds(new Set(availableFilterItems.map(item => item.id)));
+  }, [availableItemIdsKey]);
+
+  const isAllSelected = availableFilterItems.length > 0 && availableFilterItems.every(i => selectedFilterIds.has(i.id));
+  const isIndeterminate = !isAllSelected && selectedFilterIds.size > 0;
+
+  const handleToggleAll = () => {
+    if (isAllSelected) {
+      setSelectedFilterIds(new Set());
+    } else {
+      setSelectedFilterIds(new Set(availableFilterItems.map(i => i.id)));
+    }
+  };
+
+  const handleSelectAll = () => {
+    setSelectedFilterIds(new Set(availableFilterItems.map(i => i.id)));
+  };
+
+  const handleToggleItem = (id) => {
+    setSelectedFilterIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   // Real Customer Ledger Extraction & Metric Summaries
   const { ledgerEntries, targetCollection, targetLoanAmount } = useMemo(() => {
@@ -415,50 +491,80 @@ export default function CollectionReportModal({
       } catch(e) { return []; }
     })());
 
-    const isStaff = userRole === 'staff' || userRole === 'Staff' || userRole === 'agent';
-    const userBranchId = activeBranch?.id || userProfile?.branchId || 'main';
-    const isMainBranch = userBranchId === 'main' || activeBranch?.name === 'Main Branch';
     const staffName = userProfile?.staffName || userProfile?.name || userProfile?.displayName || '';
     const staffId = userProfile?.staffId || userProfile?.employeeId || userProfile?.uid || '';
 
     // 1. Scope Customers by Branch & Staff RBAC
     const scopedCustomers = (rawCustomers || []).filter((customer) => {
       if (!customer) return false;
-      const custBranchId = customer.branchId || customer.branchCode;
-      const custBranchName = customer.branch || customer.branchName;
+      const custBranchId = String(customer.branchId || customer.branchCode || '').toLowerCase().trim();
+      const custBranchName = String(customer.branch || customer.branchName || '').toLowerCase().trim();
 
-      // Branch scoping & Consolidation check
-      if (isMainBranch) {
-        if (custBranchId && disabledBranchIds.has(custBranchId)) {
+      if (isBranchFilterMode) {
+        // Main Branch mode: user is filtering by sub-branches via multi-select checkboxes
+        if (customer.branchId && disabledBranchIds.has(customer.branchId)) {
           return false;
         }
-      } else {
-        if (custBranchId && custBranchId !== userBranchId && custBranchName !== activeBranch?.name) {
-          return false;
-        }
-      }
 
-      // Staff Scoping:
-      if (canFilterByStaff) {
-        // Admin or staff with admin privileges: filter if individual staff selected
-        if (selectedStaff !== 'All Staff') {
-          if (!customerMatchesStaff(customer, selectedStaff)) {
+        if (canFilterByStaff) {
+          if (isAllSelected) {
+            // All branches selected - pass through
+          } else if (selectedFilterIds.size === 0) {
+            // No branches selected
             return false;
+          } else {
+            // Check if customer's branch matches any selected branch
+            const matchesAnyBranch = availableFilterItems.some(item => {
+              if (!selectedFilterIds.has(item.id)) return false;
+              const bId = String(item.id).toLowerCase().trim();
+              const bName = String(item.name).toLowerCase().trim();
+              return (
+                custBranchId === bId ||
+                custBranchName === bName ||
+                (custBranchId && bId && custBranchId.includes(bId)) ||
+                (custBranchName && bName && custBranchName.includes(bName))
+              );
+            });
+            if (!matchesAnyBranch) return false;
           }
         }
       } else {
-        // Regular staff without admin privileges: strictly locked to own assigned customers
-        const custStaff = customer.assignedStaff || customer.assignedStaffName || customer.staffName || customer.staff;
-        const custStaffId = customer.staffId || customer.assignedStaffId || customer.createdByStaffId || customer.createdBy;
-        const matchesStaff = (
-          (staffName && (
-            String(custStaff || '').toLowerCase().trim() === String(staffName).toLowerCase().trim()
-          )) ||
-          (staffId && (
-            String(custStaffId) === String(staffId)
-          ))
-        );
-        if (!matchesStaff) return false;
+        // Sub-Branch mode: must match activeBranch
+        if (!isMainBranch) {
+          if (custBranchId && custBranchId !== String(userBranchId).toLowerCase().trim() && custBranchName !== String(activeBranch?.name || '').toLowerCase().trim()) {
+            return false;
+          }
+        }
+
+        // Staff Scoping:
+        if (canFilterByStaff) {
+          if (isAllSelected) {
+            // All staff in this branch selected - pass through
+          } else if (selectedFilterIds.size === 0) {
+            // No staff selected
+            return false;
+          } else {
+            // Check if customer matches any selected staff member
+            const matchesAnyStaff = availableFilterItems.some(item => {
+              if (!selectedFilterIds.has(item.id)) return false;
+              return customerMatchesStaff(customer, item.name) || customerMatchesStaff(customer, item.id);
+            });
+            if (!matchesAnyStaff) return false;
+          }
+        } else {
+          // Regular staff without admin privileges: strictly locked to own assigned customers
+          const custStaff = customer.assignedStaff || customer.assignedStaffName || customer.staffName || customer.staff;
+          const custStaffId = customer.staffId || customer.assignedStaffId || customer.createdByStaffId || customer.createdBy;
+          const matchesStaff = (
+            (staffName && (
+              String(custStaff || '').toLowerCase().trim() === String(staffName).toLowerCase().trim()
+            )) ||
+            (staffId && (
+              String(custStaffId) === String(staffId)
+            ))
+          );
+          if (!matchesStaff) return false;
+        }
       }
 
       return true;
@@ -621,7 +727,7 @@ export default function CollectionReportModal({
       targetCollection: totalTarget,
       targetLoanAmount: totalSanctionedLoanAmtForDisbursed
     };
-  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedStaff, canFilterByStaff]);
+  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedFilterIds, isAllSelected, isBranchFilterMode, canFilterByStaff, availableFilterItems]);
 
   // Dual-Mode Search & Chronological Date Sorting (Ascending / Descending)
   const filteredData = useMemo(() => {
@@ -813,8 +919,11 @@ export default function CollectionReportModal({
 
         {/* LINE 2: Search Input & Action Badges (Side-by-Side in 1 Horizontal Row) */}
         <div className="flex items-center justify-between gap-2 w-full shrink-0">
-          {/* Search Input */}
-          <div className="flex-1 min-w-0 bg-slate-100/90 border border-slate-200/80 rounded-xl px-2.5 sm:px-3 h-10 flex items-center gap-1.5 sm:gap-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-inner relative">
+          {/* Search Input with inline Funnel Filter */}
+          <div 
+            ref={searchContainerRef}
+            className="flex-1 min-w-0 bg-slate-100/90 border border-slate-200/80 rounded-xl px-2.5 sm:px-3 h-10 flex items-center gap-1.5 sm:gap-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-inner relative"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
@@ -826,83 +935,100 @@ export default function CollectionReportModal({
               className="w-full bg-transparent outline-none text-xs text-slate-700 placeholder-slate-400 font-medium truncate"
             />
 
-            {/* Privilege-Gated Funnel Filter Icon */}
+            {/* Privilege-Gated Funnel Filter Icon Button */}
             {canFilterByStaff && (
-              <div className="relative shrink-0 flex items-center" ref={staffDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowStaffDropdown((prev) => !prev)}
-                  title={selectedStaff === 'All Staff' ? "Filter by Staff" : `Staff: ${selectedStaff}`}
-                  className={`p-1.5 rounded-lg transition-all flex items-center justify-center cursor-pointer select-none ${
-                    selectedStaff !== 'All Staff'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/60'
-                  }`}
-                >
-                  <Filter className="w-3.5 h-3.5" />
-                </button>
+              <button
+                type="button"
+                onClick={() => setShowFilterDropdown((prev) => !prev)}
+                title={isAllSelected ? `${filterTitle} (All Selected)` : `${filterTitle} (${selectedFilterIds.size} Selected)`}
+                className={`p-1.5 rounded-lg transition-all flex items-center justify-center cursor-pointer select-none shrink-0 ${
+                  !isAllSelected
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/60'
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+              </button>
+            )}
 
-                {/* Compact Popover Dropdown */}
-                {showStaffDropdown && (
-                  <div className="absolute right-0 top-full mt-1.5 w-48 sm:w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1.5 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3 py-1 border-b border-slate-100 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Staff Filter</span>
-                      {selectedStaff !== 'All Staff' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedStaff('All Staff');
-                            setShowStaffDropdown(false);
-                          }}
-                          className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
-                        >
-                          Reset
-                        </button>
-                      )}
-                    </div>
-
-                    {/* All Staff Option */}
+            {/* Popover anchored directly to the search input container with viewport auto-clamping! */}
+            {canFilterByStaff && showFilterDropdown && (
+              <div 
+                ref={filterDropdownRef}
+                className="absolute top-full left-0 mt-1.5 w-64 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+              >
+                {/* Header */}
+                <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{filterTitle}</span>
+                  {!isAllSelected && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedStaff('All Staff');
-                        setShowStaffDropdown(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
-                        selectedStaff === 'All Staff'
-                          ? 'bg-blue-50 text-blue-600 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
+                      onClick={handleSelectAll}
+                      className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
                     >
-                      <span>All Staff</span>
-                      {selectedStaff === 'All Staff' && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                      Select All
                     </button>
+                  )}
+                </div>
 
-                    {/* Individual Branch Staff Options */}
-                    {branchStaffMembers.length > 0 ? (
-                      branchStaffMembers.map((staff) => (
-                        <button
-                          key={staff.id || staff.name}
-                          type="button"
-                          onClick={() => {
-                            setSelectedStaff(staff.name);
-                            setShowStaffDropdown(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
-                            selectedStaff === staff.name
-                              ? 'bg-blue-50 text-blue-600 font-bold'
-                              : 'text-slate-700 hover:bg-slate-50'
+                {/* Items List with Multi-Select Checkboxes */}
+                <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
+                  {/* Select All Checkbox Row */}
+                  <div
+                    onClick={handleToggleAll}
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold hover:bg-slate-50 cursor-pointer select-none transition-colors bg-white"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                        isAllSelected 
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-2xs' 
+                          : isIndeterminate
+                            ? 'bg-blue-50 border-blue-500 text-blue-600'
+                            : 'border-slate-300 bg-white hover:border-slate-400'
+                      }`}>
+                        {isAllSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        {isIndeterminate && <div className="w-2 h-0.5 bg-blue-600 rounded" />}
+                      </div>
+                      <span className="text-slate-800">Select All</span>
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      {selectedFilterIds.size} / {availableFilterItems.length}
+                    </span>
+                  </div>
+
+                  {/* Individual Items */}
+                  {availableFilterItems.length > 0 ? (
+                    availableFilterItems.map((item) => {
+                      const isSelected = selectedFilterIds.has(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => handleToggleItem(item.id)}
+                          className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold hover:bg-slate-50 cursor-pointer select-none transition-colors ${
+                            isSelected ? 'bg-blue-50/20' : ''
                           }`}
                         >
-                          <span className="truncate">{staff.name}</span>
-                          {selectedStaff === staff.name && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-3 py-2 text-[11px] text-slate-400 italic">No staff found for branch</div>
-                    )}
-                  </div>
-                )}
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                              isSelected 
+                                ? 'bg-blue-600 border-blue-600 text-white shadow-2xs' 
+                                : 'border-slate-300 bg-white hover:border-slate-400'
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                            <span className={`truncate ${isSelected ? 'text-slate-800 font-bold' : 'text-slate-600 font-normal'}`}>
+                              {item.name}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="px-3.5 py-3 text-[11px] text-slate-400 italic text-center">
+                      {isBranchFilterMode ? 'No sub-branches found' : 'No staff found for branch'}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
