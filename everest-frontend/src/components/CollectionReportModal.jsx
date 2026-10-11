@@ -611,6 +611,10 @@ export default function CollectionReportModal({
       return ts >= startTs && ts <= endTs;
     };
 
+    const now = new Date();
+    const todayStartTs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+    const todayEndTs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
     // Calculate number of calendar days in selected date range
     const diffMs = Math.max(0, endTs - startTs);
     const daysInRange = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
@@ -618,6 +622,8 @@ export default function CollectionReportModal({
 
     let totalTarget = 0;
     let totalSanctionedLoanAmtForDisbursed = 0;
+    let totalPeriodPending = 0;
+    let totalPeriodOverdue = 0;
 
     const entriesMap = new Map(); // uniqueKey -> ledger row
 
@@ -625,148 +631,204 @@ export default function CollectionReportModal({
       const custName = cust.name || cust.customerName || 'Customer';
 
       // Daily installment target per customer
+      const rawToken = String(cust.tenureUnit || cust.paymentFrequency || cust.frequency || cust.loanType || '').toUpperCase();
+      const planToken = rawToken.includes('MONTH') ? 'MONTH' : (rawToken.includes('DAY') || rawToken.includes('DAILY') ? 'DAY' : 'WEEK');
+      const planCount = Number(cust.tenureVal || cust.tenure || cust.weeks || cust.days || cust.months || 100);
+
       const custTargetPerDay = Number(cust.perDayAmount || cust.dailyInstallment || cust.installmentAmount || cust.targetAmount || 0) ||
-        (cust.repayAmount ? Math.round(Number(cust.repayAmount) / Math.max(1, Number(cust.tenure || cust.weeks || cust.days || 100))) : 0);
+        (cust.repayAmount ? Math.round(Number(cust.repayAmount) / Math.max(1, planCount)) : 0);
 
-      // Overdue (OD) calculation for customer
-      const custOd = (() => {
-        if (cust.dynamicOverdue !== undefined && cust.dynamicOverdue !== null) return Number(cust.dynamicOverdue) || 0;
-        if (cust.overdueAmount !== undefined) return Number(cust.overdueAmount) || 0;
-        if (cust.overdue !== undefined) return Number(cust.overdue) || 0;
-        if (cust.odAmount !== undefined) return Number(cust.odAmount) || 0;
-        if (cust.od !== undefined) return Number(cust.od) || 0;
-
-        const repay = Number(cust.repayAmount || cust.totalRepayAmount || 0);
-        const sub = Number(cust.dynamicTotalPaid || cust.paidAmount || cust.totalPaid || 0);
-        const emiAmount = Number(cust.perDayAmount || cust.dailyInstallment || cust.installmentAmount || 0);
-        const rawDueDate = cust.dueDate || cust.firstDueDate || cust.startDate;
-        if (rawDueDate && emiAmount > 0) {
-          const dueTs = parseDateToTimestamp(rawDueDate);
-          if (dueTs) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            let expectedCount = 0;
-            const planToken = (cust.paymentFrequency || cust.frequency || cust.loanType || '').toUpperCase().includes('WEEK') ? 'WEEK' : 
-                              (cust.paymentFrequency || cust.frequency || cust.loanType || '').toUpperCase().includes('MONTH') ? 'MONTH' : 'DAY';
-            const planCount = Number(cust.tenure || cust.weeks || cust.days || 100);
-            const baseDateObj = new Date(dueTs);
-            for (let idx = 0; idx < planCount; idx++) {
-              const sDate = new Date(baseDateObj);
-              if (planToken === 'DAY') sDate.setDate(sDate.getDate() + idx);
-              else if (planToken === 'MONTH') sDate.setMonth(sDate.getMonth() + idx);
-              else sDate.setDate(sDate.getDate() + (idx * 7));
-              sDate.setHours(0, 0, 0, 0);
-              if (sDate < today) expectedCount++;
-            }
-            const expectedPaid = Math.min(repay, expectedCount * emiAmount);
-            return Math.max(0, expectedPaid - sub);
+      // Extract schedule timestamps
+      let scheduledTimestamps = [];
+      if (Array.isArray(cust.scheduledDates) && cust.scheduledDates.length > 0) {
+        scheduledTimestamps = cust.scheduledDates.map(ts => new Date(ts).setHours(0, 0, 0, 0));
+      } else {
+        const rawDueDate = cust.firstDueDate || cust.dueDate || cust.startDate || cust.scheduledDate;
+        let baseTs = parseDateToTimestamp(rawDueDate);
+        if (!baseTs && Array.isArray(cust.installments) && cust.installments.length > 0) {
+          const dates = cust.installments.map(i => parseDateToTimestamp(i.date)).filter(Boolean);
+          if (dates.length > 0) baseTs = Math.min(...dates);
+        }
+        if (baseTs && planCount > 0) {
+          const baseDateObj = new Date(baseTs);
+          for (let idx = 0; idx < planCount; idx++) {
+            const sDate = new Date(baseDateObj);
+            if (planToken === 'DAY') sDate.setDate(sDate.getDate() + idx);
+            else if (planToken === 'MONTH') sDate.setMonth(sDate.getMonth() + idx);
+            else sDate.setDate(sDate.getDate() + (idx * 7));
+            sDate.setHours(0, 0, 0, 0);
+            scheduledTimestamps.push(sDate.getTime());
           }
         }
-        return 0;
-      })();
-
-      const rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-      let customerHasCollectionInPeriod = false;
-      let customerTargetInPeriod = 0;
-
-      if (Array.isArray(rawInstallments) && rawInstallments.length > 0) {
-        rawInstallments.forEach((inst, index) => {
-          const instDate = inst.date || inst.paymentDate || inst.createdAt;
-          const status = String(inst.status || '').toUpperCase();
-          const amount = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
-
-          if (isInDateRange(instDate)) {
-            customerHasCollectionInPeriod = true;
-            
-            // Add to Target: if installment has scheduled due amount, use it, else custTargetPerDay
-            const instDue = Number(inst.dueAmount || inst.targetAmount || inst.target || custTargetPerDay);
-            customerTargetInPeriod += instDue;
-
-            let itemPending = 0;
-            if (cust.pendingAmount !== undefined && cust.pendingAmount !== null && Number(cust.pendingAmount) > 0) {
-              itemPending = Number(cust.pendingAmount);
-            } else if (cust.pendingDue !== undefined && cust.pendingDue !== null && Number(cust.pendingDue) > 0) {
-              itemPending = Number(cust.pendingDue);
-            } else if (instDue > 0) {
-              itemPending = Math.max(0, instDue - amount);
-            } else {
-              itemPending = Math.max(0, custTargetPerDay - amount);
-            }
-
-            if (amount > 0 && status !== 'BOUNCED' && status !== 'CANCELLED') {
-              const upiAmt = Number(inst.upiAmount || 0);
-              const cashAmt = Number(inst.cashAmount || 0);
-              const rawMode = (inst.mode || inst.paymentMode || inst.instrument || '').toString().trim().toUpperCase();
-
-              let isSplit = false;
-              let finalUpi = 0;
-              let finalCash = 0;
-              let resolvedMode = 'Cash';
-
-              if (upiAmt > 0 && cashAmt > 0) {
-                isSplit = true;
-                finalUpi = upiAmt;
-                finalCash = cashAmt;
-                resolvedMode = 'Split';
-              } else if (rawMode === 'SPLIT' || rawMode === 'UPI/CASH' || rawMode === 'BOTH') {
-                isSplit = true;
-                if (upiAmt > 0 || cashAmt > 0) {
-                  finalUpi = upiAmt;
-                  finalCash = cashAmt;
-                } else {
-                  finalUpi = Math.round(amount / 2);
-                  finalCash = amount - finalUpi;
-                }
-                resolvedMode = 'Split';
-              } else {
-                resolvedMode = resolvePaymentMode(inst);
-                if (resolvedMode === 'UPI') {
-                  finalUpi = amount;
-                  finalCash = 0;
-                } else {
-                  finalCash = amount;
-                  finalUpi = 0;
-                }
-              }
-
-              const key = `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`;
-              entriesMap.set(key, {
-                id: key,
-                customerId: cust.id,
-                name: custName,
-                mode: resolvedMode,
-                isSplit: isSplit,
-                upiAmount: finalUpi,
-                cashAmount: finalCash,
-                credit: amount,
-                debit: Number(cust.debit || 0),
-                pending: itemPending,
-                od: custOd,
-                date: instDate,
-                timeStr: inst.timeStr || inst.time,
-                createdAt: inst.createdAt || inst.date
-              });
-            }
-          }
-        });
       }
 
-      // Target summation for date range:
-      if (customerHasCollectionInPeriod && customerTargetInPeriod > 0) {
-        totalTarget += customerTargetInPeriod;
+      // Scheduled Target Computation:
+      // Target = Sum of scheduled installment dues whose schedule dates fall within From Date and To Date.
+      // For an active loan with daily frequency, count only the scheduled installments matching the selected range days.
+      let scheduledCountInRange = 0;
+      if (scheduledTimestamps.length > 0) {
+        scheduledCountInRange = scheduledTimestamps.filter(ts => ts >= startTs && ts <= endTs).length;
       } else {
         const custStatus = String(cust.status || '').toLowerCase();
         const isActiveCust = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
         if (isActiveCust && custTargetPerDay > 0) {
-          if (isSingleDay) {
-            const custNextDueDate = cust.nextDueDate || cust.dueDate || cust.scheduledDate;
-            if (custNextDueDate && isInDateRange(custNextDueDate)) {
-              totalTarget += custTargetPerDay;
-            }
-          } else {
-            totalTarget += (daysInRange * custTargetPerDay);
-          }
+          scheduledCountInRange = isSingleDay ? 1 : daysInRange;
         }
+      }
+      const customerTargetInPeriod = scheduledCountInRange * custTargetPerDay;
+      totalTarget += customerTargetInPeriod;
+
+      const rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
+
+      // Calculate total paid by customer on Today
+      let custPaidToday = 0;
+      rawInstallments.forEach(inst => {
+        const status = String(inst.status || '').toUpperCase();
+        if (status === 'BOUNCED' || status === 'CANCELLED') return;
+        const dStr = inst.date || inst.paymentDate || inst.createdAt;
+        const ts = parseDateToTimestamp(dStr);
+        if (ts && new Date(ts).setHours(0, 0, 0, 0) === todayStartTs) {
+          const amt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
+          custPaidToday += amt;
+        }
+      });
+
+      // Today's scheduled due for customer
+      const isScheduledToday = scheduledTimestamps.length > 0 
+        ? scheduledTimestamps.includes(todayStartTs) 
+        : (todayStartTs >= startTs && todayStartTs <= endTs);
+      const custPendingToday = isScheduledToday ? Math.max(0, custTargetPerDay - custPaidToday) : 0;
+
+      if (todayStartTs >= startTs && todayStartTs <= endTs) {
+        totalPeriodPending += custPendingToday;
+      }
+
+      // Process installments within range
+      if (Array.isArray(rawInstallments) && rawInstallments.length > 0) {
+        // Track latest entry on Today to attach today's pending due
+        let latestTodayInstId = null;
+        let latestTodayTs = -1;
+        rawInstallments.forEach((inst, idx) => {
+          const dStr = inst.date || inst.paymentDate || inst.createdAt;
+          const ts = parseDateToTimestamp(dStr);
+          if (ts && new Date(ts).setHours(0, 0, 0, 0) === todayStartTs && isInDateRange(dStr)) {
+            if (ts >= latestTodayTs) {
+              latestTodayTs = ts;
+              latestTodayInstId = inst.id || idx;
+            }
+          }
+        });
+
+        rawInstallments.forEach((inst, index) => {
+          const instDate = inst.date || inst.paymentDate || inst.createdAt;
+          if (!isInDateRange(instDate)) return;
+
+          const status = String(inst.status || '').toUpperCase();
+          const amount = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
+          const instTs = parseDateToTimestamp(instDate);
+          const instDayTs = instTs ? new Date(instTs).setHours(0, 0, 0, 0) : 0;
+          const isPastDate = instDayTs < todayStartTs;
+          const isTodayDate = instDayTs === todayStartTs;
+          const instDue = Number(inst.dueAmount || inst.targetAmount || inst.target || custTargetPerDay);
+
+          // 1. BOUNCED Record Handling
+          if (status === 'BOUNCED' || (amount === 0 && (inst.mode === 'BOUNCED' || status === 'BOUNCED'))) {
+            const unpaidBouncedAmount = instDue > 0 ? instDue : (custTargetPerDay > 0 ? custTargetPerDay : 250);
+            totalPeriodOverdue += unpaidBouncedAmount;
+
+            const key = `${cust.id}_bounced_${inst.id || index}_${instDate}`;
+            entriesMap.set(key, {
+              id: key,
+              customerId: cust.id,
+              name: custName,
+              mode: 'BOUNCED',
+              status: 'BOUNCED',
+              isBounced: true,
+              isSplit: false,
+              upiAmount: 0,
+              cashAmount: 0,
+              credit: 0,
+              debit: 0,
+              pending: 0, // Past bounced records MUST NOT sit in pending!
+              od: unpaidBouncedAmount,
+              date: instDate,
+              timeStr: inst.timeStr || inst.time || '',
+              createdAt: inst.createdAt || instDate
+            });
+            return;
+          }
+
+          // 2. Paid / Partial Installment Handling
+          if (amount > 0 && status !== 'CANCELLED') {
+            const upiAmt = Number(inst.upiAmount || 0);
+            const cashAmt = Number(inst.cashAmount || 0);
+            const rawMode = (inst.mode || inst.paymentMode || inst.instrument || '').toString().trim().toUpperCase();
+
+            let isSplit = false;
+            let finalUpi = 0;
+            let finalCash = 0;
+            let resolvedMode = 'Cash';
+
+            if (upiAmt > 0 && cashAmt > 0) {
+              isSplit = true;
+              finalUpi = upiAmt;
+              finalCash = cashAmt;
+              resolvedMode = 'Split';
+            } else if (rawMode === 'SPLIT' || rawMode === 'UPI/CASH' || rawMode === 'BOTH') {
+              isSplit = true;
+              if (upiAmt > 0 || cashAmt > 0) {
+                finalUpi = upiAmt;
+                finalCash = cashAmt;
+              } else {
+                finalUpi = Math.round(amount / 2);
+                finalCash = amount - finalUpi;
+              }
+              resolvedMode = 'Split';
+            } else {
+              resolvedMode = resolvePaymentMode(inst);
+              if (resolvedMode === 'UPI') {
+                finalUpi = amount;
+                finalCash = 0;
+              } else {
+                finalCash = amount;
+                finalUpi = 0;
+              }
+            }
+
+            // Pending: Applicable strictly to Today's installment if not fully paid today
+            let rowPending = 0;
+            if (isTodayDate && (inst.id || index) === latestTodayInstId) {
+              rowPending = custPendingToday;
+            }
+
+            // OD: For paid rows, 0 unless a past record had an unpaid shortfall
+            let rowOd = 0;
+            if (isPastDate && amount < instDue) {
+              rowOd = Math.max(0, instDue - amount);
+              totalPeriodOverdue += rowOd;
+            }
+
+            const key = `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`;
+            entriesMap.set(key, {
+              id: key,
+              customerId: cust.id,
+              name: custName,
+              mode: resolvedMode,
+              status: status,
+              isBounced: false,
+              isSplit: isSplit,
+              upiAmount: finalUpi,
+              cashAmount: finalCash,
+              credit: amount,
+              debit: Number(cust.debit || 0),
+              pending: rowPending,
+              od: rowOd,
+              date: instDate,
+              timeStr: inst.timeStr || inst.time || '',
+              createdAt: inst.createdAt || inst.date
+            });
+          }
+        });
       }
 
       // Loan Amount & Disbursement for Date Range:
@@ -777,7 +839,6 @@ export default function CollectionReportModal({
       const sanctionedLoanAmt = Number(cust.loanAmount || cust.amount || cust.sanctionedAmount || 0);
 
       if (isApprovedOrDisbursed && disbAmount > 0 && isInDateRange(disbDate)) {
-        // Loan was actually DISBURSED in selected date range!
         totalSanctionedLoanAmtForDisbursed += sanctionedLoanAmt;
 
         const key = `${cust.id}_debit_${disbDate}`;
@@ -787,13 +848,15 @@ export default function CollectionReportModal({
             customerId: cust.id,
             name: custName,
             mode: 'Cash',
+            status: 'DISBURSED',
+            isBounced: false,
             isSplit: false,
             upiAmount: 0,
             cashAmount: disbAmount,
             credit: 0,
             debit: disbAmount,
             pending: 0,
-            od: custOd,
+            od: 0,
             date: disbDate,
             timeStr: cust.timeStr || '',
             createdAt: disbDate
@@ -804,28 +867,12 @@ export default function CollectionReportModal({
 
     const entries = Array.from(entriesMap.values());
 
-    let totalOd = 0;
-    const seenCusts = new Set();
-    scopedCustomers.forEach((c) => {
-      const cId = c.id || c.customerId || c.name;
-      if (seenCusts.has(cId)) return;
-      seenCusts.add(cId);
-      const od = (() => {
-        if (c.dynamicOverdue !== undefined && c.dynamicOverdue !== null) return Number(c.dynamicOverdue) || 0;
-        if (c.overdueAmount !== undefined) return Number(c.overdueAmount) || 0;
-        if (c.overdue !== undefined) return Number(c.overdue) || 0;
-        if (c.odAmount !== undefined) return Number(c.odAmount) || 0;
-        if (c.od !== undefined) return Number(c.od) || 0;
-        return 0;
-      })();
-      totalOd += od;
-    });
-
     return {
       ledgerEntries: entries,
       targetCollection: totalTarget,
       targetLoanAmount: totalSanctionedLoanAmtForDisbursed,
-      totalScopedOverdue: totalOd
+      totalScopedPending: totalPeriodPending,
+      totalScopedOverdue: totalPeriodOverdue
     };
   }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedFilterIds, isAllSelected, isBranchFilterMode, canFilterByStaff, availableFilterItems, isMainBranch, userBranchId]);
 
@@ -839,18 +886,27 @@ export default function CollectionReportModal({
       if (query !== '') {
         if (isNumeric) {
           const numQuery = Number(query);
-          // Exact number equality match against Credit or Debit amounts
-          matchesSearch = (Number(item.credit) === numQuery || Number(item.debit) === numQuery);
+          // Exact number equality match against Credit, Debit, Cash, UPI, Pending, or OD
+          matchesSearch = (
+            Number(item.credit) === numQuery || 
+            Number(item.debit) === numQuery ||
+            Number(item.od) === numQuery ||
+            Number(item.pending) === numQuery ||
+            Number(item.cashAmount) === numQuery ||
+            Number(item.upiAmount) === numQuery
+          );
         } else {
-          matchesSearch = item.name.toLowerCase().includes(query.toLowerCase());
+          matchesSearch = item.name.toLowerCase().includes(query.toLowerCase()) || 
+                          String(item.mode || '').toLowerCase().includes(query.toLowerCase()) ||
+                          String(item.status || '').toLowerCase().includes(query.toLowerCase());
         }
       }
 
       let matchesType = false;
       if (isCreditActive && isDebitActive) {
-        matchesType = item.credit > 0 || item.debit > 0;
+        matchesType = item.credit > 0 || item.debit > 0 || item.isBounced || item.od > 0;
       } else if (isCreditActive) {
-        matchesType = item.credit > 0;
+        matchesType = item.credit > 0 || item.isBounced || item.od > 0;
       } else if (isDebitActive) {
         matchesType = item.debit > 0;
       } else {
@@ -864,9 +920,9 @@ export default function CollectionReportModal({
       const tsA = parseDateToTimestamp(a.createdAt || a.date) || 0;
       const tsB = parseDateToTimestamp(b.createdAt || b.date) || 0;
       if (tsA !== tsB) {
-        return sortOrder === 'asc' ? tsA - tsB : tsB - tsA;
+        return sortOrder === 'desc' ? tsB - tsA : tsA - tsB;
       }
-      return sortOrder === 'asc' ? String(a.id).localeCompare(String(b.id)) : String(b.id).localeCompare(String(a.id));
+      return sortOrder === 'desc' ? String(b.id).localeCompare(String(a.id)) : String(a.id).localeCompare(String(b.id));
     });
 
     return result;
@@ -912,21 +968,19 @@ export default function CollectionReportModal({
   }, [filteredData, isCreditActive, isDebitActive]);
 
   const totalPendingAmount = useMemo(() => {
-    const entriesPendingSum = filteredData.reduce((acc, curr) => acc + (Number(curr.pending) || 0), 0);
-    return Math.max(entriesPendingSum, Math.max(0, targetCollection - totalCollection));
-  }, [filteredData, targetCollection, totalCollection]);
+    if (searchTerm.trim() !== '') {
+      return filteredData.reduce((acc, curr) => acc + (Number(curr.pending) || 0), 0);
+    }
+    return Number(totalScopedPending || 0);
+  }, [filteredData, searchTerm, totalScopedPending]);
 
   const totalOverdueAmount = useMemo(() => {
-    let odSum = 0;
-    const seen = new Set();
-    filteredData.forEach((item) => {
-      const cId = item.customerId || item.name;
-      if (seen.has(cId)) return;
-      seen.add(cId);
-      odSum += (Number(item.od) || 0);
-    });
-    return odSum > 0 ? odSum : (Number(totalScopedOverdue) || 0);
-  }, [filteredData, totalScopedOverdue]);
+    if (searchTerm.trim() !== '') {
+      return filteredData.reduce((acc, curr) => acc + (Number(curr.od) || 0), 0);
+    }
+    const filteredOdSum = filteredData.reduce((acc, curr) => acc + (Number(curr.od) || 0), 0);
+    return Math.max(filteredOdSum, Number(totalScopedOverdue || 0));
+  }, [filteredData, searchTerm, totalScopedOverdue]);
 
   // Dynamic table column counts for responsive empty state colSpan
   const colCountMobile = 2 + (isCreditActive && !isDebitActive ? 1 : 0) + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
@@ -1460,7 +1514,14 @@ export default function CollectionReportModal({
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium text-slate-400">{index + 1}</td>
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                        <div className="font-semibold text-slate-800 leading-tight">{item.name}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-slate-800 leading-tight">{item.name}</span>
+                          {item.isBounced && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200 uppercase tracking-wider">
+                              Bounced
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] sm:text-[11px] text-slate-400 font-normal mt-0.5 whitespace-nowrap">
                           {formatTransactionSubtext(item.date, item.timeStr, item.createdAt)}
                         </div>
@@ -1469,7 +1530,11 @@ export default function CollectionReportModal({
                       {/* MOBILE-ONLY: MODE Data Cell (< lg:) */}
                       {isCreditActive && !isDebitActive ? (
                         <td className="lg:hidden py-2.5 sm:py-3 px-2 text-center">
-                          {item.isSplit ? (
+                          {item.isBounced ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80 shadow-2xs whitespace-nowrap">
+                              Bounced
+                            </span>
+                          ) : item.isSplit ? (
                             <div className="flex flex-col items-center justify-center gap-1">
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap border border-blue-200/60 shadow-2xs">
                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
@@ -1495,7 +1560,11 @@ export default function CollectionReportModal({
                       {/* MOBILE-ONLY: Credit Data Cell (< lg:) */}
                       {isCreditActive && (
                         <td className="lg:hidden py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
-                          ₹ {item.credit.toLocaleString('en-IN')}
+                          {item.isBounced ? (
+                            <span className="text-slate-400 font-semibold">-</span>
+                          ) : (
+                            `₹ ${item.credit.toLocaleString('en-IN')}`
+                          )}
                         </td>
                       )}
 
