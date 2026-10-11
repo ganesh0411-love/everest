@@ -686,6 +686,43 @@ export default function CollectionReportModal({
 
       const rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
 
+      // 1. Calculate cumulative scheduled dues up to ToDate (endTs)
+      let scheduledUpToDate = [];
+      if (scheduledTimestamps.length > 0) {
+        scheduledUpToDate = scheduledTimestamps.filter(ts => ts <= endTs);
+      } else {
+        const custStatus = String(cust.status || '').toLowerCase();
+        const isActiveCust = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
+        if (isActiveCust && custTargetPerDay > 0) {
+          scheduledUpToDate = new Array(Math.max(1, daysInRange)).fill(0);
+        }
+      }
+      const totalExpectedUpToDate = scheduledUpToDate.length * custTargetPerDay;
+
+      // 2. Calculate cumulative non-bounced collections & past bounced dues up to ToDate (endTs)
+      let totalCollectedUpToDate = 0;
+      let totalBouncedDuesUpToDate = 0;
+      let firstBouncedTs = null;
+
+      rawInstallments.forEach(inst => {
+        const dStr = inst.date || inst.paymentDate || inst.createdAt;
+        const ts = parseDateToTimestamp(dStr);
+        if (ts && ts <= endTs) {
+          const status = String(inst.status || '').toUpperCase();
+          const amt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
+          if (status === 'BOUNCED' || (amt === 0 && inst.mode === 'BOUNCED')) {
+            const bDue = Number(inst.dueAmount || inst.targetAmount || custTargetPerDay || 250);
+            totalBouncedDuesUpToDate += bDue;
+            const dayTs = new Date(ts).setHours(0, 0, 0, 0);
+            if (firstBouncedTs === null || dayTs < firstBouncedTs) {
+              firstBouncedTs = dayTs;
+            }
+          } else if (status !== 'CANCELLED' && amt > 0) {
+            totalCollectedUpToDate += amt;
+          }
+        }
+      });
+
       // Calculate total paid by customer on Today
       let custPaidToday = 0;
       rawInstallments.forEach(inst => {
@@ -708,6 +745,30 @@ export default function CollectionReportModal({
       if (todayStartTs >= startTs && todayStartTs <= endTs) {
         totalPeriodPending += custPendingToday;
       }
+
+      // 3. Cumulative Active OD (Carry-Forward Logic):
+      // Active OD = Total past unpaid bounced dues up to ToDate - Total excess collections recovered towards OD.
+      let totalDeficitUpToDate = Math.max(0, totalExpectedUpToDate - totalCollectedUpToDate);
+      if (totalDeficitUpToDate === 0 && totalBouncedDuesUpToDate > 0) {
+        totalDeficitUpToDate = totalBouncedDuesUpToDate;
+      }
+
+      let custActiveOd = 0;
+      if (todayStartTs <= endTs && isScheduledToday) {
+        custActiveOd = Math.max(0, totalDeficitUpToDate - custPendingToday);
+      } else {
+        custActiveOd = totalDeficitUpToDate;
+      }
+
+      if (custActiveOd === 0 && cust.dynamicOverdue !== undefined && cust.dynamicOverdue !== null) {
+        const dynOd = Number(cust.dynamicOverdue) || 0;
+        if (dynOd > 0) custActiveOd = dynOd;
+      }
+      if (custActiveOd === 0 && totalBouncedDuesUpToDate > 0) {
+        custActiveOd = totalBouncedDuesUpToDate;
+      }
+
+      totalPeriodOverdue += custActiveOd;
 
       // Process installments within range
       if (Array.isArray(rawInstallments) && rawInstallments.length > 0) {
@@ -733,14 +794,13 @@ export default function CollectionReportModal({
           const amount = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
           const instTs = parseDateToTimestamp(instDate);
           const instDayTs = instTs ? new Date(instTs).setHours(0, 0, 0, 0) : 0;
-          const isPastDate = instDayTs < todayStartTs;
           const isTodayDate = instDayTs === todayStartTs;
           const instDue = Number(inst.dueAmount || inst.targetAmount || inst.target || custTargetPerDay);
 
           // 1. BOUNCED Record Handling
           if (status === 'BOUNCED' || (amount === 0 && (inst.mode === 'BOUNCED' || status === 'BOUNCED'))) {
             const unpaidBouncedAmount = instDue > 0 ? instDue : (custTargetPerDay > 0 ? custTargetPerDay : 250);
-            totalPeriodOverdue += unpaidBouncedAmount;
+            const rowOd = custActiveOd > 0 ? custActiveOd : unpaidBouncedAmount;
 
             const key = `${cust.id}_bounced_${inst.id || index}_${instDate}`;
             entriesMap.set(key, {
@@ -755,8 +815,8 @@ export default function CollectionReportModal({
               cashAmount: 0,
               credit: 0,
               debit: 0,
-              pending: 0, // Past bounced records MUST NOT sit in pending!
-              od: unpaidBouncedAmount,
+              pending: 0,
+              od: rowOd,
               date: instDate,
               timeStr: inst.timeStr || inst.time || '',
               createdAt: inst.createdAt || instDate
@@ -807,11 +867,16 @@ export default function CollectionReportModal({
               rowPending = custPendingToday;
             }
 
-            // OD: For paid rows, 0 unless a past record had an unpaid shortfall
+            // OD: Persistent active OD liability displayed on customer row
             let rowOd = 0;
-            if (isPastDate && amount < instDue) {
-              rowOd = Math.max(0, instDue - amount);
-              totalPeriodOverdue += rowOd;
+            if (custActiveOd > 0) {
+              if (firstBouncedTs !== null) {
+                // If bounce occurred, carry forward active OD for dates on or after the bounce
+                rowOd = instDayTs >= firstBouncedTs ? custActiveOd : 0;
+              } else {
+                // Fallback: Show active OD on today or unpaid records
+                rowOd = (isTodayDate || amount < instDue) ? custActiveOd : 0;
+              }
             }
 
             const key = `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`;
@@ -989,10 +1054,16 @@ export default function CollectionReportModal({
 
   const totalOverdueAmount = useMemo(() => {
     if (searchTerm.trim() !== '') {
-      return filteredData.reduce((acc, curr) => acc + (Number(curr.od) || 0), 0);
+      const seenCustIds = new Set();
+      return filteredData.reduce((acc, curr) => {
+        if (!seenCustIds.has(curr.customerId)) {
+          seenCustIds.add(curr.customerId);
+          return acc + (Number(curr.od) || 0);
+        }
+        return acc;
+      }, 0);
     }
-    const filteredOdSum = filteredData.reduce((acc, curr) => acc + (Number(curr.od) || 0), 0);
-    return Math.max(filteredOdSum, Number(totalScopedOD || 0));
+    return Number(totalScopedOD || 0);
   }, [filteredData, searchTerm, totalScopedOD]);
 
   // Dynamic table column counts for responsive empty state colSpan
