@@ -124,6 +124,10 @@ const CustomerDetail = ({ customer, onBack }) => {
   const emiAmount = repayAmount > 0 ? Math.round(repayAmount / numberOfWeeks) : 0;
 
   const runningSubTotal = installments.reduce((sum, inst) => sum + (inst.amount || 0), 0);
+  const computedNetBalance = Math.max(0, repayAmount - runningSubTotal);
+  const netBalance = customer?.dynamicOutstanding !== undefined 
+    ? Math.max(0, Number(customer.dynamicOutstanding) || 0)
+    : (repayAmount > 0 ? computedNetBalance : (customer?.outstandingAmount ?? customer?.totalBalance ?? 0));
   const rawDueDate = customer.firstDueDate || customer.startDate || customer.dueDate || customer.nextDueDate || (installments.length > 0 && installments[0]?.date) || customer.loanDate || '12-07-2026';
 
   const formatName = (name) => {
