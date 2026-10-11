@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Wallet, Target, HandCoins, ArrowUpDown } from 'lucide-react';
+import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 const getTodayStr = () => {
   const today = new Date();
@@ -149,6 +151,31 @@ const formatTransactionSubtext = (dateStr, timeStr, createdAt) => {
   return dateFormatted;
 };
 
+const customerMatchesStaff = (customer, targetStaff) => {
+  if (!customer || !targetStaff || targetStaff === 'All Staff') return true;
+  const targetLower = String(targetStaff).toLowerCase().trim();
+  const cStaffName = String(customer.staffName || '').toLowerCase().trim();
+  const cAssignedStaff = String(customer.assignedStaff || '').toLowerCase().trim();
+  const cAssignedStaffName = String(customer.assignedStaffName || '').toLowerCase().trim();
+  const cStaff = String(customer.staff || '').toLowerCase().trim();
+
+  if (
+    cStaffName === targetLower ||
+    cAssignedStaff === targetLower ||
+    cAssignedStaffName === targetLower ||
+    cStaff === targetLower
+  ) {
+    return true;
+  }
+
+  const cStaffId = String(customer.staffId || customer.assignedStaffId || customer.createdByStaffId || customer.createdBy || '').toLowerCase().trim();
+  if (cStaffId && cStaffId === targetLower) {
+    return true;
+  }
+
+  return false;
+};
+
 export default function CollectionReportModal({ 
   isOpen = true, 
   onClose,
@@ -156,7 +183,8 @@ export default function CollectionReportModal({
   activeBranch = { id: 'main', name: 'Main Branch' },
   branches = [],
   customers = [],
-  customLedgerData = null
+  customLedgerData = null,
+  staffList = []
 }) {
   const [fromDate, setFromDate] = useState(() => getTodayStr());
   const [toDate, setToDate] = useState(() => getTodayStr());
@@ -164,6 +192,12 @@ export default function CollectionReportModal({
   const [searchTerm, setSearchTerm] = useState('');
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' (newest first) or 'asc' (oldest first)
+
+  // Staff Funnel Filter states
+  const [selectedStaff, setSelectedStaff] = useState('All Staff');
+  const [showStaffDropdown, setShowStaffDropdown] = useState(false);
+  const staffDropdownRef = useRef(null);
+  const [firestoreStaff, setFirestoreStaff] = useState([]);
 
   // Independent Credit & Debit multi-toggle boolean states
   const [isCreditActive, setIsCreditActive] = useState(true);
@@ -179,6 +213,78 @@ export default function CollectionReportModal({
       tableScrollRef.current.scrollTop = 0;
     }
   }, [isOpen]);
+
+  // Auto-close staff dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (staffDropdownRef.current && !staffDropdownRef.current.contains(event.target)) {
+        setShowStaffDropdown(false);
+      }
+    };
+    if (showStaffDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showStaffDropdown]);
+
+  // Reset staff filter whenever activeBranch changes
+  useEffect(() => {
+    setSelectedStaff('All Staff');
+    setShowStaffDropdown(false);
+  }, [activeBranch?.id, activeBranch?.name]);
+
+  // Real-time Firestore staff subscription with fallback to props
+  useEffect(() => {
+    try {
+      const unsub = onSnapshot(collection(db, 'staff'), (snapshot) => {
+        const list = snapshot.docs.map(d => ({ docId: d.id, id: d.id, ...d.data() }));
+        setFirestoreStaff(list);
+      }, (err) => {
+        console.warn("Firestore staff snapshot in CollectionReportModal:", err);
+      });
+      return () => unsub();
+    } catch(e) {
+      console.warn("Could not listen to staff in CollectionReportModal:", e);
+    }
+  }, []);
+
+  // Strict Privilege & Visibility Gating for Staff Funnel Filter:
+  // Visible to: Super Admin, Sub-Branch Admin, or any Staff user explicitly granted Admin privileges (where admin permission toggle/radio is enabled in Customer Management)
+  // Hidden from: Regular Staff members who do NOT possess admin privileges.
+  const userRole = String(userProfile?.role || 'admin').toLowerCase();
+  const isSuperOrBranchAdmin = 
+    userRole === 'admin' || 
+    userRole === 'super_admin' || 
+    userRole === 'superadmin' || 
+    userRole === 'branch_admin' || 
+    userRole === 'branchadmin' ||
+    userProfile?.isAdmin === true ||
+    userProfile?.isSuperAdmin === true;
+
+  const permissions = userProfile?.permissions || {};
+  const hasCustomerAdminPermission = 
+    String(permissions.customerManagementMode).toLowerCase() === 'admin' ||
+    String(permissions.customerManagementRole).toLowerCase() === 'admin';
+
+  const hasCollectionAdminPermission = 
+    String(permissions.collectionReportRole).toLowerCase() === 'admin' ||
+    permissions.collectionReportAdmin === true;
+
+  const hasGeneralAdminPrivileges = 
+    permissions.allPermissions === true ||
+    permissions.adminOverride === true ||
+    permissions.fullBranchAccess === true;
+
+  const canFilterByStaff = Boolean(
+    isSuperOrBranchAdmin ||
+    hasCustomerAdminPermission ||
+    hasCollectionAdminPermission ||
+    hasGeneralAdminPrivileges
+  );
 
   // Date period preset selection handler
   const handlePeriodSelect = (option) => {
@@ -229,6 +335,77 @@ export default function CollectionReportModal({
     );
   }, [branches]);
 
+  // Derive scoped staff list strictly for the currently selected sub-branch
+  const branchStaffMembers = useMemo(() => {
+    const userBranchId = activeBranch?.id || userProfile?.branchId || 'main';
+    const isMainBranch = userBranchId === 'main' || activeBranch?.name === 'Main Branch';
+    const activeBranchIdStr = String(activeBranch?.id || '').toLowerCase().trim();
+    const activeBranchNameStr = String(activeBranch?.name || '').toLowerCase().trim();
+
+    const staffMap = new Map(); // key: lowercase trimmed name -> { name, id }
+    const combinedStaff = firestoreStaff.length > 0 ? firestoreStaff : (staffList || []);
+
+    // 1. From active staff in Firestore / props
+    combinedStaff.forEach((s) => {
+      if (!s) return;
+      if (s.status === 'Recycled' || s.status === 'Deleted' || s.status === 'Inactive' || s.disabled === true) return;
+
+      const sBranchId = String(s.branchId || s.branch || '').toLowerCase().trim();
+      const sBranchName = String(s.branchName || s.branch || '').toLowerCase().trim();
+
+      let matchesBranch = false;
+      if (isMainBranch) {
+        if (sBranchId && disabledBranchIds.has(sBranchId)) return;
+        matchesBranch = true;
+      } else {
+        matchesBranch = 
+          sBranchId === activeBranchIdStr ||
+          sBranchName === activeBranchNameStr ||
+          (activeBranchNameStr && sBranchName.includes(activeBranchNameStr)) ||
+          (activeBranchIdStr && sBranchId.includes(activeBranchIdStr));
+      }
+
+      if (matchesBranch) {
+        const name = (s.name || s.staffName || s.displayName || '').trim();
+        if (name && !staffMap.has(name.toLowerCase())) {
+          staffMap.set(name.toLowerCase(), {
+            id: s.id || s.uid || s.docId || name,
+            name: name
+          });
+        }
+      }
+    });
+
+    // 2. Also inspect branch customers to capture all active assigned staff on current branch records
+    const rawCustomers = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
+      try {
+        const saved = localStorage.getItem('everest_customers');
+        return saved ? JSON.parse(saved) : [];
+      } catch(e) { return []; }
+    })());
+
+    (rawCustomers || []).forEach((c) => {
+      if (!c) return;
+      const custBranchId = c.branchId || c.branchCode;
+      const custBranchName = c.branch || c.branchName;
+      if (isMainBranch) {
+        if (custBranchId && disabledBranchIds.has(custBranchId)) return;
+      } else {
+        if (custBranchId && custBranchId !== userBranchId && custBranchName !== activeBranch?.name) return;
+      }
+
+      const name = (c.assignedStaff || c.assignedStaffName || c.staffName || c.staff || '').trim();
+      if (name && !staffMap.has(name.toLowerCase())) {
+        staffMap.set(name.toLowerCase(), {
+          id: c.staffId || c.assignedStaffId || name,
+          name: name
+        });
+      }
+    });
+
+    return Array.from(staffMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [firestoreStaff, staffList, activeBranch, userProfile, disabledBranchIds, customLedgerData, customers]);
+
   // Real Customer Ledger Extraction & Metric Summaries
   const { ledgerEntries, targetCollection, targetLoanAmount } = useMemo(() => {
     const rawCustomers = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
@@ -238,13 +415,7 @@ export default function CollectionReportModal({
       } catch(e) { return []; }
     })());
 
-    const userRole = userProfile?.role || 'admin';
     const isStaff = userRole === 'staff' || userRole === 'Staff' || userRole === 'agent';
-    const staffAdminOverride = Boolean(
-      userProfile?.permissions?.collectionReportAdmin ||
-      userProfile?.permissions?.fullBranchAccess ||
-      userProfile?.permissions?.adminOverride
-    );
     const userBranchId = activeBranch?.id || userProfile?.branchId || 'main';
     const isMainBranch = userBranchId === 'main' || activeBranch?.name === 'Main Branch';
     const staffName = userProfile?.staffName || userProfile?.name || userProfile?.displayName || '';
@@ -267,17 +438,27 @@ export default function CollectionReportModal({
         }
       }
 
-      // Staff Scoping
-      if (isStaff && !staffAdminOverride) {
-        const custStaff = customer.assignedStaff || customer.staffName || customer.staff;
-        const custStaffId = customer.staffId;
-        if (custStaff || custStaffId) {
-          const matchesStaff = (
-            (staffName && custStaff === staffName) ||
-            (staffId && custStaffId === staffId)
-          );
-          if (!matchesStaff) return false;
+      // Staff Scoping:
+      if (canFilterByStaff) {
+        // Admin or staff with admin privileges: filter if individual staff selected
+        if (selectedStaff !== 'All Staff') {
+          if (!customerMatchesStaff(customer, selectedStaff)) {
+            return false;
+          }
         }
+      } else {
+        // Regular staff without admin privileges: strictly locked to own assigned customers
+        const custStaff = customer.assignedStaff || customer.assignedStaffName || customer.staffName || customer.staff;
+        const custStaffId = customer.staffId || customer.assignedStaffId || customer.createdByStaffId || customer.createdBy;
+        const matchesStaff = (
+          (staffName && (
+            String(custStaff || '').toLowerCase().trim() === String(staffName).toLowerCase().trim()
+          )) ||
+          (staffId && (
+            String(custStaffId) === String(staffId)
+          ))
+        );
+        if (!matchesStaff) return false;
       }
 
       return true;
@@ -440,7 +621,7 @@ export default function CollectionReportModal({
       targetCollection: totalTarget,
       targetLoanAmount: totalSanctionedLoanAmtForDisbursed
     };
-  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate]);
+  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedStaff, canFilterByStaff]);
 
   // Dual-Mode Search & Chronological Date Sorting (Ascending / Descending)
   const filteredData = useMemo(() => {
@@ -633,7 +814,7 @@ export default function CollectionReportModal({
         {/* LINE 2: Search Input & Action Badges (Side-by-Side in 1 Horizontal Row) */}
         <div className="flex items-center justify-between gap-2 w-full shrink-0">
           {/* Search Input */}
-          <div className="flex-1 min-w-0 bg-slate-100/90 border border-slate-200/80 rounded-xl px-2.5 sm:px-3 h-10 flex items-center gap-1.5 sm:gap-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-inner">
+          <div className="flex-1 min-w-0 bg-slate-100/90 border border-slate-200/80 rounded-xl px-2.5 sm:px-3 h-10 flex items-center gap-1.5 sm:gap-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-inner relative">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
@@ -644,6 +825,86 @@ export default function CollectionReportModal({
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-transparent outline-none text-xs text-slate-700 placeholder-slate-400 font-medium truncate"
             />
+
+            {/* Privilege-Gated Funnel Filter Icon */}
+            {canFilterByStaff && (
+              <div className="relative shrink-0 flex items-center" ref={staffDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowStaffDropdown((prev) => !prev)}
+                  title={selectedStaff === 'All Staff' ? "Filter by Staff" : `Staff: ${selectedStaff}`}
+                  className={`p-1.5 rounded-lg transition-all flex items-center justify-center cursor-pointer select-none ${
+                    selectedStaff !== 'All Staff'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Compact Popover Dropdown */}
+                {showStaffDropdown && (
+                  <div className="absolute right-0 top-full mt-1.5 w-48 sm:w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1.5 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-1 border-b border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Staff Filter</span>
+                      {selectedStaff !== 'All Staff' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedStaff('All Staff');
+                            setShowStaffDropdown(false);
+                          }}
+                          className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+
+                    {/* All Staff Option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStaff('All Staff');
+                        setShowStaffDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
+                        selectedStaff === 'All Staff'
+                          ? 'bg-blue-50 text-blue-600 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>All Staff</span>
+                      {selectedStaff === 'All Staff' && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                    </button>
+
+                    {/* Individual Branch Staff Options */}
+                    {branchStaffMembers.length > 0 ? (
+                      branchStaffMembers.map((staff) => (
+                        <button
+                          key={staff.id || staff.name}
+                          type="button"
+                          onClick={() => {
+                            setSelectedStaff(staff.name);
+                            setShowStaffDropdown(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
+                            selectedStaff === staff.name
+                              ? 'bg-blue-50 text-blue-600 font-bold'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="truncate">{staff.name}</span>
+                          {selectedStaff === staff.name && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-[11px] text-slate-400 italic">No staff found for branch</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Credit & Debit Action Pills */}

@@ -5637,6 +5637,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         activeBranch={activeBranch}
         branches={branches}
         customers={customers}
+        staffList={dashboardStaffList}
       />
 
       {/* Mark Attendance Calendar Overlay */}
