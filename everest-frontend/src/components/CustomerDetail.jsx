@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ArrowLeft, Map, MapPin, Phone, CalendarDays, Clock, IndianRupee, FileText, Scale, Sprout, MoreVertical, Star, Square, X, Camera as CameraIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import OfflineImage from './OfflineImage';
@@ -95,6 +95,15 @@ const CustomerDetail = ({ customer, onBack }) => {
   const repayAmount = customer.repayAmount !== undefined && customer.repayAmount !== '' ? Number(customer.repayAmount) : 0;
   
   const getPlanToken = () => {
+    const typeStr = String(customer.loanType || customer.scheme || customer.category || '').toLowerCase();
+    const unitStr = String(customer.tenureUnit || customer.paymentFrequency || customer.frequency || '').toLowerCase();
+    if (unitStr.includes('month') || typeStr.includes('month') || typeStr.includes('personal') || typeStr.includes('agri')) {
+      return 'MONTH';
+    } else if (unitStr.includes('day') || typeStr.includes('daily') || typeStr.includes('day') || customer.days) {
+      return 'DAY';
+    } else if (unitStr.includes('week') || typeStr.includes('week') || typeStr.includes('micro') || customer.weeks) {
+      return 'WEEK';
+    }
     if (customer.tenureUnit) return customer.tenureUnit.toUpperCase().replace(/S$/, '');
     if (customer.weeks) return 'WEEK';
     if (customer.days) return 'DAY';
@@ -108,7 +117,7 @@ const CustomerDetail = ({ customer, onBack }) => {
     if (customer.weeks) return Number(customer.weeks);
     if (customer.days) return Number(customer.days);
     if (customer.months) return Number(customer.months);
-    return 12;
+    return (planToken === 'DAY' ? 100 : 12);
   };
   const planCount = getPlanCount();
   const numberOfWeeks = planCount; // Ensure fallback compatibility
@@ -116,7 +125,7 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const runningSubTotal = installments.reduce((sum, inst) => sum + (inst.amount || 0), 0);
   const netBalance = Math.max(0, repayAmount - runningSubTotal);
-  const rawDueDate = customer.nextDueDate || customer.dueDate || '26-05-2026';
+  const rawDueDate = customer.firstDueDate || customer.startDate || customer.loanDate || customer.dueDate || customer.nextDueDate || '26-05-2026';
 
   const formatName = (name) => {
     if (!name) return '';
@@ -271,42 +280,70 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const latePaymentCount = calculateLatePayments(installments);
 
-  const nextDueDateObj = (() => {
-    if (!lastValidInst || !lastValidInst.date) {
-      const startObj = new Date(baseDateObj);
-      if (planToken === 'DAY') {
-        startObj.setDate(startObj.getDate() + effectiveInstallmentCount);
-      } else if (planToken === 'MONTH') {
-        startObj.setMonth(startObj.getMonth() + effectiveInstallmentCount);
-      } else { // WEEK
-        startObj.setDate(startObj.getDate() + (effectiveInstallmentCount * 7));
+  // 1. Master Repayment Schedule: Fixed contract calendar generated at loan sanction
+  const repaymentSchedule = useMemo(() => {
+    if (Array.isArray(customer.repaymentSchedule) && customer.repaymentSchedule.length > 0) {
+      return customer.repaymentSchedule.map((item, idx) => {
+        const dStr = item.date || item.dueDate || item.scheduledDate;
+        const dObj = parseDate(dStr);
+        const dd = String(dObj.getDate()).padStart(2, '0');
+        const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+        const yyyy = dObj.getFullYear();
+        const formattedDate = `${dd}-${mm}-${yyyy}`;
+        const weekday = dObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+        const status = item.status || (idx < fullySettledCount ? 'PAID' : (idx === fullySettledCount && isLastPending ? 'PARTIAL' : 'UNPAID'));
+        return {
+          ...item,
+          index: item.index || (idx + 1),
+          date: formattedDate,
+          dateObj: dObj,
+          weekday: weekday,
+          status: status
+        };
+      });
+    }
+
+    const schedule = [];
+    for (let idx = 0; idx < planCount; idx++) {
+      let rowDateObj;
+      if (Array.isArray(customer.scheduledDates) && customer.scheduledDates[idx]) {
+        rowDateObj = new Date(customer.scheduledDates[idx]);
+      } else {
+        rowDateObj = new Date(baseDateObj);
+        if (planToken === 'DAY') {
+          rowDateObj.setDate(rowDateObj.getDate() + idx);
+        } else if (planToken === 'MONTH') {
+          rowDateObj.setMonth(rowDateObj.getMonth() + idx);
+        } else { // WEEK
+          rowDateObj.setDate(rowDateObj.getDate() + (idx * 7));
+        }
       }
-      return startObj;
-    }
-    
-    const lastDate = parseDate(lastValidInst.date);
-    if (isLastPending) {
-      return lastDate;
-    }
 
-    const nextDate = new Date(lastDate);
-    const isDaily = planToken === 'DAY' || (customer?.loanType && customer.loanType.toLowerCase().includes('daily'));
-    const isMonthly = planToken === 'MONTH' || (customer?.loanType && customer.loanType.toLowerCase().includes('month'));
-    
-    if (isDaily) {
-      nextDate.setDate(nextDate.getDate() + 1);
-    } else if (isMonthly) {
-      nextDate.setMonth(nextDate.getMonth() + 1);
-    } else { // WEEK
-      nextDate.setDate(nextDate.getDate() + 7);
-    }
-    return nextDate;
-  })();
+      const dd = String(rowDateObj.getDate()).padStart(2, '0');
+      const mm = String(rowDateObj.getMonth() + 1).padStart(2, '0');
+      const yyyy = rowDateObj.getFullYear();
+      const formattedDate = `${dd}-${mm}-${yyyy}`;
+      const weekday = rowDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
 
-  const dd = String(nextDueDateObj.getDate()).padStart(2, '0');
-  const mm = String(nextDueDateObj.getMonth() + 1).padStart(2, '0');
-  const yyyy = nextDueDateObj.getFullYear();
-  const nextFormattedDueDate = `${dd}-${mm}-${yyyy}`;
+      const status = idx < fullySettledCount ? 'PAID' : (idx === fullySettledCount && isLastPending ? 'PARTIAL' : 'UNPAID');
+
+      schedule.push({
+        index: idx + 1,
+        date: formattedDate,
+        dateObj: rowDateObj,
+        weekday: weekday,
+        amount: emiAmount,
+        status: status
+      });
+    }
+    return schedule;
+  }, [customer, planCount, baseDateObj, planToken, emiAmount, fullySettledCount, isLastPending]);
+
+  // Find the earliest installment in the master schedule that is NOT completed/paid:
+  const nextInstallment = repaymentSchedule.find(item => item.status !== 'PAID') || repaymentSchedule[repaymentSchedule.length - 1];
+
+  const nextDueDateObj = nextInstallment ? nextInstallment.dateObj : new Date();
+  const nextFormattedDueDate = nextInstallment ? nextInstallment.date : '';
   const activeModalDateObj = parseDate(collectionDate || nextFormattedDueDate);
   const nextFormattedWeekday = activeModalDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
 
@@ -361,7 +398,7 @@ const CustomerDetail = ({ customer, onBack }) => {
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
 
-  const nextLogicalNumber = effectiveInstallmentCount + 1;
+  const nextLogicalNumber = nextInstallment ? nextInstallment.index : (effectiveInstallmentCount + 1);
   const nextNumber = getOrdinal(nextLogicalNumber);
 
   const lastInstallment = installments[installments.length - 1];
@@ -1078,34 +1115,19 @@ const CustomerDetail = ({ customer, onBack }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {Array.from({ length: planCount }).map((_, idx) => {
-                    const rowDateObj = new Date(baseDateObj);
-                    if (planToken === 'DAY') {
-                      rowDateObj.setDate(rowDateObj.getDate() + idx);
-                    } else if (planToken === 'MONTH') {
-                      rowDateObj.setMonth(rowDateObj.getMonth() + idx);
-                    } else { // WEEK
-                      rowDateObj.setDate(rowDateObj.getDate() + (idx * 7));
-                    }
-                    
-                    const dd = String(rowDateObj.getDate()).padStart(2, '0');
-                    const mm = String(rowDateObj.getMonth() + 1).padStart(2, '0');
-                    const yyyy = rowDateObj.getFullYear();
-                    const formattedDate = `${dd}-${mm}-${yyyy}`;
-                    const weekday = rowDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-                    
+                  {repaymentSchedule.map((item, idx) => {
                     const outstanding = Math.max(0, repayAmount - (emiAmount * (idx + 1)));
 
                     return (
                       <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                         <td className="py-3 px-2 text-xs sm:text-sm font-black text-slate-800">
-                          {idx + 1}
+                          {item.index}
                         </td>
                         <td className="py-3 px-2 text-[11px] sm:text-[13px] font-bold text-slate-600">
-                          {formattedDate}
+                          {item.date}
                         </td>
                         <td className="py-3 px-2 text-[10px] sm:text-xs font-bold text-slate-400">
-                          ({weekday})
+                          ({item.weekday})
                         </td>
                         <td className="py-3 px-2 text-xs sm:text-sm font-black text-[#1b7c58] text-right">
                           ₹{emiAmount.toLocaleString('en-IN')}
@@ -1232,6 +1254,9 @@ const CustomerDetail = ({ customer, onBack }) => {
                     if (!instNumber) return '';
                     const idxMatch = instNumber.match(/\d+/);
                     const idx = idxMatch ? parseInt(idxMatch[0], 10) - 1 : 0;
+                    if (repaymentSchedule && repaymentSchedule[idx]) {
+                      return repaymentSchedule[idx].date;
+                    }
                     const rowDateObj = new Date(baseDateObj);
                     if (planToken === 'DAY') {
                       rowDateObj.setDate(rowDateObj.getDate() + idx);
@@ -1315,6 +1340,9 @@ const CustomerDetail = ({ customer, onBack }) => {
                           if (!instNumber) return '';
                           const idxMatch = instNumber.match(/\d+/);
                           const idx = idxMatch ? parseInt(idxMatch[0], 10) - 1 : 0;
+                          if (repaymentSchedule && repaymentSchedule[idx]) {
+                            return repaymentSchedule[idx].date;
+                          }
                           const rowDateObj = new Date(baseDateObj);
                           if (planToken === 'DAY') {
                             rowDateObj.setDate(rowDateObj.getDate() + idx);
