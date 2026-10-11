@@ -124,8 +124,7 @@ const CustomerDetail = ({ customer, onBack }) => {
   const emiAmount = repayAmount > 0 ? Math.round(repayAmount / numberOfWeeks) : 0;
 
   const runningSubTotal = installments.reduce((sum, inst) => sum + (inst.amount || 0), 0);
-  const netBalance = Math.max(0, repayAmount - runningSubTotal);
-  const rawDueDate = customer.firstDueDate || customer.startDate || customer.loanDate || customer.dueDate || customer.nextDueDate || '26-05-2026';
+  const rawDueDate = customer.firstDueDate || customer.startDate || customer.dueDate || customer.nextDueDate || (installments.length > 0 && installments[0]?.date) || customer.loanDate || '12-07-2026';
 
   const formatName = (name) => {
     if (!name) return '';
@@ -292,12 +291,16 @@ const CustomerDetail = ({ customer, onBack }) => {
         const formattedDate = `${dd}-${mm}-${yyyy}`;
         const weekday = dObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
         const status = item.status || (idx < fullySettledCount ? 'PAID' : (idx === fullySettledCount && isLastPending ? 'PARTIAL' : 'UNPAID'));
+        const ord = `${idx + 1}${getNumberSuffix(idx + 1)}`;
         return {
           ...item,
           index: item.index || (idx + 1),
+          installmentNumber: item.installmentNumber || `${ord} Installment`,
           date: formattedDate,
           dateObj: dObj,
           weekday: weekday,
+          dueAmount: Number(item.dueAmount || item.amount || emiAmount),
+          amount: Number(item.dueAmount || item.amount || emiAmount),
           status: status
         };
       });
@@ -305,18 +308,13 @@ const CustomerDetail = ({ customer, onBack }) => {
 
     const schedule = [];
     for (let idx = 0; idx < planCount; idx++) {
-      let rowDateObj;
-      if (Array.isArray(customer.scheduledDates) && customer.scheduledDates[idx]) {
-        rowDateObj = new Date(customer.scheduledDates[idx]);
-      } else {
-        rowDateObj = new Date(baseDateObj);
-        if (planToken === 'DAY') {
-          rowDateObj.setDate(rowDateObj.getDate() + idx);
-        } else if (planToken === 'MONTH') {
-          rowDateObj.setMonth(rowDateObj.getMonth() + idx);
-        } else { // WEEK
-          rowDateObj.setDate(rowDateObj.getDate() + (idx * 7));
-        }
+      let rowDateObj = new Date(baseDateObj);
+      if (planToken === 'DAY') {
+        rowDateObj.setDate(rowDateObj.getDate() + idx);
+      } else if (planToken === 'MONTH') {
+        rowDateObj.setMonth(rowDateObj.getMonth() + idx);
+      } else { // WEEK
+        rowDateObj.setDate(rowDateObj.getDate() + (idx * 7));
       }
 
       const dd = String(rowDateObj.getDate()).padStart(2, '0');
@@ -324,14 +322,17 @@ const CustomerDetail = ({ customer, onBack }) => {
       const yyyy = rowDateObj.getFullYear();
       const formattedDate = `${dd}-${mm}-${yyyy}`;
       const weekday = rowDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+      const ord = `${idx + 1}${getNumberSuffix(idx + 1)}`;
 
       const status = idx < fullySettledCount ? 'PAID' : (idx === fullySettledCount && isLastPending ? 'PARTIAL' : 'UNPAID');
 
       schedule.push({
         index: idx + 1,
+        installmentNumber: `${ord} Installment`,
         date: formattedDate,
         dateObj: rowDateObj,
         weekday: weekday,
+        dueAmount: emiAmount,
         amount: emiAmount,
         status: status
       });
@@ -344,8 +345,9 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const nextDueDateObj = nextInstallment ? nextInstallment.dateObj : new Date();
   const nextFormattedDueDate = nextInstallment ? nextInstallment.date : '';
-  const activeModalDateObj = parseDate(collectionDate || nextFormattedDueDate);
-  const nextFormattedWeekday = activeModalDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  const nextFormattedWeekday = nextInstallment ? nextInstallment.weekday : '';
+  const nextLogicalNumber = nextInstallment ? nextInstallment.index : (effectiveInstallmentCount + 1);
+  const nextNumber = `${nextLogicalNumber}${getNumberSuffix(nextLogicalNumber)}`;
 
   const now = new Date();
   now.setHours(0,0,0,0);
@@ -397,9 +399,6 @@ const CustomerDetail = ({ customer, onBack }) => {
     const v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
-
-  const nextLogicalNumber = nextInstallment ? nextInstallment.index : (effectiveInstallmentCount + 1);
-  const nextNumber = getOrdinal(nextLogicalNumber);
 
   const lastInstallment = installments[installments.length - 1];
   const isRetrySequence = lastInstallment && lastInstallment.status === 'BOUNCED';
@@ -1488,7 +1487,7 @@ const CustomerDetail = ({ customer, onBack }) => {
                           {!(isRetrySequence || isLastPending) && <span className="text-[#2d4a3e]/80 font-bold text-[11px] tracking-widest">{nextFormattedWeekday}</span>}
                         </div>
                       </div>
-                      <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">({nextNumber} Installment)</span>
+                      <span className="text-[#2d4a3e]/80 font-medium mt-1.5 text-base">({nextNumber.includes('Installment') ? nextNumber : `${nextNumber} Installment`})</span>
                     </div>
                   </div>
 

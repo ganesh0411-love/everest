@@ -815,17 +815,66 @@ function App() {
         const emiAmount = Number(c.perDayAmount || c.dailyInstallment || c.installmentAmount || c.targetAmount || 0) ||
           (repay > 0 && planCount > 0 ? Math.round(repay / planCount) : 0);
 
-        // 2. Schedule generation: base date is strictly the First Due Date (disbursement date + 1 step or explicit firstDueDate)
-        let scheduledDates = [];
-        if (Array.isArray(c.scheduledDates) && c.scheduledDates.length > 0) {
-          scheduledDates = c.scheduledDates.map(ts => new Date(ts).setHours(0, 0, 0, 0));
-        } else {
-          let firstDueTs = null;
-          if (c.firstDueDate) {
-            const d = parseDate(c.firstDueDate);
-            if (d && !isNaN(d.getTime())) firstDueTs = new Date(d).setHours(0, 0, 0, 0);
+        // Group paid amounts by installment number / count
+        const sumByNumber = {};
+        nonBouncedInsts.forEach(inst => {
+          if (inst.number) {
+            sumByNumber[inst.number] = (sumByNumber[inst.number] || 0) + (parseFloat(inst.amount) || 0);
           }
-          if (!firstDueTs) {
+        });
+        const fullySettledByNumber = Object.keys(sumByNumber).filter(num => sumByNumber[num] >= emiAmount).length;
+        const fullySettledCount = Math.max(
+          fullySettledByNumber,
+          emiAmount > 0 ? Math.floor(actualPaid / emiAmount) : 0
+        );
+        const totalPaidForLastNumber = emiAmount > 0 ? (actualPaid - (fullySettledCount * emiAmount)) : 0;
+        const isLastPending = totalPaidForLastNumber > 0 && totalPaidForLastNumber < emiAmount;
+
+        const getOrdinal = (n) => {
+          const s = ["th", "st", "nd", "rd"];
+          const v = n % 100;
+          return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+
+        // 2. Master Repayment Schedule: Fixed contract calendar (Single Source of Truth)
+        let masterRepaymentSchedule = [];
+        if (Array.isArray(c.repaymentSchedule) && c.repaymentSchedule.length > 0) {
+          masterRepaymentSchedule = c.repaymentSchedule.map((item, idx) => {
+            const dStr = item.date || item.dueDate || item.scheduledDate;
+            const dObj = parseDate(dStr);
+            const dd = String(dObj.getDate()).padStart(2, '0');
+            const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+            const yyyy = dObj.getFullYear();
+            const formattedDate = `${dd}-${mm}-${yyyy}`;
+            const weekday = dObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+            const status = item.status || (idx < fullySettledCount ? 'PAID' : (idx === fullySettledCount && isLastPending ? 'PARTIAL' : 'UNPAID'));
+            const ord = getOrdinal(idx + 1);
+            return {
+              ...item,
+              index: item.index || (idx + 1),
+              installmentNumber: item.installmentNumber || `${ord} Installment`,
+              date: formattedDate,
+              dateObj: dObj,
+              weekday: weekday,
+              dueAmount: Number(item.dueAmount || item.amount || emiAmount),
+              amount: Number(item.dueAmount || item.amount || emiAmount),
+              status: status
+            };
+          });
+        } else {
+          // Resolve base anchor date without dynamic date shifting
+          let baseDateObj = null;
+          const explicitBaseStr = c.firstDueDate || c.startDate || c.dueDate || c.nextDueDate;
+          if (explicitBaseStr) {
+            const d = parseDate(explicitBaseStr);
+            if (d && !isNaN(d.getTime())) baseDateObj = d;
+          }
+          if (!baseDateObj && insts.length > 0) {
+            const sortedInsts = [...insts].sort((a, b) => parseDate(a.date || a.createdAt).getTime() - parseDate(b.date || b.createdAt).getTime());
+            const d = parseDate(sortedInsts[0]?.date || sortedInsts[0]?.createdAt);
+            if (d && !isNaN(d.getTime())) baseDateObj = d;
+          }
+          if (!baseDateObj) {
             const disbStr = c.disbursedAt || c.disbursedDate || c.loanApprovedDate || c.approvalDate || c.loanDate;
             if (disbStr) {
               const d = parseDate(disbStr);
@@ -834,39 +883,46 @@ function App() {
                 if (planToken === 'DAY') s.setDate(s.getDate() + 1);
                 else if (planToken === 'MONTH') s.setMonth(s.getMonth() + 1);
                 else s.setDate(s.getDate() + 7);
-                firstDueTs = s.setHours(0, 0, 0, 0);
+                baseDateObj = s;
               }
             }
           }
-          if (!firstDueTs && insts.length > 0) {
-            const instTimestamps = insts.map(i => {
-              const d = parseDate(i.date || i.paymentDate || i.createdAt);
-              return d && !isNaN(d.getTime()) ? new Date(d).setHours(0, 0, 0, 0) : null;
-            }).filter(Boolean);
-            if (instTimestamps.length > 0) {
-              firstDueTs = Math.min(...instTimestamps);
-            }
-          }
-          if (!firstDueTs) {
-            const fallbackStr = c.startDate || c.scheduledDate || c.dueDate || c.date || c.createdAt;
-            if (fallbackStr) {
-              const d = parseDate(fallbackStr);
-              if (d && !isNaN(d.getTime())) firstDueTs = new Date(d).setHours(0, 0, 0, 0);
-            }
+          if (!baseDateObj) {
+            baseDateObj = parseDate(c.date || c.createdAt || '12-07-2026');
           }
 
-          if (firstDueTs && planCount > 0) {
-            const baseDateObj = new Date(firstDueTs);
-            for (let idx = 0; idx < planCount; idx++) {
-              const scheduledDateObj = new Date(baseDateObj);
-              if (planToken === 'DAY') scheduledDateObj.setDate(scheduledDateObj.getDate() + idx);
-              else if (planToken === 'MONTH') scheduledDateObj.setMonth(scheduledDateObj.getMonth() + idx);
-              else scheduledDateObj.setDate(scheduledDateObj.getDate() + (idx * 7));
-              scheduledDateObj.setHours(0, 0, 0, 0);
-              scheduledDates.push(scheduledDateObj.getTime());
-            }
+          for (let idx = 0; idx < planCount; idx++) {
+            const rowDateObj = new Date(baseDateObj);
+            if (planToken === 'DAY') rowDateObj.setDate(rowDateObj.getDate() + idx);
+            else if (planToken === 'MONTH') rowDateObj.setMonth(rowDateObj.getMonth() + idx);
+            else rowDateObj.setDate(rowDateObj.getDate() + (idx * 7));
+
+            const dd = String(rowDateObj.getDate()).padStart(2, '0');
+            const mm = String(rowDateObj.getMonth() + 1).padStart(2, '0');
+            const yyyy = rowDateObj.getFullYear();
+            const formattedDate = `${dd}-${mm}-${yyyy}`;
+            const weekday = rowDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+            const ord = getOrdinal(idx + 1);
+            const status = idx < fullySettledCount ? 'PAID' : (idx === fullySettledCount && isLastPending ? 'PARTIAL' : 'UNPAID');
+
+            masterRepaymentSchedule.push({
+              index: idx + 1,
+              installmentNumber: `${ord} Installment`,
+              date: formattedDate,
+              dateObj: rowDateObj,
+              weekday: weekday,
+              dueAmount: emiAmount,
+              amount: emiAmount,
+              status: status
+            });
           }
         }
+
+        const scheduledDates = masterRepaymentSchedule.map(item => {
+          const d = new Date(item.dateObj);
+          d.setHours(0, 0, 0, 0);
+          return d.getTime();
+        });
 
         // 3. Strict Schedule-Date Bounded Active OD Computation:
         // Only inspect installments scheduled ON or BEFORE today:
@@ -877,13 +933,9 @@ function App() {
         const pastExpectedDueSum = pastScheduledDates.length * emiAmount;
 
         // True Active OD:
-        // If total paid is less than what was due in past schedules, difference is OD.
-        // Once past dues are caught up, OD is strictly 0.
-        // Future installments (> today) are NEVER counted toward OD or pending dues!
         let overdueAmount = Math.max(0, pastExpectedDueSum - actualPaid);
 
         // Pending Dues Count:
-        // Count ONLY past installments that remain unpaid or bounced. Never count future loan days.
         let pendingDues = 0;
         if (overdueAmount > 0) {
           pendingDues = emiAmount > 0 ? Math.ceil(overdueAmount / emiAmount) : 1;
@@ -895,8 +947,14 @@ function App() {
           pendingDues = 0;
         }
 
+        const nextActiveInstallment = masterRepaymentSchedule.find(item => item.status !== 'PAID') || masterRepaymentSchedule[masterRepaymentSchedule.length - 1];
+
         return { 
           ...c, 
+          repaymentSchedule: masterRepaymentSchedule,
+          dynamicNextDueDate: nextActiveInstallment ? nextActiveInstallment.date : null,
+          dynamicNextDueAmount: nextActiveInstallment ? nextActiveInstallment.dueAmount : emiAmount,
+          dynamicNextInstallmentNumber: nextActiveInstallment ? nextActiveInstallment.installmentNumber : '',
           dynamicOutstanding: Math.max(0, repay - actualPaid),
           dynamicTotalPaid: actualPaid,
           dynamicOverdue: overdueAmount,

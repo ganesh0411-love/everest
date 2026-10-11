@@ -655,13 +655,23 @@ export default function CollectionReportModal({
 
       // Extract schedule timestamps
       let scheduledTimestamps = [];
-      if (Array.isArray(cust.scheduledDates) && cust.scheduledDates.length > 0) {
+      if (Array.isArray(cust.repaymentSchedule) && cust.repaymentSchedule.length > 0) {
+        scheduledTimestamps = cust.repaymentSchedule.map(item => {
+          const ts = parseDateToTimestamp(item.date || item.dueDate || item.scheduledDate);
+          return ts ? new Date(ts).setHours(0, 0, 0, 0) : null;
+        }).filter(Boolean);
+      } else if (Array.isArray(cust.scheduledDates) && cust.scheduledDates.length > 0) {
         scheduledTimestamps = cust.scheduledDates.map(ts => new Date(ts).setHours(0, 0, 0, 0));
       } else {
         let firstDueTs = null;
-        if (cust.firstDueDate) {
-          const ts = parseDateToTimestamp(cust.firstDueDate);
+        const explicitBaseStr = cust.firstDueDate || cust.startDate || cust.dueDate || cust.nextDueDate;
+        if (explicitBaseStr) {
+          const ts = parseDateToTimestamp(explicitBaseStr);
           if (ts) firstDueTs = new Date(ts).setHours(0, 0, 0, 0);
+        }
+        if (!firstDueTs && Array.isArray(cust.installments) && cust.installments.length > 0) {
+          const dates = cust.installments.map(i => parseDateToTimestamp(i.date)).filter(Boolean);
+          if (dates.length > 0) firstDueTs = Math.min(...dates);
         }
         if (!firstDueTs) {
           const disbStr = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.approvalDate || cust.loanDate;
@@ -676,12 +686,8 @@ export default function CollectionReportModal({
             }
           }
         }
-        if (!firstDueTs && Array.isArray(cust.installments) && cust.installments.length > 0) {
-          const dates = cust.installments.map(i => parseDateToTimestamp(i.date)).filter(Boolean);
-          if (dates.length > 0) firstDueTs = Math.min(...dates);
-        }
         if (!firstDueTs) {
-          const fallbackStr = cust.startDate || cust.scheduledDate || cust.dueDate || cust.date || cust.createdAt;
+          const fallbackStr = cust.date || cust.createdAt;
           if (fallbackStr) {
             const ts = parseDateToTimestamp(fallbackStr);
             if (ts) firstDueTs = new Date(ts).setHours(0, 0, 0, 0);
