@@ -778,19 +778,22 @@ export default function CollectionReportModal({
       const isScheduledToday = scheduledTimestamps.length > 0 
         ? scheduledTimestamps.includes(todayStartTs) 
         : (todayStartTs >= startTs && todayStartTs <= endTs);
-      const custPendingToday = isScheduledToday ? Math.max(0, custTargetPerDay - custPaidToday) : 0;
+      // Pending strictly requires collection to have started but not completed:
+      const custPendingToday = (isScheduledToday && custPaidToday > 0 && custPaidToday < custTargetPerDay)
+        ? (custTargetPerDay - custPaidToday)
+        : 0;
 
       if (todayStartTs >= startTs && todayStartTs <= endTs) {
         totalPeriodPending += custPendingToday;
       }
 
       // 3. Strict Schedule-Date Bounded Active OD Computation:
-      // Active OD is strictly bounded to scheduled dates on or before today (capped by endTs if viewing a past report)
+      // Active OD is strictly past unsettled arrears before today (capped by endTs if viewing a past report)
       let custActiveOd = 0;
       if (endTs >= todayStartTs && cust.dynamicOverdue !== undefined && cust.dynamicOverdue !== null) {
         custActiveOd = Number(cust.dynamicOverdue) || 0;
       } else {
-        const cutoffTs = Math.min(todayStartTs, endTs);
+        const cutoffTs = Math.min(todayStartTs - 1, endTs);
         const pastScheduledDates = scheduledTimestamps.filter(ts => ts <= cutoffTs);
         const pastExpectedDueSum = pastScheduledDates.length * custTargetPerDay;
 
@@ -1044,7 +1047,6 @@ export default function CollectionReportModal({
 
   // Safely compute scoped pending, target, collection, and OD with default fallbacks
   const totalScopedTarget = Number(targetCollection || 0);
-  const totalScopedPendingSafe = Number(totalScopedPending || 0);
   const totalScopedOD = Number(totalScopedOverdue || 0);
 
   // Dynamic Metrics Recalculation strictly bound to active scoped data & toggles
@@ -1087,6 +1089,12 @@ export default function CollectionReportModal({
   }, [filteredData, isCreditActive, isDebitActive]);
 
   const totalScopedCollection = Number(totalCollection || 0);
+
+  // Scoped calculations for active day (Today):
+  // Pending strictly requires collection to have started but not completed:
+  const totalScopedPendingSafe = (totalScopedCollection > 0 && totalScopedCollection < totalScopedTarget)
+    ? Number(totalScopedPending || (totalScopedTarget - totalScopedCollection) || 0)
+    : 0;
 
   const totalPendingAmount = useMemo(() => {
     if (searchTerm.trim() !== '') {

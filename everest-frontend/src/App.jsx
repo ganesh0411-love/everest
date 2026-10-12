@@ -925,9 +925,9 @@ function App() {
         });
 
         // 3. Strict Schedule-Date Bounded Active OD Computation:
-        // Only inspect installments scheduled ON or BEFORE today:
+        // Only inspect installments scheduled strictly BEFORE today (past unsettled arrears):
         const todayTs = today.getTime();
-        const pastScheduledDates = scheduledDates.filter(ts => ts <= todayTs);
+        const pastScheduledDates = scheduledDates.filter(ts => ts < todayTs);
 
         // Sum of expected dues from elapsed schedule dates
         const pastExpectedDueSum = pastScheduledDates.length * emiAmount;
