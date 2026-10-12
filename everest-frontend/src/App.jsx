@@ -58,10 +58,10 @@ const parseGlobalDate = (dStr) => {
   }
 
   if (typeof dStr === 'string') {
-    const cleanStr = dStr.replace(/\s*[\(\[]?[A-Za-z]{3,9}[\)\]]?/i, '').trim();
+    const cleanStr = dStr.replace(/\s*[\(\[]?[A-Za-z]{3,9}[\)\]]?/g, '').trim();
 
     // Check for DD-MM-YYYY, DD.MM.YYYY, DD/MM/YYYY
-    const dmyMatch = cleanStr.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})$/);
+    const dmyMatch = cleanStr.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})/);
     if (dmyMatch) {
       const day = parseInt(dmyMatch[1], 10);
       const month = parseInt(dmyMatch[2], 10);
@@ -71,7 +71,7 @@ const parseGlobalDate = (dStr) => {
     }
 
     // Check for YYYY-MM-DD
-    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})$/);
+    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})/);
     if (ymdMatch) {
       const year = parseInt(ymdMatch[1], 10);
       const month = parseInt(ymdMatch[2], 10);
@@ -947,14 +947,67 @@ function App() {
           pendingDues = 0;
         }
 
-        const nextActiveInstallment = masterRepaymentSchedule.find(item => item.status !== 'PAID') || masterRepaymentSchedule[masterRepaymentSchedule.length - 1];
+        // Next sequential pending installment counter:
+        const nextLogicalNumber = isLastPending ? (fullySettledCount + 1) : (fullySettledCount + 1);
+        const dynamicNextInstallmentNumber = `${nextLogicalNumber}${getOrdinal(nextLogicalNumber)} Installment`;
+
+        // Next collection date strictly after latest transaction date:
+        let latestTxDateObj = null;
+        if (Array.isArray(insts) && insts.length > 0) {
+          insts.forEach(inst => {
+            const rawD = inst.date || inst.createdAt;
+            if (rawD) {
+              const d = parseDate(rawD);
+              if (d && !isNaN(d.getTime())) {
+                const dZero = new Date(d);
+                dZero.setHours(0, 0, 0, 0);
+                if (!latestTxDateObj || dZero.getTime() > latestTxDateObj.getTime()) {
+                  latestTxDateObj = dZero;
+                }
+              }
+            }
+          });
+        }
+
+        let nextDueDateStr = null;
+        if (!latestTxDateObj) {
+          nextDueDateStr = masterRepaymentSchedule[0]?.date || null;
+        } else {
+          const lastTxTs = latestTxDateObj.getTime();
+          if (planToken === 'DAY') {
+            const nextDay = new Date(latestTxDateObj);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const dd = String(nextDay.getDate()).padStart(2, '0');
+            const mm = String(nextDay.getMonth() + 1).padStart(2, '0');
+            const yyyy = nextDay.getFullYear();
+            nextDueDateStr = `${dd}-${mm}-${yyyy}`;
+          } else {
+            const upcomingItem = masterRepaymentSchedule.find(item => {
+              if (!item.dateObj) return false;
+              const itemDate = new Date(item.dateObj);
+              itemDate.setHours(0, 0, 0, 0);
+              return itemDate.getTime() > lastTxTs;
+            });
+            if (upcomingItem) {
+              nextDueDateStr = upcomingItem.date;
+            } else {
+              const nextDate = new Date(latestTxDateObj);
+              if (planToken === 'WEEK') nextDate.setDate(nextDate.getDate() + 7);
+              else nextDate.setMonth(nextDate.getMonth() + 1);
+              const dd = String(nextDate.getDate()).padStart(2, '0');
+              const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
+              const yyyy = nextDate.getFullYear();
+              nextDueDateStr = `${dd}-${mm}-${yyyy}`;
+            }
+          }
+        }
 
         return { 
           ...c, 
           repaymentSchedule: masterRepaymentSchedule,
-          dynamicNextDueDate: nextActiveInstallment ? nextActiveInstallment.date : null,
-          dynamicNextDueAmount: nextActiveInstallment ? nextActiveInstallment.dueAmount : emiAmount,
-          dynamicNextInstallmentNumber: nextActiveInstallment ? nextActiveInstallment.installmentNumber : '',
+          dynamicNextDueDate: nextDueDateStr,
+          dynamicNextDueAmount: emiAmount,
+          dynamicNextInstallmentNumber: dynamicNextInstallmentNumber,
           dynamicOutstanding: Math.max(0, repay - actualPaid),
           dynamicTotalPaid: actualPaid,
           dynamicOverdue: overdueAmount,

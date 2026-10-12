@@ -142,9 +142,9 @@ const CustomerDetail = ({ customer, onBack }) => {
       return new Date(dStr.seconds * 1000);
     }
     const str = String(dStr).trim();
-    const cleanStr = str.replace(/\s*[\(\[]?[A-Za-z]{3,9}[\)\]]?/i, '').trim();
+    const cleanStr = str.replace(/\s*[\(\[]?[A-Za-z]{3,9}[\)\]]?/g, '').trim();
 
-    const dmyMatch = cleanStr.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})$/);
+    const dmyMatch = cleanStr.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})/);
     if (dmyMatch) {
       const day = parseInt(dmyMatch[1], 10);
       const month = parseInt(dmyMatch[2], 10);
@@ -153,7 +153,7 @@ const CustomerDetail = ({ customer, onBack }) => {
       return new Date(year, month - 1, day);
     }
 
-    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})$/);
+    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})/);
     if (ymdMatch) {
       const year = parseInt(ymdMatch[1], 10);
       const month = parseInt(ymdMatch[2], 10);
@@ -344,14 +344,68 @@ const CustomerDetail = ({ customer, onBack }) => {
     return schedule;
   }, [customer, planCount, baseDateObj, planToken, emiAmount, fullySettledCount, isLastPending]);
 
-  // Find the earliest installment in the master schedule that is NOT completed/paid:
-  const nextInstallment = repaymentSchedule.find(item => item.status !== 'PAID') || repaymentSchedule[repaymentSchedule.length - 1];
+  // 1. Next Installment Counter: Sequential pending installment (decoupled from static schedule dates)
+  const nextLogicalNumber = isLastPending ? (fullySettledCount + 1) : (fullySettledCount + 1);
+  const nextOrdinal = `${nextLogicalNumber}${getNumberSuffix(nextLogicalNumber)}`;
+  const nextNumber = `${nextOrdinal} Installment`;
 
-  const nextDueDateObj = nextInstallment ? nextInstallment.dateObj : new Date();
-  const nextFormattedDueDate = nextInstallment ? nextInstallment.date : '';
-  const nextFormattedWeekday = nextInstallment ? nextInstallment.weekday : '';
-  const nextLogicalNumber = nextInstallment ? nextInstallment.index : (effectiveInstallmentCount + 1);
-  const nextNumber = `${nextLogicalNumber}${getNumberSuffix(nextLogicalNumber)}`;
+  // 2. Next Due Date Selection: Strictly chronological after the latest recorded transaction date
+  let latestTxDateObj = null;
+  if (Array.isArray(installments) && installments.length > 0) {
+    installments.forEach(inst => {
+      const rawD = inst.date || inst.createdAt;
+      if (rawD) {
+        const d = parseDate(rawD);
+        if (d && !isNaN(d.getTime())) {
+          const dZero = new Date(d);
+          dZero.setHours(0, 0, 0, 0);
+          if (!latestTxDateObj || dZero.getTime() > latestTxDateObj.getTime()) {
+            latestTxDateObj = dZero;
+          }
+        }
+      }
+    });
+  }
+
+  let nextDueDateObj = null;
+  if (!latestTxDateObj) {
+    nextDueDateObj = repaymentSchedule[0]?.dateObj ? new Date(repaymentSchedule[0].dateObj) : new Date(baseDateObj || new Date());
+    nextDueDateObj.setHours(0, 0, 0, 0);
+  } else {
+    const lastTxTs = latestTxDateObj.getTime();
+    if (planToken === 'DAY') {
+      const nextDay = new Date(latestTxDateObj);
+      nextDay.setDate(nextDay.getDate() + 1);
+      nextDay.setHours(0, 0, 0, 0);
+      nextDueDateObj = nextDay;
+    } else {
+      const upcomingItem = repaymentSchedule.find(item => {
+        if (!item.dateObj) return false;
+        const itemDate = new Date(item.dateObj);
+        itemDate.setHours(0, 0, 0, 0);
+        return itemDate.getTime() > lastTxTs;
+      });
+      if (upcomingItem) {
+        nextDueDateObj = new Date(upcomingItem.dateObj);
+        nextDueDateObj.setHours(0, 0, 0, 0);
+      } else {
+        const nextDate = new Date(latestTxDateObj);
+        if (planToken === 'WEEK') {
+          nextDate.setDate(nextDate.getDate() + 7);
+        } else {
+          nextDate.setMonth(nextDate.getMonth() + 1);
+        }
+        nextDate.setHours(0, 0, 0, 0);
+        nextDueDateObj = nextDate;
+      }
+    }
+  }
+
+  const dd = String(nextDueDateObj.getDate()).padStart(2, '0');
+  const mm = String(nextDueDateObj.getMonth() + 1).padStart(2, '0');
+  const yyyy = nextDueDateObj.getFullYear();
+  const nextFormattedDueDate = `${dd}-${mm}-${yyyy}`;
+  const nextFormattedWeekday = nextDueDateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
 
   const now = new Date();
   now.setHours(0,0,0,0);
