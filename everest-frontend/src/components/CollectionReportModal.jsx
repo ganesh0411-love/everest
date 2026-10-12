@@ -325,6 +325,34 @@ export default function CollectionReportModal({
       lastMonth.setMonth(lastMonth.getMonth() - 1);
       setFromDate(formatDate(lastMonth));
       setToDate(formatDate(today));
+    } else if (option === 'All') {
+      let earliestTs = null;
+      const rawCusts = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
+        try {
+          const saved = localStorage.getItem('everest_customers');
+          return saved ? JSON.parse(saved) : [];
+        } catch (_e) { return []; }
+      })());
+
+      (rawCusts || []).forEach(cust => {
+        const insts = cust.installments || cust.ledger || cust.transactions || cust.history || [];
+        insts.forEach(inst => {
+          const dStr = inst.date || inst.paymentDate || inst.createdAt;
+          const ts = parseDateToTimestamp(dStr);
+          if (ts && (!earliestTs || ts < earliestTs)) {
+            earliestTs = ts;
+          }
+        });
+        const dStr = cust.startDate || cust.firstDueDate || cust.disbursedAt || cust.loanDate || cust.createdAt;
+        const ts = parseDateToTimestamp(dStr);
+        if (ts && (!earliestTs || ts < earliestTs)) {
+          earliestTs = ts;
+        }
+      });
+
+      const earliestDateStr = earliestTs ? formatDate(new Date(earliestTs)) : '01-01-2020';
+      setFromDate(earliestDateStr);
+      setToDate(formatDate(today));
     } else {
       const dateStr = formatDate(today);
       setFromDate(dateStr);
@@ -1649,93 +1677,122 @@ export default function CollectionReportModal({
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium text-slate-400">{index + 1}</td>
                       <td className="py-2.5 sm:py-3 px-3 sm:px-4">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-semibold text-slate-800 leading-tight">{item.name}</span>
-                          {item.isBounced && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200 uppercase tracking-wider">
-                              Bounced
-                            </span>
-                          )}
-                        </div>
+                        <div className="font-semibold text-slate-800 leading-tight truncate">{item.name}</div>
                         <div className="text-[10px] sm:text-[11px] text-slate-400 font-normal mt-0.5 whitespace-nowrap">
                           {formatTransactionSubtext(item.date, item.timeStr, item.createdAt)}
                         </div>
                       </td>
                       
-                      {/* MOBILE-ONLY: MODE Data Cell (< lg:) */}
-                      {isCreditActive && !isDebitActive ? (
-                        <td className="lg:hidden py-2.5 sm:py-3 px-2 text-center">
-                          {item.isBounced ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80 shadow-2xs whitespace-nowrap">
-                              Bounced
-                            </span>
-                          ) : item.isSplit ? (
-                            <div className="flex flex-col items-center justify-center gap-1">
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap border border-blue-200/60 shadow-2xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                                ₹{item.upiAmount.toLocaleString('en-IN')}
-                              </span>
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap border border-emerald-200/60 shadow-2xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                                ₹{item.cashAmount.toLocaleString('en-IN')}
-                              </span>
-                            </div>
-                          ) : item.mode === 'UPI' || item.mode === 'Online' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs whitespace-nowrap">
-                              UPI
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs whitespace-nowrap">
-                              Cash
-                            </span>
-                          )}
+                      {/* MOBILE-ONLY: MODE / Merged Bounced Cell (< lg:) */}
+                      {item.isBounced ? (
+                        <td 
+                          colSpan={isCreditActive && isDebitActive ? 2 : (isCreditActive && !isDebitActive ? 2 : 1)} 
+                          className="lg:hidden py-2.5 sm:py-3 px-3 sm:px-4 text-center"
+                        >
+                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-600 border border-rose-200 uppercase tracking-wider inline-block">
+                            BOUNCED
+                          </span>
                         </td>
-                      ) : null}
+                      ) : (
+                        <>
+                          {isCreditActive && !isDebitActive ? (
+                            <td className="lg:hidden py-2.5 sm:py-3 px-2 text-center">
+                              {item.isSplit ? (
+                                <div className="flex flex-col items-center justify-center gap-1">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap border border-blue-200/60 shadow-2xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                                    ₹{item.upiAmount.toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap border border-emerald-200/60 shadow-2xs">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                    ₹{item.cashAmount.toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                              ) : item.mode === 'UPI' || item.mode === 'Online' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs whitespace-nowrap">
+                                  UPI
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs whitespace-nowrap">
+                                  Cash
+                                </span>
+                              )}
+                            </td>
+                          ) : null}
 
-                      {/* MOBILE-ONLY: Credit Data Cell (< lg:) */}
-                      {isCreditActive && (
-                        <td className="lg:hidden py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
-                          {item.isBounced ? (
-                            <span className="text-slate-400 font-semibold">-</span>
-                          ) : (
-                            `₹ ${item.credit.toLocaleString('en-IN')}`
+                          {isCreditActive && (
+                            <td className="lg:hidden py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-emerald-600">
+                              ₹ {item.credit.toLocaleString('en-IN')}
+                            </td>
                           )}
-                        </td>
+                        </>
                       )}
 
                       {/* DESKTOP-ONLY: Expanded Columns when Credit is Active (lg:) */}
                       {isCreditActive && (
-                        <>
-                          <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold text-emerald-700">
-                            {item.cashAmount > 0 ? `₹ ${item.cashAmount.toLocaleString('en-IN')}` : '₹ 0'}
-                          </td>
-                          <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold text-blue-700">
-                            {item.upiAmount > 0 ? `₹ ${item.upiAmount.toLocaleString('en-IN')}` : '₹ 0'}
-                          </td>
-                          <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-black text-slate-800 bg-slate-50/50">
-                            ₹ {((item.cashAmount || 0) + (item.upiAmount || 0) || item.credit || 0).toLocaleString('en-IN')}
-                          </td>
-                          <td className={`hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold ${item.pending > 0 ? 'text-amber-600 bg-amber-50/30' : 'text-slate-400'}`}>
-                            {item.pending > 0 ? `₹ ${item.pending.toLocaleString('en-IN')}` : '₹ 0'}
-                          </td>
-                          <td className={`hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold ${item.od > 0 ? 'text-rose-600 bg-rose-50/30' : 'text-slate-400'}`}>
-                            {item.od > 0 ? `₹ ${item.od.toLocaleString('en-IN')}` : '₹ 0'}
-                          </td>
-                        </>
+                        item.isBounced ? (
+                          <>
+                            <td colSpan={3} className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center">
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-600 border border-rose-200 uppercase tracking-wider inline-block">
+                                BOUNCED
+                              </span>
+                            </td>
+                            <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold text-slate-400">
+                              ₹ 0
+                            </td>
+                            <td className={`hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold ${item.od > 0 ? 'text-rose-600 bg-rose-50/30' : 'text-slate-400'}`}>
+                              {item.od > 0 ? `₹ ${item.od.toLocaleString('en-IN')}` : '₹ 0'}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold text-emerald-700">
+                              {item.cashAmount > 0 ? `₹ ${item.cashAmount.toLocaleString('en-IN')}` : '₹ 0'}
+                            </td>
+                            <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold text-blue-700">
+                              {item.upiAmount > 0 ? `₹ ${item.upiAmount.toLocaleString('en-IN')}` : '₹ 0'}
+                            </td>
+                            <td className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-black text-slate-800 bg-slate-50/50">
+                              ₹ {((item.cashAmount || 0) + (item.upiAmount || 0) || item.credit || 0).toLocaleString('en-IN')}
+                            </td>
+                            <td className={`hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold ${item.pending > 0 ? 'text-amber-600 bg-amber-50/30' : 'text-slate-400'}`}>
+                              {item.pending > 0 ? `₹ ${item.pending.toLocaleString('en-IN')}` : '₹ 0'}
+                            </td>
+                            <td className={`hidden lg:table-cell py-3 px-3 xl:px-4 text-center font-bold ${item.od > 0 ? 'text-rose-600 bg-rose-50/30' : 'text-slate-400'}`}>
+                              {item.od > 0 ? `₹ ${item.od.toLocaleString('en-IN')}` : '₹ 0'}
+                            </td>
+                          </>
+                        )
                       )}
 
                       {/* DESKTOP-ONLY: Mode Data Cell when Debit-Only is Active */}
                       {!isCreditActive && isDebitActive && (
-                        <td className="hidden lg:table-cell py-3 px-4 text-center font-semibold text-slate-600">
-                          {item.mode}
-                        </td>
+                        item.isBounced ? (
+                          <td colSpan={2} className="hidden lg:table-cell py-3 px-4 text-center">
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-600 border border-rose-200 uppercase tracking-wider inline-block">
+                              BOUNCED
+                            </span>
+                          </td>
+                        ) : (
+                          <td className="hidden lg:table-cell py-3 px-4 text-center font-semibold text-slate-600">
+                            {item.mode}
+                          </td>
+                        )
                       )}
 
                       {/* Debit Data Cell */}
                       {isDebitActive && (
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-rose-600">
-                          ₹ {item.debit.toLocaleString('en-IN')}
-                        </td>
+                        item.isBounced ? (
+                          !isCreditActive ? null : (
+                            <td className="hidden lg:table-cell py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-slate-300">
+                              -
+                            </td>
+                          )
+                        ) : (
+                          <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-bold text-rose-600">
+                            ₹ {item.debit.toLocaleString('en-IN')}
+                          </td>
+                        )
                       )}
                     </tr>
                   ))}
