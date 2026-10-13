@@ -1915,7 +1915,10 @@ function App() {
               activeBranch={activeBranch}
               onBranchChange={handleBranchSwitch}
               onAddBranch={() => setIsAddBranchModalOpen(true)}
-              onEditBranch={() => setIsEditBranchModalOpen(true)}
+              onEditBranch={(targetBranch) => {
+                if (targetBranch && targetBranch.id) setActiveBranch(targetBranch);
+                setIsEditBranchModalOpen(true);
+              }}
               userProfile={userProfile}
               isCollectionReportOpen={isCollectionReportOpen}
             />
@@ -1928,7 +1931,10 @@ function App() {
               activeBranch={activeBranch}
               onBranchChange={handleBranchSwitch}
               onAddBranch={() => setIsAddBranchModalOpen(true)}
-              onEditBranch={() => setIsEditBranchModalOpen(true)}
+              onEditBranch={(targetBranch) => {
+                if (targetBranch && targetBranch.id) setActiveBranch(targetBranch);
+                setIsEditBranchModalOpen(true);
+              }}
               userProfile={userProfile}
             />
             <div className="flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] max-w-4xl mx-auto md:max-w-none md:mx-0 overflow-hidden">

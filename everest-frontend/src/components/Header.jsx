@@ -127,13 +127,10 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
                                     type="button"
                                     title={`Edit ${branchName}`}
                                     onClick={(e) => {
-                                      e.stopPropagation(); // Prevent closing dropdown without opening modal
+                                      e.stopPropagation();
                                       setIsBranchDropdownOpen(false);
-                                      onEditBranch?.(b); // Assuming we pass the full branch or we could fallback to App updating activeBranch before modal opens. Wait, App expects to edit activeBranch. So we should probably set it to active branch first! No, onEditBranch might not take params. Oh, App.jsx `onEditBranch` takes no params and edits `activeBranch`.
-                                      onBranchChange?.(b); // Set as active branch so App.jsx edits the right one!
-                                      setTimeout(() => {
-                                        onEditBranch?.();
-                                      }, 0);
+                                      onBranchChange?.(b);
+                                      onEditBranch?.(b);
                                     }}
                                     className="p-1.5 text-slate-400 hover:text-brand-blue hover:bg-blue-50 rounded transition-colors ml-2 flex-shrink-0"
                                   >
