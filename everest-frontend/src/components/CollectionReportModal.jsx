@@ -267,41 +267,6 @@ export default function CollectionReportModal({
     };
   }, [onClose]);
 
-  // CSV Export utility bound to header action
-  const handleDownloadCSV = () => {
-    if (!filteredData || filteredData.length === 0) {
-      alert('No transaction records to export for selected filters.');
-      return;
-    }
-    const headers = ['Date', 'Customer Name', 'Customer ID', 'Staff', 'Payment Mode', 'Credit (₹)', 'Debit (₹)', 'OD (₹)', 'Pending (₹)', 'Status'];
-    const rows = filteredData.map(item => [
-      `"${item.date || ''}"`,
-      `"${(item.name || '').replace(/"/g, '""')}"`,
-      `"${item.customerId || ''}"`,
-      `"${(item.staffName || item.assignedStaff || '').replace(/"/g, '""')}"`,
-      `"${item.mode || ''}"`,
-      item.credit || 0,
-      item.debit || 0,
-      item.od || 0,
-      item.pending || 0,
-      `"${item.status || 'SUCCESS'}"`
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Collection_Report_${fromDate || 'all'}_to_${toDate || 'all'}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  useEffect(() => {
-    window.handleDownloadCollectionReport = handleDownloadCSV;
-    return () => {
-      window.handleDownloadCollectionReport = null;
-    };
-  }, [filteredData, fromDate, toDate]);
 
   // Auto-close filter dropdown on click outside
   useEffect(() => {
@@ -1173,6 +1138,42 @@ export default function CollectionReportModal({
 
     return result;
   }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive, sortOrder, showBounced]);
+
+  // CSV Export utility bound to header action (defined safely after filteredData initialization)
+  const handleDownloadCSV = () => {
+    if (!filteredData || filteredData.length === 0) {
+      alert('No transaction records to export for selected filters.');
+      return;
+    }
+    const headers = ['Date', 'Customer Name', 'Customer ID', 'Staff', 'Payment Mode', 'Credit (₹)', 'Debit (₹)', 'OD (₹)', 'Pending (₹)', 'Status'];
+    const rows = filteredData.map(item => [
+      `"${item.date || ''}"`,
+      `"${(item.name || '').replace(/"/g, '""')}"`,
+      `"${item.customerId || ''}"`,
+      `"${(item.staffName || item.assignedStaff || '').replace(/"/g, '""')}"`,
+      `"${item.mode || ''}"`,
+      item.credit || 0,
+      item.debit || 0,
+      item.od || 0,
+      item.pending || 0,
+      `"${item.status || 'SUCCESS'}"`
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Collection_Report_${fromDate || 'all'}_to_${toDate || 'all'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  useEffect(() => {
+    window.handleDownloadCollectionReport = handleDownloadCSV;
+    return () => {
+      window.handleDownloadCollectionReport = null;
+    };
+  }, [filteredData, fromDate, toDate]);
 
   // Safely compute scoped pending, target, collection, and OD with default fallbacks
   const totalScopedTarget = Number(targetCollection || 0);
