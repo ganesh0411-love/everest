@@ -205,6 +205,9 @@ export default function CollectionReportModal({
   const [isCreditActive, setIsCreditActive] = useState(true);
   const [isDebitActive, setIsDebitActive] = useState(true);
 
+  // Optional Bounced row inclusion filter (default: hidden)
+  const [showBounced, setShowBounced] = useState(false);
+
   // Refs for Date inputs & Scroll
   const fromDateInputRef = useRef(null);
   const toDateInputRef = useRef(null);
@@ -214,6 +217,16 @@ export default function CollectionReportModal({
     if (isOpen && tableScrollRef.current) {
       tableScrollRef.current.scrollTop = 0;
     }
+  }, [isOpen]);
+
+  // Body scroll-lock: apply on open, strictly restore on unmount / close
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+    };
   }, [isOpen]);
 
   // Auto-close filter dropdown on click outside
@@ -1049,9 +1062,11 @@ export default function CollectionReportModal({
 
       let matchesType = false;
       if (isCreditActive && isDebitActive) {
-        matchesType = item.credit > 0 || item.debit > 0 || item.isBounced || item.od > 0;
+        matchesType = (item.credit > 0 || item.debit > 0 || item.od > 0) ||
+                      (item.isBounced && showBounced);
       } else if (isCreditActive) {
-        matchesType = item.credit > 0 || item.isBounced || item.od > 0;
+        matchesType = (item.credit > 0 || item.od > 0) ||
+                      (item.isBounced && showBounced);
       } else if (isDebitActive) {
         matchesType = item.debit > 0;
       } else {
@@ -1071,7 +1086,7 @@ export default function CollectionReportModal({
     });
 
     return result;
-  }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive, sortOrder]);
+  }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive, sortOrder, showBounced]);
 
   // Safely compute scoped pending, target, collection, and OD with default fallbacks
   const totalScopedTarget = Number(targetCollection || 0);
@@ -1367,7 +1382,7 @@ export default function CollectionReportModal({
             )}
           </div>
 
-          {/* Credit & Debit Action Pills */}
+          {/* Credit, Debit & Bounced Action Pills */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 h-10">
             <button
               onClick={() => setIsCreditActive((prev) => !prev)}
@@ -1395,6 +1410,29 @@ export default function CollectionReportModal({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
               </svg>
               <span>Debit</span>
+            </button>
+
+            {/* Optional Bounced Checkbox Filter */}
+            <button
+              onClick={() => setShowBounced((prev) => !prev)}
+              title={showBounced ? 'Hide bounced rows' : 'Show bounced rows'}
+              className={`rounded-xl px-2 sm:px-2.5 h-full flex items-center gap-1 font-semibold text-[11px] transition-all cursor-pointer border select-none shrink-0 ${
+                showBounced
+                  ? 'bg-rose-50 text-rose-600 border-rose-300 shadow-xs'
+                  : 'bg-slate-100 text-slate-400 border-slate-200/80 hover:opacity-80'
+              }`}
+            >
+              {/* Tiny checkbox visual */}
+              <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all ${
+                showBounced ? 'bg-rose-500 border-rose-500' : 'bg-white border-slate-300'
+              }`}>
+                {showBounced && (
+                  <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                    <path d="M1.5 5.5L4 8L8.5 2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </span>
+              <span>Bounced</span>
             </button>
           </div>
         </div>
