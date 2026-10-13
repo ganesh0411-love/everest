@@ -177,7 +177,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
           )}
 
         <div className="flex items-center gap-2 relative" ref={menuRef}>
-            {/* Header Action: Download Icon on Desktop when Collection Report is open */}
+            {/* Header Action: Download Icon when Collection Report is open */}
             {isCollectionReportOpen && (
               <button
                 type="button"
@@ -187,7 +187,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
                   }
                 }}
                 title="Download Report"
-                className="hidden md:flex w-9 h-9 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition cursor-pointer shrink-0"
+                className="flex w-9 h-9 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition cursor-pointer shrink-0"
               >
                 <Download className="w-4 h-4" />
               </button>

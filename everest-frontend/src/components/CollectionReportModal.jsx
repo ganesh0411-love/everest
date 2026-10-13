@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, AlertTriangle } from 'lucide-react';
+import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, AlertTriangle, Download } from 'lucide-react';
+import CollectionReportDownloadModal from './CollectionReportDownloadModal';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 
@@ -207,6 +208,9 @@ export default function CollectionReportModal({
 
   // Optional Bounced row inclusion filter (default: hidden)
   const [showBounced, setShowBounced] = useState(false);
+
+  // Statement Download Modal state
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   // Refs for Date inputs & Scroll
   const fromDateInputRef = useRef(null);
@@ -943,6 +947,8 @@ export default function CollectionReportModal({
               debit: 0,
               pending: 0,
               od: rowOd,
+              loanType: cust.loanType || cust.scheme || cust.category || 'Microfinance',
+              disbursementAmount: Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0),
               date: instDate,
               timeStr: inst.timeStr || inst.time || '',
               createdAt: inst.createdAt || instDate
@@ -1020,6 +1026,8 @@ export default function CollectionReportModal({
               debit: Number(cust.debit || 0),
               pending: rowPending,
               od: rowOd,
+              loanType: cust.loanType || cust.scheme || cust.category || 'Microfinance',
+              disbursementAmount: Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0),
               date: instDate,
               timeStr: inst.timeStr || inst.time || '',
               createdAt: inst.createdAt || inst.date
@@ -1054,6 +1062,8 @@ export default function CollectionReportModal({
             debit: disbAmount,
             pending: 0,
             od: 0,
+            loanType: cust.loanType || cust.scheme || cust.category || 'Microfinance',
+            disbursementAmount: disbAmount,
             date: disbDate,
             timeStr: cust.timeStr || '',
             createdAt: disbDate
@@ -1169,11 +1179,11 @@ export default function CollectionReportModal({
   };
 
   useEffect(() => {
-    window.handleDownloadCollectionReport = handleDownloadCSV;
+    window.handleDownloadCollectionReport = () => setIsDownloadModalOpen(true);
     return () => {
       window.handleDownloadCollectionReport = null;
     };
-  }, [filteredData, fromDate, toDate]);
+  }, []);
 
   // Safely compute scoped pending, target, collection, and OD with default fallbacks
   const totalScopedTarget = Number(targetCollection || 0);
@@ -1365,6 +1375,16 @@ export default function CollectionReportModal({
               </div>
             )}
           </div>
+
+          {/* Statement Download Action Button */}
+          <button
+            type="button"
+            onClick={() => setIsDownloadModalOpen(true)}
+            title="Download Account Statement"
+            className="w-[38px] h-[38px] rounded-xl bg-white border border-slate-200/90 flex items-center justify-center text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer"
+          >
+            <Download className="w-4 h-4 stroke-[2.2]" />
+          </button>
         </div>
 
         {/* LINE 2: Search Input & Action Badges (Side-by-Side in 1 Horizontal Row) */}
@@ -1943,6 +1963,25 @@ export default function CollectionReportModal({
           </table>
         </div>
       </div>
+
+      {/* Statement Download & PDF Modal */}
+      <CollectionReportDownloadModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        activeBranch={activeBranch}
+        branches={branches}
+        fromDate={fromDate}
+        toDate={toDate}
+        data={filteredData}
+        targetCollection={totalScopedTarget}
+        totalCollection={totalCollection}
+        onlineCollection={onlineCollection}
+        cashCollection={cashCollection}
+        totalScopedPending={totalScopedPending}
+        totalScopedOverdue={totalScopedOD}
+        totalDisbursement={totalDisbursement}
+        initialIncludeBounced={showBounced}
+      />
 
     </div>
   );
