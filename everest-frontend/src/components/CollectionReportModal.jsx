@@ -252,6 +252,57 @@ export default function CollectionReportModal({
     };
   }, []);
 
+  // Explicit close handler with immediate scroll lock release
+  const handleClose = () => {
+    restoreBodyScroll();
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    window.handleCloseCollectionReport = handleClose;
+    return () => {
+      window.handleCloseCollectionReport = null;
+    };
+  }, [onClose]);
+
+  // CSV Export utility bound to header action
+  const handleDownloadCSV = () => {
+    if (!filteredData || filteredData.length === 0) {
+      alert('No transaction records to export for selected filters.');
+      return;
+    }
+    const headers = ['Date', 'Customer Name', 'Customer ID', 'Staff', 'Payment Mode', 'Credit (₹)', 'Debit (₹)', 'OD (₹)', 'Pending (₹)', 'Status'];
+    const rows = filteredData.map(item => [
+      `"${item.date || ''}"`,
+      `"${(item.name || '').replace(/"/g, '""')}"`,
+      `"${item.customerId || ''}"`,
+      `"${(item.staffName || item.assignedStaff || '').replace(/"/g, '""')}"`,
+      `"${item.mode || ''}"`,
+      item.credit || 0,
+      item.debit || 0,
+      item.od || 0,
+      item.pending || 0,
+      `"${item.status || 'SUCCESS'}"`
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Collection_Report_${fromDate || 'all'}_to_${toDate || 'all'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  useEffect(() => {
+    window.handleDownloadCollectionReport = handleDownloadCSV;
+    return () => {
+      window.handleDownloadCollectionReport = null;
+    };
+  }, [filteredData, fromDate, toDate]);
+
   // Auto-close filter dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1084,7 +1135,13 @@ export default function CollectionReportModal({
       }
 
       // 1. Strict Bounced Filter: If unchecked, completely exclude bounced records
-      const isBouncedRow = item.status === 'BOUNCED' || item.isBounced || String(item.mode).toUpperCase() === 'BOUNCED';
+      const isBouncedRow = Boolean(
+        item.isBounced || 
+        item.status === 'BOUNCED' || 
+        String(item.mode || '').toUpperCase() === 'BOUNCED' ||
+        String(item.status || '').toUpperCase().includes('BOUNCE') ||
+        String(item.mode || '').toUpperCase().includes('BOUNCE')
+      );
       if (!showBounced && isBouncedRow) {
         return false;
       }
@@ -1203,6 +1260,20 @@ export default function CollectionReportModal({
         
         {/* LINE 1: Date Range & Period (Side-by-Side in 1 Horizontal Row) */}
         <div className="flex items-center gap-1.5 sm:gap-2 w-full shrink-0">
+          {/* Back / Close Action Button */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={handleClose}
+              title="Back to Dashboard"
+              className="w-[38px] h-[38px] rounded-xl bg-white border border-slate-200/90 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-50 active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+              </svg>
+            </button>
+          )}
+
           {/* From Date */}
           <div 
             onClick={() => {

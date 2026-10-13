@@ -184,7 +184,11 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             {isCollectionReportOpen && (
               <button
                 type="button"
-                onClick={() => {}}
+                onClick={() => {
+                  if (typeof window.handleDownloadCollectionReport === 'function') {
+                    window.handleDownloadCollectionReport();
+                  }
+                }}
                 title="Download Report"
                 className="hidden md:flex w-9 h-9 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition cursor-pointer shrink-0"
               >
@@ -316,7 +320,11 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             </h1>
             <button
               type="button"
-              onClick={() => {}}
+              onClick={() => {
+                if (typeof window.handleDownloadCollectionReport === 'function') {
+                  window.handleDownloadCollectionReport();
+                }
+              }}
               title="Download Report"
               className="absolute right-0 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition cursor-pointer"
             >
