@@ -1524,29 +1524,23 @@ export default function CollectionReportModal({
             </div>
           ) : (
             /* Case C: Card 1 = Collection */
-            <div className="flex-1 flex items-center justify-between gap-2 pr-2 sm:pr-3 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
-                  <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
-                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 whitespace-nowrap">
-                    ₹ {totalCollection.toLocaleString('en-IN')}
-                  </span>
-                </div>
+            <div className="flex-1 flex items-center gap-1 pr-2 sm:pr-3 min-w-0 overflow-hidden">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
+                <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
               </div>
-              {/* UPI & Cash Breakdown (Clean, Non-overlapping Dot Rows) */}
-              <div className="flex flex-col justify-center text-[9px] sm:text-[10px] leading-tight space-y-0.5 ml-auto shrink-0 border-l border-sky-200/70 pl-2">
-                <div className="flex items-center gap-1 whitespace-nowrap">
+              <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                  ₹ {totalCollection.toLocaleString('en-IN')}
+                </span>
+                {/* UPI & Cash Breakdown (compact stacked rows, truncates gracefully) */}
+                <div className="flex items-center gap-1 mt-0.5 min-w-0 overflow-hidden">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                  <span className="text-slate-500 font-medium">UPI:</span>
-                  <span className="font-bold text-blue-700">₹{onlineCollection.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex items-center gap-1 whitespace-nowrap">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                  <span className="text-slate-500 font-medium">Cash:</span>
-                  <span className="font-bold text-emerald-700">₹{cashCollection.toLocaleString('en-IN')}</span>
+                  <span className="text-[8px] sm:text-[9px] text-slate-400 font-medium shrink-0">UPI:</span>
+                  <span className="text-[8px] sm:text-[9px] font-bold text-blue-700 truncate">₹{onlineCollection.toLocaleString('en-IN')}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 ml-1"></span>
+                  <span className="text-[8px] sm:text-[9px] text-slate-400 font-medium shrink-0">Cash:</span>
+                  <span className="text-[8px] sm:text-[9px] font-bold text-emerald-700 truncate">₹{cashCollection.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -1555,29 +1549,23 @@ export default function CollectionReportModal({
           {/* Card 2 (Right 50%) */}
           {isCreditActive && !isDebitActive ? (
             /* Case A: Card 2 = Collection */
-            <div className="flex-1 flex items-center justify-between gap-2 pl-2 sm:pl-3 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
-                  <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
-                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 whitespace-nowrap">
-                    ₹ {totalCollection.toLocaleString('en-IN')}
-                  </span>
-                </div>
+            <div className="flex-1 flex items-center gap-1 pl-2 sm:pl-3 min-w-0 overflow-hidden">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0">
+                <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
               </div>
-              {/* UPI & Cash Breakdown */}
-              <div className="flex flex-col justify-center text-[9px] sm:text-[10px] leading-tight space-y-0.5 ml-auto shrink-0 border-l border-sky-200/70 pl-2">
-                <div className="flex items-center gap-1 whitespace-nowrap">
+              <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                <span className="text-[9px] sm:text-[10px] font-medium text-slate-500 leading-none">Collection</span>
+                <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight mt-0.5 truncate">
+                  ₹ {totalCollection.toLocaleString('en-IN')}
+                </span>
+                {/* UPI & Cash Breakdown (compact stacked rows, truncates gracefully) */}
+                <div className="flex items-center gap-1 mt-0.5 min-w-0 overflow-hidden">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                  <span className="text-slate-500 font-medium">UPI:</span>
-                  <span className="font-bold text-blue-700">₹{onlineCollection.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex items-center gap-1 whitespace-nowrap">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                  <span className="text-slate-500 font-medium">Cash:</span>
-                  <span className="font-bold text-emerald-700">₹{cashCollection.toLocaleString('en-IN')}</span>
+                  <span className="text-[8px] sm:text-[9px] text-slate-400 font-medium shrink-0">UPI:</span>
+                  <span className="text-[8px] sm:text-[9px] font-bold text-blue-700 truncate">₹{onlineCollection.toLocaleString('en-IN')}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 ml-1"></span>
+                  <span className="text-[8px] sm:text-[9px] text-slate-400 font-medium shrink-0">Cash:</span>
+                  <span className="text-[8px] sm:text-[9px] font-bold text-emerald-700 truncate">₹{cashCollection.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -1689,7 +1677,7 @@ export default function CollectionReportModal({
                           colSpan={isCreditActive && isDebitActive ? 2 : (isCreditActive && !isDebitActive ? 2 : 1)} 
                           className="lg:hidden py-2.5 sm:py-3 px-3 sm:px-4 text-center"
                         >
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-600 border border-rose-200 uppercase tracking-wider inline-block">
+                          <span className="text-[11px] sm:text-xs font-semibold text-rose-500 tracking-wide uppercase">
                             BOUNCED
                           </span>
                         </td>
@@ -1733,7 +1721,7 @@ export default function CollectionReportModal({
                         item.isBounced ? (
                           <>
                             <td colSpan={3} className="hidden lg:table-cell py-3 px-3 xl:px-4 text-center">
-                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-600 border border-rose-200 uppercase tracking-wider inline-block">
+                              <span className="text-[11px] sm:text-xs font-semibold text-rose-500 tracking-wide uppercase">
                                 BOUNCED
                               </span>
                             </td>
@@ -1769,7 +1757,7 @@ export default function CollectionReportModal({
                       {!isCreditActive && isDebitActive && (
                         item.isBounced ? (
                           <td colSpan={2} className="hidden lg:table-cell py-3 px-4 text-center">
-                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-600 border border-rose-200 uppercase tracking-wider inline-block">
+                            <span className="text-[11px] sm:text-xs font-semibold text-rose-500 tracking-wide uppercase">
                               BOUNCED
                             </span>
                           </td>
