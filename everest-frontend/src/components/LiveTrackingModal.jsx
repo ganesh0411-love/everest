@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { MapPin, Loader2 } from 'lucide-react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { MapPin, Loader2, AlertCircle } from 'lucide-react';
+import { loadGoogleMaps } from '../utils/googleMapsLoader';
 
 function getRelativeTime(isoStringOrTimestamp) {
   if (!isoStringOrTimestamp) return 'Unknown';
@@ -35,12 +34,147 @@ function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+const motorbikeSvg = `
+  <style>
+    .nav-bike-rider-marker {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    .stationary-radar {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 80px;
+      height: 80px;
+      margin-top: -40px;
+      margin-left: -40px;
+      background: rgba(37, 99, 235, 0.35);
+      border-radius: 50%;
+      animation: radar-pulse 2.5s infinite ease-out;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      z-index: -1;
+    }
+    @keyframes radar-pulse {
+      0% { transform: scale(0.3); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+  </style>
+  <div style="position: relative;">
+    <div class="stationary-radar"></div>
+    <div class="bike-icon-wrapper" style="
+      width: 36px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(0deg);
+      transition: transform 0.3s ease-out;
+      will-change: transform;
+    ">
+      <svg width="36" height="60" viewBox="0 0 36 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Top-down motorcycle body, handlebars, rider helmet & jacket -->
+        <ellipse cx="18" cy="10" rx="3.5" ry="9" fill="#1e293b" />
+        <rect x="15" y="14" width="6" height="22" rx="3" fill="#eab308" />
+        <ellipse cx="18" cy="48" rx="4" ry="10" fill="#0f172a" />
+        <path d="M6 19 L30 19" stroke="#334155" stroke-width="3" stroke-linecap="round" />
+        <circle cx="6" cy="19" r="2.5" fill="#f8fafc" />
+        <circle cx="30" cy="19" r="2.5" fill="#f8fafc" />
+        <ellipse cx="18" cy="27" rx="8" ry="6" fill="#3b82f6" />
+        <circle cx="18" cy="24" r="6" fill="#f8fafc" stroke="#0284c7" stroke-width="1.5" />
+        <path d="M15 22 Q18 20 21 22" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />
+      </svg>
+    </div>
+  </div>`;
+
+function createRiderOverlayClass() {
+  if (typeof window === 'undefined' || !window.google?.maps?.OverlayView) return null;
+
+  return class RiderOverlay extends window.google.maps.OverlayView {
+    constructor(map, position) {
+      super();
+      this.position = position ? new window.google.maps.LatLng(position.lat, position.lng) : null;
+      this.heading = 0;
+      this.speed = 0;
+      this.div = null;
+      this.setMap(map);
+    }
+
+    onAdd() {
+      this.div = document.createElement('div');
+      this.div.style.position = 'absolute';
+      this.div.style.cursor = 'pointer';
+      this.div.style.zIndex = '1000';
+      this.div.style.userSelect = 'none';
+      this.div.innerHTML = motorbikeSvg;
+      const panes = this.getPanes();
+      if (panes?.overlayMouseTarget) {
+        panes.overlayMouseTarget.appendChild(this.div);
+      }
+    }
+
+    draw() {
+      if (!this.div || !this.position) return;
+      const overlayProjection = this.getProjection();
+      if (!overlayProjection) return;
+      const point = overlayProjection.fromLatLngToDivPixel(this.position);
+      if (point) {
+        this.div.style.left = `${point.x - 18}px`;
+        this.div.style.top = `${point.y - 30}px`;
+      }
+    }
+
+    setPosition(lat, lng, heading = 0, speed = 0) {
+      this.position = new window.google.maps.LatLng(lat, lng);
+      this.heading = heading;
+      this.speed = speed;
+      if (this.div) {
+        const wrapper = this.div.querySelector('.bike-icon-wrapper');
+        if (wrapper) wrapper.style.transform = `rotate(${heading}deg)`;
+        const radar = this.div.querySelector('.stationary-radar');
+        if (radar) radar.style.opacity = speed < 5 ? '1' : '0';
+      }
+      this.draw();
+    }
+
+    onRemove() {
+      if (this.div && this.div.parentNode) {
+        this.div.parentNode.removeChild(this.div);
+        this.div = null;
+      }
+    }
+  };
+}
+
 export default function LiveTrackingModal({ staffId, staffName, onClose, initialMode = 'current' }) {
-  const [mapLayer, setMapLayer] = useState('street'); // 'street' | 'satellite'
+  const [mapLayer, setMapLayer] = useState('satellite'); // 'street' (roadmap) | 'satellite' (hybrid)
   const [trackingData, setTrackingData] = useState(null);
   const [liveLocationData, setLiveLocationData] = useState(null);
   const [isLiveActive, setIsLiveActive] = useState(initialMode === 'live');
   const [loading, setLoading] = useState(true);
+
+  // Google Maps Loading & Error State Guard
+  const [mapsLoaded, setMapsLoaded] = useState(Boolean(typeof window !== 'undefined' && window.google?.maps));
+  const [mapsError, setMapsError] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (window.google?.maps) {
+      setMapsLoaded(true);
+      return;
+    }
+    loadGoogleMaps()
+      .then(() => {
+        if (isMounted) setMapsLoaded(true);
+      })
+      .catch((err) => {
+        console.warn('Google Maps Script Load Error:', err);
+        if (isMounted) setMapsError(err);
+      });
+    return () => { isMounted = false; };
+  }, []);
   
   // 3-Tier Viewport State ('normal' | 'workspace' | 'fullscreen')
   const [modalViewMode, setModalViewMode] = useState('normal');
@@ -54,12 +188,19 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   };
 
   useEffect(() => {
-    if (!mapInstance.current) return;
+    if (!mapInstance.current || !window.google?.maps) return;
     const t1 = setTimeout(() => {
-      if (mapInstance.current) mapInstance.current.invalidateSize();
+      if (mapInstance.current && window.google?.maps) {
+        window.google.maps.event.trigger(mapInstance.current, 'resize');
+        if (animCurrentPosRef.current) {
+          mapInstance.current.panTo(animCurrentPosRef.current);
+        }
+      }
     }, 100);
     const t2 = setTimeout(() => {
-      if (mapInstance.current) mapInstance.current.invalidateSize();
+      if (mapInstance.current && window.google?.maps) {
+        window.google.maps.event.trigger(mapInstance.current, 'resize');
+      }
     }, 300);
     return () => {
       clearTimeout(t1);
@@ -78,13 +219,11 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   const handleRecenter = () => {
     setIsFollowMode(true);
     isFollowModeRef.current = true;
-    let targetLat = animCurrentPosRef.current?.lat || loc?.lat;
-    let targetLng = animCurrentPosRef.current?.lng || loc?.lng;
+    const targetLat = animCurrentPosRef.current?.lat || loc?.lat;
+    const targetLng = animCurrentPosRef.current?.lng || loc?.lng;
     if (targetLat && targetLng && mapInstance.current) {
-      mapInstance.current.flyTo([targetLat, targetLng], 18, {
-        animate: true,
-        duration: 1
-      });
+      mapInstance.current.panTo({ lat: targetLat, lng: targetLng });
+      mapInstance.current.setZoom(18);
     }
   };
 
@@ -92,25 +231,26 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     if (!mapInstance.current) return;
     setIsFollowMode(false);
     isFollowModeRef.current = false;
-    mapInstance.current.panBy([dx, dy], { animate: true, duration: 0.25 });
+    mapInstance.current.panBy(dx, dy);
   };
 
   const handleZoomIn = () => {
     if (!mapInstance.current) return;
-    mapInstance.current.zoomIn(1);
+    const currentZoom = mapInstance.current.getZoom() || 17;
+    mapInstance.current.setZoom(currentZoom + 1);
   };
 
   const handleZoomOut = () => {
     if (!mapInstance.current) return;
-    mapInstance.current.zoomOut(1);
+    const currentZoom = mapInstance.current.getZoom() || 17;
+    mapInstance.current.setZoom(currentZoom - 1);
   };
 
   // Map Refs
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
-  const markerRef = useRef(null);
+  const riderOverlayRef = useRef(null);
   const polylineRef = useRef(null);
-  const tileLayerRef = useRef(null);
   const routeTrailRef = useRef([]);
   const sessionStartTimeRef = useRef(initialMode === 'live' ? Date.now() : null);
   const lastAcceptedTimeRef = useRef(initialMode === 'live' ? Date.now() : 0);
@@ -120,6 +260,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   const animFrameRef = useRef(null);
   
   const [uiSpeed, setUiSpeed] = useState(0);
+
   useEffect(() => {
     if (!staffId) return;
 
@@ -205,127 +346,62 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     };
   }, [staffId, isLiveActive]);
 
-  // 1. Map Initialization (Run Once when loaded)
+  // 1. Google Maps Initialization (Satellite Hybrid & 3D Tilt Configuration)
   useEffect(() => {
-    if (loading || !mapRef.current || mapInstance.current) return;
+    if (loading || !mapsLoaded || !mapRef.current || mapInstance.current || !window.google?.maps) return;
     
-    mapInstance.current = L.map(mapRef.current, {
-      zoomControl: false,
-      attributionControl: false
-    }).setView([0, 0], 17);
+    const RiderOverlayClass = createRiderOverlayClass();
 
-    mapInstance.current.on('dragstart', () => {
+    // Field-tuned Map Options per requirement:
+    const mapOptions = {
+      mapTypeId: mapLayer === 'street' ? 'roadmap' : 'hybrid', // Combines crisp satellite photography with clear survey/road vectors
+      zoomControl: true,
+      streetViewControl: false,
+      mapTypeControl: true, // Allows field officer to toggle Satellite / Road / Terrain
+      fullscreenControl: true,
+      tilt: 45 // Enables 3D tilt perspective where high-res imagery is available
+    };
+
+    const initialCenter = animCurrentPosRef.current || (loc?.lat ? { lat: loc.lat, lng: loc.lng } : { lat: 10.3673, lng: 77.9803 });
+
+    mapInstance.current = new window.google.maps.Map(mapRef.current, {
+      ...mapOptions,
+      center: initialCenter,
+      zoom: 17
+    });
+
+    mapInstance.current.addListener('dragstart', () => {
       setIsFollowMode(false);
       isFollowModeRef.current = false;
     });
 
-    const motorbikeSvg = `
-      <style>
-        .nav-bike-rider-marker {
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-        }
-        .glowing-polyline {
-          filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.8));
-        }
-        .stationary-radar {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: 80px;
-          height: 80px;
-          margin-top: -40px;
-          margin-left: -40px;
-          background: rgba(59, 130, 246, 0.35);
-          border-radius: 50%;
-          animation: radar-pulse 2.5s infinite ease-out;
-          pointer-events: none;
-          opacity: 0;
-          transition: opacity 0.5s ease;
-          z-index: -1;
-        }
-        @keyframes radar-pulse {
-          0% { transform: scale(0.3); opacity: 1; }
-          100% { transform: scale(1.5); opacity: 0; }
-        }
-      </style>
-      <div style="position: relative;">
-        <div class="stationary-radar"></div>
-        <div class="bike-icon-wrapper" style="
-          width: 36px;
-          height: 60px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transform: rotate(0deg);
-          transition: transform 0.3s ease-out;
-          will-change: transform;
-        ">
-          <svg width="36" height="60" viewBox="0 0 36 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <!-- Top-down motorcycle body, handlebars, rider helmet & jacket -->
-            <ellipse cx="18" cy="10" rx="3.5" ry="9" fill="#1e293b" />
-            <rect x="15" y="14" width="6" height="22" rx="3" fill="#eab308" />
-            <ellipse cx="18" cy="48" rx="4" ry="10" fill="#0f172a" />
-            <path d="M6 19 L30 19" stroke="#334155" stroke-width="3" stroke-linecap="round" />
-            <circle cx="6" cy="19" r="2.5" fill="#f8fafc" />
-            <circle cx="30" cy="19" r="2.5" fill="#f8fafc" />
-            <ellipse cx="18" cy="27" rx="8" ry="6" fill="#3b82f6" />
-            <circle cx="18" cy="24" r="6" fill="#f8fafc" stroke="#0284c7" stroke-width="1.5" />
-            <path d="M15 22 Q18 20 21 22" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />
-          </svg>
-        </div>
-      </div>`;
-
-    const icon = L.divIcon({
-      html: motorbikeSvg,
-      className: 'nav-bike-rider-marker',
-      iconSize: [36, 60],
-      iconAnchor: [18, 30]
+    // Native Google Maps Polyline for live breadcrumb path
+    polylineRef.current = new window.google.maps.Polyline({
+      map: mapInstance.current,
+      path: [],
+      strokeColor: '#2563EB', // Requirement: strokeColor #2563EB
+      strokeWeight: 4,        // Requirement: strokeWeight 4
+      strokeOpacity: 0.9,
+      geodesic: true
     });
 
-    markerRef.current = L.marker([0, 0], { icon, opacity: 0 }).addTo(mapInstance.current);
-    polylineRef.current = L.polyline([], { 
-      color: '#0284c7', 
-      weight: 4, 
-      opacity: 0.8,
-      lineCap: 'round',
-      lineJoin: 'round',
-      className: 'glowing-polyline'
-    }).addTo(mapInstance.current);
+    if (RiderOverlayClass) {
+      riderOverlayRef.current = new RiderOverlayClass(mapInstance.current, initialCenter);
+    }
 
     setTimeout(() => {
-      if (mapInstance.current) {
-        mapInstance.current.invalidateSize();
+      if (mapInstance.current && window.google?.maps) {
+        window.google.maps.event.trigger(mapInstance.current, 'resize');
       }
     }, 200);
-  }, [loading]);
+  }, [loading, mapsLoaded]);
 
-  // 2. Tile Layer Update (Mapbox HD Vector Tiles & High-Res Satellite)
+  // 2. Map Layer Switcher (Hybrid Satellite vs High-Res Roadmap)
   useEffect(() => {
     if (!mapInstance.current) return;
-    
-    if (tileLayerRef.current) {
-      mapInstance.current.removeLayer(tileLayerRef.current);
-    }
-    
-    const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "pk.eyJ1IjoiOTY1OTAzMDE0NCIsImEiOiJjbXVyYWFmOHYwM3Q5MzJwb21hNmxidWhsIn0.1_yyUGCDI_FtaFykmOJojw";
-    
-    const isStreet = mapLayer === 'street';
-    // Request 512px retina tiles (@2x) for crisp HD satellite and vector rendering on mobile screens
-    const layerUrl = isStreet 
-      ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
-      : `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`;
-    
-    tileLayerRef.current = L.tileLayer(layerUrl, { 
-      tileSize: 512,
-      zoomOffset: -1,
-      maxNativeZoom: 19,
-      maxZoom: 20,
-      crossOrigin: true,
-      attribution: '© Mapbox © OpenStreetMap'
-    }).addTo(mapInstance.current);
-  }, [mapLayer, loading]);
+    const targetTypeId = mapLayer === 'street' ? 'roadmap' : 'hybrid';
+    mapInstance.current.setMapTypeId(targetTypeId);
+  }, [mapLayer]);
 
   // 3. Dynamic Telemetry Enqueue (No Flicker)
   useEffect(() => {
@@ -382,18 +458,22 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }
     
     const hasValidCoords = loc && typeof loc.lat === 'number' && typeof loc.lng === 'number' && (loc.lat !== 0 || loc.lng !== 0) && !isNaN(loc.lat) && !isNaN(loc.lng);
-    if (!hasValidCoords || !mapInstance.current || !markerRef.current) return;
+    if (!hasValidCoords || !mapInstance.current) return;
 
     if (!isLiveActive) {
         // Handle static offline viewing
         routeTrailRef.current = [];
         animQueueRef.current = [];
         animCurrentPosRef.current = null;
-        if (polylineRef.current) polylineRef.current.setLatLngs([]);
-        markerRef.current.setLatLng([loc.lat, loc.lng]);
-        markerRef.current.setOpacity(1);
-        mapInstance.current.setView([loc.lat, loc.lng], 17);
-        mapInstance.current.invalidateSize();
+        if (polylineRef.current) polylineRef.current.setPath([]);
+        if (riderOverlayRef.current) {
+          riderOverlayRef.current.setPosition(loc.lat, loc.lng, heading, 0);
+        }
+        mapInstance.current.setCenter({ lat: loc.lat, lng: loc.lng });
+        mapInstance.current.setZoom(17);
+        if (window.google?.maps) {
+          window.google.maps.event.trigger(mapInstance.current, 'resize');
+        }
         return;
     }
 
@@ -410,7 +490,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       else locTime = new Date(loc.updatedAt).getTime();
     }
 
-    // Strict Monotonic Timestamp Validation: Only accept incoming coordinates if incomingPoint.timestamp >= lastAcceptedPoint.timestamp
+    // Strict Monotonic Timestamp Validation
     if (isLiveActive && locTime > 0) {
       if (lastAcceptedTimeRef.current > 0 && locTime < lastAcceptedTimeRef.current) {
         console.warn('[Telemetry] Rejected out-of-order timestamp:', locTime, '<', lastAcceptedTimeRef.current);
@@ -431,15 +511,6 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
       currentSpeed = trackingData?.liveSession?.currentSpeed || 0;
       setUiSpeed(currentSpeed);
     }
-    
-    if (markerRef.current) {
-        markerRef.current.setOpacity(1);
-        const el = markerRef.current.getElement();
-        if (el) {
-            const radar = el.querySelector('.stationary-radar');
-            if (radar) radar.style.opacity = currentSpeed < 5 ? '1' : '0';
-        }
-    }
 
     const targetPoint = { lat: loc.lat, lng: loc.lng, heading };
 
@@ -458,18 +529,21 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             routeTrailRef.current = [[targetPoint.lat, targetPoint.lng]];
             animCurrentPosRef.current = { lat: targetPoint.lat, lng: targetPoint.lng, heading: targetPoint.heading };
         }
-        markerRef.current.setLatLng([animCurrentPosRef.current.lat, animCurrentPosRef.current.lng]);
-        markerRef.current.setOpacity(1);
-        if (polylineRef.current) polylineRef.current.setLatLngs(routeTrailRef.current);
-        mapInstance.current.setView([targetPoint.lat, targetPoint.lng], 17); // instant snap
-        mapInstance.current.invalidateSize();
+        
+        if (riderOverlayRef.current) {
+          riderOverlayRef.current.setPosition(animCurrentPosRef.current.lat, animCurrentPosRef.current.lng, animCurrentPosRef.current.heading, currentSpeed);
+        }
+        if (polylineRef.current && routeTrailRef.current.length > 0) {
+          polylineRef.current.setPath(routeTrailRef.current.map(p => ({ lat: p[0], lng: p[1] })));
+        }
+        mapInstance.current.setCenter({ lat: targetPoint.lat, lng: targetPoint.lng });
+        mapInstance.current.setZoom(17);
     } else {
-        // We are already initialized. Enqueue the new target if it's different and meaningful (> 4m distance).
+        // Enqueue the new target if it's different and meaningful (> 4m distance).
         const lastTarget = animQueueRef.current.length > 0 ? animQueueRef.current[animQueueRef.current.length - 1] : animCurrentPosRef.current;
         const dist = getDistanceFromLatLonInM(targetPoint.lat, targetPoint.lng, lastTarget.lat, lastTarget.lng);
         
         if (dist > 4.0) {
-            // Real-time stream: cap queue to prevent lagging behind on long trips
             if (animQueueRef.current.length > 2) {
                 animQueueRef.current = [animQueueRef.current[animQueueRef.current.length - 1]];
             }
@@ -495,11 +569,9 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
              animCurrentPosRef.current.progress = 0;
         }
 
-        // Cap maximum duration to prevent freezing, speed up if queue is building
         let duration = 2000;
         if (animQueueRef.current.length > 1) duration = 1000;
         
-        // Prevent delta spikes (e.g. tab backgrounded) from breaking progress
         const safeDelta = Math.min(delta, 100);
         animCurrentPosRef.current.progress += (safeDelta / duration);
         const progress = Math.min(1, animCurrentPosRef.current.progress);
@@ -519,23 +591,18 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         animCurrentPosRef.current.lng = newLng;
         animCurrentPosRef.current.heading = newHeading;
 
-        if (markerRef.current) {
-            markerRef.current.setLatLng([newLat, newLng]);
-            const el = markerRef.current.getElement();
-            if (el) {
-                const wrapper = el.querySelector('.bike-icon-wrapper');
-                if (wrapper) wrapper.style.transform = `rotate(${newHeading}deg)`;
-            }
+        if (riderOverlayRef.current) {
+          riderOverlayRef.current.setPosition(newLat, newLng, newHeading, uiSpeed);
         }
 
         if (isFollowModeRef.current && mapInstance.current) {
-            mapInstance.current.panTo([newLat, newLng], { animate: true, duration: 0.3 });
+          mapInstance.current.panTo({ lat: newLat, lng: newLng });
         }
 
         if (polylineRef.current && routeTrailRef.current.length > 0) {
-            const drawTrail = [...routeTrailRef.current];
-            drawTrail[drawTrail.length - 1] = [newLat, newLng];
-            polylineRef.current.setLatLngs(drawTrail);
+          const drawTrail = [...routeTrailRef.current];
+          drawTrail[drawTrail.length - 1] = [newLat, newLng];
+          polylineRef.current.setPath(drawTrail.map(p => ({ lat: p[0], lng: p[1] })));
         }
 
         if (progress >= 1) {
@@ -550,7 +617,6 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
                         const distPrevToLast = getDistanceFromLatLonInM(lastPt[0], lastPt[1], prevPt[0], prevPt[1]);
                         const distPrevToTarget = getDistanceFromLatLonInM(target.lat, target.lng, prevPt[0], prevPt[1]);
                         
-                        // Strict Forward Polyline Guard: push only if advancing forward along trajectory
                         if (distPrevToTarget >= distPrevToLast) {
                             routeTrailRef.current.push([target.lat, target.lng]);
                         } else {
@@ -576,15 +642,20 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isLiveActive]);
+  }, [isLiveActive, uiSpeed]);
 
-  // Destroy map instance on unmount
+  // Clean map instance on unmount
   useEffect(() => {
     return () => {
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
+      if (riderOverlayRef.current) {
+        riderOverlayRef.current.setMap(null);
+        riderOverlayRef.current = null;
       }
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+        polylineRef.current = null;
+      }
+      mapInstance.current = null;
     };
   }, []);
 
@@ -597,8 +668,6 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         forcePingAt: Date.now(),
         requestedAt: serverTimestamp()
       });
-      
-      // Auto clear loading spinner after 10s max if location doesn't update
       setTimeout(() => setIsPinging(false), 10000);
     } catch (e) {
       console.error(e);
@@ -630,13 +699,13 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
     }
     setIsLiveActive(true);
     try {
-      setUiSpeed(0.0); // Reset speed instantly
+      setUiSpeed(0.0);
       sessionStartTimeRef.current = Date.now();
       lastAcceptedTimeRef.current = Date.now();
-      routeTrailRef.current = []; // immediately purge the current coordinates array
+      routeTrailRef.current = [];
       animQueueRef.current = [];
       animCurrentPosRef.current = null;
-      if (polylineRef.current) polylineRef.current.setLatLngs([]);
+      if (polylineRef.current) polylineRef.current.setPath([]);
       
       await updateDoc(doc(db, 'staff_tracking', staffId), {
         isLiveTrackingActive: true,
@@ -644,8 +713,8 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
         lastAdminHeartbeat: Date.now(),
         liveSessionStartedAt: new Date().toISOString(),
         'liveSession.isActive': true,
-        'liveSession.routePath': [], // reset on new session
-        forcePingAt: Date.now() // Wake client immediately
+        'liveSession.routePath': [],
+        forcePingAt: Date.now()
       });
     } catch (e) {
       console.error(e);
@@ -753,13 +822,13 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             </span>
           </div>
 
-          {/* 2. Top-Right Floating Actions Cluster (Round Circular Buttons) - z-50 so Close button is always clickable above overlays */}
+          {/* 2. Top-Right Floating Actions Cluster (Round Circular Buttons) */}
           <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 pointer-events-auto">
-            {/* Layer Toggle */}
+            {/* Layer Toggle (Hybrid Satellite vs High-Res Road Map) */}
             <button 
               onClick={() => setMapLayer(prev => prev === 'street' ? 'satellite' : 'street')}
               className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-              title={mapLayer === 'street' ? 'Switch to Satellite View' : 'Switch to High-Res Street Map'}
+              title={mapLayer === 'street' ? 'Switch to Google Hybrid Satellite View' : 'Switch to Google Roadmap'}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
             </button>
@@ -814,7 +883,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
               )}
             </button>
 
-            {/* Close Button [ ✕ ] - Uses handleStopTracking to cleanly terminate session */}
+            {/* Close Button [ ✕ ] */}
             <button 
               onClick={handleStopTracking} 
               className="bg-white/90 backdrop-blur-md p-2.5 rounded-full shadow-md border border-slate-200 text-slate-700 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all flex items-center justify-center cursor-pointer pointer-events-auto"
@@ -833,7 +902,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
               </div>
               <h4 className="font-bold text-sm tracking-wide text-white">Acquiring live satellite signal...</h4>
               <p className="text-xs text-slate-300 mt-1 max-w-xs mb-4">
-                Connecting to handset background daemon. Coordinates will auto-center on road map immediately.
+                Connecting to handset background daemon. Coordinates will auto-center on Google hybrid map immediately.
               </p>
               <button 
                 onClick={handleStopTracking}
@@ -845,18 +914,38 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
             </div>
           )}
 
-          {/* Map Container */}
-          {loading ? (
-            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400 mb-2"></div>
-              <p>Loading location data...</p>
+          {/* Map Container with Google Maps Fallback & Error Guard */}
+          {mapsError ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-300 p-6 text-center">
+              <AlertCircle className="w-8 h-8 text-amber-400 mb-2" />
+              <p className="font-semibold text-sm">Google Maps Connection Warning</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                Awaiting Google Maps satellite stream connection.
+              </p>
+              <button
+                onClick={() => {
+                  setMapsError(null);
+                  loadGoogleMaps().then(() => setMapsLoaded(true)).catch(setMapsError);
+                }}
+                className="mt-3 px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-slate-700 cursor-pointer transition"
+              >
+                Retry Connection
+              </button>
+            </div>
+          ) : (!mapsLoaded || loading) ? (
+            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-900">
+              <div className="relative mb-3 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full border-4 border-sky-400/30 border-t-sky-400 animate-spin"></div>
+                <Loader2 className="w-5 h-5 text-sky-400 absolute animate-pulse" />
+              </div>
+              <p className="text-xs font-semibold text-slate-300">Loading Google Maps Hybrid Satellite...</p>
             </div>
           ) : loc?.lat && loc?.lng ? (
             <div ref={mapRef} className="w-full h-full z-0" style={{ isolation: 'isolate' }}></div>
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                <MapPin size={48} className="mb-2 opacity-30" />
-                <p>Awaiting staff mobile GPS signal</p>
+            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-900">
+              <MapPin size={48} className="mb-2 opacity-30 text-sky-400" />
+              <p>Awaiting staff mobile GPS signal</p>
             </div>
           )}
 
@@ -947,7 +1036,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
                 <button 
                   onClick={handleForcePing}
                   disabled={isPinging}
-                  className="px-4 py-2 bg-white/95 hover:bg-white text-slate-700 font-semibold text-xs rounded-full shadow-lg border border-slate-200/80 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-70"
+                  className="px-4 py-2 bg-white/95 hover:bg-white text-slate-700 font-semibold text-xs rounded-full shadow-lg border border-slate-200/80 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-70 cursor-pointer"
                 >
                   {isPinging ? (
                     <>
@@ -966,7 +1055,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
               ) : (
                 <button 
                   onClick={handleStopTracking}
-                  className="px-4 py-2 bg-red-600/90 hover:bg-red-600 text-white font-semibold text-xs rounded-full shadow-lg border border-red-500/50 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all"
+                  className="px-4 py-2 bg-red-600/90 hover:bg-red-600 text-white font-semibold text-xs rounded-full shadow-lg border border-red-500/50 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
                 >
                   <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                   Stop Live Tracking
@@ -982,7 +1071,7 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
                   window.open(url, '_blank');
                 }}
                 disabled={!loc?.lat}
-                className="px-4 py-2 bg-blue-600/90 hover:bg-blue-600 text-white font-semibold text-xs rounded-full shadow-lg border border-blue-500/50 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                className="px-4 py-2 bg-blue-600/90 hover:bg-blue-600 text-white font-semibold text-xs rounded-full shadow-lg border border-blue-500/50 backdrop-blur-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
                 Get Directions

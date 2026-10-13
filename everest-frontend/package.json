@@ -24,6 +24,7 @@
     "@capgo/capacitor-printer": "^8.0.14",
     "@imgly/background-removal": "^1.7.0",
     "@ionic/pwa-elements": "^3.4.0",
+    "@react-google-maps/api": "^2.20.8",
     "@supabase/supabase-js": "^2.106.2",
     "@turf/area": "^7.3.5",
     "@turf/helpers": "^7.3.5",
