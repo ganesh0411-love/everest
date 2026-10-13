@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, collection, writeBatch, query, where, getDocs } from 'firebase/firestore';
-import { Building2, X, Phone, MapPin, RotateCcw } from 'lucide-react';
+import { Building2, X, MapPin, RotateCcw } from 'lucide-react';
 
 const resolveInitialLocation = (b) => {
   if (!b) return null;
@@ -265,19 +265,16 @@ const EditBranchModal = ({ isOpen, onClose, activeBranch, onBranchUpdated, onBra
 
           {/* Row 2: Office Phone */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+            <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
               Office Phone
             </label>
-            <div className="relative flex items-center">
-              <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
-              <input
-                type="tel"
-                value={officePhone}
-                onChange={(e) => setOfficePhone(e.target.value)}
-                className="w-full pl-8.5 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs sm:text-sm font-medium text-slate-800 placeholder:text-slate-400 transition-all"
-                placeholder="e.g. +91 98765 43210"
-              />
-            </div>
+            <input
+              type="tel"
+              value={officePhone}
+              onChange={(e) => setOfficePhone(e.target.value)}
+              placeholder="+91 98765 43210"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50 font-medium text-slate-800 placeholder:text-slate-400"
+            />
           </div>
 
           {/* Row 3: Full Address */}

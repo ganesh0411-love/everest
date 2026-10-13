@@ -109,9 +109,24 @@ const Settings = ({ branches = [], userProfile = null, activeBranch = { id: 'mai
                             {branch.branchCode || branch.id}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                          <MapPin className="w-3.5 h-3.5" />
-                          {branch.location || 'Location unassigned'}
+                        <div className="flex flex-col gap-0.5">
+                          {branch.address && (
+                            <span className="text-xs text-slate-600 line-clamp-1">{branch.address}</span>
+                          )}
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                            <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                            <span>
+                              {typeof branch.location === 'object' && branch.location !== null
+                                ? `${branch.location.lat != null ? Number(branch.location.lat).toFixed(4) : ''}, ${branch.location.lng != null ? Number(branch.location.lng).toFixed(4) : ''}`
+                                : (typeof branch.location === 'string' && branch.location ? branch.location : 'Location unassigned')}
+                            </span>
+                            {branch.officePhone && (
+                              <>
+                                <span className="text-slate-300">•</span>
+                                <span className="text-slate-600">{branch.officePhone}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
 
