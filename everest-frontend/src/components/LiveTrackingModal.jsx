@@ -61,6 +61,13 @@ const motorbikeSvg = `
       0% { transform: scale(0.3); opacity: 1; }
       100% { transform: scale(1.5); opacity: 0; }
     }
+    /* Suppress default white Google Maps UI controls so custom joystick controls have full priority */
+    .gm-bundled-control,
+    .gm-control-active,
+    .gm-fullscreen-control,
+    .gmnoprint {
+      display: none !important;
+    }
   </style>
   <div style="position: relative;">
     <div class="stationary-radar"></div>
@@ -354,11 +361,14 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
 
     // Field-tuned Map Options per requirement:
     const mapOptions = {
-      mapTypeId: mapLayer === 'street' ? 'roadmap' : 'hybrid', // Combines crisp satellite photography with clear survey/road vectors
-      zoomControl: true,
+      mapTypeId: mapLayer === 'street' ? 'roadmap' : 'hybrid',
+      disableDefaultUI: true, // Disables all default Google controls at once
+      zoomControl: false,      // Hide default white +/- zoom buttons
+      fullscreenControl: false, // Hide default white 4-arrow square button
       streetViewControl: false,
-      mapTypeControl: true, // Allows field officer to toggle Satellite / Road / Terrain
-      fullscreenControl: true,
+      mapTypeControl: false,   // Keeps UI clean; custom buttons manage toggles
+      keyboardShortcuts: false,
+      gestureHandling: 'greedy', // Smooth fluid mobile and desktop interactions
       tilt: 45 // Enables 3D tilt perspective where high-res imagery is available
     };
 

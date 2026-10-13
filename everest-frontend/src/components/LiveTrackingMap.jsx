@@ -4,11 +4,14 @@ import { loadGoogleMaps, getGoogleMapsApiKey } from '../utils/googleMapsLoader';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 export const defaultMapOptions = {
-  mapTypeId: 'hybrid', // Combines crisp satellite photography with clear survey/road vectors
-  zoomControl: true,
+  mapTypeId: 'hybrid',
+  disableDefaultUI: true, // Disables all default Google controls at once
+  zoomControl: false,      // Hide default white +/- zoom buttons
+  fullscreenControl: false, // Hide default white 4-arrow square button
   streetViewControl: false,
-  mapTypeControl: true, // Allows field officer to toggle Satellite / Road / Terrain
-  fullscreenControl: true,
+  mapTypeControl: false,   // Keeps UI clean; custom buttons manage toggles
+  keyboardShortcuts: false,
+  gestureHandling: 'greedy', // Smooth fluid mobile and desktop interactions
   tilt: 45 // Enables 3D tilt perspective where high-res imagery is available
 };
 
