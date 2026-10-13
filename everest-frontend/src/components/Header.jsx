@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2 } from 'lucide-react';
+import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download } from 'lucide-react';
 
 const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile, isCollectionReportOpen }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -180,6 +180,17 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
           )}
 
         <div className="flex items-center gap-2 relative" ref={menuRef}>
+            {/* Header Action: Download Icon on Desktop when Collection Report is open */}
+            {isCollectionReportOpen && (
+              <button
+                type="button"
+                onClick={() => {}}
+                title="Download Report"
+                className="hidden md:flex w-9 h-9 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition cursor-pointer shrink-0"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            )}
             {userProfile?.role === 'staff' ? (
               <div className="flex items-center gap-1.5">
                 {(() => {
@@ -299,9 +310,19 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
       {/* Unified Mobile Title / Brand */}
       <div className="md:hidden w-full flex justify-center mt-1 pb-1">
         {isCollectionReportOpen ? (
-          <h1 className="text-[20px] font-black text-slate-900 tracking-wider uppercase leading-none" style={{ fontFamily: 'Georgia, serif' }}>
-            Collection Report
-          </h1>
+          <div className="w-full flex items-center justify-center relative min-h-[36px]">
+            <h1 className="text-[20px] font-black text-slate-900 tracking-wider uppercase leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+              Collection Report
+            </h1>
+            <button
+              type="button"
+              onClick={() => {}}
+              title="Download Report"
+              className="absolute right-0 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
         ) : (currentView === 'Home' || currentView === 'HOME') ? (
           <h1 className="text-[24px] font-black text-slate-900 tracking-tight leading-none" style={{ fontFamily: 'Georgia, serif' }}>
             Everest Micro<span style={{ fontSize: '19px' }}>Finance</span>

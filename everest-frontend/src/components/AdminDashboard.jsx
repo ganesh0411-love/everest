@@ -4955,7 +4955,18 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
       }
       if (showMarkAttendanceCalendar) { setShowMarkAttendanceCalendar(false); return true; }
       if (showAttendanceOverlay) { setShowAttendanceOverlay(false); return true; }
-      if (showCollectionReportModal) { setShowCollectionReportModal(false); return true; }
+      if (showCollectionReportModal) { 
+        setShowCollectionReportModal(false); 
+        setIsCollectionReportOpen?.(false);
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('position');
+        document.body.style.removeProperty('top');
+        document.body.style.removeProperty('width');
+        document.body.style.overflow = 'auto';
+        document.documentElement.style.overflow = 'auto';
+        document.body.classList.remove('modal-open', 'overflow-hidden');
+        return true; 
+      }
 
       // 1. Modals & Popups
       if (isLandSearchModalOpen) { setIsLandSearchModalOpen(false); return true; }
@@ -5632,6 +5643,13 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
         onClose={() => {
           setShowCollectionReportModal(false);
           setIsCollectionReportOpen?.(false);
+          document.body.style.removeProperty('overflow');
+          document.body.style.removeProperty('position');
+          document.body.style.removeProperty('top');
+          document.body.style.removeProperty('width');
+          document.body.style.overflow = 'auto';
+          document.documentElement.style.overflow = 'auto';
+          document.body.classList.remove('modal-open', 'overflow-hidden');
         }}
         userProfile={userProfile}
         activeBranch={activeBranch}

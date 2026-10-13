@@ -575,6 +575,18 @@ function App() {
     }
   }, [currentView]);
 
+  useEffect(() => {
+    if (!isCollectionReportOpen) {
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('position');
+      document.body.style.removeProperty('top');
+      document.body.style.removeProperty('width');
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.body.classList.remove('modal-open', 'overflow-hidden');
+    }
+  }, [isCollectionReportOpen]);
+
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(null);
@@ -638,6 +650,7 @@ function App() {
         }
 
         // 1. Close open modal states first
+        if (isCollectionReportOpen) { setIsCollectionReportOpen(false); return; }
         if (fullscreenImage) { setFullscreenImage(null); return; }
         if (isAddCustomerOpen) { setIsAddCustomerOpen(false); return; }
         if (isFilterOpen) { setIsFilterOpen(false); return; }

@@ -219,15 +219,38 @@ export default function CollectionReportModal({
     }
   }, [isOpen]);
 
-  // Body scroll-lock: apply on open, strictly restore on unmount / close
+  // Bulletproof body scroll restoration helper
+  const restoreBodyScroll = () => {
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('position');
+    document.body.style.removeProperty('top');
+    document.body.style.removeProperty('width');
+    document.body.style.overflow = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.body.classList.remove('modal-open', 'overflow-hidden');
+    const rootEl = document.getElementById('root');
+    if (rootEl) {
+      rootEl.style.removeProperty('overflow');
+      rootEl.style.removeProperty('height');
+    }
+  };
+
+  // Body scroll-lock: apply on open, aggressively restore on unmount / close
   useEffect(() => {
-    if (!isOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
     return () => {
-      document.body.style.overflow = prevOverflow || '';
+      restoreBodyScroll();
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    // Unconditional unmount safeguard
+    return () => {
+      restoreBodyScroll();
+    };
+  }, []);
 
   // Auto-close filter dropdown on click outside
   useEffect(() => {
@@ -1060,13 +1083,19 @@ export default function CollectionReportModal({
         }
       }
 
+      // 1. Strict Bounced Filter: If unchecked, completely exclude bounced records
+      const isBouncedRow = item.status === 'BOUNCED' || item.isBounced || String(item.mode).toUpperCase() === 'BOUNCED';
+      if (!showBounced && isBouncedRow) {
+        return false;
+      }
+
       let matchesType = false;
-      if (isCreditActive && isDebitActive) {
-        matchesType = (item.credit > 0 || item.debit > 0 || item.od > 0) ||
-                      (item.isBounced && showBounced);
+      if (isBouncedRow) {
+        matchesType = isCreditActive;
+      } else if (isCreditActive && isDebitActive) {
+        matchesType = item.credit > 0 || item.debit > 0 || item.od > 0;
       } else if (isCreditActive) {
-        matchesType = (item.credit > 0 || item.od > 0) ||
-                      (item.isBounced && showBounced);
+        matchesType = item.credit > 0 || item.od > 0;
       } else if (isDebitActive) {
         matchesType = item.debit > 0;
       } else {
