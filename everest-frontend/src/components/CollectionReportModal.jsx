@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, AlertTriangle, Download } from 'lucide-react';
+import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, AlertTriangle } from 'lucide-react';
 import CollectionReportDownloadModal from './CollectionReportDownloadModal';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -1290,7 +1290,7 @@ export default function CollectionReportModal({
             onClick={() => {
               try { fromDateInputRef.current?.showPicker?.(); } catch(e) { fromDateInputRef.current?.click?.(); }
             }}
-            className="flex-1 min-w-0 bg-white border border-slate-200/90 rounded-xl px-2 sm:px-2.5 h-[38px] flex items-center gap-1.5 sm:gap-2 shadow-2xs cursor-pointer"
+            className="flex-1 min-w-0 bg-white border border-slate-200/90 rounded-xl px-2.5 sm:px-3 h-[38px] flex items-center gap-1.5 sm:gap-2 shadow-2xs cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1302,7 +1302,7 @@ export default function CollectionReportModal({
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="text-[11px] sm:text-xs font-semibold text-slate-700 bg-transparent outline-none truncate p-0 border-none leading-none w-full cursor-text"
+                className="text-xs font-semibold text-slate-700 bg-transparent outline-none p-0 border-none leading-none w-full cursor-text"
               />
               <input
                 ref={fromDateInputRef}
@@ -1321,7 +1321,7 @@ export default function CollectionReportModal({
             onClick={() => {
               try { toDateInputRef.current?.showPicker?.(); } catch(e) { toDateInputRef.current?.click?.(); }
             }}
-            className="flex-1 min-w-0 bg-white border border-slate-200/90 rounded-xl px-2 sm:px-2.5 h-[38px] flex items-center gap-1.5 sm:gap-2 shadow-2xs cursor-pointer"
+            className="flex-1 min-w-0 bg-white border border-slate-200/90 rounded-xl px-2.5 sm:px-3 h-[38px] flex items-center gap-1.5 sm:gap-2 shadow-2xs cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1333,7 +1333,7 @@ export default function CollectionReportModal({
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="text-[11px] sm:text-xs font-semibold text-slate-700 bg-transparent outline-none truncate p-0 border-none leading-none w-full cursor-text"
+                className="text-xs font-semibold text-slate-700 bg-transparent outline-none p-0 border-none leading-none w-full cursor-text"
               />
               <input
                 ref={toDateInputRef}
@@ -1375,16 +1375,6 @@ export default function CollectionReportModal({
               </div>
             )}
           </div>
-
-          {/* Statement Download Action Button */}
-          <button
-            type="button"
-            onClick={() => setIsDownloadModalOpen(true)}
-            title="Download Account Statement"
-            className="w-[38px] h-[38px] rounded-xl bg-white border border-slate-200/90 flex items-center justify-center text-blue-600 hover:text-blue-700 hover:bg-blue-50 active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer"
-          >
-            <Download className="w-4 h-4 stroke-[2.2]" />
-          </button>
         </div>
 
         {/* LINE 2: Search Input & Action Badges (Side-by-Side in 1 Horizontal Row) */}

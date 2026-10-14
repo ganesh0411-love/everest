@@ -169,16 +169,10 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
 
           {/* Centered Page Title when viewing Collection Report */}
           {isCollectionReportOpen && (currentView === 'Home' || currentView === 'Collection Report' || currentView === 'Collection') && (
-            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 items-center justify-center pointer-events-none">
+            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 items-center justify-center gap-2.5">
               <h1 className="text-base md:text-lg font-black text-slate-900 tracking-wider uppercase">
                 Collection Report
               </h1>
-            </div>
-          )}
-
-        <div className="flex items-center gap-2 relative" ref={menuRef}>
-            {/* Header Action: Download Icon when Collection Report is open */}
-            {isCollectionReportOpen && (
               <button
                 type="button"
                 onClick={() => {
@@ -186,12 +180,15 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
                     window.handleDownloadCollectionReport();
                   }
                 }}
-                title="Download Report"
-                className="flex w-9 h-9 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition cursor-pointer shrink-0"
+                title="Download Collection Statement"
+                className="flex w-8 h-8 items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition cursor-pointer"
               >
                 <Download className="w-4 h-4" />
               </button>
-            )}
+            </div>
+          )}
+
+        <div className="flex items-center gap-2 relative" ref={menuRef}>
             {userProfile?.role === 'staff' ? (
               <div className="flex items-center gap-1.5">
                 {(() => {
