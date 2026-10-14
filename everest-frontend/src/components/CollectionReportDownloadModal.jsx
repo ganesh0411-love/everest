@@ -705,10 +705,10 @@ export default function CollectionReportDownloadModal({
                   {/* Elegant Subtle Vertical Divider Line */}
                   <div style={{ width: '1.5px', height: '68px', backgroundColor: '#e2e8f0', margin: '0 16px' }} />
 
-                  {/* TOP RIGHT: Single-Line Title Above Divider Line, Branch Address Below */}
+                  {/* TOP RIGHT: Clean Modern Typography Heading & Branch Address */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flex: 1 }}>
                     
-                    {/* 1. Title Above Line: Bold Royal Navy, uppercase, right-aligned, cleanly ABOVE divider line */}
+                    {/* Heading: ACCOUNT STATEMENT (Bold Royal Navy, right-aligned) */}
                     <div 
                       style={{ 
                         color: '#0c3563', 
@@ -717,33 +717,18 @@ export default function CollectionReportDownloadModal({
                         letterSpacing: '-0.3px', 
                         textAlign: 'right', 
                         textTransform: 'uppercase', 
-                        whiteSpace: 'nowrap',
-                        paddingRight: '6px',
-                        marginBottom: '4px'
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       ACCOUNT STATEMENT
                     </div>
 
-                    {/* 2 & 3. Divider Line with attached vertical right accent bar directly beneath title, and Branch Address strictly BELOW the line */}
-                    <div 
-                      style={{ 
-                        borderTop: '3.5px solid #0284c7', 
-                        borderRight: '3.5px solid #0284c7', 
-                        paddingTop: '4px', 
-                        paddingRight: '6px', 
-                        paddingLeft: '14px',
-                        display: 'inline-block',
-                        textAlign: 'right',
-                        minWidth: '235px'
-                      }}
-                    >
-                      <div style={{ fontSize: '9.5px', color: '#475569', fontWeight: 600, lineHeight: 1.35 }}>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{branchInfo.displayTitle}</div>
-                        <div>{branchInfo.addrLine1}</div>
-                        {branchInfo.addrLine2 && <div>{branchInfo.addrLine2}</div>}
-                        <div>Ph: {branchInfo.phone}</div>
-                      </div>
+                    {/* Directly below (with subtle top margin): Right-aligned branch address details */}
+                    <div style={{ fontSize: '9.5px', color: '#475569', fontWeight: 600, lineHeight: 1.35, textAlign: 'right', marginTop: '4px' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{branchInfo.displayTitle}</div>
+                      <div>{branchInfo.addrLine1}</div>
+                      {branchInfo.addrLine2 && <div>{branchInfo.addrLine2}</div>}
+                      <div>Ph: {branchInfo.phone}</div>
                     </div>
                   </div>
                 </div>
@@ -905,8 +890,16 @@ export default function CollectionReportDownloadModal({
                       <Calendar style={{ width: '14px', height: '14px' }} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '10px', fontWeight: 600, color: '#334155', lineHeight: 1.25 }}>
-                      <div>From : <span style={{ fontWeight: 700, color: '#0f172a' }}>{fromDate}</span></div>
-                      <div>To &nbsp;&nbsp;&nbsp;: <span style={{ fontWeight: 700, color: '#0f172a' }}>{toDate}</span></div>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ width: '34px', color: '#475569' }}>From</span>
+                        <span style={{ color: '#475569', marginRight: '5px' }}>:</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{fromDate}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ width: '34px', color: '#475569' }}>To</span>
+                        <span style={{ color: '#475569', marginRight: '5px' }}>:</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{toDate}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -934,13 +927,15 @@ export default function CollectionReportDownloadModal({
                     <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0, border: '1px solid #a7f3d0' }}>
                       <Wallet style={{ width: '13px', height: '13px' }} />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '10.5px', lineHeight: 1.25 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontWeight: 700, color: '#0284c7', fontSize: '9.5px', width: '28px' }}>UPI:</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '10px', lineHeight: 1.25 }}>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, color: '#0284c7', fontSize: '9.5px', width: '32px' }}>UPI</span>
+                        <span style={{ color: '#0284c7', fontWeight: 700, marginRight: '5px' }}>:</span>
                         <span style={{ fontWeight: 800, color: '#0369a1' }}>₹ {metrics.upi.toLocaleString('en-IN')}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontWeight: 700, color: '#059669', fontSize: '9.5px', width: '28px' }}>Cash:</span>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, color: '#059669', fontSize: '9.5px', width: '32px' }}>Cash</span>
+                        <span style={{ color: '#059669', fontWeight: 700, marginRight: '5px' }}>:</span>
                         <span style={{ fontWeight: 800, color: '#065f46' }}>₹ {metrics.cash.toLocaleString('en-IN')}</span>
                       </div>
                     </div>
