@@ -90,6 +90,9 @@ export default function CollectionReportDownloadModal({
   data = [],
   allLedgerData = [],
   searchTerm = '',
+  isCreditActive = true,
+  isDebitActive = true,
+  sortOrder = 'desc',
   targetCollection = 0,
   totalCollection = 0,
   onlineCollection = 0,
@@ -145,27 +148,71 @@ export default function CollectionReportDownloadModal({
     };
   }, [activeBranch]);
 
-  // 100% Real Live Collection Report Data & Metrics Binding
+  // 100% Real Live Collection Report Data & Metrics Binding (Strict WYSIWYG sync)
   const { statementEntries, metrics } = useMemo(() => {
     let baseList = data || [];
 
     // If includeBounced changed from initial state and allLedgerData is provided
     if (includeBounced !== initialIncludeBounced && Array.isArray(allLedgerData) && allLedgerData.length > 0) {
+      const query = searchTerm.trim();
+      const isNumeric = query !== '' && !/[a-zA-Z]/.test(query) && !isNaN(Number(query));
+
       baseList = allLedgerData.filter((item) => {
-        if (searchTerm && searchTerm.trim()) {
-          const q = searchTerm.trim().toLowerCase();
-          const match = (item.name || '').toLowerCase().includes(q) ||
-                        String(item.mode || '').toLowerCase().includes(q) ||
-                        String(item.status || '').toLowerCase().includes(q);
-          if (!match) return false;
+        let matchesSearch = true;
+        if (query !== '') {
+          if (isNumeric) {
+            const numQuery = Number(query);
+            matchesSearch = (
+              Number(item.credit) === numQuery || 
+              Number(item.debit) === numQuery ||
+              Number(item.od) === numQuery ||
+              Number(item.pending) === numQuery ||
+              Number(item.cashAmount) === numQuery ||
+              Number(item.upiAmount) === numQuery
+            );
+          } else {
+            matchesSearch = (item.name || '').toLowerCase().includes(query.toLowerCase()) || 
+                            String(item.mode || '').toLowerCase().includes(query.toLowerCase()) ||
+                            String(item.status || '').toLowerCase().includes(query.toLowerCase());
+          }
         }
-        if (!includeBounced) {
-          return !item.isBounced && item.mode !== 'BOUNCED' && item.status !== 'BOUNCED';
+
+        const isBouncedRow = Boolean(
+          item.isBounced || 
+          item.status === 'BOUNCED' || 
+          String(item.mode || '').toUpperCase() === 'BOUNCED' ||
+          String(item.status || '').toUpperCase().includes('BOUNCE') ||
+          String(item.mode || '').toUpperCase().includes('BOUNCE')
+        );
+
+        if (!includeBounced && isBouncedRow) {
+          return false;
         }
-        return true;
+
+        let matchesType = false;
+        if (isBouncedRow) {
+          matchesType = isCreditActive;
+        } else if (isCreditActive && isDebitActive) {
+          matchesType = Number(item.credit || 0) > 0 || Number(item.debit || 0) > 0 || Number(item.od || 0) > 0;
+        } else if (isCreditActive) {
+          matchesType = Number(item.credit || 0) > 0 || Number(item.od || 0) > 0;
+        } else if (isDebitActive) {
+          matchesType = Number(item.debit || 0) > 0;
+        } else {
+          matchesType = false;
+        }
+
+        return matchesSearch && matchesType;
       });
-    } else if (!includeBounced) {
-      baseList = baseList.filter(item => !item.isBounced && item.mode !== 'BOUNCED' && item.status !== 'BOUNCED');
+
+      baseList = [...baseList].sort((a, b) => {
+        const tsA = parseDateToTimestamp(a.createdAt || a.date) || 0;
+        const tsB = parseDateToTimestamp(b.createdAt || b.date) || 0;
+        if (tsA !== tsB) {
+          return sortOrder === 'desc' ? tsB - tsA : tsA - tsB;
+        }
+        return sortOrder === 'desc' ? String(b.id).localeCompare(String(a.id)) : String(a.id).localeCompare(String(a.id));
+      });
     }
 
     // When includeBounced matches initial state, directly use the exact calculated screen metrics
@@ -197,7 +244,7 @@ export default function CollectionReportDownloadModal({
       const isCredit = Number(item.credit || 0) > 0;
       const isDebit = Number(item.debit || 0) > 0;
 
-      if (isCredit) {
+      if (isCreditActive && isCredit) {
         coll += Number(item.credit || 0);
         const itemUpi = Number(item.upiAmount || 0);
         const itemCash = Number(item.cashAmount || 0);
@@ -207,16 +254,15 @@ export default function CollectionReportDownloadModal({
         } else if (itemUpi > 0) {
           upi += itemUpi;
           if (itemCash > 0) cash += itemCash;
-        } else if (itemCash > 0) {
-          cash += itemCash;
-        } else if (item.mode === 'UPI') {
+          else if (item.credit > itemUpi) cash += (item.credit - itemUpi);
+        } else if (item.mode === 'UPI' || item.mode === 'Online') {
           upi += Number(item.credit || 0);
         } else {
           cash += Number(item.credit || 0);
         }
       }
 
-      if (isDebit) {
+      if (isDebitActive && isDebit) {
         disb += Number(item.debit || 0);
       }
 
@@ -233,11 +279,11 @@ export default function CollectionReportDownloadModal({
         cash,
         pending: totalScopedPending > 0 ? totalScopedPending : pending,
         od: totalScopedOverdue > 0 ? totalScopedOverdue : od,
-        disbursement: totalDisbursement > 0 ? totalDisbursement : disb,
+        disbursement: isDebitActive ? (totalDisbursement > 0 ? totalDisbursement : disb) : 0,
         entriesCount: baseList.length
       }
     };
-  }, [data, allLedgerData, searchTerm, includeBounced, initialIncludeBounced, targetCollection, totalCollection, onlineCollection, cashCollection, totalScopedPending, totalScopedOverdue, totalDisbursement]);
+  }, [data, allLedgerData, searchTerm, isCreditActive, isDebitActive, sortOrder, includeBounced, initialIncludeBounced, targetCollection, totalCollection, onlineCollection, cashCollection, totalScopedPending, totalScopedOverdue, totalDisbursement]);
 
   // Construct Live JSON Summary Payload for QR Code Verification
   const qrPayloadJson = useMemo(() => {
@@ -661,7 +707,7 @@ export default function CollectionReportDownloadModal({
             </div>
           </div>
 
-          {/* 4 KPI SUMMARY METRIC CARDS (Uniform 96px height with zero collision) */}
+          {/* 4 KPI SUMMARY METRIC CARDS (Uniform 106px height with zero collision) */}
           <div 
             style={{
               display: 'grid',
@@ -676,10 +722,10 @@ export default function CollectionReportDownloadModal({
                 backgroundColor: '#f0f7ff',
                 border: '1.5px solid #bae6fd',
                 borderRadius: '12px',
-                padding: '8px 10px',
+                padding: '10px 12px',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '96px',
+                height: '106px',
                 boxSizing: 'border-box'
               }}
             >
@@ -690,7 +736,7 @@ export default function CollectionReportDownloadModal({
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#0284c7' }}>Target</span>
               </div>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '19px', fontWeight: 900, color: '#0c4a6e' }}>
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#0c4a6e' }}>
                   ₹ {metrics.target.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -705,39 +751,39 @@ export default function CollectionReportDownloadModal({
                 padding: '8px 10px',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between',
-                height: '96px',
+                height: '106px',
                 boxSizing: 'border-box'
               }}
             >
               {/* Top: Icon + Title */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#059669', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
-                  <Wallet style={{ width: '13px', height: '13px' }} />
+                <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#059669', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
+                  <Wallet style={{ width: '12px', height: '12px' }} />
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#059669' }}>Collection</span>
               </div>
 
-              {/* Middle: UPI & Cash split with comfortable breathing room */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '2px 0' }}>
+              {/* Zone 1 (Top/Middle): UPI & Cash displayed with 12.5px bold font and 8.5px uppercase label */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '3px 0 2px 0' }}>
                 <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '1px' }}>UPI</div>
-                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#065f46' }}>₹ {metrics.upi.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '2px' }}>UPI</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#065f46', lineHeight: 1.1 }}>₹ {metrics.upi.toLocaleString('en-IN')}</div>
                 </div>
-                <div style={{ width: '1px', height: '18px', backgroundColor: '#a7f3d0', margin: '0 4px' }} />
+                <div style={{ width: '1px', height: '20px', backgroundColor: '#a7f3d0', margin: '0 4px' }} />
                 <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '1px' }}>Cash</div>
-                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#065f46' }}>₹ {metrics.cash.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '2px' }}>Cash</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#065f46', lineHeight: 1.1 }}>₹ {metrics.cash.toLocaleString('en-IN')}</div>
                 </div>
               </div>
 
-              {/* Bottom: Solid Emerald Banner */}
+              {/* Zone 2 (Bottom): Anchored Total ₹ ZZ banner with margin-top: auto */}
               <div 
                 style={{
+                  marginTop: 'auto',
                   backgroundColor: '#059669',
                   color: '#ffffff',
                   borderRadius: '6px',
-                  fontSize: '11px',
+                  fontSize: '11.5px',
                   fontWeight: 800,
                   textAlign: 'center',
                   padding: '3px 0',
@@ -754,10 +800,10 @@ export default function CollectionReportDownloadModal({
                 backgroundColor: '#fffbeb',
                 border: '1.5px solid #fde68a',
                 borderRadius: '12px',
-                padding: '8px 10px',
+                padding: '10px 12px',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '96px',
+                height: '106px',
                 boxSizing: 'border-box'
               }}
             >
@@ -768,7 +814,7 @@ export default function CollectionReportDownloadModal({
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#d97706' }}>Pending</span>
               </div>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '19px', fontWeight: 900, color: '#d97706' }}>
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#d97706' }}>
                   ₹ {metrics.pending.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -780,10 +826,10 @@ export default function CollectionReportDownloadModal({
                 backgroundColor: '#fef2f2',
                 border: '1.5px solid #fecaca',
                 borderRadius: '12px',
-                padding: '8px 10px',
+                padding: '10px 12px',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '96px',
+                height: '106px',
                 boxSizing: 'border-box'
               }}
             >
@@ -794,7 +840,7 @@ export default function CollectionReportDownloadModal({
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626' }}>OD / Overdue</span>
               </div>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '19px', fontWeight: 900, color: '#dc2626' }}>
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#dc2626' }}>
                   ₹ {metrics.od.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -954,28 +1000,32 @@ export default function CollectionReportDownloadModal({
                 const isEven = idx % 2 === 0;
                 const loanTypeMeta = getLoanTypeStyle(item.loanType);
 
+                const isBounced = Boolean(
+                  item.isBounced || 
+                  item.status === 'BOUNCED' || 
+                  item.mode === 'BOUNCED' ||
+                  String(item.status || '').toUpperCase().includes('BOUNCE') ||
+                  String(item.mode || '').toUpperCase().includes('BOUNCE')
+                );
+
                 const disbAmt = Number(item.debit || 0);
                 const isCredit = Number(item.credit || 0) > 0;
-                const isBounced = item.isBounced || item.status === 'BOUNCED' || item.mode === 'BOUNCED';
 
                 let upiVal = '-';
                 let cashVal = '-';
                 let totalVal = '-';
 
-                if (isCredit) {
+                if (!isBounced && isCredit) {
                   const u = Number(item.upiAmount || 0);
                   const c = Number(item.cashAmount || 0);
                   upiVal = u > 0 ? `₹ ${u.toLocaleString('en-IN')}` : '-';
                   cashVal = c > 0 ? `₹ ${c.toLocaleString('en-IN')}` : '-';
                   totalVal = `₹ ${Number(item.credit).toLocaleString('en-IN')}`;
-                } else if (isBounced) {
-                  upiVal = '-';
-                  cashVal = '-';
-                  totalVal = '-';
                 }
 
                 const pendingVal = `₹ ${Number(item.pending || 0).toLocaleString('en-IN')}`;
                 const odVal = `₹ ${Number(item.od || 0).toLocaleString('en-IN')}`;
+                const disbVal = (!isBounced && disbAmt > 0) ? `₹ ${disbAmt.toLocaleString('en-IN')}` : '-';
 
                 return (
                   <div 
@@ -1010,32 +1060,67 @@ export default function CollectionReportDownloadModal({
                     </div>
 
                     {/* Disbursement Amount */}
-                    <div style={{ width: '86px', minWidth: '86px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: disbAmt > 0 ? '#0f172a' : '#64748b', fontWeight: disbAmt > 0 ? 700 : 500, borderRight: '1px solid #e2e8f0', padding: '6px 4px' }}>
-                      {disbAmt > 0 ? `₹ ${disbAmt.toLocaleString('en-IN')}` : '-'}
+                    <div style={{ width: '86px', minWidth: '86px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: disbVal !== '-' ? '#0f172a' : '#64748b', fontWeight: disbVal !== '-' ? 700 : 500, borderRight: '1px solid #e2e8f0', padding: '6px 4px' }}>
+                      {disbVal}
                     </div>
 
-                    {/* Collection UPI */}
-                    <div style={{ width: '58px', minWidth: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: upiVal !== '-' ? '#0f172a' : '#94a3b8', fontWeight: 500, borderRight: '1px solid #e2e8f0', padding: '6px 2px' }}>
-                      {upiVal}
-                    </div>
+                    {/* Collection Columns (Merged 174px spanned cell if BOUNCED, or 3 separate 58px columns) */}
+                    {isBounced ? (
+                      <div 
+                        style={{ 
+                          width: '174px', 
+                          minWidth: '174px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          borderRight: '1px solid #e2e8f0', 
+                          padding: '4px' 
+                        }}
+                      >
+                        <span 
+                          style={{ 
+                            backgroundColor: '#fee2e2', 
+                            color: '#dc2626', 
+                            borderRadius: '6px', 
+                            padding: '2.5px 12px', 
+                            fontSize: '9.5px', 
+                            fontWeight: 800, 
+                            border: '1px solid #fecaca',
+                            letterSpacing: '0.4px',
+                            textTransform: 'uppercase',
+                            display: 'inline-block',
+                            lineHeight: 1.2
+                          }}
+                        >
+                          BOUNCED
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Collection UPI */}
+                        <div style={{ width: '58px', minWidth: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: upiVal !== '-' ? '#0f172a' : '#94a3b8', fontWeight: 500, borderRight: '1px solid #e2e8f0', padding: '6px 2px' }}>
+                          {upiVal}
+                        </div>
 
-                    {/* Collection Cash */}
-                    <div style={{ width: '58px', minWidth: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: cashVal !== '-' ? '#0f172a' : '#94a3b8', fontWeight: 500, borderRight: '1px solid #e2e8f0', padding: '6px 2px' }}>
-                      {cashVal}
-                    </div>
+                        {/* Collection Cash */}
+                        <div style={{ width: '58px', minWidth: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: cashVal !== '-' ? '#0f172a' : '#94a3b8', fontWeight: 500, borderRight: '1px solid #e2e8f0', padding: '6px 2px' }}>
+                          {cashVal}
+                        </div>
 
-                    {/* Collection Total */}
-                    <div style={{ width: '58px', minWidth: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: totalVal !== '-' ? '#0f172a' : '#94a3b8', fontWeight: 700, borderRight: '1px solid #e2e8f0', padding: '6px 2px' }}>
-                      {totalVal}
-                    </div>
+                        {/* Collection Total */}
+                        <div style={{ width: '58px', minWidth: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: totalVal !== '-' ? '#0f172a' : '#94a3b8', fontWeight: 700, borderRight: '1px solid #e2e8f0', padding: '6px 2px' }}>
+                          {totalVal}
+                        </div>
+                      </>
+                    )}
 
                     {/* Pending */}
-                    <div style={{ width: '58px', minWidth: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.pending > 0 ? '#d97706' : '#64748b', fontWeight: item.pending > 0 ? 700 : 500, borderRight: '1px solid #e2e8f0', padding: '6px 2px' }}>
+                    <div style={{ width: '58px', minWidth: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: Number(item.pending || 0) > 0 ? '#d97706' : '#64748b', fontWeight: Number(item.pending || 0) > 0 ? 700 : 500, borderRight: '1px solid #e2e8f0', padding: '6px 2px' }}>
                       {pendingVal}
                     </div>
 
                     {/* OD */}
-                    <div style={{ width: '48px', minWidth: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.od > 0 ? '#dc2626' : '#64748b', fontWeight: item.od > 0 ? 700 : 500, padding: '6px 2px' }}>
+                    <div style={{ width: '48px', minWidth: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: Number(item.od || 0) > 0 ? '#dc2626' : '#64748b', fontWeight: Number(item.od || 0) > 0 ? 700 : 500, padding: '6px 2px' }}>
                       {odVal}
                     </div>
                   </div>

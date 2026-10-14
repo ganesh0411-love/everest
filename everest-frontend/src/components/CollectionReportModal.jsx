@@ -1975,12 +1975,15 @@ export default function CollectionReportModal({
         data={filteredData}
         allLedgerData={ledgerEntries}
         searchTerm={searchTerm}
+        isCreditActive={isCreditActive}
+        isDebitActive={isDebitActive}
+        sortOrder={sortOrder}
         targetCollection={totalScopedTarget}
         totalCollection={totalCollection}
         onlineCollection={onlineCollection}
         cashCollection={cashCollection}
-        totalScopedPending={totalScopedPending}
-        totalScopedOverdue={totalScopedOD}
+        totalScopedPending={totalPendingAmount}
+        totalScopedOverdue={totalOverdueAmount}
         totalDisbursement={totalDisbursement}
         initialIncludeBounced={showBounced}
       />
