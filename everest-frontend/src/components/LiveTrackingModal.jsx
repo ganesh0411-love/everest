@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { MapPin, Loader2, AlertCircle } from 'lucide-react';
-import { loadGoogleMaps } from '../utils/googleMapsLoader';
+import { loadGoogleMaps, isGoogleMapsLoaded } from '../utils/googleMapsLoader';
 
 function getRelativeTime(isoStringOrTimestamp) {
   if (!isoStringOrTimestamp) return 'Unknown';
@@ -97,12 +97,14 @@ const motorbikeSvg = `
   </div>`;
 
 function createRiderOverlayClass() {
-  if (typeof window === 'undefined' || !window.google?.maps?.OverlayView) return null;
+  if (typeof window === 'undefined' || !isGoogleMapsLoaded() || typeof window.google?.maps?.OverlayView !== 'function') return null;
 
   return class RiderOverlay extends window.google.maps.OverlayView {
     constructor(map, position) {
       super();
-      this.position = position ? new window.google.maps.LatLng(position.lat, position.lng) : null;
+      this.position = (position && typeof window.google?.maps?.LatLng === 'function') 
+        ? new window.google.maps.LatLng(position.lat, position.lng) 
+        : null;
       this.heading = 0;
       this.speed = 0;
       this.div = null;
@@ -134,7 +136,9 @@ function createRiderOverlayClass() {
     }
 
     setPosition(lat, lng, heading = 0, speed = 0) {
-      this.position = new window.google.maps.LatLng(lat, lng);
+      if (typeof window.google?.maps?.LatLng === 'function') {
+        this.position = new window.google.maps.LatLng(lat, lng);
+      }
       this.heading = heading;
       this.speed = speed;
       if (this.div) {
@@ -162,13 +166,13 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
   const [isLiveActive, setIsLiveActive] = useState(initialMode === 'live');
   const [loading, setLoading] = useState(true);
 
-  // Google Maps Loading & Error State Guard
-  const [mapsLoaded, setMapsLoaded] = useState(Boolean(typeof window !== 'undefined' && window.google?.maps));
+  // Google Maps Loading & Error State Guard (Constructor-safe)
+  const [mapsLoaded, setMapsLoaded] = useState(isGoogleMapsLoaded);
   const [mapsError, setMapsError] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
-    if (window.google?.maps) {
+    if (isGoogleMapsLoaded()) {
       setMapsLoaded(true);
       return;
     }
@@ -355,55 +359,63 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
 
   // 1. Google Maps Initialization (Satellite Hybrid & 3D Tilt Configuration)
   useEffect(() => {
-    if (loading || !mapsLoaded || !mapRef.current || mapInstance.current || !window.google?.maps) return;
+    if (loading || !mapsLoaded || !mapRef.current || mapInstance.current) return;
+    if (!isGoogleMapsLoaded() || typeof window.google?.maps?.Map !== 'function') return;
     
-    const RiderOverlayClass = createRiderOverlayClass();
+    try {
+      const RiderOverlayClass = createRiderOverlayClass();
 
-    // Field-tuned Map Options per requirement:
-    const mapOptions = {
-      mapTypeId: mapLayer === 'street' ? 'roadmap' : 'hybrid',
-      disableDefaultUI: true, // Disables all default Google controls at once
-      zoomControl: false,      // Hide default white +/- zoom buttons
-      fullscreenControl: false, // Hide default white 4-arrow square button
-      streetViewControl: false,
-      mapTypeControl: false,   // Keeps UI clean; custom buttons manage toggles
-      keyboardShortcuts: false,
-      gestureHandling: 'greedy', // Smooth fluid mobile and desktop interactions
-      tilt: 45 // Enables 3D tilt perspective where high-res imagery is available
-    };
+      // Field-tuned Map Options per requirement:
+      const mapOptions = {
+        mapTypeId: mapLayer === 'street' ? 'roadmap' : 'hybrid',
+        disableDefaultUI: true, // Disables all default Google controls at once
+        zoomControl: false,      // Hide default white +/- zoom buttons
+        fullscreenControl: false, // Hide default white 4-arrow square button
+        streetViewControl: false,
+        mapTypeControl: false,   // Keeps UI clean; custom buttons manage toggles
+        keyboardShortcuts: false,
+        gestureHandling: 'greedy', // Smooth fluid mobile and desktop interactions
+        tilt: 45 // Enables 3D tilt perspective where high-res imagery is available
+      };
 
-    const initialCenter = animCurrentPosRef.current || (loc?.lat ? { lat: loc.lat, lng: loc.lng } : { lat: 10.3673, lng: 77.9803 });
+      const initialCenter = animCurrentPosRef.current || (loc?.lat ? { lat: loc.lat, lng: loc.lng } : { lat: 10.3673, lng: 77.9803 });
 
-    mapInstance.current = new window.google.maps.Map(mapRef.current, {
-      ...mapOptions,
-      center: initialCenter,
-      zoom: 17
-    });
+      mapInstance.current = new window.google.maps.Map(mapRef.current, {
+        ...mapOptions,
+        center: initialCenter,
+        zoom: 17
+      });
 
-    mapInstance.current.addListener('dragstart', () => {
-      setIsFollowMode(false);
-      isFollowModeRef.current = false;
-    });
+      mapInstance.current.addListener('dragstart', () => {
+        setIsFollowMode(false);
+        isFollowModeRef.current = false;
+      });
 
-    // Native Google Maps Polyline for live breadcrumb path
-    polylineRef.current = new window.google.maps.Polyline({
-      map: mapInstance.current,
-      path: [],
-      strokeColor: '#2563EB', // Requirement: strokeColor #2563EB
-      strokeWeight: 4,        // Requirement: strokeWeight 4
-      strokeOpacity: 0.9,
-      geodesic: true
-    });
-
-    if (RiderOverlayClass) {
-      riderOverlayRef.current = new RiderOverlayClass(mapInstance.current, initialCenter);
-    }
-
-    setTimeout(() => {
-      if (mapInstance.current && window.google?.maps) {
-        window.google.maps.event.trigger(mapInstance.current, 'resize');
+      // Native Google Maps Polyline for live breadcrumb path
+      if (typeof window.google?.maps?.Polyline === 'function') {
+        polylineRef.current = new window.google.maps.Polyline({
+          map: mapInstance.current,
+          path: [],
+          strokeColor: '#2563EB', // Requirement: strokeColor #2563EB
+          strokeWeight: 4,        // Requirement: strokeWeight 4
+          strokeOpacity: 0.9,
+          geodesic: true
+        });
       }
-    }, 200);
+
+      if (RiderOverlayClass) {
+        riderOverlayRef.current = new RiderOverlayClass(mapInstance.current, initialCenter);
+      }
+
+      setTimeout(() => {
+        if (mapInstance.current && window.google?.maps?.event) {
+          window.google.maps.event.trigger(mapInstance.current, 'resize');
+        }
+      }, 200);
+    } catch (err) {
+      console.error('Failed to initialize Google Map safely:', err);
+      setMapsError(err);
+    }
   }, [loading, mapsLoaded]);
 
   // 2. Map Layer Switcher (Hybrid Satellite vs High-Res Roadmap)
@@ -943,20 +955,12 @@ export default function LiveTrackingModal({ staffId, staffName, onClose, initial
               </button>
             </div>
           ) : (!mapsLoaded || loading) ? (
-            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-900">
-              <div className="relative mb-3 flex items-center justify-center">
-                <div className="w-10 h-10 rounded-full border-4 border-sky-400/30 border-t-sky-400 animate-spin"></div>
-                <Loader2 className="w-5 h-5 text-sky-400 absolute animate-pulse" />
-              </div>
-              <p className="text-xs font-semibold text-slate-300">Loading Google Maps Hybrid Satellite...</p>
+            <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900 text-slate-300">
+              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+              <span className="text-xs font-medium tracking-wide">Connecting to Live Satellite Map...</span>
             </div>
-          ) : loc?.lat && loc?.lng ? (
-            <div ref={mapRef} className="w-full h-full z-0" style={{ isolation: 'isolate' }}></div>
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-900">
-              <MapPin size={48} className="mb-2 opacity-30 text-sky-400" />
-              <p>Awaiting staff mobile GPS signal</p>
-            </div>
+            <div ref={mapRef} className="w-full h-full z-0" style={{ isolation: 'isolate' }}></div>
           )}
 
           {/* Floating Pan-Joystick D-pad Navigation & Zoom Controls (z-40) */}

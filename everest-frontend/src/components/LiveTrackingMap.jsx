@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { GoogleMap, MarkerF, PolylineF, PolygonF } from '@react-google-maps/api';
-import { loadGoogleMaps, getGoogleMapsApiKey } from '../utils/googleMapsLoader';
+import { loadGoogleMaps, getGoogleMapsApiKey, isGoogleMapsLoaded } from '../utils/googleMapsLoader';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 export const defaultMapOptions = {
@@ -32,8 +32,8 @@ export function createMotorbikeSvgIcon(heading = 0) {
   `;
   return {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: typeof window !== 'undefined' && window.google?.maps ? new window.google.maps.Size(36, 60) : undefined,
-    anchor: typeof window !== 'undefined' && window.google?.maps ? new window.google.maps.Point(18, 30) : undefined
+    scaledSize: typeof window !== 'undefined' && isGoogleMapsLoaded() && window.google?.maps?.Size ? new window.google.maps.Size(36, 60) : undefined,
+    anchor: typeof window !== 'undefined' && isGoogleMapsLoaded() && window.google?.maps?.Point ? new window.google.maps.Point(18, 30) : undefined
   };
 }
 
@@ -52,12 +52,12 @@ export default function LiveTrackingMap({
   onMapLoad,
   mapTypeId = 'hybrid'
 }) {
-  const [isLoaded, setIsLoaded] = useState(Boolean(typeof window !== 'undefined' && window.google?.maps));
+  const [isLoaded, setIsLoaded] = useState(isGoogleMapsLoaded);
   const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
-    if (window.google?.maps) {
+    if (isGoogleMapsLoaded()) {
       setIsLoaded(true);
       return;
     }
@@ -127,12 +127,9 @@ export default function LiveTrackingMap({
 
   if (!isLoaded) {
     return (
-      <div className={`flex flex-col items-center justify-center bg-slate-900 text-slate-400 p-4 ${className}`}>
-        <div className="relative mb-3 flex items-center justify-center">
-          <div className="w-10 h-10 rounded-full border-4 border-sky-400/30 border-t-sky-400 animate-spin"></div>
-          <Loader2 className="w-5 h-5 text-sky-400 absolute animate-pulse" />
-        </div>
-        <p className="text-xs font-medium text-slate-300">Loading Google Maps Hybrid Satellite...</p>
+      <div className={`flex flex-col items-center justify-center h-full w-full bg-slate-900 text-slate-300 ${className}`}>
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <span className="text-xs font-medium tracking-wide">Connecting to Live Satellite Map...</span>
       </div>
     );
   }

@@ -9,10 +9,21 @@ export function getGoogleMapsApiKey() {
   return import.meta.env.VITE_GOOGLE_MAPS_API_KEY || DEFAULT_API_KEY;
 }
 
+export function isGoogleMapsLoaded() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.google === 'object' &&
+    window.google !== null &&
+    typeof window.google.maps === 'object' &&
+    window.google.maps !== null &&
+    typeof window.google.maps.Map === 'function'
+  );
+}
+
 export function loadGoogleMaps(apiKey = getGoogleMapsApiKey()) {
   if (typeof window === 'undefined') return Promise.reject(new Error('Window not available'));
 
-  if (window.google && window.google.maps) {
+  if (isGoogleMapsLoaded()) {
     return Promise.resolve(window.google.maps);
   }
 
@@ -21,46 +32,76 @@ export function loadGoogleMaps(apiKey = getGoogleMapsApiKey()) {
   }
 
   loadPromise = new Promise((resolve, reject) => {
-    // Check if script element already exists
+    if (isGoogleMapsLoaded()) {
+      resolve(window.google.maps);
+      return;
+    }
+
+    let pollInterval = null;
+    let timeoutId = null;
+
+    const cleanup = () => {
+      if (pollInterval) clearInterval(pollInterval);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+
+    const handleSuccess = () => {
+      cleanup();
+      resolve(window.google.maps);
+    };
+
+    // Global callback explicitly triggered by Google Maps when Map constructor is ready
+    window.__initGoogleMap = () => {
+      if (isGoogleMapsLoaded()) {
+        handleSuccess();
+      }
+    };
+
+    // Active polling fallback in case callback or events fire out of order
+    pollInterval = setInterval(() => {
+      if (isGoogleMapsLoaded()) {
+        handleSuccess();
+      }
+    }, 60);
+
+    timeoutId = setTimeout(() => {
+      cleanup();
+      if (isGoogleMapsLoaded()) {
+        resolve(window.google.maps);
+      } else {
+        loadPromise = null;
+        reject(new Error('Google Maps initialization timeout: window.google.maps.Map is not ready'));
+      }
+    }, 20000);
+
+    // Check if script element already exists in document
     const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
     if (existingScript) {
-      if (window.google && window.google.maps) {
-        resolve(window.google.maps);
-        return;
-      }
       existingScript.addEventListener('load', () => {
-        if (window.google && window.google.maps) resolve(window.google.maps);
-        else reject(new Error('Google Maps script loaded but window.google.maps not found'));
+        if (isGoogleMapsLoaded()) handleSuccess();
       });
-      existingScript.addEventListener('error', (err) => reject(err));
+      existingScript.addEventListener('error', (err) => {
+        cleanup();
+        loadPromise = null;
+        reject(err || new Error('Failed to load existing Google Maps script'));
+      });
       return;
     }
 
     const script = document.createElement('script');
     script.type = 'text/javascript';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,drawing&v=weekly&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,drawing&callback=__initGoogleMap`;
     script.async = true;
     script.defer = true;
 
-    const timeout = setTimeout(() => {
-      reject(new Error('Google Maps load timeout (15s)'));
-    }, 15000);
-
     script.onload = () => {
-      clearTimeout(timeout);
-      if (window.google && window.google.maps) {
-        resolve(window.google.maps);
-      } else {
-        // Fallback check after small tick
-        setTimeout(() => {
-          if (window.google && window.google.maps) resolve(window.google.maps);
-          else reject(new Error('Google Maps loaded but api missing'));
-        }, 100);
+      if (isGoogleMapsLoaded()) {
+        handleSuccess();
       }
     };
 
     script.onerror = (err) => {
-      clearTimeout(timeout);
+      cleanup();
       loadPromise = null;
       reject(err || new Error('Failed to load Google Maps script'));
     };
