@@ -1173,12 +1173,11 @@ export default function CollectionReportDownloadModal({
                   borderBottom: '2px solid #0284c7' 
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <img src={mountainEmblem} alt="Everest" style={{ width: '20px', height: '18px', objectFit: 'contain' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '13px', fontWeight: 900, color: '#0d2b59' }}>
                     Everest Microfinance
                   </span>
-                  <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>
                     • Account Statement (Continuation)
                   </span>
                 </div>
@@ -1208,7 +1207,7 @@ export default function CollectionReportDownloadModal({
                   top: '50%',
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
-                  opacity: 0.10,
+                  opacity: 0.20,
                   pointerEvents: 'none',
                   zIndex: 0,
                   display: 'flex',
@@ -1326,7 +1325,7 @@ export default function CollectionReportDownloadModal({
                       style={{ 
                         display: 'flex',
                         width: '100%',
-                        backgroundColor: isEven ? 'rgba(255, 255, 255, 0.75)' : 'rgba(248, 250, 252, 0.78)',
+                        backgroundColor: isEven ? 'rgba(255, 255, 255, 0.65)' : 'rgba(248, 250, 252, 0.70)',
                         borderBottom: '1px solid #e2e8f0',
                         fontSize: '9.5px',
                         boxSizing: 'border-box'
