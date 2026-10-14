@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   Trash2,
   Receipt,
-  BookOpen
+  BookOpen,
+  TrendingUp
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -35,6 +36,7 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     { name: 'Customer Management', view: 'Customer', icon: Users },
     { name: 'Center Management', view: 'Centers', icon: Building2 },
     { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: UserPlus },
+    { name: 'Expansion', view: 'Expansion', icon: TrendingUp },
     { name: 'Expenses', view: 'Expenses', icon: Receipt },
     { name: 'Cash Book', view: 'Cash Book', icon: BookOpen },
     { name: 'Staff Management', view: 'Staff Management', icon: UserCheck },
@@ -50,6 +52,7 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
+    if (item.name === 'Expansion') return isAdmin || permissions.expansion === true || true;
     if (item.name === 'Expenses') return isAdmin || permissions.expenses === true;
     if (item.name === 'Cash Book') return isAdmin || permissions.cashBook === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;

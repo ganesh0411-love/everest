@@ -15,6 +15,7 @@ import {
   CustomerKYCUpdate, 
 } from './components/Placeholders';
 import AddBulkCustomer from './components/AddBulkCustomer';
+import ExpansionView from './components/ExpansionView';
 import Expenses from './components/Expenses';
 import CashBook from './components/CashBook';
 import CenterManagement from './components/CenterManagement';
@@ -1331,6 +1332,7 @@ function App() {
       case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} branches={branches} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer activeBranch={activeBranch} /></div>;
+      case 'Expansion': return <div className="flex-1 overflow-y-auto"><ExpansionView activeBranch={activeBranch} userProfile={userProfile} branches={branches} customers={customers} onBack={() => navigateToView('Home')} /></div>;
       case 'Expenses': return <div className="flex-1 overflow-y-auto"><Expenses activeBranch={activeBranch} userProfile={userProfile} branches={branches} onBack={() => navigateToView('Home')} /></div>;
       case 'Cash Book': return <div className="flex-1 overflow-y-auto"><CashBook activeBranch={activeBranch} userProfile={userProfile} branches={branches} customers={customers} onBack={() => navigateToView('Home')} /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} branches={branches} /></div>;
