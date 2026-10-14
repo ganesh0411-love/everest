@@ -705,32 +705,45 @@ export default function CollectionReportDownloadModal({
                   {/* Elegant Subtle Vertical Divider Line */}
                   <div style={{ width: '1.5px', height: '68px', backgroundColor: '#e2e8f0', margin: '0 16px' }} />
 
-                  {/* TOP RIGHT: Single-Line ACCOUNT STATEMENT Heading with Stacked Branch Address Directly Beneath */}
+                  {/* TOP RIGHT: Single-Line Title Above Divider Line, Branch Address Below */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flex: 1 }}>
                     
-                    {/* Single-Line Heading with Clean Accent Framing */}
+                    {/* 1. Title Above Line: Bold Royal Navy, uppercase, right-aligned, cleanly ABOVE divider line */}
+                    <div 
+                      style={{ 
+                        color: '#0c3563', 
+                        fontSize: '22px', 
+                        fontWeight: 900, 
+                        letterSpacing: '-0.3px', 
+                        textAlign: 'right', 
+                        textTransform: 'uppercase', 
+                        whiteSpace: 'nowrap',
+                        paddingRight: '6px',
+                        marginBottom: '4px'
+                      }}
+                    >
+                      ACCOUNT STATEMENT
+                    </div>
+
+                    {/* 2 & 3. Divider Line with attached vertical right accent bar directly beneath title, and Branch Address strictly BELOW the line */}
                     <div 
                       style={{ 
                         borderTop: '3.5px solid #0284c7', 
                         borderRight: '3.5px solid #0284c7', 
-                        paddingTop: '3px', 
+                        paddingTop: '4px', 
                         paddingRight: '6px', 
-                        paddingLeft: '12px',
-                        paddingBottom: '2px',
-                        display: 'inline-block'
+                        paddingLeft: '14px',
+                        display: 'inline-block',
+                        textAlign: 'right',
+                        minWidth: '235px'
                       }}
                     >
-                      <div style={{ color: '#0c3563', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.3px', textAlign: 'right', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-                        ACCOUNT STATEMENT
+                      <div style={{ fontSize: '9.5px', color: '#475569', fontWeight: 600, lineHeight: 1.35 }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{branchInfo.displayTitle}</div>
+                        <div>{branchInfo.addrLine1}</div>
+                        {branchInfo.addrLine2 && <div>{branchInfo.addrLine2}</div>}
+                        <div>Ph: {branchInfo.phone}</div>
                       </div>
-                    </div>
-
-                    {/* Branch Office Address Stacked Directly Beneath Single-Line Heading */}
-                    <div style={{ fontSize: '9.5px', color: '#475569', fontWeight: 600, lineHeight: 1.35, textAlign: 'right', marginTop: '4px' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{branchInfo.displayTitle}</div>
-                      <div>{branchInfo.addrLine1}</div>
-                      {branchInfo.addrLine2 && <div>{branchInfo.addrLine2}</div>}
-                      <div>Ph: {branchInfo.phone}</div>
                     </div>
                   </div>
                 </div>
