@@ -5,7 +5,6 @@ import QRCode from 'qrcode';
 import { Capacitor } from '@capacitor/core';
 import { Download, Share2, X, Check, FileText, Target, Wallet, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import logo from '../assets/logo.png';
-import brandedQrAsset from '../assets/everest-qr-branded.png';
 import mountainEmblem from '../assets/everest-mountain-emblem.png';
 
 const parseDateToTimestamp = (dStr) => {
@@ -81,22 +80,6 @@ const getLoanTypeStyle = (type) => {
   return { color: '#0284c7', label: type || 'Microfinance' };
 };
 
-// 12 Pixel-Perfect Reference Records matching media_1791947345015_1f55baa6.png
-const REFERENCE_SAMPLE_RECORDS = [
-  { id: 's1', date: '03-05-2026', name: 'Mr. Abdul quadir', loanType: 'Microfinance', debit: 5000, upiAmount: 1200, cashAmount: 800, credit: 2000, pending: 500, od: 0 },
-  { id: 's2', date: '10-05-2026', name: 'Mr. Arul Cyril', loanType: 'Personal Loan', debit: 10000, upiAmount: 1000, cashAmount: 1000, credit: 2000, pending: 700, od: 0 },
-  { id: 's3', date: '16-05-2026', name: 'Mrs. Selvi', loanType: 'Agri Loan', debit: 6500, upiAmount: 2000, cashAmount: 500, credit: 2500, pending: 250, od: 0 },
-  { id: 's4', date: '26-05-2026', name: 'Mr. Kumar', loanType: 'Daily', debit: 6000, upiAmount: 1800, cashAmount: 1200, credit: 3000, pending: 400, od: 0 },
-  { id: 's5', date: '05-06-2026', name: 'Mrs. Lakshmi', loanType: 'Microfinance', debit: 7500, upiAmount: 0, cashAmount: 0, credit: 0, pending: 300, od: 200 },
-  { id: 's6', date: '12-06-2026', name: 'Mr. Rajkumar', loanType: 'Personal Loan', debit: 12000, upiAmount: 2500, cashAmount: 1000, credit: 3500, pending: 800, od: 0 },
-  { id: 's7', date: '20-06-2026', name: 'Mrs. Prema', loanType: 'Agri Loan', debit: 9000, upiAmount: 1200, cashAmount: 800, credit: 2000, pending: 600, od: 0 },
-  { id: 's8', date: '28-06-2026', name: 'Mr. Vignesh', loanType: 'Daily', debit: 4500, upiAmount: 900, cashAmount: 600, credit: 1500, pending: 300, od: 100 },
-  { id: 's9', date: '05-07-2026', name: 'Mrs. Deepa', loanType: 'Microfinance', debit: 8000, upiAmount: 1700, cashAmount: 1000, credit: 2700, pending: 500, od: 0 },
-  { id: 's10', date: '12-07-2026', name: 'Mr. Balan', loanType: 'Personal Loan', debit: 15000, upiAmount: 2300, cashAmount: 1200, credit: 3500, pending: 700, od: 200 },
-  { id: 's11', date: '18-07-2026', name: 'Mrs. Kavitha', loanType: 'Agri Loan', debit: 6500, upiAmount: 1000, cashAmount: 500, credit: 1500, pending: 400, od: 0 },
-  { id: 's12', date: '25-07-2026', name: 'Mr. Mohan', loanType: 'Daily', debit: 9500, upiAmount: 1400, cashAmount: 900, credit: 2300, pending: 600, od: 0 }
-];
-
 export default function CollectionReportDownloadModal({
   isOpen,
   onClose,
@@ -105,6 +88,8 @@ export default function CollectionReportDownloadModal({
   fromDate,
   toDate,
   data = [],
+  allLedgerData = [],
+  searchTerm = '',
   targetCollection = 0,
   totalCollection = 0,
   onlineCollection = 0,
@@ -115,10 +100,8 @@ export default function CollectionReportDownloadModal({
   initialIncludeBounced = false
 }) {
   const [includeBounced, setIncludeBounced] = useState(Boolean(initialIncludeBounced));
-  const [useSampleData, setUseSampleData] = useState(() => (data && data.length === 0));
-  const [qrCodeStyle, setQrCodeStyle] = useState('scannable'); // 'scannable' or 'branded_art'
   const [isGenerating, setIsGenerating] = useState(false);
-  const [scannableQrDataUrl, setScannableQrDataUrl] = useState('');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [downloadTimestamp, setDownloadTimestamp] = useState(() => formatCurrentTimestamp());
 
   const printableRef = useRef(null);
@@ -128,16 +111,13 @@ export default function CollectionReportDownloadModal({
     if (isOpen) {
       setIncludeBounced(Boolean(initialIncludeBounced));
       setDownloadTimestamp(formatCurrentTimestamp());
-      if (!data || data.length === 0) {
-        setUseSampleData(true);
-      }
     }
-  }, [isOpen, initialIncludeBounced, data]);
+  }, [isOpen, initialIncludeBounced]);
 
   // Clean deduplicated branch info
   const branchInfo = useMemo(() => {
-    const rawName = typeof activeBranch === 'string' ? activeBranch : (activeBranch?.name || 'Kullappuram Branch');
-    const cleanName = rawName.replace(/\s+branch\s*$/i, '').trim() || 'Kullappuram';
+    const rawName = typeof activeBranch === 'string' ? activeBranch : (activeBranch?.name || 'Main Branch');
+    const cleanName = rawName.replace(/\s+branch\s*$/i, '').trim() || 'Main';
     const displayTitle = `${cleanName} Branch`;
 
     let addrLine1 = 'Door No: 278, Ambigai Apartment,';
@@ -165,31 +145,47 @@ export default function CollectionReportDownloadModal({
     };
   }, [activeBranch]);
 
-  // Recalculate statement entries and metrics
-  const { statementEntries, metrics, effectiveFromDate, effectiveToDate } = useMemo(() => {
-    if (useSampleData) {
+  // 100% Real Live Collection Report Data & Metrics Binding
+  const { statementEntries, metrics } = useMemo(() => {
+    let baseList = data || [];
+
+    // If includeBounced changed from initial state and allLedgerData is provided
+    if (includeBounced !== initialIncludeBounced && Array.isArray(allLedgerData) && allLedgerData.length > 0) {
+      baseList = allLedgerData.filter((item) => {
+        if (searchTerm && searchTerm.trim()) {
+          const q = searchTerm.trim().toLowerCase();
+          const match = (item.name || '').toLowerCase().includes(q) ||
+                        String(item.mode || '').toLowerCase().includes(q) ||
+                        String(item.status || '').toLowerCase().includes(q);
+          if (!match) return false;
+        }
+        if (!includeBounced) {
+          return !item.isBounced && item.mode !== 'BOUNCED' && item.status !== 'BOUNCED';
+        }
+        return true;
+      });
+    } else if (!includeBounced) {
+      baseList = baseList.filter(item => !item.isBounced && item.mode !== 'BOUNCED' && item.status !== 'BOUNCED');
+    }
+
+    // When includeBounced matches initial state, directly use the exact calculated screen metrics
+    if (includeBounced === initialIncludeBounced) {
       return {
-        statementEntries: REFERENCE_SAMPLE_RECORDS,
+        statementEntries: baseList,
         metrics: {
-          target: 38532,
-          total: 64328,
-          upi: 32199,
-          cash: 32129,
-          pending: 5820,
-          od: 3450,
-          disbursement: 48750,
-          entriesCount: 156
-        },
-        effectiveFromDate: '03-05-2026',
-        effectiveToDate: '13-10-2026'
+          target: Number(targetCollection || 0),
+          total: Number(totalCollection || 0),
+          upi: Number(onlineCollection || 0),
+          cash: Number(cashCollection || 0),
+          pending: Number(totalScopedPending || 0),
+          od: Number(totalScopedOverdue || 0),
+          disbursement: Number(totalDisbursement || 0),
+          entriesCount: baseList.length
+        }
       };
     }
 
-    const entries = (data || []).filter((item) => {
-      if (includeBounced) return true;
-      return !item.isBounced && item.mode !== 'BOUNCED' && item.status !== 'BOUNCED';
-    });
-
+    // Dynamically recalculate if toggled in modal
     let coll = 0;
     let upi = 0;
     let cash = 0;
@@ -197,12 +193,12 @@ export default function CollectionReportDownloadModal({
     let pending = 0;
     let od = 0;
 
-    entries.forEach((item) => {
-      const isCredit = item.credit > 0;
-      const isDebit = item.debit > 0;
+    baseList.forEach((item) => {
+      const isCredit = Number(item.credit || 0) > 0;
+      const isDebit = Number(item.debit || 0) > 0;
 
       if (isCredit) {
-        coll += item.credit;
+        coll += Number(item.credit || 0);
         const itemUpi = Number(item.upiAmount || 0);
         const itemCash = Number(item.cashAmount || 0);
         if (item.isSplit || (itemUpi > 0 && itemCash > 0)) {
@@ -214,14 +210,14 @@ export default function CollectionReportDownloadModal({
         } else if (itemCash > 0) {
           cash += itemCash;
         } else if (item.mode === 'UPI') {
-          upi += item.credit;
+          upi += Number(item.credit || 0);
         } else {
-          cash += item.credit;
+          cash += Number(item.credit || 0);
         }
       }
 
       if (isDebit) {
-        disb += item.debit;
+        disb += Number(item.debit || 0);
       }
 
       pending += Number(item.pending || 0);
@@ -229,7 +225,7 @@ export default function CollectionReportDownloadModal({
     });
 
     return {
-      statementEntries: entries,
+      statementEntries: baseList,
       metrics: {
         target: Number(targetCollection || 0),
         total: coll,
@@ -238,48 +234,51 @@ export default function CollectionReportDownloadModal({
         pending: totalScopedPending > 0 ? totalScopedPending : pending,
         od: totalScopedOverdue > 0 ? totalScopedOverdue : od,
         disbursement: totalDisbursement > 0 ? totalDisbursement : disb,
-        entriesCount: entries.length
-      },
-      effectiveFromDate: fromDate || '03-05-2026',
-      effectiveToDate: toDate || '13-10-2026'
+        entriesCount: baseList.length
+      }
     };
-  }, [useSampleData, data, includeBounced, targetCollection, totalScopedPending, totalScopedOverdue, totalDisbursement, fromDate, toDate]);
+  }, [data, allLedgerData, searchTerm, includeBounced, initialIncludeBounced, targetCollection, totalCollection, onlineCollection, cashCollection, totalScopedPending, totalScopedOverdue, totalDisbursement]);
 
-  // Construct Authenticity Verification Payload Text
-  const verificationPayloadText = useMemo(() => {
-    const hash = generateDocHash(`${branchInfo.displayTitle}|${effectiveFromDate}|${effectiveToDate}|${metrics.total}|${metrics.entriesCount}`);
-    return [
-      'EVEREST MICROFINANCE - VERIFIED STATEMENT',
-      `Branch: ${branchInfo.displayTitle}`,
-      `Period: ${effectiveFromDate} to ${effectiveToDate}`,
-      `Total Collection: ₹ ${metrics.total.toLocaleString('en-IN')} (UPI: ₹ ${metrics.upi.toLocaleString('en-IN')}, Cash: ₹ ${metrics.cash.toLocaleString('en-IN')})`,
-      `Target: ₹ ${metrics.target.toLocaleString('en-IN')} | Pending: ₹ ${metrics.pending.toLocaleString('en-IN')} | OD: ₹ ${metrics.od.toLocaleString('en-IN')}`,
-      `Total Entries: ${metrics.entriesCount}`,
-      `Generated: ${downloadTimestamp}`,
-      `Doc Hash: ${hash}`,
-      'Status: AUTHENTIC ORIGINAL RECORD'
-    ].join('\n');
-  }, [branchInfo, effectiveFromDate, effectiveToDate, metrics, downloadTimestamp]);
+  // Construct Live JSON Summary Payload for QR Code Verification
+  const qrPayloadJson = useMemo(() => {
+    const hash = generateDocHash(`${branchInfo.displayTitle}|${fromDate}|${toDate}|${metrics.total}|${metrics.entriesCount}`);
+    return JSON.stringify({
+      organization: "Everest Microfinance",
+      branch: branchInfo.displayTitle,
+      period: `${fromDate} to ${toDate}`,
+      targetAmount: Number(metrics.target || 0),
+      totalCollection: Number(metrics.total || 0),
+      upiCollection: Number(metrics.upi || 0),
+      cashCollection: Number(metrics.cash || 0),
+      pendingAmount: Number(metrics.pending || 0),
+      overdueAmount: Number(metrics.od || 0),
+      disbursementAmount: Number(metrics.disbursement || 0),
+      totalEntries: Number(metrics.entriesCount || 0),
+      generatedAt: downloadTimestamp,
+      documentHash: hash,
+      verificationStatus: "AUTHENTIC_ORIGINAL_RECORD"
+    }, null, 2);
+  }, [branchInfo, fromDate, toDate, metrics, downloadTimestamp]);
 
-  // Generate Scannable Verification QR Code Data URL
+  // Generate Scannable Verification QR Code
   useEffect(() => {
     if (!isOpen) return;
 
     let isMounted = true;
     const generateQr = async () => {
       try {
-        const url = await QRCode.toDataURL(verificationPayloadText, {
-          errorCorrectionLevel: 'H',
+        const url = await QRCode.toDataURL(qrPayloadJson, {
+          errorCorrectionLevel: 'M',
           margin: 1,
           width: 320,
           color: {
-            dark: '#1E5A99',
+            dark: '#0c3563',
             light: '#ffffff'
           }
         });
 
         if (isMounted) {
-          setScannableQrDataUrl(url);
+          setQrCodeDataUrl(url);
         }
       } catch (err) {
         console.error('Failed to generate verification QR code:', err);
@@ -291,7 +290,7 @@ export default function CollectionReportDownloadModal({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, verificationPayloadText]);
+  }, [isOpen, qrPayloadJson]);
 
   // Compile PDF with html2canvas and jsPDF
   const compilePdf = async () => {
@@ -330,7 +329,7 @@ export default function CollectionReportDownloadModal({
       heightLeft -= pageHeight;
     }
 
-    const filename = `Everest_Account_Statement_${effectiveFromDate}_to_${effectiveToDate}.pdf`;
+    const filename = `Everest_Account_Statement_${fromDate}_to_${toDate}.pdf`;
     return { pdf, filename };
   };
 
@@ -392,7 +391,7 @@ export default function CollectionReportDownloadModal({
 
         await Share.share({
           title: 'Everest Account Statement',
-          text: `Account Statement for ${branchInfo.displayTitle} (${effectiveFromDate} to ${effectiveToDate})`,
+          text: `Account Statement for ${branchInfo.displayTitle} (${fromDate} to ${toDate})`,
           url: fileWriteResult.uri,
           dialogTitle: 'Share Statement PDF'
         });
@@ -404,7 +403,7 @@ export default function CollectionReportDownloadModal({
           await navigator.share({
             files: [file],
             title: filename,
-            text: `Everest Account Statement (${effectiveFromDate} to ${effectiveToDate})`
+            text: `Everest Account Statement (${fromDate} to ${toDate})`
           });
         } else {
           pdf.save(filename);
@@ -425,9 +424,9 @@ export default function CollectionReportDownloadModal({
 
   return (
     <>
-      {/* 1. COMPACT DOWNLOAD ACTION DIALOG */}
+      {/* 1. CLEAN DOWNLOAD ACTION DIALOG (No confusing sample/mode toggles) */}
       <div className="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-5 sm:p-6 border border-slate-100 flex flex-col gap-3.5 relative animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-5 sm:p-6 border border-slate-100 flex flex-col gap-4 relative animate-in zoom-in-95 duration-200">
           
           {/* Header */}
           <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
@@ -438,7 +437,7 @@ export default function CollectionReportDownloadModal({
               <div className="flex flex-col">
                 <h3 className="text-base font-extrabold text-slate-900 tracking-tight">Download Collection Statement</h3>
                 <span className="text-xs font-semibold text-slate-500">
-                  {branchInfo.displayTitle} • {effectiveFromDate} to {effectiveToDate}
+                  {branchInfo.displayTitle} • {fromDate} to {toDate}
                 </span>
               </div>
             </div>
@@ -451,82 +450,28 @@ export default function CollectionReportDownloadModal({
             </button>
           </div>
 
-          {/* Configuration Toggles */}
-          <div className="flex flex-col gap-2">
-            
-            {/* Toggle 1: Include Bounced Records */}
-            <div 
-              onClick={() => !isGenerating && setIncludeBounced(!includeBounced)}
-              className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100/80 cursor-pointer transition select-none"
-            >
-              <div className="flex flex-col pr-2">
-                <span className="text-xs font-bold text-slate-800">Include Bounced Records</span>
-                <span className="text-[10.5px] text-slate-500 font-medium">
-                  Include returned/bounced dues in statement ledger & metrics
-                </span>
-              </div>
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
-                includeBounced 
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-2xs' 
-                  : 'border-slate-300 bg-white'
-              }`}>
-                {includeBounced && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-              </div>
+          {/* Single Checkbox Toggle: Include Bounced Records */}
+          <div 
+            onClick={() => !isGenerating && setIncludeBounced(!includeBounced)}
+            className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100/80 cursor-pointer transition select-none"
+          >
+            <div className="flex flex-col pr-2">
+              <span className="text-xs font-bold text-slate-800">Include Bounced Records</span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Include returned/bounced dues in statement ledger & metrics
+              </span>
             </div>
-
-            {/* Toggle 2: Sample Reference Records (When Live Records are 0 or to inspect 1:1 design) */}
-            <div 
-              onClick={() => !isGenerating && setUseSampleData(!useSampleData)}
-              className="flex items-center justify-between p-2.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 hover:bg-amber-100/60 cursor-pointer transition select-none"
-            >
-              <div className="flex flex-col pr-2">
-                <span className="text-xs font-bold text-amber-900">Load Target Reference Data (12 Records)</span>
-                <span className="text-[10.5px] text-amber-700 font-medium">
-                  Matches client reference design 1:1 with all 12 sample ledger rows
-                </span>
-              </div>
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
-                useSampleData 
-                  ? 'bg-amber-600 border-amber-600 text-white shadow-2xs' 
-                  : 'border-amber-300 bg-white'
-              }`}>
-                {useSampleData && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-              </div>
-            </div>
-
-            {/* Toggle 3: QR Code Artwork Style */}
-            <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-800">QR Code Mode</span>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {qrCodeStyle === 'scannable' ? 'Scannable Live Verification Text' : 'Client Vector Art Image'}
-                </span>
-              </div>
-              <div className="flex items-center bg-slate-200/80 p-0.5 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setQrCodeStyle('scannable')}
-                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ${
-                    qrCodeStyle === 'scannable' ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600'
-                  }`}
-                >
-                  Live Scannable
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQrCodeStyle('branded_art')}
-                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ${
-                    qrCodeStyle === 'branded_art' ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600'
-                  }`}
-                >
-                  Branded Art
-                </button>
-              </div>
+            <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+              includeBounced 
+                ? 'bg-blue-600 border-blue-600 text-white shadow-2xs' 
+                : 'border-slate-300 bg-white'
+            }`}>
+              {includeBounced && <Check className="w-3.5 h-3.5 stroke-[3]" />}
             </div>
           </div>
 
-          {/* Preview Metrics Card */}
-          <div className="bg-sky-50/60 rounded-2xl border border-sky-100 p-3 grid grid-cols-2 gap-2 text-xs">
+          {/* Live Scoped Preview Metrics Card */}
+          <div className="bg-sky-50/60 rounded-2xl border border-sky-100 p-3.5 grid grid-cols-2 gap-2 text-xs">
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Target</span>
               <span className="text-sm font-black text-slate-800">₹ {metrics.target.toLocaleString('en-IN')}</span>
@@ -534,7 +479,7 @@ export default function CollectionReportDownloadModal({
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Total Collection</span>
               <span className="text-sm font-black text-sky-700">₹ {metrics.total.toLocaleString('en-IN')}</span>
-              <span className="text-[9px] text-slate-500 font-semibold">
+              <span className="text-[9px] text-slate-500 font-semibold mt-0.5">
                 UPI: ₹{metrics.upi.toLocaleString('en-IN')} | Cash: ₹{metrics.cash.toLocaleString('en-IN')}
               </span>
             </div>
@@ -614,10 +559,10 @@ export default function CollectionReportDownloadModal({
           {/* HEADER SECTION */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', width: '100%' }}>
             
-            {/* TOP LEFT: Branded / Scannable QR Code + Everest Title & Branch Address */}
+            {/* TOP LEFT: Auto-Generated Live Verification QR Code + Everest Title & Branch Address */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
               
-              {/* QR Code Container */}
+              {/* QR Code Container with Central Mountain Emblem */}
               <div 
                 style={{
                   width: '80px',
@@ -633,44 +578,32 @@ export default function CollectionReportDownloadModal({
                   overflow: 'hidden'
                 }}
               >
-                {qrCodeStyle === 'branded_art' ? (
-                  /* Client's exact branded artwork asset */
+                {qrCodeDataUrl ? (
                   <img 
-                    src={brandedQrAsset} 
-                    alt="Everest Branded QR" 
+                    src={qrCodeDataUrl} 
+                    alt="Verification QR" 
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                   />
                 ) : (
-                  /* Scannable Live QR Code with embedded central mountain emblem */
-                  <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {scannableQrDataUrl ? (
-                      <img 
-                        src={scannableQrDataUrl} 
-                        alt="Scannable Verification QR" 
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                      />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', backgroundColor: '#f1f5f9' }} />
-                    )}
-                    {/* Embedded Central Mountain & Arrow Emblem */}
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        width: '26px',
-                        height: '24px',
-                        backgroundColor: '#ffffff',
-                        borderRadius: '4px',
-                        padding: '1px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 0 2px rgba(0,0,0,0.2)'
-                      }}
-                    >
-                      <img src={mountainEmblem} alt="Mountain" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                    </div>
-                  </div>
+                  <div style={{ width: '100%', height: '100%', backgroundColor: '#f1f5f9' }} />
                 )}
+                {/* Embedded Central Mountain & Growth Arrow Emblem */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    width: '24px',
+                    height: '22px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '4px',
+                    padding: '1px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 2px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  <img src={mountainEmblem} alt="Mountain" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </div>
               </div>
 
               {/* Title & Branch Office Address */}
@@ -690,23 +623,27 @@ export default function CollectionReportDownloadModal({
               </div>
             </div>
 
-            {/* TOP RIGHT: Account Statement with Cyan Accent Bar & Safe Vertical Timestamp */}
+            {/* TOP RIGHT: Account Statement with Seamless 90-Degree Corner Framing & Safe Vertical Timestamp */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
               
-              {/* Framed Title Block */}
-              <div style={{ position: 'relative', paddingRight: '8px', paddingTop: '2px' }}>
-                {/* Top horizontal cyan bar */}
-                <div style={{ width: '150px', height: '4px', backgroundColor: '#0284c7', marginLeft: 'auto', marginBottom: '6px' }} />
-                {/* Right vertical cyan bar */}
-                <div style={{ position: 'absolute', right: 0, top: 0, width: '4px', height: '62px', backgroundColor: '#0284c7' }} />
-
+              {/* Seamless Corner Framed Title Block */}
+              <div 
+                style={{ 
+                  borderTop: '4px solid #0284c7', 
+                  borderRight: '4px solid #0284c7', 
+                  paddingTop: '6px', 
+                  paddingRight: '8px', 
+                  paddingLeft: '14px',
+                  paddingBottom: '2px'
+                }}
+              >
                 <div style={{ color: '#0c3563', fontSize: '26px', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-0.5px', textAlign: 'right', textTransform: 'uppercase' }}>
                   ACCOUNT<br />STATEMENT
                 </div>
               </div>
 
-              {/* Unclipped Vertical Timestamp Column inside header */}
-              <div style={{ width: '16px', height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {/* Unclipped Vertical Timestamp Column strictly inside header boundary */}
+              <div style={{ width: '16px', height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div 
                   style={{
                     transform: 'rotate(90deg)',
@@ -724,7 +661,7 @@ export default function CollectionReportDownloadModal({
             </div>
           </div>
 
-          {/* 4 KPI SUMMARY METRIC CARDS */}
+          {/* 4 KPI SUMMARY METRIC CARDS (Uniform 96px height with zero collision) */}
           <div 
             style={{
               display: 'grid',
@@ -742,12 +679,12 @@ export default function CollectionReportDownloadModal({
                 padding: '8px 10px',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '84px',
+                height: '96px',
                 boxSizing: 'border-box'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#0284c7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#0284c7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
                   <Target style={{ width: '14px', height: '14px' }} />
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#0284c7' }}>Target</span>
@@ -759,46 +696,52 @@ export default function CollectionReportDownloadModal({
               </div>
             </div>
 
-            {/* Card 2: Collection */}
+            {/* Card 2: Collection (Fixed text collision: comfortable vertical room) */}
             <div 
               style={{
                 backgroundColor: '#f0fdf4',
                 border: '1.5px solid #a7f3d0',
                 borderRadius: '12px',
-                padding: '6px 8px',
+                padding: '8px 10px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                height: '84px',
+                height: '96px',
                 boxSizing: 'border-box'
               }}
             >
+              {/* Top: Icon + Title */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#059669', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Wallet style={{ width: '14px', height: '14px' }} />
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#059669', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
+                  <Wallet style={{ width: '13px', height: '13px' }} />
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#059669' }}>Collection</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', margin: '1px 0' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '8.5px', fontWeight: 600, color: '#047857' }}>UPI</div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#065f46' }}>₹ {metrics.upi.toLocaleString('en-IN')}</div>
+
+              {/* Middle: UPI & Cash split with comfortable breathing room */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '2px 0' }}>
+                <div style={{ textAlign: 'center', flex: 1 }}>
+                  <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '1px' }}>UPI</div>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#065f46' }}>₹ {metrics.upi.toLocaleString('en-IN')}</div>
                 </div>
-                <div style={{ width: '1px', height: '16px', backgroundColor: '#a7f3d0' }} />
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '8.5px', fontWeight: 600, color: '#047857' }}>Cash</div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#065f46' }}>₹ {metrics.cash.toLocaleString('en-IN')}</div>
+                <div style={{ width: '1px', height: '18px', backgroundColor: '#a7f3d0', margin: '0 4px' }} />
+                <div style={{ textAlign: 'center', flex: 1 }}>
+                  <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '1px' }}>Cash</div>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#065f46' }}>₹ {metrics.cash.toLocaleString('en-IN')}</div>
                 </div>
               </div>
+
+              {/* Bottom: Solid Emerald Banner */}
               <div 
                 style={{
                   backgroundColor: '#059669',
                   color: '#ffffff',
-                  borderRadius: '5px',
+                  borderRadius: '6px',
                   fontSize: '11px',
                   fontWeight: 800,
                   textAlign: 'center',
-                  padding: '2px 0'
+                  padding: '3px 0',
+                  lineHeight: 1.2
                 }}
               >
                 Total ₹ {metrics.total.toLocaleString('en-IN')}
@@ -814,12 +757,12 @@ export default function CollectionReportDownloadModal({
                 padding: '8px 10px',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '84px',
+                height: '96px',
                 boxSizing: 'border-box'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#ea580c', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#ea580c', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
                   <Clock style={{ width: '14px', height: '14px' }} />
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#d97706' }}>Pending</span>
@@ -840,12 +783,12 @@ export default function CollectionReportDownloadModal({
                 padding: '8px 10px',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '84px',
+                height: '96px',
                 boxSizing: 'border-box'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#dc2626', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#dc2626', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
                   <AlertTriangle style={{ width: '14px', height: '14px' }} />
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626' }}>OD / Overdue</span>
@@ -858,7 +801,7 @@ export default function CollectionReportDownloadModal({
             </div>
           </div>
 
-          {/* SUB-SUMMARY STRIP */}
+          {/* SUB-SUMMARY STRIP (100% Real Live Disbursement, Period & Total Entries) */}
           <div 
             style={{
               backgroundColor: '#ffffff',
@@ -871,7 +814,7 @@ export default function CollectionReportDownloadModal({
               justifyContent: 'space-between'
             }}
           >
-            {/* Left: Disbursement Amount */}
+            {/* Left: Real Disbursement Amount */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#0284c7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -891,23 +834,23 @@ export default function CollectionReportDownloadModal({
             {/* Middle Divider */}
             <div style={{ width: '1px', height: '28px', backgroundColor: '#cbd5e1' }} />
 
-            {/* Middle: Period From & To */}
+            {/* Middle: Exact Selected Screen Period */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '10.5px', fontWeight: 600, color: '#334155' }}>
-              <div>Period From &nbsp;: &nbsp;{effectiveFromDate}</div>
-              <div>Period To &nbsp;&nbsp;&nbsp;: &nbsp;{effectiveToDate}</div>
+              <div>Period From &nbsp;: &nbsp;{fromDate}</div>
+              <div>Period To &nbsp;&nbsp;&nbsp;: &nbsp;{toDate}</div>
             </div>
 
             {/* Right Divider */}
             <div style={{ width: '1px', height: '28px', backgroundColor: '#cbd5e1' }} />
 
-            {/* Right: Total Entries */}
+            {/* Right: Actual Filtered Total Entries */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', fontWeight: 700, color: '#334155' }}>
               <span>Total Entries &nbsp;:</span>
               <span style={{ fontSize: '15px', fontWeight: 900, color: '#0f172a' }}>{metrics.entriesCount}</span>
             </div>
           </div>
 
-          {/* DETAILED LEDGER TABLE WITH WATERMARK (Built with clean reliable flex-rows to avoid html2canvas rowSpan drops) */}
+          {/* DETAILED LEDGER TABLE WITH WATERMARK (Rendering REAL live transactions) */}
           <div 
             style={{
               position: 'relative',
@@ -1005,14 +948,14 @@ export default function CollectionReportDownloadModal({
               </div>
             </div>
 
-            {/* TABLE ROWS */}
+            {/* REAL LIVE TRANSACTION ROWS */}
             <div style={{ display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1 }}>
               {statementEntries.map((item, idx) => {
                 const isEven = idx % 2 === 0;
                 const loanTypeMeta = getLoanTypeStyle(item.loanType);
 
                 const disbAmt = Number(item.debit || 0);
-                const isCredit = item.credit > 0;
+                const isCredit = Number(item.credit || 0) > 0;
                 const isBounced = item.isBounced || item.status === 'BOUNCED' || item.mode === 'BOUNCED';
 
                 let upiVal = '-';
@@ -1099,7 +1042,7 @@ export default function CollectionReportDownloadModal({
                 );
               })}
 
-              {/* Empty State */}
+              {/* Empty State when no real live records match active filter */}
               {statementEntries.length === 0 && (
                 <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '11px', backgroundColor: '#ffffff' }}>
                   No transaction records found for the selected period.

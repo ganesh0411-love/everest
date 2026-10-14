@@ -1973,6 +1973,8 @@ export default function CollectionReportModal({
         fromDate={fromDate}
         toDate={toDate}
         data={filteredData}
+        allLedgerData={ledgerEntries}
+        searchTerm={searchTerm}
         targetCollection={totalScopedTarget}
         totalCollection={totalCollection}
         onlineCollection={onlineCollection}
