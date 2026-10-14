@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { Capacitor } from '@capacitor/core';
-import { Download, Share2, X, Check, FileText, Target, Wallet, Clock, AlertTriangle, Loader2 } from 'lucide-react';
+import { Download, Share2, X, Check, FileText, Target, Wallet, Clock, AlertTriangle, Loader2, Calendar, ClipboardList } from 'lucide-react';
 import logo from '../assets/logo.png';
 import mountainEmblem from '../assets/everest-mountain-emblem.png';
 
@@ -640,17 +640,17 @@ export default function CollectionReportDownloadModal({
           >
             {page.isFirstPage ? (
               <>
-                {/* HEADER SECTION (Page 1 Only) */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', width: '100%' }}>
+                {/* HEADER SECTION (Page 1 Only: Branding Left, Divider Middle, Single-Line Title & Address Right) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', paddingBottom: '2px' }}>
                   
-                  {/* TOP LEFT: Auto-Generated Live Verification QR Code + Everest Title & Branch Address */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  {/* TOP LEFT: Verification QR Code + Branding ONLY */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     
                     {/* QR Code Container with Central Mountain Emblem */}
                     <div 
                       style={{
-                        width: '80px',
-                        height: '80px',
+                        width: '76px',
+                        height: '76px',
                         backgroundColor: '#ffffff',
                         border: '1.5px solid #cbd5e1',
                         borderRadius: '6px',
@@ -659,7 +659,8 @@ export default function CollectionReportDownloadModal({
                         alignItems: 'center',
                         justifyContent: 'center',
                         position: 'relative',
-                        overflow: 'hidden'
+                        overflow: 'hidden',
+                        shrink: 0
                       }}
                     >
                       {qrCodeDataUrl ? (
@@ -690,62 +691,51 @@ export default function CollectionReportDownloadModal({
                       </div>
                     </div>
 
-                    {/* Title & Branch Office Address */}
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {/* Branding ONLY (Beside QR code) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#0d2b59', margin: 0, lineHeight: 1.05, letterSpacing: '-0.3px' }}>
                         Everest
                       </h1>
                       <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0d2b59', margin: 0, lineHeight: 1.05, letterSpacing: '-0.3px' }}>
                         Microfinance
                       </h2>
-                      <div style={{ fontSize: '10.5px', color: '#334155', fontWeight: 600, lineHeight: 1.35, marginTop: '4px' }}>
-                        <div>{branchInfo.displayTitle},</div>
-                        <div>{branchInfo.addrLine1}</div>
-                        {branchInfo.addrLine2 && <div>{branchInfo.addrLine2}</div>}
-                        <div>Ph: {branchInfo.phone}</div>
-                      </div>
                     </div>
                   </div>
 
-                  {/* TOP RIGHT: Account Statement with Seamless 90-Degree Corner Framing & Safe Vertical Timestamp */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  {/* Elegant Subtle Vertical Divider Line */}
+                  <div style={{ width: '1.5px', height: '68px', backgroundColor: '#e2e8f0', margin: '0 16px' }} />
+
+                  {/* TOP RIGHT: Single-Line ACCOUNT STATEMENT Heading with Stacked Branch Address Directly Beneath */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flex: 1 }}>
                     
-                    {/* Seamless Corner Framed Title Block */}
+                    {/* Single-Line Heading with Clean Accent Framing */}
                     <div 
                       style={{ 
-                        borderTop: '4px solid #0284c7', 
-                        borderRight: '4px solid #0284c7', 
-                        paddingTop: '6px', 
-                        paddingRight: '8px', 
-                        paddingLeft: '14px',
-                        paddingBottom: '2px'
+                        borderTop: '3.5px solid #0284c7', 
+                        borderRight: '3.5px solid #0284c7', 
+                        paddingTop: '3px', 
+                        paddingRight: '6px', 
+                        paddingLeft: '12px',
+                        paddingBottom: '2px',
+                        display: 'inline-block'
                       }}
                     >
-                      <div style={{ color: '#0c3563', fontSize: '26px', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-0.5px', textAlign: 'right', textTransform: 'uppercase' }}>
-                        ACCOUNT<br />STATEMENT
+                      <div style={{ color: '#0c3563', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.3px', textAlign: 'right', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                        ACCOUNT STATEMENT
                       </div>
                     </div>
 
-                    {/* Unclipped Vertical Timestamp Column strictly inside header boundary */}
-                    <div style={{ width: '16px', height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div 
-                        style={{
-                          transform: 'rotate(90deg)',
-                          transformOrigin: 'center center',
-                          whiteSpace: 'nowrap',
-                          fontSize: '8px',
-                          fontWeight: 600,
-                          color: '#94a3b8',
-                          letterSpacing: '0.2px'
-                        }}
-                      >
-                        Downloaded: {downloadTimestamp}
-                      </div>
+                    {/* Branch Office Address Stacked Directly Beneath Single-Line Heading */}
+                    <div style={{ fontSize: '9.5px', color: '#475569', fontWeight: 600, lineHeight: 1.35, textAlign: 'right', marginTop: '4px' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{branchInfo.displayTitle}</div>
+                      <div>{branchInfo.addrLine1}</div>
+                      {branchInfo.addrLine2 && <div>{branchInfo.addrLine2}</div>}
+                      <div>Ph: {branchInfo.phone}</div>
                     </div>
                   </div>
                 </div>
 
-                {/* 4 KPI SUMMARY METRIC CARDS (Uniform 106px height with clean unboxed Total) */}
+                {/* 4 COMPACT UNIFIED MAIN KPI CARDS (Row 1: Uniform 72px height, Collection showing ONLY Total) */}
                 <div 
                   style={{
                     display: 'grid',
@@ -759,74 +749,52 @@ export default function CollectionReportDownloadModal({
                     style={{
                       backgroundColor: '#f0f7ff',
                       border: '1.5px solid #bae6fd',
-                      borderRadius: '12px',
-                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      padding: '8px 10px',
                       display: 'flex',
                       flexDirection: 'column',
-                      height: '106px',
+                      justifyContent: 'space-between',
+                      height: '72px',
                       boxSizing: 'border-box'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#0284c7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
-                        <Target style={{ width: '14px', height: '14px' }} />
+                      <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#0284c7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
+                        <Target style={{ width: '13px', height: '13px' }} />
                       </div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#0284c7' }}>Target</span>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#0284c7' }}>Target</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '20px', fontWeight: 900, color: '#0c4a6e' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 900, color: '#0c4a6e' }}>
                         ₹ {metrics.target.toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
 
-                  {/* Card 2: Collection (Clean unboxed Total text, zero squashing) */}
+                  {/* Card 2: Collection (Displaying ONLY Total Collected, centered & clean) */}
                   <div 
                     style={{
                       backgroundColor: '#f0fdf4',
                       border: '1.5px solid #a7f3d0',
-                      borderRadius: '12px',
-                      padding: '9px 12px',
+                      borderRadius: '10px',
+                      padding: '8px 10px',
                       display: 'flex',
                       flexDirection: 'column',
-                      height: '106px',
+                      justifyContent: 'space-between',
+                      height: '72px',
                       boxSizing: 'border-box'
                     }}
                   >
-                    {/* Top: Icon + Title */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#059669', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
-                        <Wallet style={{ width: '12px', height: '12px' }} />
+                        <Wallet style={{ width: '13px', height: '13px' }} />
                       </div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#059669' }}>Collection</span>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#059669' }}>Collection</span>
                     </div>
-
-                    {/* Middle: UPI & Cash split */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '4px 0 2px 0' }}>
-                      <div style={{ textAlign: 'center', flex: 1 }}>
-                        <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '2px' }}>UPI</div>
-                        <div style={{ fontSize: '12px', fontWeight: 800, color: '#065f46', lineHeight: 1.1 }}>₹ {metrics.upi.toLocaleString('en-IN')}</div>
-                      </div>
-                      <div style={{ width: '1px', height: '20px', backgroundColor: '#a7f3d0', margin: '0 4px' }} />
-                      <div style={{ textAlign: 'center', flex: 1 }}>
-                        <div style={{ fontSize: '8.5px', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '2px' }}>Cash</div>
-                        <div style={{ fontSize: '12px', fontWeight: 800, color: '#065f46', lineHeight: 1.1 }}>₹ {metrics.cash.toLocaleString('en-IN')}</div>
-                      </div>
-                    </div>
-
-                    {/* Bottom: Clean, bold, unboxed text cleanly centered */}
-                    <div 
-                      style={{
-                        marginTop: 'auto',
-                        fontSize: '13px',
-                        fontWeight: 900,
-                        color: '#047857',
-                        textAlign: 'center',
-                        paddingTop: '2px',
-                        lineHeight: 1.2
-                      }}
-                    >
-                      Total: ₹ {metrics.total.toLocaleString('en-IN')}
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 900, color: '#065f46' }}>
+                        ₹ {metrics.total.toLocaleString('en-IN')}
+                      </span>
                     </div>
                   </div>
 
@@ -835,22 +803,23 @@ export default function CollectionReportDownloadModal({
                     style={{
                       backgroundColor: '#fffbeb',
                       border: '1.5px solid #fde68a',
-                      borderRadius: '12px',
-                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      padding: '8px 10px',
                       display: 'flex',
                       flexDirection: 'column',
-                      height: '106px',
+                      justifyContent: 'space-between',
+                      height: '72px',
                       boxSizing: 'border-box'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#ea580c', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
-                        <Clock style={{ width: '14px', height: '14px' }} />
+                      <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#ea580c', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
+                        <Clock style={{ width: '13px', height: '13px' }} />
                       </div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#d97706' }}>Pending</span>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#d97706' }}>Pending</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '20px', fontWeight: 900, color: '#d97706' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 900, color: '#d97706' }}>
                         ₹ {metrics.pending.toLocaleString('en-IN')}
                       </span>
                     </div>
@@ -861,74 +830,107 @@ export default function CollectionReportDownloadModal({
                     style={{
                       backgroundColor: '#fef2f2',
                       border: '1.5px solid #fecaca',
-                      borderRadius: '12px',
-                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      padding: '8px 10px',
                       display: 'flex',
                       flexDirection: 'column',
-                      height: '106px',
+                      justifyContent: 'space-between',
+                      height: '72px',
                       boxSizing: 'border-box'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#dc2626', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
-                        <AlertTriangle style={{ width: '14px', height: '14px' }} />
+                      <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#dc2626', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
+                        <AlertTriangle style={{ width: '13px', height: '13px' }} />
                       </div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626' }}>OD / Overdue</span>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#dc2626' }}>OD / Overdue</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '20px', fontWeight: 900, color: '#dc2626' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 900, color: '#dc2626' }}>
                         ₹ {metrics.od.toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* SUB-SUMMARY STRIP (Disbursement, Period & Total Entries) */}
+                {/* SUB-SUMMARY STRIP (Row 2: Expanded into 4 Partitioned Modules with Dedicated UPI/Cash) */}
                 <div 
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1.5px solid #cbd5e1',
                     borderRadius: '10px',
-                    padding: '8px 16px',
+                    padding: '8px 14px',
                     marginTop: '10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
                   }}
                 >
-                  {/* Left: Real Disbursement Amount */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#0284c7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  {/* Module 1: Disbursement Amount */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1.15 }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#0284c7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M19 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3" />
                         <path d="M12 7c-4 0-7 2.5-7 6.5C5 18 8 21 12 21s7-3 7-7.5c0-4-3-6.5-7-6.5z" />
                         <circle cx="12" cy="14" r="2" />
                       </svg>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#475569', lineHeight: 1.1 }}>Disbursement Amount</span>
-                      <span style={{ fontSize: '16px', fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
+                      <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#475569', lineHeight: 1.1 }}>Disbursement Amount</span>
+                      <span style={{ fontSize: '15px', fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
                         ₹ {metrics.disbursement.toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
 
-                  {/* Middle Divider */}
-                  <div style={{ width: '1px', height: '26px', backgroundColor: '#cbd5e1' }} />
+                  {/* Divider 1 */}
+                  <div style={{ width: '1px', height: '28px', backgroundColor: '#cbd5e1' }} />
 
-                  {/* Middle: Exact Selected Screen Period */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '10px', fontWeight: 600, color: '#334155' }}>
-                    <div>Period From &nbsp;: &nbsp;{fromDate}</div>
-                    <div>Period To &nbsp;&nbsp;&nbsp;: &nbsp;{toDate}</div>
+                  {/* Module 2: Period */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1.1, paddingLeft: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#f1f5f9', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0, border: '1px solid #e2e8f0' }}>
+                      <Calendar style={{ width: '14px', height: '14px' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '10px', fontWeight: 600, color: '#334155', lineHeight: 1.25 }}>
+                      <div>From : <span style={{ fontWeight: 700, color: '#0f172a' }}>{fromDate}</span></div>
+                      <div>To &nbsp;&nbsp;&nbsp;: <span style={{ fontWeight: 700, color: '#0f172a' }}>{toDate}</span></div>
+                    </div>
                   </div>
 
-                  {/* Right Divider */}
-                  <div style={{ width: '1px', height: '26px', backgroundColor: '#cbd5e1' }} />
+                  {/* Divider 2 */}
+                  <div style={{ width: '1px', height: '28px', backgroundColor: '#cbd5e1' }} />
 
-                  {/* Right: Actual Filtered Total Entries */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontWeight: 700, color: '#334155' }}>
-                    <span>Total Entries &nbsp;:</span>
-                    <span style={{ fontSize: '15px', fontWeight: 900, color: '#0f172a' }}>{metrics.entriesCount}</span>
+                  {/* Module 3: Total Entries */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 0.9, paddingLeft: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#f1f5f9', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0, border: '1px solid #e2e8f0' }}>
+                      <ClipboardList style={{ width: '14px', height: '14px' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#475569', lineHeight: 1.1 }}>Total Entries</span>
+                      <span style={{ fontSize: '15px', fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
+                        {metrics.entriesCount}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Divider 3 */}
+                  <div style={{ width: '1px', height: '28px', backgroundColor: '#cbd5e1' }} />
+
+                  {/* Module 4: Collection Breakdown (UPI & Cash Stacked) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1.05, paddingLeft: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0, border: '1px solid #a7f3d0' }}>
+                      <Wallet style={{ width: '13px', height: '13px' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '10.5px', lineHeight: 1.25 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontWeight: 700, color: '#0284c7', fontSize: '9.5px', width: '28px' }}>UPI:</span>
+                        <span style={{ fontWeight: 800, color: '#0369a1' }}>₹ {metrics.upi.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontWeight: 700, color: '#059669', fontSize: '9.5px', width: '28px' }}>Cash:</span>
+                        <span style={{ fontWeight: 800, color: '#065f46' }}>₹ {metrics.cash.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </>
@@ -1201,14 +1203,14 @@ export default function CollectionReportDownloadModal({
                 justifyContent: 'space-between', 
                 alignItems: 'center', 
                 fontSize: '8.5px', 
-                color: '#94a3b8', 
+                color: '#64748b', 
                 fontWeight: 600, 
                 borderTop: '1px solid #e2e8f0', 
                 paddingTop: '6px', 
                 marginTop: 'auto' 
               }}
             >
-              <span>Everest Microfinance • Authentic Collection Statement</span>
+              <span>Downloaded: {downloadTimestamp}</span>
               <span>Page {page.pageIndex + 1} of {pages.length}</span>
             </div>
           </div>
