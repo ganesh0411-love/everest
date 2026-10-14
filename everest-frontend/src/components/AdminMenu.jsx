@@ -6,6 +6,8 @@ const AdminMenu = ({ pendingCount = 0, onSelectMenu }) => {
     { name: 'Customer', icon: '👤' },
     { name: 'Groups', icon: '👥' },
     { name: 'Add Bulk Customer', icon: '📥' },
+    { name: 'Expenses', icon: '💼' },
+    { name: 'Cash Book', icon: '📒' },
     { name: 'Staff Management', icon: '👔' },
     { name: 'Dashboard Overview', icon: '📊' },
     { name: 'Customer KYC Update', icon: '🛡️' },

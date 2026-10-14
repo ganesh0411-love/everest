@@ -10,7 +10,9 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
-  Trash2
+  Trash2,
+  Receipt,
+  BookOpen
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -33,6 +35,8 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     { name: 'Customer Management', view: 'Customer', icon: Users },
     { name: 'Center Management', view: 'Centers', icon: Building2 },
     { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: UserPlus },
+    { name: 'Expenses', view: 'Expenses', icon: Receipt },
+    { name: 'Cash Book', view: 'Cash Book', icon: BookOpen },
     { name: 'Staff Management', view: 'Staff Management', icon: UserCheck },
     { name: 'Application Status', view: 'Application Status', icon: ClipboardList },
     { name: 'Customer KYC Update', view: 'Customer KYC Update', icon: ShieldCheck },
@@ -46,6 +50,8 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
+    if (item.name === 'Expenses') return isAdmin || permissions.expenses === true;
+    if (item.name === 'Cash Book') return isAdmin || permissions.cashBook === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 
     return true;

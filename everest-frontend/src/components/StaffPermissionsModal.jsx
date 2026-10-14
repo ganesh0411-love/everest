@@ -22,6 +22,8 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
     collectionReportRole: 'Staff', // 'Staff' or 'Admin'
     attendance: false,
     attendanceRole: 'Staff', // 'Staff' or 'Admin'
+    expenses: false,
+    cashBook: false,
     recycleBin: false,
 
     // Dashboard Cards
@@ -328,6 +330,32 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                   <span className="font-medium text-slate-600">Admin</span>
                 </label>
               </div>
+            </div>
+
+            {/* Expenses */}
+            <div className={`flex items-center p-3 border rounded-xl transition-colors ${permissions.expenses ? 'border-purple-200 bg-purple-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+              <label className="flex items-center cursor-pointer flex-1">
+                <input 
+                  type="checkbox"
+                  className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                  checked={permissions.expenses}
+                  onChange={() => handleToggle('expenses')}
+                />
+                <span className="text-sm font-bold text-slate-700">Expenses</span>
+              </label>
+            </div>
+
+            {/* Cash Book */}
+            <div className={`flex items-center p-3 border rounded-xl transition-colors ${permissions.cashBook ? 'border-purple-200 bg-purple-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+              <label className="flex items-center cursor-pointer flex-1">
+                <input 
+                  type="checkbox"
+                  className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                  checked={permissions.cashBook}
+                  onChange={() => handleToggle('cashBook')}
+                />
+                <span className="text-sm font-bold text-slate-700">Cash Book</span>
+              </label>
             </div>
 
             {/* Recycle Bin */}

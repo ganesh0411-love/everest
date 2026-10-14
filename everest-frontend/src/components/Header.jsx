@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download } from 'lucide-react';
+import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download, Receipt, BookOpen } from 'lucide-react';
 
 const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile, isCollectionReportOpen }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -49,6 +49,8 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     { name: 'Customer Management', view: 'Customer', icon: <Users className="w-5 h-5" /> },
     { name: 'Center Management', view: 'Centers', icon: <Building2 className="w-5 h-5" /> },
     { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: <UserPlus className="w-5 h-5" /> },
+    { name: 'Expenses', view: 'Expenses', icon: <Receipt className="w-5 h-5" /> },
+    { name: 'Cash Book', view: 'Cash Book', icon: <BookOpen className="w-5 h-5" /> },
     { name: 'Staff Management', view: 'Staff Management', icon: <UserCheck className="w-5 h-5" /> },
     { name: 'Customer KYC Update', view: 'Customer KYC Update', icon: <ShieldCheck className="w-5 h-5" /> },
     { name: 'Application Status', view: 'Application Status', icon: <ClipboardList className="w-5 h-5" /> },
@@ -63,6 +65,8 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
     if (item.name === 'Add Bulk Customer') return true;
+    if (item.name === 'Expenses') return isAdmin || permissions.expenses === true;
+    if (item.name === 'Cash Book') return isAdmin || permissions.cashBook === true;
     if (item.name === 'Customer KYC Update') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 
