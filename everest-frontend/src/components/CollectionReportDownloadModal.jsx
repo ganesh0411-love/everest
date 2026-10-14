@@ -4,8 +4,8 @@ import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { Capacitor } from '@capacitor/core';
 import { Download, Share2, X, Check, FileText, Target, Wallet, Clock, AlertTriangle, Loader2, Calendar, ClipboardList } from 'lucide-react';
-import logo from '../assets/logo.png';
 import mountainEmblem from '../assets/everest-mountain-emblem.png';
+import watermarkEmblem from '../assets/everest-emblem-watermark.png';
 import { supabase } from '../supabase';
 import { db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -81,6 +81,66 @@ const getLoanTypeStyle = (type) => {
   if (t.includes('daily')) return { color: '#ea580c', label: 'Daily' };
   if (t.includes('micro')) return { color: '#0284c7', label: 'Microfinance' };
   return { color: '#0284c7', label: type || 'Microfinance' };
+};
+
+// High-precision dynamic QR generator with brand Navy-to-Teal module gradient
+const generateBrandedQrDataUrl = async (url) => {
+  try {
+    const size = 320;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+
+    await QRCode.toCanvas(canvas, url, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: size,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const imgData = ctx.getImageData(0, 0, size, size);
+      const pixels = imgData.data;
+
+      // Smooth vertical gradient: Royal Navy (#123A70) to Brand Teal (#0284C7)
+      for (let y = 0; y < size; y++) {
+        const t = y / size;
+        const r = Math.round(18 + (2 - 18) * t);
+        const g = Math.round(58 + (132 - 58) * t);
+        const b = Math.round(112 + (199 - 112) * t);
+
+        for (let x = 0; x < size; x++) {
+          const idx = (y * size + x) * 4;
+          if (pixels[idx] < 128) {
+            pixels[idx] = r;
+            pixels[idx + 1] = g;
+            pixels[idx + 2] = b;
+            pixels[idx + 3] = 255;
+          } else {
+            pixels[idx] = 255;
+            pixels[idx + 1] = 255;
+            pixels[idx + 2] = 255;
+            pixels[idx + 3] = 255;
+          }
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      return canvas.toDataURL('image/png');
+    }
+  } catch (err) {
+    console.warn('Canvas QR color stylization fallback:', err);
+  }
+
+  return await QRCode.toDataURL(url, {
+    errorCorrectionLevel: 'H',
+    margin: 1,
+    width: 320,
+    color: { dark: '#1E5A99', light: '#ffffff' }
+  });
 };
 
 export default function CollectionReportDownloadModal({
@@ -345,15 +405,7 @@ export default function CollectionReportDownloadModal({
     setVerificationUrl(directPublicUrl);
 
     let isMounted = true;
-    QRCode.toDataURL(directPublicUrl, {
-      errorCorrectionLevel: 'H',
-      margin: 1,
-      width: 320,
-      color: {
-        dark: '#0c3563',
-        light: '#ffffff'
-      }
-    }).then((url) => {
+    generateBrandedQrDataUrl(directPublicUrl).then((url) => {
       if (isMounted) {
         setQrCodeDataUrl(url);
       }
@@ -421,16 +473,8 @@ export default function CollectionReportDownloadModal({
         .getPublicUrl(storagePath);
       const livePublicUrl = pubData.publicUrl;
 
-      // 2. Generate high-precision dynamic QR code encoding the live cloud URL
-      const qrData = await QRCode.toDataURL(livePublicUrl, {
-        errorCorrectionLevel: 'H',
-        margin: 1,
-        width: 320,
-        color: {
-          dark: '#0c3563',
-          light: '#ffffff'
-        }
-      });
+      // 2. Generate high-precision dynamic QR code encoding the live cloud URL with Navy-to-Teal gradient
+      const qrData = await generateBrandedQrDataUrl(livePublicUrl);
       setQrCodeDataUrl(qrData);
 
       // Brief tick to ensure the DOM renders the updated QR Code before html2canvas capture
@@ -529,16 +573,8 @@ export default function CollectionReportDownloadModal({
         .getPublicUrl(storagePath);
       const livePublicUrl = pubData.publicUrl;
 
-      // 2. Generate high-precision dynamic QR code encoding the live cloud URL
-      const qrData = await QRCode.toDataURL(livePublicUrl, {
-        errorCorrectionLevel: 'H',
-        margin: 1,
-        width: 320,
-        color: {
-          dark: '#0c3563',
-          light: '#ffffff'
-        }
-      });
+      // 2. Generate high-precision dynamic QR code encoding the live cloud URL with Navy-to-Teal gradient
+      const qrData = await generateBrandedQrDataUrl(livePublicUrl);
       setQrCodeDataUrl(qrData);
 
       await new Promise((resolve) => setTimeout(resolve, 200));
@@ -793,48 +829,84 @@ export default function CollectionReportDownloadModal({
                   {/* TOP LEFT: Verification QR Code + Branding ONLY */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     
-                    {/* QR Code Container with Central Mountain Emblem */}
+                    {/* Artistic Everest Branded QR Container with Mountain & Wave Contour Frame */}
                     <div 
                       style={{
-                        width: '76px',
-                        height: '76px',
-                        backgroundColor: '#ffffff',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '6px',
-                        padding: '2px',
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '8px',
+                        padding: '2.5px',
+                        background: 'linear-gradient(135deg, #123A70 0%, #0284C7 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         position: 'relative',
-                        overflow: 'hidden',
-                        shrink: 0
+                        boxShadow: '0 1px 4px rgba(2, 132, 199, 0.2)',
+                        flexShrink: 0
                       }}
                     >
-                      {qrCodeDataUrl ? (
-                        <img 
-                          src={qrCodeDataUrl} 
-                          alt="Verification QR" 
-                          style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                        />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', backgroundColor: '#f1f5f9' }} />
-                      )}
-                      {/* Embedded Central Mountain & Growth Arrow Emblem */}
+                      {/* Top-Right Decorative Mountain Contour Motif */}
+                      <svg 
+                        style={{ position: 'absolute', top: '1px', right: '3px', width: '16px', height: '9px', pointerEvents: 'none', zIndex: 2 }} 
+                        viewBox="0 0 24 14" 
+                        fill="none"
+                      >
+                        <path d="M0 14L8 3L13 9L18 2L24 14H0Z" fill="#ffffff" fillOpacity="0.9" />
+                      </svg>
+
+                      {/* Bottom Decorative Wave Contour Motif */}
+                      <svg 
+                        style={{ position: 'absolute', bottom: '1px', left: '3px', right: '3px', width: 'calc(100% - 6px)', height: '4px', pointerEvents: 'none', zIndex: 2 }} 
+                        viewBox="0 0 80 8" 
+                        fill="none"
+                      >
+                        <path d="M0 4C15 0 25 8 40 4C55 0 65 8 80 4V8H0V4Z" fill="#ffffff" fillOpacity="0.85" />
+                      </svg>
+
+                      {/* Inner QR Canvas Card */}
                       <div 
                         style={{
-                          position: 'absolute',
-                          width: '20px',
-                          height: '20px',
+                          width: '100%',
+                          height: '100%',
                           backgroundColor: '#ffffff',
-                          borderRadius: '3px',
-                          padding: '1px',
+                          borderRadius: '6px',
+                          padding: '2px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 0 2px rgba(0,0,0,0.15)'
+                          position: 'relative',
+                          overflow: 'hidden',
+                          zIndex: 1
                         }}
                       >
-                        <img src={mountainEmblem} alt="Mountain" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        {qrCodeDataUrl ? (
+                          <img 
+                            src={qrCodeDataUrl} 
+                            alt="Verification QR" 
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} 
+                          />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', backgroundColor: '#f1f5f9' }} />
+                        )}
+
+                        {/* Central Mountain Emblem Overlay (Strictly centered inside 20% safe zone) */}
+                        <div 
+                          style={{
+                            position: 'absolute',
+                            width: '18px',
+                            height: '18px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '3px',
+                            padding: '1.5px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 0 3px rgba(0,0,0,0.25)',
+                            zIndex: 3
+                          }}
+                        >
+                          <img src={mountainEmblem} alt="Mountain" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        </div>
                       </div>
                     </div>
 
@@ -1129,14 +1201,14 @@ export default function CollectionReportDownloadModal({
                 backgroundColor: '#ffffff'
               }}
             >
-              {/* Center Background Watermark */}
+              {/* Center Background Watermark (Clean Circular Everest Stats Emblem without text) */}
               <div 
                 style={{
                   position: 'absolute',
                   top: '50%',
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
-                  opacity: 0.08,
+                  opacity: 0.10,
                   pointerEvents: 'none',
                   zIndex: 0,
                   display: 'flex',
@@ -1144,7 +1216,7 @@ export default function CollectionReportDownloadModal({
                   justifyContent: 'center'
                 }}
               >
-                <img src={logo} alt="Everest Watermark" style={{ width: '220px', height: '220px', objectFit: 'contain' }} />
+                <img src={watermarkEmblem} alt="Everest Circular Watermark" style={{ width: '230px', height: '230px', objectFit: 'contain' }} />
               </div>
 
               {/* TABLE HEADER BAR (Repeated on Every Page: Solid Royal Navy #1E5A99 with crisp white text) */}
@@ -1254,7 +1326,7 @@ export default function CollectionReportDownloadModal({
                       style={{ 
                         display: 'flex',
                         width: '100%',
-                        backgroundColor: isEven ? '#ffffff' : '#f8fafc',
+                        backgroundColor: isEven ? 'rgba(255, 255, 255, 0.75)' : 'rgba(248, 250, 252, 0.78)',
                         borderBottom: '1px solid #e2e8f0',
                         fontSize: '9.5px',
                         boxSizing: 'border-box'
@@ -1344,7 +1416,7 @@ export default function CollectionReportDownloadModal({
 
                 {/* Empty State when no real live records match active filter */}
                 {page.rows.length === 0 && (
-                  <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '11px', backgroundColor: '#ffffff' }}>
+                  <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '11px', backgroundColor: 'rgba(255, 255, 255, 0.85)' }}>
                     No transaction records found for the selected period.
                   </div>
                 )}
