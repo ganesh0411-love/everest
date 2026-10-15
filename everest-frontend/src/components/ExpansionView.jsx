@@ -15,7 +15,13 @@ import {
   User, 
   Clock, 
   ArrowUpDown, 
-  Filter 
+  Filter,
+  Banknote,
+  Camera,
+  Image as ImageIcon,
+  Eye,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -130,10 +136,12 @@ const d12Display = formatDateToDisplay(getDaysAgoYmd(12));
 const d18Display = formatDateToDisplay(getDaysAgoYmd(18));
 const d25Display = formatDateToDisplay(getDaysAgoYmd(25));
 
+const SAMPLE_UPI_RECEIPT = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600"><rect width="100%" height="100%" fill="%23f8fafc"/><rect x="20" y="20" width="360" height="560" rx="20" fill="%23ffffff" stroke="%23e2e8f0" stroke-width="2"/><circle cx="200" cy="90" r="32" fill="%2316a34a"/><path d="M188 90l8 8 16-16" stroke="%23ffffff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="200" y="150" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="%230f172a" text-anchor="middle">Payment Successful</text><text x="200" y="175" font-family="Arial,sans-serif" font-size="12" fill="%2364748b" text-anchor="middle">UPI Ref: 429381029384</text><text x="200" y="225" font-family="Arial,sans-serif" font-size="32" font-weight="900" fill="%230f172a" text-anchor="middle">₹ 5,000.00</text><line x1="40" y1="260" x2="360" y2="260" stroke="%23e2e8f0" stroke-dasharray="4,4"/><text x="50" y="300" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Paid To</text><text x="350" y="300" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">Building Owner Realty</text><text x="50" y="340" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">From Account</text><text x="350" y="340" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">Everest Microfinance</text><text x="50" y="380" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Payment Mode</text><text x="350" y="380" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%2316a34a" text-anchor="end">UPI Transfer</text><text x="50" y="420" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Transaction Time</text><text x="350" y="420" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">15-10-2026 10:15 AM</text><rect x="40" y="460" width="320" height="70" rx="12" fill="%23f1f5f9"/><text x="60" y="490" font-family="Arial,sans-serif" font-size="11" fill="%2364748b">Note</text><text x="60" y="512" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a">Monthly Branch Rent - October 2026</text></svg>`;
+
 const INITIAL_EXPENSES = [
-  { id: 'exp_1', date: todayDisplay, description: 'Office Rent & Maintenance', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' },
-  { id: 'exp_2', date: todayDisplay, description: 'Evening Tea & Refreshments', category: 'Tea & Snacks', amount: 250, remarks: 'Daily Staff Tea', mode: 'Cash', paidBy: 'Admin' },
-  { id: 'exp_3', date: yesterdayDisplay, description: 'Travel & Fuel Allowance', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
+  { id: 'exp_1', date: todayDisplay, description: 'Office Rent & Maintenance', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager', receiptImage: SAMPLE_UPI_RECEIPT },
+  { id: 'exp_2', date: todayDisplay, description: 'Evening Tea & Refreshments', category: 'Tea & Snacks', amount: 250, remarks: 'Daily Staff Tea', mode: 'Cash', paidBy: 'Admin', cashDenominations: { d500: 0, d200: 1, d100: 0, d50: 1, d20: 0, d10: 0, coins: 0, total: 250 } },
+  { id: 'exp_3', date: yesterdayDisplay, description: 'Travel & Fuel Allowance', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer', cashDenominations: { d500: 4, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0, total: 2000 } },
   { id: 'exp_4', date: yesterdayDisplay, description: 'Electricity Bill', category: 'Electricity / Utilities', amount: 1850, remarks: 'EB Monthly Bill', mode: 'UPI', paidBy: 'Branch Manager' },
   { id: 'exp_5', date: d3Display, description: 'Stationery & Register Books', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
   { id: 'exp_6', date: d5Display, description: 'Printer Toner Cartridge', category: 'Printing', amount: 1200, remarks: 'HP LaserJet Toner', mode: 'UPI', paidBy: 'Admin' },
@@ -196,7 +204,9 @@ export default function ExpansionView({
           return parsed.map(p => ({
             ...p,
             category: p.category || 'Others',
-            mode: String(p.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI'
+            mode: String(p.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
+            cashDenominations: p.cashDenominations || (p.id === 'exp_2' ? { d500: 0, d200: 1, d100: 0, d50: 1, d20: 0, d10: 0, coins: 0, total: 250 } : p.id === 'exp_3' ? { d500: 4, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0, total: 2000 } : null),
+            receiptImage: p.receiptImage || p.receiptUrl || (p.id === 'exp_1' ? SAMPLE_UPI_RECEIPT : null)
           }));
         }
       }
@@ -210,15 +220,34 @@ export default function ExpansionView({
   const [isExpModalOpen, setIsExpModalOpen] = useState(false);
   const [editingExp, setEditingExp] = useState(null);
 
+  // Denomination sub-modal & calculation state
+  const [isDenomModalOpen, setIsDenomModalOpen] = useState(false);
+  const [tempDenom, setTempDenom] = useState({
+    d500: 0,
+    d200: 0,
+    d100: 0,
+    d50: 0,
+    d20: 0,
+    d10: 0,
+    coins: 0
+  });
+
+  // Source Viewers (Cash Breakdown popover & UPI Screenshot lightbox)
+  const [activeDenomViewer, setActiveDenomViewer] = useState(null);
+  const [activeReceiptModal, setActiveReceiptModal] = useState(null);
+
   // Form State
   const [expForm, setExpForm] = useState({
     date: formatDateToDisplay(getTodayYmd()),
     description: '',
     category: 'Fuel/Travel',
+    customCategory: '',
     amount: '',
     remarks: '',
     mode: 'Cash',
-    paidBy: userProfile?.name || 'Admin'
+    paidBy: userProfile?.name || 'Admin',
+    cashDenominations: null,
+    receiptImage: null
   });
 
   // --- Real-time Firestore Listener for Expenses ---
@@ -235,7 +264,9 @@ export default function ExpansionView({
               id: d.id,
               ...data,
               category: data.category || 'Others',
-              mode: String(data.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI'
+              mode: String(data.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
+              cashDenominations: data.cashDenominations || null,
+              receiptImage: data.receiptImage || data.receiptUrl || null
             };
           });
           setExpenses(list);
@@ -253,8 +284,15 @@ export default function ExpansionView({
   const matchCategory = (expense, cat) => {
     if (!cat || cat === 'All Categories') return true;
     const expCat = String(expense.category || '').toLowerCase();
+    const expRawCat = String(expense.rawCategory || '').toLowerCase();
+    const expCustomCat = String(expense.customCategory || '').toLowerCase();
     const expDesc = String(expense.description || '').toLowerCase();
     const target = cat.toLowerCase();
+
+    if (target === 'others') {
+      return expRawCat === 'others' || expCat === 'others' || Boolean(expCustomCat) || (!CATEGORIES.some(c => c.toLowerCase() === expCat));
+    }
+
     if (expCat === target) return true;
     if (target.includes('fuel') || target.includes('travel')) return expCat.includes('travel') || expCat.includes('fuel') || expDesc.includes('travel') || expDesc.includes('fuel');
     if (target.includes('rent')) return expCat.includes('rent') || expDesc.includes('rent');
@@ -446,6 +484,71 @@ export default function ExpansionView({
     setActivePreset('Custom');
   };
 
+  // --- Denomination & Receipt Handlers ---
+  const calculateTempDenomTotal = (denomObj = tempDenom) => {
+    return (
+      (Number(denomObj.d500) || 0) * 500 +
+      (Number(denomObj.d200) || 0) * 200 +
+      (Number(denomObj.d100) || 0) * 100 +
+      (Number(denomObj.d50) || 0) * 50 +
+      (Number(denomObj.d20) || 0) * 20 +
+      (Number(denomObj.d10) || 0) * 10 +
+      (Number(denomObj.coins) || 0)
+    );
+  };
+
+  const handleDenomCountChange = (key, val) => {
+    const num = Math.max(0, parseInt(val, 10) || 0);
+    setTempDenom(prev => ({
+      ...prev,
+      [key]: isNaN(num) ? 0 : num
+    }));
+  };
+
+  const handleOpenDenomModal = () => {
+    if (expForm.cashDenominations) {
+      setTempDenom({
+        d500: expForm.cashDenominations.d500 || 0,
+        d200: expForm.cashDenominations.d200 || 0,
+        d100: expForm.cashDenominations.d100 || 0,
+        d50: expForm.cashDenominations.d50 || 0,
+        d20: expForm.cashDenominations.d20 || 0,
+        d10: expForm.cashDenominations.d10 || 0,
+        coins: expForm.cashDenominations.coins || 0
+      });
+    } else {
+      setTempDenom({ d500: 0, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0 });
+    }
+    setIsDenomModalOpen(true);
+  };
+
+  const handleSaveDenomination = () => {
+    const total = calculateTempDenomTotal(tempDenom);
+    if (total <= 0) {
+      setExpForm(prev => ({ ...prev, cashDenominations: null }));
+    } else {
+      setExpForm(prev => ({
+        ...prev,
+        cashDenominations: { ...tempDenom, total }
+      }));
+    }
+    setIsDenomModalOpen(false);
+  };
+
+  const handleReceiptImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Receipt screenshot size exceeds 5MB limit. Please choose a smaller image.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setExpForm(prev => ({ ...prev, receiptImage: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   // --- Expense CRUD ---
   const handleOpenAddExpense = () => {
     setEditingExp(null);
@@ -453,25 +556,51 @@ export default function ExpansionView({
       date: formatDateToDisplay(fromDate) || formatDateToDisplay(getTodayYmd()),
       description: '',
       category: selectedCategory !== 'All Categories' ? selectedCategory : 'Fuel/Travel',
+      customCategory: '',
       amount: '',
       remarks: '',
       mode: selectedMode !== 'All Modes' ? selectedMode : 'Cash',
-      paidBy: userProfile?.name || 'Admin'
+      paidBy: userProfile?.name || 'Admin',
+      cashDenominations: null,
+      receiptImage: null
     });
+    setTempDenom({ d500: 0, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0 });
     setIsExpModalOpen(true);
   };
 
   const handleOpenEditExpense = (item) => {
     setEditingExp(item);
+    const standardCategories = CATEGORIES.filter(c => c !== 'All Categories' && c !== 'Others');
+    const isCustom = !standardCategories.includes(item.category);
+    const cat = isCustom ? 'Others' : (item.category || 'Others');
+    const customCat = item.customCategory || (isCustom && item.category !== 'Others' ? item.category : '');
+
     setExpForm({
       date: item.date || formatDateToDisplay(getTodayYmd()),
       description: item.description || '',
-      category: item.category || 'Others',
+      category: cat,
+      customCategory: customCat,
       amount: item.amount || '',
       remarks: item.remarks && item.remarks !== '-' ? item.remarks : '',
       mode: String(item.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
-      paidBy: item.paidBy || userProfile?.name || 'Admin'
+      paidBy: item.paidBy || userProfile?.name || 'Admin',
+      cashDenominations: item.cashDenominations || null,
+      receiptImage: item.receiptImage || item.receiptUrl || null
     });
+
+    if (item.cashDenominations) {
+      setTempDenom({
+        d500: item.cashDenominations.d500 || 0,
+        d200: item.cashDenominations.d200 || 0,
+        d100: item.cashDenominations.d100 || 0,
+        d50: item.cashDenominations.d50 || 0,
+        d20: item.cashDenominations.d20 || 0,
+        d10: item.cashDenominations.d10 || 0,
+        coins: item.cashDenominations.coins || 0
+      });
+    } else {
+      setTempDenom({ d500: 0, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0 });
+    }
     setIsExpModalOpen(true);
   };
 
@@ -483,14 +612,29 @@ export default function ExpansionView({
       return;
     }
 
+    if (expForm.category === 'Others' && !expForm.customCategory?.trim()) {
+      alert('Please enter a custom category name for "Others".');
+      return;
+    }
+
+    const finalCategory = expForm.category === 'Others'
+      ? (expForm.customCategory.trim() || 'Others')
+      : expForm.category;
+
+    const isCash = expForm.mode === 'Cash';
+
     const payload = {
       date: expForm.date || formatDateToDisplay(getTodayYmd()),
       description: expForm.description.trim() || 'Expense',
-      category: expForm.category || 'Others',
+      category: finalCategory,
+      rawCategory: expForm.category,
+      customCategory: expForm.category === 'Others' ? expForm.customCategory.trim() : null,
       amount: amt,
       remarks: expForm.remarks.trim() || '-',
-      mode: expForm.mode === 'Cash' ? 'Cash' : 'UPI',
+      mode: isCash ? 'Cash' : 'UPI',
       paidBy: expForm.paidBy.trim() || userProfile?.name || 'Admin',
+      cashDenominations: isCash && expForm.cashDenominations ? expForm.cashDenominations : null,
+      receiptImage: !isCash && expForm.receiptImage ? expForm.receiptImage : null,
       branchId,
       updatedAt: new Date().toISOString()
     };
@@ -996,6 +1140,7 @@ export default function ExpansionView({
                   <th className="py-3 px-3 text-right w-28">Amount (₹)</th>
                   <th className="py-3 px-3 min-w-[130px]">Remarks</th>
                   <th className="py-3 px-3 text-center w-24">Mode</th>
+                  <th className="py-3 px-3 text-center w-36">Source</th>
                   <th className="py-3 px-3 w-32">Paid By</th>
                   <th className="py-3 px-3 text-center w-20">Actions</th>
                 </tr>
@@ -1013,8 +1158,8 @@ export default function ExpansionView({
                       {item.description}
                     </td>
                     <td className="py-3 px-3">
-                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                        {item.category || 'Others'}
+                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 max-w-[130px] truncate" title={item.customCategory || item.category || 'Others'}>
+                        {item.customCategory || item.category || 'Others'}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
@@ -1025,6 +1170,31 @@ export default function ExpansionView({
                     </td>
                     <td className="py-3 px-3 text-center">
                       {renderModeBadge(item.mode)}
+                    </td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      {item.mode === 'Cash' && item.cashDenominations && (item.cashDenominations.total > 0 || Object.values(item.cashDenominations).some(v => Number(v) > 0)) ? (
+                        <button
+                          type="button"
+                          onClick={() => setActiveDenomViewer(item)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs transition active:scale-95 cursor-pointer"
+                          title="Click to view recorded Cash Denomination Breakdown"
+                        >
+                          <Banknote className="w-3 h-3 text-emerald-600" />
+                          <span>Cash Breakdown</span>
+                        </button>
+                      ) : (item.receiptImage || item.receiptUrl) ? (
+                        <button
+                          type="button"
+                          onClick={() => setActiveReceiptModal(item)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs transition active:scale-95 cursor-pointer group"
+                          title="Click to view Payment Screenshot / Receipt"
+                        >
+                          <Camera className="w-3 h-3 text-purple-600" />
+                          <span>Receipt</span>
+                        </button>
+                      ) : (
+                        <span className="text-slate-300 font-bold text-xs">-</span>
+                      )}
                     </td>
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-1.5">
@@ -1061,7 +1231,7 @@ export default function ExpansionView({
 
                 {sortedFilteredExpenses.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-400 text-xs font-semibold">
+                    <td colSpan={10} className="py-8 text-center text-slate-400 text-xs font-semibold">
                       No expenses found matching the selected filter criteria. Click "+ Add Expense" to record a new entry.
                     </td>
                   </tr>
@@ -1077,7 +1247,7 @@ export default function ExpansionView({
                   <td className="py-3 px-3 text-right text-rose-700 font-black text-sm whitespace-nowrap">
                     {formatCurrency(totalFilteredExpense)}
                   </td>
-                  <td colSpan={4} className="py-3 px-3 text-right text-slate-500 font-bold text-xs">
+                  <td colSpan={5} className="py-3 px-3 text-right text-slate-500 font-bold text-xs">
                     {sortedFilteredExpenses.length} {sortedFilteredExpenses.length === 1 ? 'Entry' : 'Entries'} Recorded
                   </td>
                 </tr>
@@ -1196,7 +1366,7 @@ export default function ExpansionView({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 items-start">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Category</label>
                   <select
@@ -1208,9 +1378,32 @@ export default function ExpansionView({
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
+                  {expForm.category === 'Others' && (
+                    <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <label className="block text-[9px] font-black text-rose-600 uppercase mb-0.5">
+                        Custom Category Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Courier, Water Tanker"
+                        value={expForm.customCategory || ''}
+                        onChange={(e) => setExpForm({ ...expForm, customCategory: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-rose-50/50 border border-rose-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-rose-500 placeholder:text-slate-400"
+                      />
+                    </div>
+                  )}
                 </div>
+
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Payment Mode</label>
+                    {expForm.mode === 'Cash' && expForm.cashDenominations && expForm.cashDenominations.total > 0 && (
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                        ₹{expForm.cashDenominations.total.toLocaleString('en-IN')}
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={expForm.mode}
                     onChange={(e) => setExpForm({ ...expForm, mode: e.target.value })}
@@ -1219,6 +1412,81 @@ export default function ExpansionView({
                     <option value="Cash">Cash</option>
                     <option value="UPI">UPI</option>
                   </select>
+
+                  {/* Context-Aware Verification Trigger */}
+                  <div className="mt-2">
+                    {expForm.mode === 'Cash' ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handleOpenDenomModal}
+                          className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-extrabold transition shadow-2xs cursor-pointer ${
+                            expForm.cashDenominations && expForm.cashDenominations.total > 0
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>
+                            {expForm.cashDenominations && expForm.cashDenominations.total > 0
+                              ? `✓ Breakdown (₹${expForm.cashDenominations.total.toLocaleString('en-IN')})`
+                              : '+ Denomination'}
+                          </span>
+                        </button>
+                        {expForm.cashDenominations && expForm.cashDenominations.total > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpForm(prev => ({ ...prev, cashDenominations: null }))}
+                            title="Remove Denomination"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <label className={`flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-extrabold transition shadow-2xs ${
+                          expForm.receiptImage
+                            ? 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}>
+                          <Camera className="w-3.5 h-3.5 text-purple-600" />
+                          <span>{expForm.receiptImage ? 'Change Receipt' : '+ Upload Screenshot'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleReceiptImageUpload}
+                          />
+                        </label>
+                        {expForm.receiptImage && (
+                          <div className="flex items-center gap-1 bg-purple-50/80 border border-purple-200 rounded-lg p-0.5">
+                            <img
+                              src={expForm.receiptImage}
+                              alt="Receipt"
+                              className="w-6 h-6 object-cover rounded cursor-pointer hover:opacity-80"
+                              onClick={() => setActiveReceiptModal({
+                                receiptImage: expForm.receiptImage,
+                                description: expForm.description || 'Receipt Preview',
+                                amount: expForm.amount || 0,
+                                date: expForm.date
+                              })}
+                              title="Click to preview receipt"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setExpForm(prev => ({ ...prev, receiptImage: null }))}
+                              title="Remove Receipt"
+                              className="p-0.5 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1274,6 +1542,275 @@ export default function ExpansionView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-Modal: Cash Denomination Counter */}
+      {isDenomModalOpen && (
+        <div className="fixed inset-0 z-60 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Banknote className="w-4 h-4 text-emerald-700" />
+                <div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                    Cash Denomination Counter
+                  </h4>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    Count notes for Cash verification
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDenomModalOpen(false)}
+                className="w-6 h-6 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="divide-y divide-slate-100 text-xs">
+                {[500, 200, 100, 50, 20, 10].map(val => (
+                  <div key={val} className="py-1.5 flex items-center justify-between gap-2">
+                    <span className="font-extrabold text-slate-700 w-14 px-2 py-0.5 bg-slate-100 rounded-md text-center text-xs">
+                      ₹{val}
+                    </span>
+                    <span className="text-slate-400 font-bold">×</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={tempDenom[`d${val}`] || ''}
+                      onChange={(e) => handleDenomCountChange(`d${val}`, e.target.value)}
+                      placeholder="0"
+                      className="w-20 px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 text-xs"
+                    />
+                    <span className="font-black text-slate-700 text-right w-20 text-xs">
+                      ₹ {((Number(tempDenom[`d${val}`]) || 0) * val).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ))}
+
+                {/* Coins Row */}
+                <div className="py-1.5 flex items-center justify-between gap-2">
+                  <span className="font-extrabold text-slate-700 w-14 px-2 py-0.5 bg-slate-100 rounded-md text-center text-xs">
+                    Coins
+                  </span>
+                  <span className="text-slate-400 font-bold">=</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={tempDenom.coins || ''}
+                    onChange={(e) => handleDenomCountChange('coins', e.target.value)}
+                    placeholder="0"
+                    className="w-20 px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 text-xs"
+                  />
+                  <span className="font-black text-slate-700 text-right w-20 text-xs">
+                    ₹ {(Number(tempDenom.coins) || 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Calculated Total Bar */}
+              <div className="p-3 bg-emerald-50/80 rounded-2xl border border-emerald-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block">
+                    Total Counted
+                  </span>
+                  <span className="text-base font-black text-emerald-700">
+                    ₹ {calculateTempDenomTotal().toLocaleString('en-IN')}
+                  </span>
+                </div>
+                {calculateTempDenomTotal() > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpForm(prev => ({ ...prev, amount: calculateTempDenomTotal() }));
+                    }}
+                    className="text-[10px] font-black px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl shadow-2xs transition active:scale-95 cursor-pointer"
+                  >
+                    Sync to Amount
+                  </button>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTempDenom({ d500: 0, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0 });
+                    setExpForm(prev => ({ ...prev, cashDenominations: null }));
+                    setIsDenomModalOpen(false);
+                  }}
+                  className="text-xs text-rose-600 hover:underline font-bold cursor-pointer"
+                >
+                  Clear
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsDenomModalOpen(false)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveDenomination}
+                    className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm cursor-pointer"
+                  >
+                    Save Denomination
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox / Inspector: Cash Denomination Breakdown Viewer */}
+      {activeDenomViewer && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Banknote className="w-4 h-4 text-emerald-700" />
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                    Cash Denomination Breakdown
+                  </h3>
+                  <span className="text-[10px] text-slate-500 font-medium truncate max-w-[200px] block">
+                    {activeDenomViewer.date} • {activeDenomViewer.description}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveDenomViewer(null)}
+                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
+                    <th className="py-1 text-left">Denomination</th>
+                    <th className="py-1 text-center">Count</th>
+                    <th className="py-1 text-right">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {[500, 200, 100, 50, 20, 10].map(val => {
+                    const count = Number(activeDenomViewer.cashDenominations?.[`d${val}`]) || 0;
+                    if (count === 0) return null;
+                    return (
+                      <tr key={val} className="py-2">
+                        <td className="py-2 font-bold text-slate-700">₹{val}</td>
+                        <td className="py-2 text-center text-slate-500 font-bold">{count}</td>
+                        <td className="py-2 text-right font-black text-slate-800">
+                          ₹ {(count * val).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {(Number(activeDenomViewer.cashDenominations?.coins) || 0) > 0 && (
+                    <tr className="py-2">
+                      <td className="py-2 font-bold text-slate-700">Coins</td>
+                      <td className="py-2 text-center text-slate-500 font-bold">-</td>
+                      <td className="py-2 text-right font-black text-slate-800">
+                        ₹ {Number(activeDenomViewer.cashDenominations.coins).toLocaleString('en-IN')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-emerald-200/80 font-black">
+                    <td colSpan={2} className="pt-3 text-slate-800 uppercase tracking-wider text-[10px]">
+                      Total Cash Counted
+                    </td>
+                    <td className="pt-3 text-right text-emerald-700 text-sm">
+                      ₹ {(Number(activeDenomViewer.cashDenominations?.total) || Number(activeDenomViewer.amount)).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                <span className="text-slate-500 font-semibold">Expense Amount:</span>
+                <span className="font-extrabold text-slate-800">{formatCurrency(activeDenomViewer.amount)}</span>
+              </div>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveDenomViewer(null)}
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox / Inspector: UPI Payment Screenshot Lightbox */}
+      {activeReceiptModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="px-5 py-4 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-purple-700" />
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                    Payment Screenshot / Receipt
+                  </h3>
+                  <span className="text-[10px] text-slate-500 font-medium truncate max-w-[260px] block">
+                    {activeReceiptModal.date} • {activeReceiptModal.description} ({formatCurrency(activeReceiptModal.amount)})
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveReceiptModal(null)}
+                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-slate-900/5">
+              {activeReceiptModal.receiptImage || activeReceiptModal.receiptUrl ? (
+                <img
+                  src={activeReceiptModal.receiptImage || activeReceiptModal.receiptUrl}
+                  alt="Payment Receipt"
+                  className="max-h-[60vh] w-auto max-w-full rounded-2xl shadow-lg border border-slate-200 object-contain bg-white"
+                />
+              ) : (
+                <div className="py-12 text-center text-slate-400 text-xs">
+                  No receipt image found for this transaction.
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 bg-white border-t border-slate-100 flex items-center justify-between shrink-0 text-xs">
+              <span className="text-slate-500 font-medium">
+                Paid By: <strong className="text-slate-700">{activeReceiptModal.paidBy || 'Admin'}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveReceiptModal(null)}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
