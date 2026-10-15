@@ -529,6 +529,7 @@ export default function ExpansionView({
     } else {
       setExpForm(prev => ({
         ...prev,
+        amount: total,
         cashDenominations: { ...tempDenom, total }
       }));
     }
@@ -1321,8 +1322,14 @@ export default function ExpansionView({
 
       {/* Modal: Add/Edit Expense */}
       {isExpModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          style={{ zIndex: 50 }}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150 relative"
+            style={{ zIndex: 50 }}
+          >
             <div className="px-6 py-4 bg-rose-50/80 border-b border-rose-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-rose-700" />
@@ -1548,9 +1555,23 @@ export default function ExpansionView({
 
       {/* Sub-Modal: Cash Denomination Counter */}
       {isDenomModalOpen && (
-        <div className="fixed inset-0 z-60 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
-            <div className="px-5 py-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
+        <div 
+          className="fixed inset-0 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          style={{ zIndex: 70 }}
+        >
+          {/* Dark Backdrop Overlay at z-[65] */}
+          <div 
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
+            style={{ zIndex: 65 }}
+            onClick={() => setIsDenomModalOpen(false)}
+          />
+
+          {/* Modal Dialog Card at z-[70] with crisp proportions */}
+          <div 
+            className="relative bg-white rounded-3xl shadow-2xl max-w-md w-full min-w-[380px] sm:min-w-[440px] overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150"
+            style={{ zIndex: 70 }}
+          >
+            <div className="px-6 py-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Banknote className="w-4 h-4 text-emerald-700" />
                 <div>
@@ -1565,18 +1586,18 @@ export default function ExpansionView({
               <button
                 type="button"
                 onClick={() => setIsDenomModalOpen(false)}
-                className="w-6 h-6 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center text-xs cursor-pointer"
+                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center text-xs cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-4 space-y-3">
-              <div className="divide-y divide-slate-100 text-xs">
+            <div className="p-5 space-y-4">
+              <div className="bg-slate-50/80 rounded-2xl p-3 border border-slate-200/80 divide-y divide-slate-200/60 text-xs">
                 {[500, 200, 100, 50, 20, 10].map(val => (
-                  <div key={val} className="py-1.5 flex items-center justify-between gap-2">
-                    <span className="font-extrabold text-slate-700 w-14 px-2 py-0.5 bg-slate-100 rounded-md text-center text-xs">
-                      ₹{val}
+                  <div key={val} className="py-2 flex items-center justify-between gap-3">
+                    <span className="font-extrabold text-slate-800 w-16 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-center shadow-2xs text-xs">
+                      ₹ {val}
                     </span>
                     <span className="text-slate-400 font-bold">×</span>
                     <input
@@ -1585,84 +1606,80 @@ export default function ExpansionView({
                       value={tempDenom[`d${val}`] || ''}
                       onChange={(e) => handleDenomCountChange(`d${val}`, e.target.value)}
                       placeholder="0"
-                      className="w-20 px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 text-xs"
+                      className="w-24 px-3 py-1.5 text-center bg-white border border-slate-300 rounded-xl font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 text-xs shadow-2xs"
                     />
-                    <span className="font-black text-slate-700 text-right w-20 text-xs">
+                    <span className="text-slate-400 font-bold">=</span>
+                    <span className="font-black text-slate-800 text-right w-24 text-xs">
                       ₹ {((Number(tempDenom[`d${val}`]) || 0) * val).toLocaleString('en-IN')}
                     </span>
                   </div>
                 ))}
 
                 {/* Coins Row */}
-                <div className="py-1.5 flex items-center justify-between gap-2">
-                  <span className="font-extrabold text-slate-700 w-14 px-2 py-0.5 bg-slate-100 rounded-md text-center text-xs">
+                <div className="py-2 flex items-center justify-between gap-3">
+                  <span className="font-extrabold text-slate-800 w-16 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-center shadow-2xs text-xs">
                     Coins
                   </span>
-                  <span className="text-slate-400 font-bold">=</span>
+                  <span className="text-slate-400 font-bold">×</span>
                   <input
                     type="number"
                     min="0"
                     value={tempDenom.coins || ''}
                     onChange={(e) => handleDenomCountChange('coins', e.target.value)}
                     placeholder="0"
-                    className="w-20 px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 text-xs"
+                    className="w-24 px-3 py-1.5 text-center bg-white border border-slate-300 rounded-xl font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 text-xs shadow-2xs"
                   />
-                  <span className="font-black text-slate-700 text-right w-20 text-xs">
+                  <span className="text-slate-400 font-bold">=</span>
+                  <span className="font-black text-slate-800 text-right w-24 text-xs">
                     ₹ {(Number(tempDenom.coins) || 0).toLocaleString('en-IN')}
                   </span>
                 </div>
               </div>
 
-              {/* Calculated Total Bar */}
-              <div className="p-3 bg-emerald-50/80 rounded-2xl border border-emerald-200 flex items-center justify-between">
+              {/* Prominent Bottom Banner: Total Cash: ₹ [Calculated Sum] */}
+              <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50/80 rounded-2xl border-2 border-emerald-300/80 flex items-center justify-between shadow-2xs">
                 <div>
                   <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block">
-                    Total Counted
+                    Total Cash
                   </span>
-                  <span className="text-base font-black text-emerald-700">
+                  <span className="text-lg font-black text-emerald-700">
                     ₹ {calculateTempDenomTotal().toLocaleString('en-IN')}
                   </span>
                 </div>
                 {calculateTempDenomTotal() > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExpForm(prev => ({ ...prev, amount: calculateTempDenomTotal() }));
-                    }}
-                    className="text-[10px] font-black px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl shadow-2xs transition active:scale-95 cursor-pointer"
-                  >
-                    Sync to Amount
-                  </button>
+                  <span className="text-[11px] font-bold text-emerald-800 bg-white px-2.5 py-1 rounded-xl border border-emerald-200 shadow-2xs">
+                    Will auto-fill Amount
+                  </span>
                 )}
               </div>
 
-              {/* Actions */}
+              {/* Seamless State Sync & Return Buttons */}
               <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => {
                     setTempDenom({ d500: 0, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0 });
                     setExpForm(prev => ({ ...prev, cashDenominations: null }));
-                    setIsDenomModalOpen(false);
                   }}
-                  className="text-xs text-rose-600 hover:underline font-bold cursor-pointer"
+                  className="text-xs text-slate-400 hover:text-rose-600 font-bold cursor-pointer transition"
                 >
-                  Clear
+                  Clear Notes
                 </button>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsDenomModalOpen(false)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer transition active:scale-95"
                   >
-                    Cancel
+                    Cancel / Close
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveDenomination}
-                    className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm cursor-pointer"
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-sm cursor-pointer transition active:scale-95 flex items-center gap-1.5"
                   >
-                    Save Denomination
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Apply / Save Denomination</span>
                   </button>
                 </div>
               </div>
@@ -1673,8 +1690,14 @@ export default function ExpansionView({
 
       {/* Lightbox / Inspector: Cash Denomination Breakdown Viewer */}
       {activeDenomViewer && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+        <div 
+          className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          style={{ zIndex: 80 }}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150 relative"
+            style={{ zIndex: 80 }}
+          >
             <div className="px-5 py-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Banknote className="w-4 h-4 text-emerald-700" />
@@ -1762,8 +1785,14 @@ export default function ExpansionView({
 
       {/* Lightbox / Inspector: UPI Payment Screenshot Lightbox */}
       {activeReceiptModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+        <div 
+          className="fixed inset-0 z-[80] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          style={{ zIndex: 80 }}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] relative"
+            style={{ zIndex: 80 }}
+          >
             <div className="px-5 py-4 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <Camera className="w-4 h-4 text-purple-700" />
