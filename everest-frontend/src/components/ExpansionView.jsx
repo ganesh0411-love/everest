@@ -12,7 +12,8 @@ import {
   ChevronRight, 
   ArrowLeft, 
   User, 
-  Receipt
+  Receipt,
+  Home
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -77,7 +78,8 @@ export default function ExpansionView({
   userProfile = null, 
   branches = [], 
   customers = [], 
-  onBack 
+  onBack,
+  onHome
 }) {
   const branchId = activeBranch?.id || 'main';
 
@@ -445,16 +447,16 @@ export default function ExpansionView({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f0f4f9] text-slate-800 p-3 sm:p-5 lg:p-6 space-y-4">
+    <div className="w-full min-h-screen bg-[#f0f4f9] text-slate-800 p-4 sm:p-6 lg:p-8 space-y-5 overflow-x-hidden">
       {/* 1. Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div className="flex items-center gap-3">
           {onBack && (
             <button
               type="button"
               onClick={onBack}
               title="Back to Dashboard"
-              className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-2xs cursor-pointer active:scale-95 transition"
+              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-2xs cursor-pointer active:scale-95 transition"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
@@ -463,29 +465,35 @@ export default function ExpansionView({
             <h1 className="text-2xl lg:text-3xl font-black text-[#1e293b] tracking-tight">
               Expansion
             </h1>
-            <span className="text-xs text-slate-500 font-medium">
+            <span className="text-xs sm:text-sm text-slate-500 font-medium">
               Manage Expenses & Cash Outflow
             </span>
           </div>
         </div>
 
-        {/* Top-Right Badges */}
+        {/* Top-Right Badges & Prominent Home Button */}
         <div className="flex items-center gap-3 self-end sm:self-auto">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700">
             <Calendar className="w-3.5 h-3.5 text-blue-600" />
             <span>{displaySelectedDateStr} <span className="text-slate-400 font-normal">(Generated)</span></span>
           </div>
 
-          <div className="w-8 h-8 rounded-full border border-blue-200 bg-blue-50 flex items-center justify-center text-blue-600 shadow-2xs">
-            <User className="w-4 h-4" />
-          </div>
+          <button
+            type="button"
+            onClick={onHome || onBack}
+            title="Go to Home"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-2xs cursor-pointer active:scale-95 transition text-xs font-extrabold"
+          >
+            <Home className="w-4 h-4 stroke-[2.5]" />
+            <span>Home</span>
+          </button>
         </div>
       </div>
 
-      {/* 2. Main Desktop Responsive Grid (Left Workspace ~78-80% / Right Compact Sidebar ~20-22%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_270px] xl:grid-cols-[1fr_280px] gap-4">
-        {/* ================= LEFT / MAIN COLUMN ================= */}
-        <div className="space-y-4">
+      {/* 2. Main Desktop Responsive Grid (75% Main Analytics & Table / 25% Calendar Sidebar) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full">
+        {/* ================= LEFT / MAIN COLUMN (75% / 9 cols) ================= */}
+        <div className="lg:col-span-9 space-y-4 min-w-0">
           {/* Top Metric Summary Row */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
             {/* Card 1: Yesterday Summary (Trimmed to Exactly 3 Spacious Cards: Total, Cash in Hand, Cash in Online) */}
@@ -728,8 +736,8 @@ export default function ExpansionView({
           </div>
         </div>
 
-        {/* ================= RIGHT / COMPACT CALENDAR SIDEBAR (~20-22%) ================= */}
-        <div className="space-y-4">
+        {/* ================= RIGHT / CALENDAR SIDEBAR (25% / 3 cols) ================= */}
+        <div className="lg:col-span-3 space-y-4 min-w-0">
           {/* Scaled-down Compact Calendar Widget */}
           <div className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-2xs space-y-2.5">
             {/* Header: Select Date & Date Pill */}

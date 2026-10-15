@@ -1332,7 +1332,29 @@ function App() {
       case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} branches={branches} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer activeBranch={activeBranch} /></div>;
-      case 'Expansion': return <div className="flex-1 overflow-y-auto"><ExpansionView activeBranch={activeBranch} userProfile={userProfile} branches={branches} customers={customers} onBack={() => navigateToView('Home')} /></div>;
+      case 'Expansion': 
+        return (
+          <div className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden">
+            <ExpansionView 
+              activeBranch={activeBranch} 
+              userProfile={userProfile} 
+              branches={branches} 
+              customers={customers} 
+              onBack={() => {
+                if (viewHistory.length > 1) {
+                  const newHist = [...viewHistory];
+                  newHist.pop();
+                  const prevView = newHist[newHist.length - 1] || 'Home';
+                  setViewHistory(newHist);
+                  setCurrentView(prevView);
+                } else {
+                  navigateToView('Home');
+                }
+              }} 
+              onHome={() => navigateToView('Home')} 
+            />
+          </div>
+        );
       case 'Expenses': return <div className="flex-1 overflow-y-auto"><Expenses activeBranch={activeBranch} userProfile={userProfile} branches={branches} onBack={() => navigateToView('Home')} /></div>;
       case 'Cash Book': return <div className="flex-1 overflow-y-auto"><CashBook activeBranch={activeBranch} userProfile={userProfile} branches={branches} customers={customers} onBack={() => navigateToView('Home')} /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} branches={branches} /></div>;
@@ -1913,7 +1935,7 @@ function App() {
           <CustomerDashboard userProfile={userProfile} customers={customers} />
         ) : (
           <div className="w-full h-full flex flex-col relative overflow-hidden">
-            {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && (
+            {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Expansion' && (
             <Header 
               currentView={currentView} 
               setCurrentView={switchTab}
@@ -1930,20 +1952,22 @@ function App() {
             />
           )}
           <div className="flex-1 flex flex-col md:flex-row w-full overflow-hidden relative">
-            <DesktopSidebar 
-              currentView={currentView} 
-              setCurrentView={switchTab}
-              branches={branches}
-              activeBranch={activeBranch}
-              onBranchChange={handleBranchSwitch}
-              onAddBranch={() => setIsAddBranchModalOpen(true)}
-              onEditBranch={(targetBranch) => {
-                if (targetBranch && targetBranch.id) setActiveBranch(targetBranch);
-                setIsEditBranchModalOpen(true);
-              }}
-              userProfile={userProfile}
-            />
-            <div className="flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] max-w-4xl mx-auto md:max-w-none md:mx-0 overflow-hidden">
+            {currentView !== 'Expansion' && (
+              <DesktopSidebar 
+                currentView={currentView} 
+                setCurrentView={switchTab}
+                branches={branches}
+                activeBranch={activeBranch}
+                onBranchChange={handleBranchSwitch}
+                onAddBranch={() => setIsAddBranchModalOpen(true)}
+                onEditBranch={(targetBranch) => {
+                  if (targetBranch && targetBranch.id) setActiveBranch(targetBranch);
+                  setIsEditBranchModalOpen(true);
+                }}
+                userProfile={userProfile}
+              />
+            )}
+            <div className={`flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] ${currentView === 'Expansion' ? 'max-w-none mx-0' : 'max-w-4xl mx-auto md:max-w-none md:mx-0'} overflow-hidden`}>
               {renderView()}
 
               {/* Filter Modal Overlay */}
