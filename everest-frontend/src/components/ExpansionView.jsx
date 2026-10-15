@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, 
   Wallet, 
-  Landmark, 
   Smartphone, 
   Coins, 
   Plus, 
@@ -11,9 +10,10 @@ import {
   ChevronLeft, 
   ChevronRight, 
   ArrowLeft, 
-  User, 
   Receipt,
-  Home
+  Home,
+  User,
+  Clock
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -66,11 +66,55 @@ const isSameDay = (dateA, dateB) => {
   return formatDateToYmd(dateA) === formatDateToYmd(dateB);
 };
 
-// Initial Seed Data Matching Requirements
+// Date Range Check (Inclusive)
+const isDateInRange = (dateStr, fromYmd, toYmd) => {
+  if (!dateStr) return false;
+  const itemYmd = formatDateToYmd(dateStr);
+  if (!itemYmd) return false;
+  const start = fromYmd <= toYmd ? fromYmd : toYmd;
+  const end = fromYmd <= toYmd ? toYmd : fromYmd;
+  return itemYmd >= start && itemYmd <= end;
+};
+
+// Date helper generators
+const getTodayYmd = () => {
+  const d = new Date();
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${dy}`;
+};
+
+const getYesterdayYmd = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${dy}`;
+};
+
+const getDaysAgoYmd = (days) => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${dy}`;
+};
+
+// Seed expenses supporting both current runtime dates & reference screenshot dates
+const todayDisplay = formatDateToDisplay(getTodayYmd());
+const yesterdayDisplay = formatDateToDisplay(getYesterdayYmd());
+const weekAgoDisplay = formatDateToDisplay(getDaysAgoYmd(3));
+
 const INITIAL_EXPENSES = [
-  { id: 'exp_1', date: '01-05-2026', description: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'Bank Transfer', paidBy: 'Branch Manager' },
-  { id: 'exp_2', date: '02-05-2026', description: 'Travel & Fuel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
-  { id: 'exp_3', date: '03-05-2026', description: 'Stationery & Printing', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' }
+  { id: 'exp_1', date: todayDisplay, description: 'Office Rent & Maintenance', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' },
+  { id: 'exp_2', date: yesterdayDisplay, description: 'Travel & Fuel Allowance', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
+  { id: 'exp_3', date: weekAgoDisplay, description: 'Stationery & Printing', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_4', date: '03-05-2026', description: 'Stationery & Printing', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_5', date: '02-05-2026', description: 'Travel & Fuel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
+  { id: 'exp_6', date: '01-05-2026', description: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' }
 ];
 
 export default function ExpansionView({ 
@@ -83,12 +127,25 @@ export default function ExpansionView({
 }) {
   const branchId = activeBranch?.id || 'main';
 
-  // Active Selected Date (defaults to 03-05-2026 matching reference UI)
-  const [selectedDate, setSelectedDate] = useState('2026-05-03');
+  // Preset Filters: 'Today' | 'Yesterday' | 'Last Week' | 'Last Month' | 'Custom'
+  const [activePreset, setActivePreset] = useState('Today');
 
-  // Calendar month state (defaults to May 2026)
-  const [calendarYear, setCalendarYear] = useState(2026);
-  const [calendarMonth, setCalendarMonth] = useState(4); // 0-indexed: 4 = May
+  // Active Date Range Filter (YMD strings)
+  const [fromDate, setFromDate] = useState(getTodayYmd());
+  const [toDate, setToDate] = useState(getTodayYmd());
+
+  // Focused Selected Date (for calendar highlight)
+  const [selectedDate, setSelectedDate] = useState(getTodayYmd());
+
+  // Calendar month state
+  const [calendarYear, setCalendarYear] = useState(() => {
+    const d = new Date();
+    return d.getFullYear();
+  });
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    return d.getMonth();
+  });
 
   // Storage Key
   const expStorageKey = `everest_expansion_expenses_${branchId}`;
@@ -99,7 +156,13 @@ export default function ExpansionView({
       const saved = localStorage.getItem(expStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Normalize any legacy 'Bank Transfer' modes to 'UPI'
+          return parsed.map(p => ({
+            ...p,
+            mode: String(p.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI'
+          }));
+        }
       }
       return INITIAL_EXPENSES;
     } catch (e) {
@@ -113,7 +176,7 @@ export default function ExpansionView({
 
   // Form State
   const [expForm, setExpForm] = useState({
-    date: '03-05-2026',
+    date: formatDateToDisplay(getTodayYmd()),
     description: '',
     amount: '',
     remarks: '',
@@ -129,7 +192,14 @@ export default function ExpansionView({
       const qExp = query(collection(db, 'expansion_expenses'), where('branchId', '==', branchId));
       unsubExp = onSnapshot(qExp, (snap) => {
         if (!snap.empty) {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const list = snap.docs.map(d => {
+            const data = d.data();
+            return {
+              id: d.id,
+              ...data,
+              mode: String(data.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI'
+            };
+          });
           setExpenses(list);
           localStorage.setItem(expStorageKey, JSON.stringify(list));
         }
@@ -141,135 +211,122 @@ export default function ExpansionView({
     };
   }, [branchId, expStorageKey]);
 
-  // --- Date Computations ---
-  const todayDateStr = useMemo(() => {
-    const d = new Date();
-    const yr = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const dy = String(d.getDate()).padStart(2, '0');
-    return `${yr}-${mo}-${dy}`;
-  }, []);
+  // --- Filtered Expenses based on active Date Range ---
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(e => isDateInRange(e.date, fromDate, toDate));
+  }, [expenses, fromDate, toDate]);
 
-  const yesterdayDateStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    const yr = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const dy = String(d.getDate()).padStart(2, '0');
-    return `${yr}-${mo}-${dy}`;
-  }, []);
+  // Aggregate Filtered Total Expense
+  const totalFilteredExpense = useMemo(() => {
+    return filteredExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+  }, [filteredExpenses]);
 
-  // --- Dynamic Collection Data Binding for Yesterday & Selected Date ---
-  const { yesterdayMetrics, todayMetrics, selectedDateMetrics } = useMemo(() => {
-    let yCash = 0;
-    let yAccount = 0;
-    let yOnline = 0;
-    let yCount = 0;
+  // --- KPI Card 1: Today's Summary (Expense) Metrics ---
+  const periodMetrics = useMemo(() => {
+    let total = 0;
+    let cash = 0;
+    let online = 0;
 
-    let tCash = 0;
-    let tAccount = 0;
-    let tOnline = 0;
-
-    let sCash = 0;
-    let sOnline = 0;
-    let sCount = 0;
-
-    (customers || []).forEach(cust => {
-      const installments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-      installments.forEach(inst => {
-        const instDate = inst.date || inst.paymentDate || inst.createdAt;
-        const status = String(inst.status || '').toUpperCase();
-        if (status === 'BOUNCED' || status === 'CANCELLED') return;
-
-        const amt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
-        if (amt <= 0) return;
-
-        const isSplit = Boolean(inst.isSplit);
-        const modeStr = String(inst.paymentMode || inst.mode || '').toUpperCase();
-        const isOnline = modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('GPAY') || modeStr.includes('PHONEPE');
-        const isAccount = modeStr.includes('BANK') || modeStr.includes('NEFT') || modeStr.includes('RTGS') || modeStr.includes('IMPS') || modeStr.includes('CHEQUE');
-
-        // Check Yesterday
-        if (isSameDay(instDate, yesterdayDateStr)) {
-          yCount++;
-          if (isSplit) {
-            yCash += Number(inst.cashAmount || 0);
-            yOnline += Number(inst.upiAmount || 0);
-          } else if (isOnline) {
-            yOnline += amt;
-          } else if (isAccount) {
-            yAccount += amt;
-          } else {
-            yCash += amt;
-          }
-        }
-
-        // Check Today
-        if (isSameDay(instDate, todayDateStr)) {
-          if (isSplit) {
-            tCash += Number(inst.cashAmount || 0);
-            tOnline += Number(inst.upiAmount || 0);
-          } else if (isOnline) {
-            tOnline += amt;
-          } else if (isAccount) {
-            tAccount += amt;
-          } else {
-            tCash += amt;
-          }
-        }
-
-        // Check Selected Date
-        if (isSameDay(instDate, selectedDate)) {
-          sCount++;
-          if (isSplit) {
-            sCash += Number(inst.cashAmount || 0);
-            sOnline += Number(inst.upiAmount || 0);
-          } else if (isOnline) {
-            sOnline += amt;
-          } else {
-            sCash += amt;
-          }
-        }
-      });
+    filteredExpenses.forEach(exp => {
+      const amt = Number(exp.amount) || 0;
+      const mode = String(exp.mode || 'Cash').toUpperCase();
+      total += amt;
+      if (mode.includes('CASH')) {
+        cash += amt;
+      } else {
+        online += amt;
+      }
     });
 
-    // Reference baseline fallback values (1,20,000 Total / 1,00,000 Cash in Hand / 20,000 Cash in Online)
-    const yTotal = yCount > 0 ? (yCash + yAccount + yOnline) : 120000;
-    const finalYCash = yCount > 0 ? yCash : 100000;
-    const finalYOnline = yCount > 0 ? (yOnline + yAccount) : 20000;
+    return { total, cash, online };
+  }, [filteredExpenses]);
 
-    // Selected date details
-    const finalSCash = sCount > 0 ? sCash : (isSameDay(selectedDate, '2026-05-03') ? 100000 : finalYCash);
-    const finalSOnline = sCount > 0 ? sOnline : (isSameDay(selectedDate, '2026-05-03') ? 20000 : finalYOnline);
+  // --- Preset Filter Handler ---
+  const handlePresetClick = (preset) => {
+    setActivePreset(preset);
+    const today = getTodayYmd();
+    const yesterday = getYesterdayYmd();
 
-    return {
-      yesterdayMetrics: {
-        total: yTotal,
-        cashInHand: finalYCash,
-        cashInOnline: finalYOnline
-      },
-      todayMetrics: {
-        total: tCash + tAccount + tOnline,
-        cashInHand: tCash,
-        cashInOnline: tOnline
-      },
-      selectedDateMetrics: {
-        cashInHand: finalSCash,
-        cashInOnline: finalSOnline
-      }
-    };
-  }, [customers, yesterdayDateStr, todayDateStr, selectedDate]);
+    if (preset === 'Today') {
+      setFromDate(today);
+      setToDate(today);
+      setSelectedDate(today);
+    } else if (preset === 'Yesterday') {
+      setFromDate(yesterday);
+      setToDate(yesterday);
+      setSelectedDate(yesterday);
+    } else if (preset === 'Last Week') {
+      const sevenDaysAgo = getDaysAgoYmd(7);
+      setFromDate(sevenDaysAgo);
+      setToDate(today);
+      setSelectedDate(today);
+    } else if (preset === 'Last Month') {
+      const thirtyDaysAgo = getDaysAgoYmd(30);
+      setFromDate(thirtyDaysAgo);
+      setToDate(today);
+      setSelectedDate(today);
+    } else if (preset === 'Custom') {
+      // Retain current fromDate & toDate
+    }
+  };
 
-  // Aggregate Expense Total
-  const totalExpense = useMemo(() => {
-    return expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  }, [expenses]);
+  const handleCustomDateChange = (field, newYmd) => {
+    if (!newYmd) return;
+    setActivePreset('Custom');
+    if (field === 'from') {
+      setFromDate(newYmd);
+      setSelectedDate(newYmd);
+    } else {
+      setToDate(newYmd);
+      setSelectedDate(newYmd);
+    }
+  };
+
+  // --- Right Sidebar: Mini Expense Ledger Pagination / Limit ---
+  const miniLedgerLimit = useMemo(() => {
+    if (activePreset === 'Today' || activePreset === 'Yesterday') return 10;
+    if (activePreset === 'Last Week') return 7;
+    if (activePreset === 'Last Month') return 30;
+    return 10;
+  }, [activePreset]);
+
+  const miniLedgerEntries = useMemo(() => {
+    const sorted = [...expenses].sort((a, b) => {
+      const ymdA = formatDateToYmd(a.date);
+      const ymdB = formatDateToYmd(b.date);
+      return ymdB.localeCompare(ymdA);
+    });
+    return sorted.slice(0, miniLedgerLimit);
+  }, [expenses, miniLedgerLimit]);
+
+  // Mini Ledger Row Click: Focus strictly on that date
+  const handleDrillDownDate = (dateStr) => {
+    const ymd = formatDateToYmd(dateStr);
+    setFromDate(ymd);
+    setToDate(ymd);
+    setSelectedDate(ymd);
+    setActivePreset('Custom');
+
+    const match = ymd.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      setCalendarYear(parseInt(match[1], 10));
+      setCalendarMonth(parseInt(match[2], 10) - 1);
+    }
+  };
+
+  // Calendar Day Click: Focus strictly on that date
+  const handleCalendarDayClick = (dayYmd) => {
+    setSelectedDate(dayYmd);
+    setFromDate(dayYmd);
+    setToDate(dayYmd);
+    setActivePreset('Custom');
+  };
 
   // --- Expense CRUD ---
   const handleOpenAddExpense = () => {
     setEditingExp(null);
     setExpForm({
-      date: formatDateToDisplay(selectedDate) || '03-05-2026',
+      date: formatDateToDisplay(fromDate) || formatDateToDisplay(getTodayYmd()),
       description: '',
       amount: '',
       remarks: '',
@@ -282,11 +339,11 @@ export default function ExpansionView({
   const handleOpenEditExpense = (item) => {
     setEditingExp(item);
     setExpForm({
-      date: item.date || '03-05-2026',
+      date: item.date || formatDateToDisplay(getTodayYmd()),
       description: item.description || '',
       amount: item.amount || '',
       remarks: item.remarks && item.remarks !== '-' ? item.remarks : '',
-      mode: item.mode || 'Cash',
+      mode: String(item.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
       paidBy: item.paidBy || userProfile?.name || 'Admin'
     });
     setIsExpModalOpen(true);
@@ -301,11 +358,11 @@ export default function ExpansionView({
     }
 
     const payload = {
-      date: expForm.date || '03-05-2026',
+      date: expForm.date || formatDateToDisplay(getTodayYmd()),
       description: expForm.description.trim() || 'Expense',
       amount: amt,
       remarks: expForm.remarks.trim() || '-',
-      mode: expForm.mode || 'Cash',
+      mode: expForm.mode === 'Cash' ? 'Cash' : 'UPI',
       paidBy: expForm.paidBy.trim() || userProfile?.name || 'Admin',
       branchId,
       updatedAt: new Date().toISOString()
@@ -330,7 +387,7 @@ export default function ExpansionView({
       } catch (e) {}
 
       setExpenses(prev => {
-        const updated = [...prev, { id: newId, ...payload }];
+        const updated = [{ id: newId, ...payload }, ...prev];
         localStorage.setItem(expStorageKey, JSON.stringify(updated));
         return updated;
       });
@@ -417,34 +474,44 @@ export default function ExpansionView({
     }
   };
 
-  const displaySelectedDateStr = formatDateToDisplay(selectedDate) || '03-05-2026';
+  // Header Date Badge Text
+  const headerDateBadgeText = useMemo(() => {
+    const fromDisplay = formatDateToDisplay(fromDate);
+    const toDisplay = formatDateToDisplay(toDate);
+    if (!fromDisplay && !toDisplay) return 'Today';
+    if (fromDisplay === toDisplay) {
+      return fromDisplay;
+    }
+    return `${fromDisplay} to ${toDisplay}`;
+  }, [fromDate, toDate]);
 
-  // Mode Badge Helper
+  // Mode Badge Helper (Cash & UPI Only)
   const renderModeBadge = (mode) => {
     const m = String(mode || 'Cash').toUpperCase();
-    if (m.includes('UPI') || m.includes('ONLINE') || m.includes('GPAY')) {
+    if (m.includes('UPI') || m.includes('ONLINE') || m.includes('GPAY') || m.includes('PHONEPE') || m.includes('BANK')) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
           <Smartphone className="w-2.5 h-2.5" />
           UPI
         </span>
       );
     }
-    if (m.includes('BANK') || m.includes('TRANSFER') || m.includes('NEFT')) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-sky-50 text-sky-700 border border-sky-200">
-          <Landmark className="w-2.5 h-2.5" />
-          Bank Transfer
-        </span>
-      );
-    }
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
         <Wallet className="w-2.5 h-2.5" />
         Cash
       </span>
     );
   };
+
+  // Dynamic Card 1 Title
+  const card1Title = useMemo(() => {
+    if (activePreset === 'Today') return "Today's Summary (Expense)";
+    if (activePreset === 'Yesterday') return "Yesterday's Summary (Expense)";
+    if (activePreset === 'Last Week') return "Last Week's Summary (Expense)";
+    if (activePreset === 'Last Month') return "Last Month's Summary (Expense)";
+    return "Summary (Expense)";
+  }, [activePreset]);
 
   return (
     <div className="w-full min-h-screen bg-[#f0f4f9] text-slate-800 p-4 sm:p-6 lg:p-8 space-y-5 overflow-x-hidden">
@@ -475,7 +542,7 @@ export default function ExpansionView({
         <div className="flex items-center gap-3 self-end sm:self-auto">
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700">
             <Calendar className="w-3.5 h-3.5 text-blue-600" />
-            <span>{displaySelectedDateStr} <span className="text-slate-400 font-normal">(Generated)</span></span>
+            <span>{headerDateBadgeText} <span className="text-slate-400 font-normal">(Generated)</span></span>
           </div>
 
           <button
@@ -496,112 +563,113 @@ export default function ExpansionView({
         <div className="lg:col-span-9 space-y-4 min-w-0">
           {/* Top Metric Summary Row */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
-            {/* Card 1: Yesterday Summary (Trimmed to Exactly 3 Spacious Cards: Total, Cash in Hand, Cash in Online) */}
-            <div className="md:col-span-7 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Calendar className="w-4 h-4 stroke-[2.2]" />
-                  </div>
-                  <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
-                    Yesterday Summary
-                  </h3>
+            {/* Card 1: Today's Summary (Expense) — Spacious, tall, prominent, no Collections badge */}
+            <div className="md:col-span-7 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs space-y-3.5 flex flex-col justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Receipt className="w-4 h-4 stroke-[2.2]" />
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">
-                  Collections
-                </span>
+                <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                  {card1Title}
+                </h3>
               </div>
 
-              {/* 3 Spacious Mini Cards (No clipping, generous padding) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* 3 Spacious, Tall Metric Cards with Generous Padding & Prominent Currency */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* 1. Total */}
-                <div className="bg-slate-50/70 border border-slate-100/90 rounded-xl p-3 flex items-center gap-2.5 hover:bg-slate-50 transition">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
-                    <Coins className="w-4 h-4 stroke-[2.2]" />
+                <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[96px] flex items-center gap-3.5 hover:bg-slate-50 transition shadow-2xs">
+                  <div className="w-11 h-11 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
+                    <Coins className="w-5 h-5 stroke-[2.2]" />
                   </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total</span>
-                    <span className="text-xs sm:text-sm font-black text-slate-900 block whitespace-nowrap">
-                      {formatCurrency(yesterdayMetrics.total)}
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total</span>
+                    <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                      {formatCurrency(periodMetrics.total)}
                     </span>
                   </div>
                 </div>
 
                 {/* 2. Cash in Hand */}
-                <div className="bg-slate-50/70 border border-slate-100/90 rounded-xl p-3 flex items-center gap-2.5 hover:bg-slate-50 transition">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
-                    <Wallet className="w-4 h-4 stroke-[2.2]" />
+                <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[96px] flex items-center gap-3.5 hover:bg-slate-50 transition shadow-2xs">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Wallet className="w-5 h-5 stroke-[2.2]" />
                   </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Hand</span>
-                    <span className="text-xs sm:text-sm font-black text-slate-900 block whitespace-nowrap">
-                      {formatCurrency(yesterdayMetrics.cashInHand)}
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Hand</span>
+                    <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                      {formatCurrency(periodMetrics.cash)}
                     </span>
                   </div>
                 </div>
 
                 {/* 3. Cash in Online */}
-                <div className="bg-slate-50/70 border border-slate-100/90 rounded-xl p-3 flex items-center gap-2.5 hover:bg-slate-50 transition">
-                  <div className="w-8 h-8 rounded-lg bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
-                    <Smartphone className="w-4 h-4 stroke-[2.2]" />
+                <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[96px] flex items-center gap-3.5 hover:bg-slate-50 transition shadow-2xs">
+                  <div className="w-11 h-11 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
+                    <Smartphone className="w-5 h-5 stroke-[2.2]" />
                   </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Online</span>
-                    <span className="text-xs sm:text-sm font-black text-slate-900 block whitespace-nowrap">
-                      {formatCurrency(yesterdayMetrics.cashInOnline)}
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Online</span>
+                    <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                      {formatCurrency(periodMetrics.online)}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: Today Collections */}
-            <div className="md:col-span-5 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-2.5">
+            {/* Card 2: Preset Date Filter Panel (Replaces old 'Today' box) */}
+            <div className="md:col-span-5 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs space-y-3.5 flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Calendar className="w-4 h-4 stroke-[2.2]" />
+                    <Clock className="w-4 h-4 stroke-[2.2]" />
                   </div>
                   <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
-                    Today
+                    Filter Period
                   </h3>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">
-                  Live
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full capitalize">
+                  {activePreset}
                 </span>
               </div>
 
-              {/* Total Row */}
-              <div className="bg-slate-50/70 border border-slate-100/90 rounded-xl p-2.5 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
-                  <Coins className="w-3.5 h-3.5 stroke-[2.2]" />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total</span>
-                  <span className="text-xs sm:text-sm font-black text-slate-900">{formatCurrency(todayMetrics.total)}</span>
-                </div>
+              {/* Preset Pills: Today | Yesterday | Last Week | Last Month | Custom */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {['Today', 'Yesterday', 'Last Week', 'Last Month', 'Custom'].map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => handlePresetClick(preset)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      activePreset === preset
+                        ? 'bg-blue-600 text-white shadow-2xs font-black'
+                        : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
               </div>
 
-              {/* 2 Mini Cards (Cash in Hand & Cash in Online) */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-50/70 border border-slate-100/90 rounded-xl p-2.5 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
-                    <Wallet className="w-3 h-3 stroke-[2.2]" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Cash in Hand</span>
-                    <span className="text-xs font-black text-slate-900 block whitespace-nowrap">{formatCurrency(todayMetrics.cashInHand)}</span>
-                  </div>
+              {/* Adjacent Date Inputs: From : [ DD-MM-YYYY ] | To : [ DD-MM-YYYY ] */}
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase shrink-0">From :</span>
+                  <input
+                    type="date"
+                    value={formatDateToYmd(fromDate)}
+                    onChange={(e) => handleCustomDateChange('from', e.target.value)}
+                    className="w-full bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                  />
                 </div>
-
-                <div className="bg-slate-50/70 border border-slate-100/90 rounded-xl p-2.5 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
-                    <Smartphone className="w-3 h-3 stroke-[2.2]" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Cash in Online</span>
-                    <span className="text-xs font-black text-slate-900 block whitespace-nowrap">{formatCurrency(todayMetrics.cashInOnline)}</span>
-                  </div>
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase shrink-0">To :</span>
+                  <input
+                    type="date"
+                    value={formatDateToYmd(toDate)}
+                    onChange={(e) => handleCustomDateChange('to', e.target.value)}
+                    className="w-full bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                  />
                 </div>
               </div>
             </div>
@@ -626,7 +694,7 @@ export default function ExpansionView({
 
               <div className="flex items-center gap-3">
                 <div className="px-3 py-1 bg-white border border-rose-200/80 rounded-xl text-xs font-extrabold text-rose-700 shadow-2xs">
-                  Total: {formatCurrency(totalExpense)}
+                  Total: {formatCurrency(totalFilteredExpense)}
                 </div>
                 <button
                   type="button"
@@ -655,7 +723,7 @@ export default function ExpansionView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {expenses.map((item, idx) => (
+                  {filteredExpenses.map((item, idx) => (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-3 text-center font-bold text-slate-400">
                         {idx + 1}
@@ -708,10 +776,10 @@ export default function ExpansionView({
                     </tr>
                   ))}
 
-                  {expenses.length === 0 && (
+                  {filteredExpenses.length === 0 && (
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-slate-400 text-xs font-semibold">
-                        No expenses recorded yet. Click "+ Add Expense" to record a new entry.
+                        No expenses recorded for this period. Click "+ Add Expense" to record a new entry.
                       </td>
                     </tr>
                   )}
@@ -724,10 +792,10 @@ export default function ExpansionView({
                       Total Expenses
                     </td>
                     <td className="py-3 px-3 text-right text-rose-700 font-black text-sm whitespace-nowrap">
-                      {formatCurrency(totalExpense)}
+                      {formatCurrency(totalFilteredExpense)}
                     </td>
                     <td colSpan={4} className="py-3 px-3 text-right text-slate-500 font-bold text-xs">
-                      {expenses.length} {expenses.length === 1 ? 'Entry' : 'Entries'} Recorded
+                      {filteredExpenses.length} {filteredExpenses.length === 1 ? 'Entry' : 'Entries'} Recorded
                     </td>
                   </tr>
                 </tfoot>
@@ -739,7 +807,7 @@ export default function ExpansionView({
         {/* ================= RIGHT / CALENDAR SIDEBAR (25% / 3 cols) ================= */}
         <div className="lg:col-span-3 space-y-4 min-w-0">
           {/* Scaled-down Compact Calendar Widget */}
-          <div className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-2xs space-y-2.5">
+          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2.5">
             {/* Header: Select Date & Date Pill */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
@@ -747,7 +815,7 @@ export default function ExpansionView({
                 <span>Select Date</span>
               </div>
               <div className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700">
-                {displaySelectedDateStr}
+                {formatDateToDisplay(selectedDate)}
               </div>
             </div>
 
@@ -783,7 +851,7 @@ export default function ExpansionView({
               <span>Sat</span>
             </div>
 
-            {/* Calendar Grid (Compact 24px buttons) */}
+            {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-1 text-center">
               {calendarDays.map((slot, i) => {
                 const isSelected = isSameDay(slot.dateStr, selectedDate);
@@ -791,8 +859,8 @@ export default function ExpansionView({
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setSelectedDate(slot.dateStr)}
-                    className={`h-6 w-6 mx-auto rounded-full text-[11px] font-bold flex items-center justify-center transition cursor-pointer ${
+                    onClick={() => handleCalendarDayClick(slot.dateStr)}
+                    className={`h-6.5 w-6.5 mx-auto rounded-full text-[11px] font-bold flex items-center justify-center transition cursor-pointer ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-xs font-black'
                         : slot.isCurrentMonth
@@ -807,44 +875,65 @@ export default function ExpansionView({
             </div>
           </div>
 
-          {/* Details for Selected Date Card */}
-          <div className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-2xs space-y-2.5">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-              <div className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Calendar className="w-3 h-3 stroke-[2.2]" />
+          {/* Quick Expense History Ledger (Replaces old 'Details for [Date]' card) */}
+          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2.5">
+            {/* Header: Title + Dynamic count pill */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                <Receipt className="w-3.5 h-3.5 text-rose-600" />
+                <span>Recent Expenses</span>
               </div>
-              <h3 className="text-xs font-black text-slate-900 tracking-tight">
-                Details for {displaySelectedDateStr}
-              </h3>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                Total Entries: {miniLedgerEntries.length}
+              </span>
             </div>
 
-            {/* 2 Stacked Cards (Cash in Hand & Cash in Online) */}
-            <div className="space-y-2">
-              {/* Cash in Hand */}
-              <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2.5 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-emerald-100/70 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Wallet className="w-3.5 h-3.5 stroke-[2.2]" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Hand</span>
-                  <span className="text-sm font-black text-slate-900 block truncate">
-                    {formatCurrency(selectedDateMetrics.cashInHand)}
-                  </span>
-                </div>
-              </div>
+            {/* Compact Columns: S.No | Date | Expense (₹) */}
+            <div className="max-h-64 overflow-y-auto overflow-x-hidden">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="text-[9px] font-black uppercase text-slate-400 border-b border-slate-100 bg-slate-50/60 sticky top-0 z-10">
+                    <th className="py-1.5 px-2 text-center w-8">S.No</th>
+                    <th className="py-1.5 px-2">Date</th>
+                    <th className="py-1.5 px-2 text-right">Expense (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {miniLedgerEntries.map((item, idx) => {
+                    const isSelected = isSameDay(item.date, fromDate) && isSameDay(item.date, toDate);
+                    return (
+                      <tr
+                        key={item.id || idx}
+                        onClick={() => handleDrillDownDate(item.date)}
+                        className={`cursor-pointer transition-colors group ${
+                          isSelected
+                            ? 'bg-rose-50/80 font-bold text-rose-800'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                        title={`Click to filter main ledger by ${item.date}`}
+                      >
+                        <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2 px-2 whitespace-nowrap font-medium">
+                          {formatDateToDisplay(item.date)}
+                        </td>
+                        <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap">
+                          {formatCurrency(item.amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
 
-              {/* Cash in Online */}
-              <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-2.5 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-purple-100/70 text-purple-600 flex items-center justify-center shrink-0">
-                  <Smartphone className="w-3.5 h-3.5 stroke-[2.2]" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Online</span>
-                  <span className="text-sm font-black text-slate-900 block truncate">
-                    {formatCurrency(selectedDateMetrics.cashInOnline)}
-                  </span>
-                </div>
-              </div>
+                  {miniLedgerEntries.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-slate-400 text-xs font-medium">
+                        No recent expenses
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -919,7 +1008,6 @@ export default function ExpansionView({
                   >
                     <option value="Cash">Cash</option>
                     <option value="UPI">UPI</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
                   </select>
                 </div>
                 <div>
