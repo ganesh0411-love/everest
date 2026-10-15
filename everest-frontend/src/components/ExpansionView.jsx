@@ -10,10 +10,12 @@ import {
   ChevronLeft, 
   ChevronRight, 
   ArrowLeft, 
-  Receipt,
-  Home,
-  User,
-  Clock
+  Receipt, 
+  Home, 
+  User, 
+  Clock, 
+  ArrowUpDown, 
+  Filter 
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -103,18 +105,45 @@ const getDaysAgoYmd = (days) => {
   return `${yr}-${mo}-${dy}`;
 };
 
+// Standard Operational Categories
+const CATEGORIES = [
+  'All Categories',
+  'Fuel/Travel',
+  'Office Rent',
+  'Tea & Snacks',
+  'Stationery',
+  'Printing',
+  'Maintenance',
+  'Electricity / Utilities',
+  'Staff Salary / Advance',
+  'Telephone / Internet',
+  'Others'
+];
+
 // Seed expenses supporting both current runtime dates & reference screenshot dates
 const todayDisplay = formatDateToDisplay(getTodayYmd());
 const yesterdayDisplay = formatDateToDisplay(getYesterdayYmd());
-const weekAgoDisplay = formatDateToDisplay(getDaysAgoYmd(3));
+const d3Display = formatDateToDisplay(getDaysAgoYmd(3));
+const d5Display = formatDateToDisplay(getDaysAgoYmd(5));
+const d8Display = formatDateToDisplay(getDaysAgoYmd(8));
+const d12Display = formatDateToDisplay(getDaysAgoYmd(12));
+const d18Display = formatDateToDisplay(getDaysAgoYmd(18));
+const d25Display = formatDateToDisplay(getDaysAgoYmd(25));
 
 const INITIAL_EXPENSES = [
-  { id: 'exp_1', date: todayDisplay, description: 'Office Rent & Maintenance', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' },
-  { id: 'exp_2', date: yesterdayDisplay, description: 'Travel & Fuel Allowance', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
-  { id: 'exp_3', date: weekAgoDisplay, description: 'Stationery & Printing', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_4', date: '03-05-2026', description: 'Stationery & Printing', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_5', date: '02-05-2026', description: 'Travel & Fuel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
-  { id: 'exp_6', date: '01-05-2026', description: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' }
+  { id: 'exp_1', date: todayDisplay, description: 'Office Rent & Maintenance', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' },
+  { id: 'exp_2', date: todayDisplay, description: 'Evening Tea & Refreshments', category: 'Tea & Snacks', amount: 250, remarks: 'Daily Staff Tea', mode: 'Cash', paidBy: 'Admin' },
+  { id: 'exp_3', date: yesterdayDisplay, description: 'Travel & Fuel Allowance', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
+  { id: 'exp_4', date: yesterdayDisplay, description: 'Electricity Bill', category: 'Electricity / Utilities', amount: 1850, remarks: 'EB Monthly Bill', mode: 'UPI', paidBy: 'Branch Manager' },
+  { id: 'exp_5', date: d3Display, description: 'Stationery & Register Books', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_6', date: d5Display, description: 'Printer Toner Cartridge', category: 'Printing', amount: 1200, remarks: 'HP LaserJet Toner', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_7', date: d8Display, description: 'Air Conditioner Servicing', category: 'Maintenance', amount: 1800, remarks: 'Bi-annual Maintenance', mode: 'Cash', paidBy: 'Admin' },
+  { id: 'exp_8', date: d12Display, description: 'Staff Field Advance', category: 'Staff Salary / Advance', amount: 3000, remarks: 'Festival Advance', mode: 'UPI', paidBy: 'Branch Manager' },
+  { id: 'exp_9', date: d18Display, description: 'Broadband Fiber Internet', category: 'Telephone / Internet', amount: 999, remarks: 'BSNL Monthly Fiber', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_10', date: d25Display, description: 'Branch Hardware & Repairs', category: 'Others', amount: 650, remarks: 'Door Lock Repair', mode: 'Cash', paidBy: 'Field Officer' },
+  { id: 'exp_11', date: '03-05-2026', description: 'Stationery & Printing', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_12', date: '02-05-2026', description: 'Travel & Fuel', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
+  { id: 'exp_13', date: '01-05-2026', description: 'Office Rent', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' }
 ];
 
 export default function ExpansionView({ 
@@ -134,10 +163,17 @@ export default function ExpansionView({
   const [fromDate, setFromDate] = useState(getTodayYmd());
   const [toDate, setToDate] = useState(getTodayYmd());
 
-  // Focused Selected Date (for calendar highlight)
+  // Focused Selected Date (for calendar highlight & single-day views)
   const [selectedDate, setSelectedDate] = useState(getTodayYmd());
 
-  // Calendar month state
+  // Category and Mode Filters
+  const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [selectedMode, setSelectedMode] = useState('All Modes');
+
+  // Table Sort Order: 'desc' = Newest first, 'asc' = Oldest first
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  // Calendar month navigation state
   const [calendarYear, setCalendarYear] = useState(() => {
     const d = new Date();
     return d.getFullYear();
@@ -157,9 +193,9 @@ export default function ExpansionView({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Normalize any legacy 'Bank Transfer' modes to 'UPI'
           return parsed.map(p => ({
             ...p,
+            category: p.category || 'Others',
             mode: String(p.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI'
           }));
         }
@@ -178,6 +214,7 @@ export default function ExpansionView({
   const [expForm, setExpForm] = useState({
     date: formatDateToDisplay(getTodayYmd()),
     description: '',
+    category: 'Fuel/Travel',
     amount: '',
     remarks: '',
     mode: 'Cash',
@@ -197,6 +234,7 @@ export default function ExpansionView({
             return {
               id: d.id,
               ...data,
+              category: data.category || 'Others',
               mode: String(data.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI'
             };
           });
@@ -211,17 +249,62 @@ export default function ExpansionView({
     };
   }, [branchId, expStorageKey]);
 
-  // --- Filtered Expenses based on active Date Range ---
+  // Category matching helper
+  const matchCategory = (expense, cat) => {
+    if (!cat || cat === 'All Categories') return true;
+    const expCat = String(expense.category || '').toLowerCase();
+    const expDesc = String(expense.description || '').toLowerCase();
+    const target = cat.toLowerCase();
+    if (expCat === target) return true;
+    if (target.includes('fuel') || target.includes('travel')) return expCat.includes('travel') || expCat.includes('fuel') || expDesc.includes('travel') || expDesc.includes('fuel');
+    if (target.includes('rent')) return expCat.includes('rent') || expDesc.includes('rent');
+    if (target.includes('tea') || target.includes('snacks')) return expCat.includes('tea') || expCat.includes('snacks') || expDesc.includes('tea') || expDesc.includes('snacks');
+    if (target.includes('stationery')) return expCat.includes('stationery') || expDesc.includes('stationery');
+    if (target.includes('printing')) return expCat.includes('printing') || expDesc.includes('printing');
+    if (target.includes('maintenance')) return expCat.includes('maintenance') || expDesc.includes('maintenance');
+    if (target.includes('electricity') || target.includes('utilities')) return expCat.includes('electricity') || expCat.includes('utilities') || expDesc.includes('electricity') || expDesc.includes('bill');
+    if (target.includes('salary') || target.includes('advance')) return expCat.includes('salary') || expCat.includes('advance') || expDesc.includes('salary');
+    if (target.includes('telephone') || target.includes('internet')) return expCat.includes('telephone') || expCat.includes('internet') || expDesc.includes('internet') || expDesc.includes('phone');
+    return expCat.includes(target) || expDesc.includes(target);
+  };
+
+  // Mode matching helper
+  const matchMode = (expense, mode) => {
+    if (!mode || mode === 'All Modes') return true;
+    const m = String(expense.mode || '').toUpperCase();
+    if (mode === 'Cash') return m.includes('CASH');
+    if (mode === 'UPI') return m.includes('UPI') || m.includes('ONLINE') || m.includes('BANK');
+    return true;
+  };
+
+  // --- Filtered Expenses based on active Date Range, Category, & Mode ---
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => isDateInRange(e.date, fromDate, toDate));
-  }, [expenses, fromDate, toDate]);
+    return expenses.filter(e => {
+      return isDateInRange(e.date, fromDate, toDate) &&
+             matchCategory(e, selectedCategory) &&
+             matchMode(e, selectedMode);
+    });
+  }, [expenses, fromDate, toDate, selectedCategory, selectedMode]);
+
+  // Sorted Filtered Expenses based on sortOrder
+  const sortedFilteredExpenses = useMemo(() => {
+    return [...filteredExpenses].sort((a, b) => {
+      const ymdA = formatDateToYmd(a.date);
+      const ymdB = formatDateToYmd(b.date);
+      if (sortOrder === 'desc') {
+        return ymdB.localeCompare(ymdA);
+      } else {
+        return ymdA.localeCompare(ymdB);
+      }
+    });
+  }, [filteredExpenses, sortOrder]);
 
   // Aggregate Filtered Total Expense
   const totalFilteredExpense = useMemo(() => {
     return filteredExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [filteredExpenses]);
 
-  // --- KPI Card 1: Today's Summary (Expense) Metrics ---
+  // --- KPI Card 1: Summary (Expense) Metrics ---
   const periodMetrics = useMemo(() => {
     let total = 0;
     let cash = 0;
@@ -240,6 +323,19 @@ export default function ExpansionView({
 
     return { total, cash, online };
   }, [filteredExpenses]);
+
+  // Dynamic Card 1 Title
+  const card1Title = useMemo(() => {
+    if (fromDate === toDate) {
+      if (activePreset === 'Today') return "Today's Summary (Expense)";
+      if (activePreset === 'Yesterday') return "Yesterday's Summary (Expense)";
+      const dDisplay = formatDateToDisplay(fromDate);
+      return `${dDisplay} Summary (Expense)`;
+    }
+    if (activePreset === 'Last Week') return "Last Week's Summary (Expense)";
+    if (activePreset === 'Last Month') return "Last Month's Summary (Expense)";
+    return `${formatDateToDisplay(fromDate)} - ${formatDateToDisplay(toDate)} Summary (Expense)`;
+  }, [fromDate, toDate, activePreset]);
 
   // --- Preset Filter Handler ---
   const handlePresetClick = (preset) => {
@@ -282,22 +378,17 @@ export default function ExpansionView({
     }
   };
 
-  // --- Right Sidebar: Mini Expense Ledger Pagination / Limit ---
-  const miniLedgerLimit = useMemo(() => {
-    if (activePreset === 'Today' || activePreset === 'Yesterday') return 10;
-    if (activePreset === 'Last Week') return 7;
-    if (activePreset === 'Last Month') return 30;
-    return 10;
-  }, [activePreset]);
-
+  // --- Right Sidebar: Mini Expense Ledger Filtered & Sorted (Up to 35 Entries) ---
   const miniLedgerEntries = useMemo(() => {
-    const sorted = [...expenses].sort((a, b) => {
+    const list = expenses.filter(e => {
+      return matchCategory(e, selectedCategory) && matchMode(e, selectedMode);
+    });
+    return [...list].sort((a, b) => {
       const ymdA = formatDateToYmd(a.date);
       const ymdB = formatDateToYmd(b.date);
       return ymdB.localeCompare(ymdA);
-    });
-    return sorted.slice(0, miniLedgerLimit);
-  }, [expenses, miniLedgerLimit]);
+    }).slice(0, 35);
+  }, [expenses, selectedCategory, selectedMode]);
 
   // Mini Ledger Row Click: Focus strictly on that date
   const handleDrillDownDate = (dateStr) => {
@@ -328,9 +419,10 @@ export default function ExpansionView({
     setExpForm({
       date: formatDateToDisplay(fromDate) || formatDateToDisplay(getTodayYmd()),
       description: '',
+      category: selectedCategory !== 'All Categories' ? selectedCategory : 'Fuel/Travel',
       amount: '',
       remarks: '',
-      mode: 'Cash',
+      mode: selectedMode !== 'All Modes' ? selectedMode : 'Cash',
       paidBy: userProfile?.name || 'Admin'
     });
     setIsExpModalOpen(true);
@@ -341,6 +433,7 @@ export default function ExpansionView({
     setExpForm({
       date: item.date || formatDateToDisplay(getTodayYmd()),
       description: item.description || '',
+      category: item.category || 'Others',
       amount: item.amount || '',
       remarks: item.remarks && item.remarks !== '-' ? item.remarks : '',
       mode: String(item.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
@@ -360,6 +453,7 @@ export default function ExpansionView({
     const payload = {
       date: expForm.date || formatDateToDisplay(getTodayYmd()),
       description: expForm.description.trim() || 'Expense',
+      category: expForm.category || 'Others',
       amount: amt,
       remarks: expForm.remarks.trim() || '-',
       mode: expForm.mode === 'Cash' ? 'Cash' : 'UPI',
@@ -504,14 +598,34 @@ export default function ExpansionView({
     );
   };
 
-  // Dynamic Card 1 Title
-  const card1Title = useMemo(() => {
-    if (activePreset === 'Today') return "Today's Summary (Expense)";
-    if (activePreset === 'Yesterday') return "Yesterday's Summary (Expense)";
-    if (activePreset === 'Last Week') return "Last Week's Summary (Expense)";
-    if (activePreset === 'Last Month') return "Last Month's Summary (Expense)";
-    return "Summary (Expense)";
-  }, [activePreset]);
+  // Calendar Day Styling Logic:
+  // - Single Date: Blue
+  // - Range: From = Green (#16A34A), To = Red (#DC2626), In-Between = Soft Blue Wash
+  const startRangeYmd = fromDate <= toDate ? fromDate : toDate;
+  const endRangeYmd = fromDate <= toDate ? toDate : fromDate;
+  const isSingleDateMode = startRangeYmd === endRangeYmd;
+
+  const getCalendarDayClasses = (slot) => {
+    const isFrom = isSameDay(slot.dateStr, startRangeYmd);
+    const isTo = isSameDay(slot.dateStr, endRangeYmd);
+    const isBetween = !isSingleDateMode && slot.dateStr > startRangeYmd && slot.dateStr < endRangeYmd;
+
+    if (isSingleDateMode && isFrom) {
+      return 'bg-blue-600 text-white font-black shadow-xs ring-2 ring-blue-300 rounded-full';
+    }
+    if (!isSingleDateMode && isFrom) {
+      return 'bg-[#16a34a] text-white font-black shadow-xs ring-2 ring-emerald-300 rounded-full';
+    }
+    if (!isSingleDateMode && isTo) {
+      return 'bg-[#dc2626] text-white font-black shadow-xs ring-2 ring-rose-300 rounded-full';
+    }
+    if (isBetween) {
+      return 'bg-blue-50 text-blue-900 font-extrabold border-y border-blue-100 rounded-none';
+    }
+    return slot.isCurrentMonth
+      ? 'text-slate-700 hover:bg-slate-100 rounded-full'
+      : 'text-slate-300 hover:bg-slate-50 rounded-full';
+  };
 
   return (
     <div className="w-full min-h-screen bg-[#f0f4f9] text-slate-800 p-4 sm:p-6 lg:p-8 space-y-5 overflow-x-hidden">
@@ -557,384 +671,434 @@ export default function ExpansionView({
         </div>
       </div>
 
-      {/* 2. Main Desktop Responsive Grid (75% Main Analytics & Table / 25% Calendar Sidebar) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full">
-        {/* ================= LEFT / MAIN COLUMN (75% / 9 cols) ================= */}
-        <div className="lg:col-span-9 space-y-4 min-w-0">
-          {/* Top Metric Summary Row */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
-            {/* Card 1: Today's Summary (Expense) — Spacious, tall, prominent, no Collections badge */}
-            <div className="md:col-span-7 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs space-y-3.5 flex flex-col justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Receipt className="w-4 h-4 stroke-[2.2]" />
-                </div>
-                <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
-                  {card1Title}
-                </h3>
-              </div>
-
-              {/* 3 Spacious, Tall Metric Cards with Generous Padding & Prominent Currency */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* 1. Total */}
-                <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[96px] flex items-center gap-3.5 hover:bg-slate-50 transition shadow-2xs">
-                  <div className="w-11 h-11 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
-                    <Coins className="w-5 h-5 stroke-[2.2]" />
-                  </div>
-                  <div className="min-w-0 flex flex-col justify-center">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total</span>
-                    <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                      {formatCurrency(periodMetrics.total)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 2. Cash in Hand */}
-                <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[96px] flex items-center gap-3.5 hover:bg-slate-50 transition shadow-2xs">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
-                    <Wallet className="w-5 h-5 stroke-[2.2]" />
-                  </div>
-                  <div className="min-w-0 flex flex-col justify-center">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Hand</span>
-                    <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                      {formatCurrency(periodMetrics.cash)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3. Cash in Online */}
-                <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[96px] flex items-center gap-3.5 hover:bg-slate-50 transition shadow-2xs">
-                  <div className="w-11 h-11 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
-                    <Smartphone className="w-5 h-5 stroke-[2.2]" />
-                  </div>
-                  <div className="min-w-0 flex flex-col justify-center">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Online</span>
-                    <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                      {formatCurrency(periodMetrics.online)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+      {/* 2. Top Unified Row (Card 1: 5 cols, Card 2: 4 cols, Calendar: 3 cols -> Equal Height with items-stretch) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Card 1: Summary (Expense) — Dynamically synchronized header, tall prominent cards */}
+        <div className="lg:col-span-5 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Receipt className="w-4 h-4 stroke-[2.2]" />
             </div>
-
-            {/* Card 2: Preset Date Filter Panel (Replaces old 'Today' box) */}
-            <div className="md:col-span-5 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs space-y-3.5 flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Clock className="w-4 h-4 stroke-[2.2]" />
-                  </div>
-                  <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
-                    Filter Period
-                  </h3>
-                </div>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full capitalize">
-                  {activePreset}
-                </span>
-              </div>
-
-              {/* Preset Pills: Today | Yesterday | Last Week | Last Month | Custom */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {['Today', 'Yesterday', 'Last Week', 'Last Month', 'Custom'].map(preset => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => handlePresetClick(preset)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                      activePreset === preset
-                        ? 'bg-blue-600 text-white shadow-2xs font-black'
-                        : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
-                    }`}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-
-              {/* Adjacent Date Inputs: From : [ DD-MM-YYYY ] | To : [ DD-MM-YYYY ] */}
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase shrink-0">From :</span>
-                  <input
-                    type="date"
-                    value={formatDateToYmd(fromDate)}
-                    onChange={(e) => handleCustomDateChange('from', e.target.value)}
-                    className="w-full bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase shrink-0">To :</span>
-                  <input
-                    type="date"
-                    value={formatDateToYmd(toDate)}
-                    onChange={(e) => handleCustomDateChange('to', e.target.value)}
-                    className="w-full bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
+            <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
+              {card1Title}
+            </h3>
           </div>
 
-          {/* ================= PRIMARY FULL-WIDTH EXPENSE ENTRY TABLE ================= */}
-          <div className="bg-white rounded-2xl border border-rose-100/90 shadow-2xs overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-rose-100 flex flex-wrap items-center justify-between gap-3 bg-rose-50/20">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
-                  <Receipt className="w-4 h-4 stroke-[2.4]" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                    Expense Entry
-                  </h3>
-                  <span className="text-[11px] font-medium text-slate-400 block -mt-0.5">
-                    Daily operational expenses and branch payouts
-                  </span>
-                </div>
+          {/* 3 Spacious, Tall Metric Cards with Generous Padding & Prominent Currency */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 items-center">
+            {/* 1. Total */}
+            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[100px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
+              <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
+                <Coins className="w-5 h-5 stroke-[2.2]" />
               </div>
-
-              <div className="flex items-center gap-3">
-                <div className="px-3 py-1 bg-white border border-rose-200/80 rounded-xl text-xs font-extrabold text-rose-700 shadow-2xs">
-                  Total: {formatCurrency(totalFilteredExpense)}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleOpenAddExpense}
-                  className="bg-[#dc2626] hover:bg-[#b91c1c] text-white font-extrabold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs active:scale-95 transition cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Add Expense</span>
-                </button>
+              <div className="min-w-0 flex flex-col justify-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total</span>
+                <span className="text-sm sm:text-base font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                  {formatCurrency(periodMetrics.total)}
+                </span>
               </div>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    <th className="py-3 px-3 text-center w-12">S.No</th>
-                    <th className="py-3 px-3 w-28">Date</th>
-                    <th className="py-3 px-3 min-w-[160px]">Description</th>
-                    <th className="py-3 px-3 text-right w-32">Amount (₹)</th>
-                    <th className="py-3 px-3 min-w-[140px]">Remarks</th>
-                    <th className="py-3 px-3 text-center w-28">Mode</th>
-                    <th className="py-3 px-3 w-36">Paid By</th>
-                    <th className="py-3 px-3 text-center w-20">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredExpenses.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 px-3 text-center font-bold text-slate-400">
-                        {idx + 1}
-                      </td>
-                      <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
-                        {item.date}
-                      </td>
-                      <td className="py-3 px-3 font-bold text-slate-800">
-                        {item.description}
-                      </td>
-                      <td className="py-3 px-3 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="py-3 px-3 text-slate-500 font-medium">
-                        {item.remarks || '-'}
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        {renderModeBadge(item.mode)}
-                      </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-bold shrink-0">
-                            <User className="w-3 h-3" />
-                          </div>
-                          <span className="font-semibold text-slate-700 text-xs truncate max-w-[100px]">
-                            {item.paidBy || 'Admin'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditExpense(item)}
-                            title="Edit"
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteExpense(item.id)}
-                            title="Delete"
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+            {/* 2. Cash in Hand */}
+            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[100px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
+                <Wallet className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="min-w-0 flex flex-col justify-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Hand</span>
+                <span className="text-sm sm:text-base font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                  {formatCurrency(periodMetrics.cash)}
+                </span>
+              </div>
+            </div>
 
-                  {filteredExpenses.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400 text-xs font-semibold">
-                        No expenses recorded for this period. Click "+ Add Expense" to record a new entry.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-
-                {/* Summary Footer Calculating Total Expenses */}
-                <tfoot>
-                  <tr className="bg-rose-50/70 font-black border-t-2 border-rose-200/80 text-xs">
-                    <td colSpan={3} className="py-3 px-3 text-slate-800 font-extrabold uppercase tracking-wide">
-                      Total Expenses
-                    </td>
-                    <td className="py-3 px-3 text-right text-rose-700 font-black text-sm whitespace-nowrap">
-                      {formatCurrency(totalFilteredExpense)}
-                    </td>
-                    <td colSpan={4} className="py-3 px-3 text-right text-slate-500 font-bold text-xs">
-                      {filteredExpenses.length} {filteredExpenses.length === 1 ? 'Entry' : 'Entries'} Recorded
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+            {/* 3. Cash in Online */}
+            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[100px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
+              <div className="w-10 h-10 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
+                <Smartphone className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="min-w-0 flex flex-col justify-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Online</span>
+                <span className="text-sm sm:text-base font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                  {formatCurrency(periodMetrics.online)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ================= RIGHT / CALENDAR SIDEBAR (25% / 3 cols) ================= */}
-        <div className="lg:col-span-3 space-y-4 min-w-0">
-          {/* Scaled-down Compact Calendar Widget */}
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2.5">
-            {/* Header: Select Date & Date Pill */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>Select Date</span>
+        {/* Card 2: Preset Date Filter Panel + Category & Mode Selectors */}
+        <div className="lg:col-span-4 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Clock className="w-4 h-4 stroke-[2.2]" />
               </div>
-              <div className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700">
-                {formatDateToDisplay(selectedDate)}
-              </div>
+              <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                Filter Period
+              </h3>
             </div>
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full capitalize">
+              {activePreset}
+            </span>
+          </div>
 
-            {/* Month Navigation */}
-            <div className="flex items-center justify-between px-1">
+          {/* Preset Pills: Today | Yesterday | Last Week | Last Month | Custom */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {['Today', 'Yesterday', 'Last Week', 'Last Month', 'Custom'].map(preset => (
               <button
+                key={preset}
                 type="button"
-                onClick={handlePrevMonth}
-                className="w-6 h-6 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+                onClick={() => handlePresetClick(preset)}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  activePreset === preset
+                    ? 'bg-blue-600 text-white shadow-2xs font-black'
+                    : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
+                }`}
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                {preset}
               </button>
-              <span className="text-xs font-extrabold text-slate-800">
-                {monthNames[calendarMonth]} {calendarYear}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="w-6 h-6 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            ))}
+          </div>
 
-            {/* Days of Week Header */}
-            <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-extrabold text-slate-400 uppercase">
-              <span>Sun</span>
-              <span>Mon</span>
-              <span>Tue</span>
-              <span>Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
+          {/* Adjacent Date Inputs: From : [ DD-MM-YYYY ] | To : [ DD-MM-YYYY ] */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase shrink-0">From :</span>
+              <input
+                type="date"
+                value={formatDateToYmd(fromDate)}
+                onChange={(e) => handleCustomDateChange('from', e.target.value)}
+                className="w-full bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+              />
             </div>
-
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1 text-center">
-              {calendarDays.map((slot, i) => {
-                const isSelected = isSameDay(slot.dateStr, selectedDate);
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleCalendarDayClick(slot.dateStr)}
-                    className={`h-6.5 w-6.5 mx-auto rounded-full text-[11px] font-bold flex items-center justify-center transition cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-600 text-white shadow-xs font-black'
-                        : slot.isCurrentMonth
-                        ? 'text-slate-700 hover:bg-slate-100'
-                        : 'text-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    {slot.dayNumber}
-                  </button>
-                );
-              })}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase shrink-0">To :</span>
+              <input
+                type="date"
+                value={formatDateToYmd(toDate)}
+                onChange={(e) => handleCustomDateChange('to', e.target.value)}
+                className="w-full bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+              />
             </div>
           </div>
 
-          {/* Quick Expense History Ledger (Replaces old 'Details for [Date]' card) */}
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2.5">
-            {/* Header: Title + Dynamic count pill */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-                <Receipt className="w-3.5 h-3.5 text-rose-600" />
-                <span>Recent Expenses</span>
-              </div>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
-                Total Entries: {miniLedgerEntries.length}
+          {/* Category & Mode Selectors */}
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Category</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer truncate"
+              >
+                {CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Mode</label>
+              <select
+                value={selectedMode}
+                onChange={(e) => setSelectedMode(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer"
+              >
+                <option value="All Modes">All Modes</option>
+                <option value="Cash">Cash</option>
+                <option value="UPI">UPI</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Calendar Card — Locked Height Sync with Left Cards via h-full flex */}
+        <div className="lg:col-span-3 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-2.5">
+          {/* Header: Select Date & Date Pill */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <span>Select Date</span>
+            </div>
+            <div className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700">
+              {formatDateToDisplay(selectedDate)}
+            </div>
+          </div>
+
+          {/* Month Navigation */}
+          <div className="flex items-center justify-between px-1">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="w-6 h-6 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-xs font-extrabold text-slate-800">
+              {monthNames[calendarMonth]} {calendarYear}
+            </span>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="w-6 h-6 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Days of Week Header */}
+          <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-extrabold text-slate-400 uppercase">
+            <span>Sun</span>
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+          </div>
+
+          {/* Calendar Grid with Range Coloration: From = Green (#16A34A), To = Red (#DC2626), Single = Blue */}
+          <div className="grid grid-cols-7 gap-1 text-center place-items-center">
+            {calendarDays.map((slot, i) => {
+              const dayClasses = getCalendarDayClasses(slot);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => handleCalendarDayClick(slot.dateStr)}
+                  className={`h-6.5 w-6.5 mx-auto text-[11px] font-bold flex items-center justify-center transition cursor-pointer ${dayClasses}`}
+                >
+                  {slot.dayNumber}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Range Color Legend */}
+          {!isSingleDateMode && (
+            <div className="flex items-center justify-center gap-3 pt-1 border-t border-slate-100 text-[10px] font-bold text-slate-500">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#16a34a]"></span> From
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#dc2626]"></span> To
               </span>
             </div>
+          )}
+        </div>
+      </div>
 
-            {/* Compact Columns: S.No | Date | Expense (₹) */}
-            <div className="max-h-64 overflow-y-auto overflow-x-hidden">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="text-[9px] font-black uppercase text-slate-400 border-b border-slate-100 bg-slate-50/60 sticky top-0 z-10">
-                    <th className="py-1.5 px-2 text-center w-8">S.No</th>
-                    <th className="py-1.5 px-2">Date</th>
-                    <th className="py-1.5 px-2 text-right">Expense (₹)</th>
+      {/* 3. Bottom Parallel Row (Expense Entry Table 75% / Recent Expenses 25% starting on exact same baseline) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
+        {/* ================= LEFT 75% (9 cols): PRIMARY EXPENSE ENTRY TABLE ================= */}
+        <div className="lg:col-span-9 bg-white rounded-2xl border border-rose-100/90 shadow-2xs overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-rose-100 flex flex-wrap items-center justify-between gap-3 bg-rose-50/20">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
+                <Receipt className="w-4 h-4 stroke-[2.4]" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                  Expense Entry
+                </h3>
+                <span className="text-[11px] font-medium text-slate-400 block -mt-0.5">
+                  Daily operational expenses and branch payouts
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Date Sorting Toggle: Date : NEWEST ⇅ OLDEST */}
+              <button
+                type="button"
+                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                title={`Sort by Date: currently ${sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}. Click to toggle.`}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-700 shadow-2xs cursor-pointer active:scale-95 transition"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 text-blue-600" />
+                <span className="text-slate-400 font-semibold">Date :</span>
+                <span className={`px-1.5 py-0.5 rounded-md ${sortOrder === 'desc' ? 'bg-blue-600 text-white font-black' : 'text-slate-500 font-bold'}`}>NEWEST</span>
+                <span className="text-slate-300">⇅</span>
+                <span className={`px-1.5 py-0.5 rounded-md ${sortOrder === 'asc' ? 'bg-blue-600 text-white font-black' : 'text-slate-500 font-bold'}`}>OLDEST</span>
+              </button>
+
+              <div className="px-3 py-1.5 bg-white border border-rose-200/80 rounded-xl text-xs font-extrabold text-rose-700 shadow-2xs">
+                Total: {formatCurrency(totalFilteredExpense)}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenAddExpense}
+                className="bg-[#dc2626] hover:bg-[#b91c1c] text-white font-extrabold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs active:scale-95 transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Add Expense</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <th className="py-3 px-3 text-center w-12">S.No</th>
+                  <th className="py-3 px-3 w-28">Date</th>
+                  <th className="py-3 px-3 min-w-[150px]">Description</th>
+                  <th className="py-3 px-3 w-28">Category</th>
+                  <th className="py-3 px-3 text-right w-28">Amount (₹)</th>
+                  <th className="py-3 px-3 min-w-[130px]">Remarks</th>
+                  <th className="py-3 px-3 text-center w-24">Mode</th>
+                  <th className="py-3 px-3 w-32">Paid By</th>
+                  <th className="py-3 px-3 text-center w-20">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {sortedFilteredExpenses.map((item, idx) => (
+                  <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-3 text-center font-bold text-slate-400">
+                      {idx + 1}
+                    </td>
+                    <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
+                      {item.date}
+                    </td>
+                    <td className="py-3 px-3 font-bold text-slate-800">
+                      {item.description}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                        {item.category || 'Others'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
+                      {formatCurrency(item.amount)}
+                    </td>
+                    <td className="py-3 px-3 text-slate-500 font-medium">
+                      {item.remarks || '-'}
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      {renderModeBadge(item.mode)}
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-bold shrink-0">
+                          <User className="w-3 h-3" />
+                        </div>
+                        <span className="font-semibold text-slate-700 text-xs truncate max-w-[90px]">
+                          {item.paidBy || 'Admin'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditExpense(item)}
+                          title="Edit"
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteExpense(item.id)}
+                          title="Delete"
+                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {miniLedgerEntries.map((item, idx) => {
-                    const isSelected = isSameDay(item.date, fromDate) && isSameDay(item.date, toDate);
-                    return (
-                      <tr
-                        key={item.id || idx}
-                        onClick={() => handleDrillDownDate(item.date)}
-                        className={`cursor-pointer transition-colors group ${
-                          isSelected
-                            ? 'bg-rose-50/80 font-bold text-rose-800'
-                            : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                        title={`Click to filter main ledger by ${item.date}`}
-                      >
-                        <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600">
-                          {idx + 1}
-                        </td>
-                        <td className="py-2 px-2 whitespace-nowrap font-medium">
-                          {formatDateToDisplay(item.date)}
-                        </td>
-                        <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap">
-                          {formatCurrency(item.amount)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                ))}
 
-                  {miniLedgerEntries.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="py-6 text-center text-slate-400 text-xs font-medium">
-                        No recent expenses
+                {sortedFilteredExpenses.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-slate-400 text-xs font-semibold">
+                      No expenses found matching the selected filter criteria. Click "+ Add Expense" to record a new entry.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+
+              {/* Summary Footer Calculating Total Expenses */}
+              <tfoot>
+                <tr className="bg-rose-50/70 font-black border-t-2 border-rose-200/80 text-xs">
+                  <td colSpan={4} className="py-3 px-3 text-slate-800 font-extrabold uppercase tracking-wide">
+                    Total Expenses
+                  </td>
+                  <td className="py-3 px-3 text-right text-rose-700 font-black text-sm whitespace-nowrap">
+                    {formatCurrency(totalFilteredExpense)}
+                  </td>
+                  <td colSpan={4} className="py-3 px-3 text-right text-slate-500 font-bold text-xs">
+                    {sortedFilteredExpenses.length} {sortedFilteredExpenses.length === 1 ? 'Entry' : 'Entries'} Recorded
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        {/* ================= RIGHT 25% (3 cols): QUICK EXPENSE HISTORY LEDGER (Scrollable up to 35 entries) ================= */}
+        <div className="lg:col-span-3 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3 flex flex-col">
+          {/* Header: Title + Dynamic count pill */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+              <Receipt className="w-3.5 h-3.5 text-rose-600" />
+              <span>Recent Expenses</span>
+            </div>
+            <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+              Total Entries: {miniLedgerEntries.length}
+            </span>
+          </div>
+
+          {/* Compact Columns: S.No | Date | Expense (₹) with max-h-[500px] and smooth vertical scrollbar */}
+          <div className="max-h-[500px] overflow-y-auto pr-1 divide-y divide-slate-100">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="sticky top-0 bg-white/95 backdrop-blur-xs z-10 border-b border-slate-100">
+                <tr className="text-[9px] font-black uppercase text-slate-400">
+                  <th className="py-2 px-2 text-center w-8">S.No</th>
+                  <th className="py-2 px-2">Date</th>
+                  <th className="py-2 px-2 text-right">Expense (₹)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {miniLedgerEntries.map((item, idx) => {
+                  const isSelected = isSameDay(item.date, fromDate) && isSameDay(item.date, toDate);
+                  return (
+                    <tr
+                      key={item.id || idx}
+                      onClick={() => handleDrillDownDate(item.date)}
+                      className={`cursor-pointer transition-colors group ${
+                        isSelected
+                          ? 'bg-rose-50/90 font-bold text-rose-800'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                      title={`Click to focus on ${item.date}`}
+                    >
+                      <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2 px-2 whitespace-nowrap font-medium">
+                        {formatDateToDisplay(item.date)}
+                      </td>
+                      <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap">
+                        {formatCurrency(item.amount)}
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+
+                {miniLedgerEntries.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-slate-400 text-xs font-medium">
+                      No recent expenses matching active filters
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -986,19 +1150,19 @@ export default function ExpansionView({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Office Rent, Travel & Fuel, Stationery"
-                  value={expForm.description}
-                  onChange={(e) => setExpForm({ ...expForm, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-rose-500"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Category</label>
+                  <select
+                    value={expForm.category}
+                    onChange={(e) => setExpForm({ ...expForm, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-rose-500 cursor-pointer"
+                  >
+                    {CATEGORIES.filter(c => c !== 'All Categories').map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
                   <select
@@ -1010,6 +1174,21 @@ export default function ExpansionView({
                     <option value="UPI">UPI</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Monthly Branch Rent, Tea & Snacks, Stationery"
+                  value={expForm.description}
+                  onChange={(e) => setExpForm({ ...expForm, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-rose-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Paid By</label>
                   <input
@@ -1021,17 +1200,16 @@ export default function ExpansionView({
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-rose-500"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Remarks</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Field Visit, Office Supplies, Monthly"
-                  value={expForm.remarks}
-                  onChange={(e) => setExpForm({ ...expForm, remarks: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-rose-500"
-                />
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Remarks</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Field Visit, Office Supplies"
+                    value={expForm.remarks}
+                    onChange={(e) => setExpForm({ ...expForm, remarks: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-rose-500"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
