@@ -378,19 +378,52 @@ export default function ExpansionView({
     }
   };
 
-  // --- Right Sidebar: Mini Expense Ledger Filtered & Sorted (Up to 35 Entries) ---
-  const miniLedgerEntries = useMemo(() => {
+  // --- Right Sidebar: Unique-Date Aggregated Expenses Ledger (No Duplicate Dates) ---
+  const dailyAggregatedExpenses = useMemo(() => {
+    // 1. Filter by category & mode first
     const list = expenses.filter(e => {
       return matchCategory(e, selectedCategory) && matchMode(e, selectedMode);
     });
-    return [...list].sort((a, b) => {
-      const ymdA = formatDateToYmd(a.date);
-      const ymdB = formatDateToYmd(b.date);
-      return ymdB.localeCompare(ymdA);
-    }).slice(0, 35);
-  }, [expenses, selectedCategory, selectedMode]);
 
-  // Mini Ledger Row Click: Focus strictly on that date
+    // 2. Group by date YMD
+    const groupsByYmd = {};
+    list.forEach(item => {
+      if (!item.date) return;
+      const ymd = formatDateToYmd(item.date);
+      if (!ymd) return;
+
+      if (!groupsByYmd[ymd]) {
+        groupsByYmd[ymd] = {
+          ymd: ymd,
+          displayDate: formatDateToDisplay(item.date),
+          totalAmount: 0,
+          count: 0
+        };
+      }
+      groupsByYmd[ymd].totalAmount += Number(item.amount || 0);
+      groupsByYmd[ymd].count += 1;
+    });
+
+    // 3. Convert to array and sort descending by date (newest first)
+    let aggregatedList = Object.values(groupsByYmd).sort((a, b) => b.ymd.localeCompare(a.ymd));
+
+    // 4. Strict filter limits
+    if (activePreset === 'Last Week') {
+      const weekAgo = getDaysAgoYmd(7);
+      const today = getTodayYmd();
+      aggregatedList = aggregatedList.filter(g => g.ymd >= weekAgo && g.ymd <= today).slice(0, 7);
+    } else if (activePreset === 'Last Month') {
+      const monthAgo = getDaysAgoYmd(30);
+      const today = getTodayYmd();
+      aggregatedList = aggregatedList.filter(g => g.ymd >= monthAgo && g.ymd <= today).slice(0, 30);
+    } else {
+      aggregatedList = aggregatedList.slice(0, 35);
+    }
+
+    return aggregatedList;
+  }, [expenses, selectedCategory, selectedMode, activePreset]);
+
+  // Mini Ledger Row Click: Focus strictly on that unique date
   const handleDrillDownDate = (dateStr) => {
     const ymd = formatDateToYmd(dateStr);
     setFromDate(ymd);
@@ -673,8 +706,8 @@ export default function ExpansionView({
 
       {/* 2. Top Unified Row (Card 1: 5 cols, Card 2: 4 cols, Calendar: 3 cols -> Equal Height with items-stretch) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        {/* Card 1: Summary (Expense) — Dynamically synchronized header, tall prominent cards */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-4">
+        {/* Card 1: Summary (Expense) — Dynamically synchronized header, compact tall metric boxes */}
+        <div className="lg:col-span-5 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-3">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
             <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <Receipt className="w-4 h-4 stroke-[2.2]" />
@@ -684,10 +717,10 @@ export default function ExpansionView({
             </h3>
           </div>
 
-          {/* 3 Spacious, Tall Metric Cards with Generous Padding & Prominent Currency */}
+          {/* 3 Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 items-center">
             {/* 1. Total */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[100px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
+            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 min-h-[88px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
               <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
                 <Coins className="w-5 h-5 stroke-[2.2]" />
               </div>
@@ -700,7 +733,7 @@ export default function ExpansionView({
             </div>
 
             {/* 2. Cash in Hand */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[100px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
+            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 min-h-[88px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
               <div className="w-10 h-10 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
                 <Wallet className="w-5 h-5 stroke-[2.2]" />
               </div>
@@ -713,7 +746,7 @@ export default function ExpansionView({
             </div>
 
             {/* 3. Cash in Online */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 min-h-[100px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
+            <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 min-h-[88px] flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs h-full">
               <div className="w-10 h-10 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
                 <Smartphone className="w-5 h-5 stroke-[2.2]" />
               </div>
@@ -727,14 +760,14 @@ export default function ExpansionView({
           </div>
         </div>
 
-        {/* Card 2: Preset Date Filter Panel + Category & Mode Selectors */}
-        <div className="lg:col-span-4 bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-3">
+        {/* Card 2: Preset Date Filter Panel with Inline Category & Mode Dropdowns */}
+        <div className="lg:col-span-4 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-2.5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Clock className="w-4 h-4 stroke-[2.2]" />
+              <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
               </div>
-              <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
+              <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
                 Filter Period
               </h3>
             </div>
@@ -743,14 +776,14 @@ export default function ExpansionView({
             </span>
           </div>
 
-          {/* Preset Pills: Today | Yesterday | Last Week | Last Month | Custom */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {['Today', 'Yesterday', 'Last Week', 'Last Month', 'Custom'].map(preset => (
+          {/* Row 1: Preset Pills: [ Today ] [ Yesterday ] [ Last Week ] [ Last Month ] */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {['Today', 'Yesterday', 'Last Week', 'Last Month'].map(preset => (
               <button
                 key={preset}
                 type="button"
                 onClick={() => handlePresetClick(preset)}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
                   activePreset === preset
                     ? 'bg-blue-600 text-white shadow-2xs font-black'
                     : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
@@ -761,36 +794,49 @@ export default function ExpansionView({
             ))}
           </div>
 
-          {/* Adjacent Date Inputs: From : [ DD-MM-YYYY ] | To : [ DD-MM-YYYY ] */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-              <span className="text-[10px] font-black text-slate-400 uppercase shrink-0">From :</span>
+          {/* Row 2: [ Custom ]  From: [ DD/MM/YYYY ]  To: [ DD/MM/YYYY ]  [ Category ▾ ]  [ Mode ▾ ] */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+            {/* Custom Pill */}
+            <button
+              type="button"
+              onClick={() => handlePresetClick('Custom')}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                activePreset === 'Custom'
+                  ? 'bg-blue-600 text-white shadow-2xs font-black'
+                  : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
+              }`}
+            >
+              Custom
+            </button>
+
+            {/* From Date */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 shrink-0">
+              <span className="text-[9px] font-black text-slate-400 uppercase">From:</span>
               <input
                 type="date"
                 value={formatDateToYmd(fromDate)}
                 onChange={(e) => handleCustomDateChange('from', e.target.value)}
-                className="w-full bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                className="w-[100px] bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
               />
             </div>
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-              <span className="text-[10px] font-black text-slate-400 uppercase shrink-0">To :</span>
+
+            {/* To Date */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 shrink-0">
+              <span className="text-[9px] font-black text-slate-400 uppercase">To:</span>
               <input
                 type="date"
                 value={formatDateToYmd(toDate)}
                 onChange={(e) => handleCustomDateChange('to', e.target.value)}
-                className="w-full bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                className="w-[100px] bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
               />
             </div>
-          </div>
 
-          {/* Category & Mode Selectors */}
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Category</label>
+            {/* Inline Category Dropdown */}
+            <div className="relative shrink-0 flex-1 min-w-[105px]">
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer truncate"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2 py-1 text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer truncate h-[29px]"
               >
                 {CATEGORIES.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -798,12 +844,12 @@ export default function ExpansionView({
               </select>
             </div>
 
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Mode</label>
+            {/* Inline Mode Dropdown */}
+            <div className="relative shrink-0 min-w-[80px]">
               <select
                 value={selectedMode}
                 onChange={(e) => setSelectedMode(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2 py-1 text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer h-[29px]"
               >
                 <option value="All Modes">All Modes</option>
                 <option value="Cash">Cash</option>
@@ -813,10 +859,10 @@ export default function ExpansionView({
           </div>
         </div>
 
-        {/* Right Calendar Card — Locked Height Sync with Left Cards via h-full flex */}
-        <div className="lg:col-span-3 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-2.5">
+        {/* Right Calendar Card — Locked Height Sync with Left Cards via items-stretch */}
+        <div className="lg:col-span-3 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-2">
           {/* Header: Select Date & Date Pill */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
             <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
               <Calendar className="w-3.5 h-3.5 text-blue-600" />
               <span>Select Date</span>
@@ -1040,21 +1086,21 @@ export default function ExpansionView({
           </div>
         </div>
 
-        {/* ================= RIGHT 25% (3 cols): QUICK EXPENSE HISTORY LEDGER (Scrollable up to 35 entries) ================= */}
+        {/* ================= RIGHT 25% (3 cols): QUICK EXPENSE HISTORY LEDGER (Unique Dates, Fixed 6-Row Viewport) ================= */}
         <div className="lg:col-span-3 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3 flex flex-col">
-          {/* Header: Title + Dynamic count pill */}
+          {/* Header: Title + Dynamic count pill of Unique Days */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
             <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
               <Receipt className="w-3.5 h-3.5 text-rose-600" />
               <span>Recent Expenses</span>
             </div>
             <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
-              Total Entries: {miniLedgerEntries.length}
+              Days Recorded: {dailyAggregatedExpenses.length}
             </span>
           </div>
 
-          {/* Compact Columns: S.No | Date | Expense (₹) with max-h-[500px] and smooth vertical scrollbar */}
-          <div className="max-h-[500px] overflow-y-auto pr-1 divide-y divide-slate-100">
+          {/* Fixed 6-Row Viewport with Independent Internal Scrollbar (max-h-[260px]) */}
+          <div className="max-h-[260px] overflow-y-auto pr-1 divide-y divide-slate-100">
             <table className="w-full text-left border-collapse text-xs">
               <thead className="sticky top-0 bg-white/95 backdrop-blur-xs z-10 border-b border-slate-100">
                 <tr className="text-[9px] font-black uppercase text-slate-400">
@@ -1064,36 +1110,36 @@ export default function ExpansionView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {miniLedgerEntries.map((item, idx) => {
-                  const isSelected = isSameDay(item.date, fromDate) && isSameDay(item.date, toDate);
+                {dailyAggregatedExpenses.map((group, idx) => {
+                  const isSelected = isSameDay(group.ymd, fromDate) && isSameDay(group.ymd, toDate);
                   return (
                     <tr
-                      key={item.id || idx}
-                      onClick={() => handleDrillDownDate(item.date)}
+                      key={group.ymd || idx}
+                      onClick={() => handleDrillDownDate(group.displayDate)}
                       className={`cursor-pointer transition-colors group ${
                         isSelected
                           ? 'bg-rose-50/90 font-bold text-rose-800'
                           : 'hover:bg-slate-50 text-slate-700'
                       }`}
-                      title={`Click to focus on ${item.date}`}
+                      title={`Click to focus on ${group.displayDate} (Total: ${formatCurrency(group.totalAmount)})`}
                     >
-                      <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600">
+                      <td className="py-2.5 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600">
                         {idx + 1}
                       </td>
-                      <td className="py-2 px-2 whitespace-nowrap font-medium">
-                        {formatDateToDisplay(item.date)}
+                      <td className="py-2.5 px-2 whitespace-nowrap font-medium">
+                        {group.displayDate}
                       </td>
-                      <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap">
-                        {formatCurrency(item.amount)}
+                      <td className="py-2.5 px-2 text-right font-black text-rose-600 whitespace-nowrap">
+                        {formatCurrency(group.totalAmount)}
                       </td>
                     </tr>
                   );
                 })}
 
-                {miniLedgerEntries.length === 0 && (
+                {dailyAggregatedExpenses.length === 0 && (
                   <tr>
                     <td colSpan={3} className="py-8 text-center text-slate-400 text-xs font-medium">
-                      No recent expenses matching active filters
+                      No expenses recorded for active filters
                     </td>
                   </tr>
                 )}
