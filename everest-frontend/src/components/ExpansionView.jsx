@@ -68,6 +68,17 @@ const formatDateToYmd = (dateStr) => {
   return clean;
 };
 
+// Formats timestamp or ISO string to HH:MM AM/PM
+const formatTime = (isoString) => {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '10:30 AM';
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  } catch (e) {
+    return '10:30 AM';
+  }
+};
+
 // Robust day comparison
 const isSameDay = (dateA, dateB) => {
   if (!dateA || !dateB) return false;
@@ -139,19 +150,19 @@ const d25Display = formatDateToDisplay(getDaysAgoYmd(25));
 const SAMPLE_UPI_RECEIPT = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600"><rect width="100%" height="100%" fill="%23f8fafc"/><rect x="20" y="20" width="360" height="560" rx="20" fill="%23ffffff" stroke="%23e2e8f0" stroke-width="2"/><circle cx="200" cy="90" r="32" fill="%2316a34a"/><path d="M188 90l8 8 16-16" stroke="%23ffffff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="200" y="150" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="%230f172a" text-anchor="middle">Payment Successful</text><text x="200" y="175" font-family="Arial,sans-serif" font-size="12" fill="%2364748b" text-anchor="middle">UPI Ref: 429381029384</text><text x="200" y="225" font-family="Arial,sans-serif" font-size="32" font-weight="900" fill="%230f172a" text-anchor="middle">₹ 5,000.00</text><line x1="40" y1="260" x2="360" y2="260" stroke="%23e2e8f0" stroke-dasharray="4,4"/><text x="50" y="300" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Paid To</text><text x="350" y="300" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">Building Owner Realty</text><text x="50" y="340" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">From Account</text><text x="350" y="340" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">Everest Microfinance</text><text x="50" y="380" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Payment Mode</text><text x="350" y="380" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%2316a34a" text-anchor="end">UPI Transfer</text><text x="50" y="420" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Transaction Time</text><text x="350" y="420" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">15-10-2026 10:15 AM</text><rect x="40" y="460" width="320" height="70" rx="12" fill="%23f1f5f9"/><text x="60" y="490" font-family="Arial,sans-serif" font-size="11" fill="%2364748b">Note</text><text x="60" y="512" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a">Monthly Branch Rent - October 2026</text></svg>`;
 
 const INITIAL_EXPENSES = [
-  { id: 'exp_1', date: todayDisplay, description: 'Office Rent & Maintenance', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager', receiptImage: SAMPLE_UPI_RECEIPT },
-  { id: 'exp_2', date: todayDisplay, description: 'Evening Tea & Refreshments', category: 'Tea & Snacks', amount: 250, remarks: 'Daily Staff Tea', mode: 'Cash', paidBy: 'Admin', cashDenominations: { d500: 0, d200: 1, d100: 0, d50: 1, d20: 0, d10: 0, coins: 0, total: 250 } },
-  { id: 'exp_3', date: yesterdayDisplay, description: 'Travel & Fuel Allowance', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer', cashDenominations: { d500: 4, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0, total: 2000 } },
-  { id: 'exp_4', date: yesterdayDisplay, description: 'Electricity Bill', category: 'Electricity / Utilities', amount: 1850, remarks: 'EB Monthly Bill', mode: 'UPI', paidBy: 'Branch Manager' },
-  { id: 'exp_5', date: d3Display, description: 'Stationery & Register Books', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_6', date: d5Display, description: 'Printer Toner Cartridge', category: 'Printing', amount: 1200, remarks: 'HP LaserJet Toner', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_7', date: d8Display, description: 'Air Conditioner Servicing', category: 'Maintenance', amount: 1800, remarks: 'Bi-annual Maintenance', mode: 'Cash', paidBy: 'Admin' },
-  { id: 'exp_8', date: d12Display, description: 'Staff Field Advance', category: 'Staff Salary / Advance', amount: 3000, remarks: 'Festival Advance', mode: 'UPI', paidBy: 'Branch Manager' },
-  { id: 'exp_9', date: d18Display, description: 'Broadband Fiber Internet', category: 'Telephone / Internet', amount: 999, remarks: 'BSNL Monthly Fiber', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_10', date: d25Display, description: 'Branch Hardware & Repairs', category: 'Others', amount: 650, remarks: 'Door Lock Repair', mode: 'Cash', paidBy: 'Field Officer' },
-  { id: 'exp_11', date: '03-05-2026', description: 'Stationery & Printing', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_12', date: '02-05-2026', description: 'Travel & Fuel', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
-  { id: 'exp_13', date: '01-05-2026', description: 'Office Rent', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' }
+  { id: 'exp_1', date: todayDisplay, time: '10:15 AM', description: 'Office Rent & Maintenance', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager', receiptImage: SAMPLE_UPI_RECEIPT },
+  { id: 'exp_2', date: todayDisplay, time: '04:30 PM', description: 'Evening Tea & Refreshments', category: 'Tea & Snacks', amount: 250, remarks: 'Daily Staff Tea', mode: 'Cash', paidBy: 'Admin', cashDenominations: { d500: 0, d200: 1, d100: 0, d50: 1, d20: 0, d10: 0, coins: 0, total: 250 } },
+  { id: 'exp_3', date: yesterdayDisplay, time: '05:45 PM', description: 'Travel & Fuel Allowance', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer', cashDenominations: { d500: 4, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0, total: 2000 } },
+  { id: 'exp_4', date: yesterdayDisplay, time: '11:20 AM', description: 'Electricity Bill', category: 'Electricity / Utilities', amount: 1850, remarks: 'EB Monthly Bill', mode: 'UPI', paidBy: 'Branch Manager' },
+  { id: 'exp_5', date: d3Display, time: '02:15 PM', description: 'Stationery & Register Books', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_6', date: d5Display, time: '11:00 AM', description: 'Printer Toner Cartridge', category: 'Printing', amount: 1200, remarks: 'HP LaserJet Toner', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_7', date: d8Display, time: '03:45 PM', description: 'Air Conditioner Servicing', category: 'Maintenance', amount: 1800, remarks: 'Bi-annual Maintenance', mode: 'Cash', paidBy: 'Admin' },
+  { id: 'exp_8', date: d12Display, time: '01:30 PM', description: 'Staff Field Advance', category: 'Staff Salary / Advance', amount: 3000, remarks: 'Festival Advance', mode: 'UPI', paidBy: 'Branch Manager' },
+  { id: 'exp_9', date: d18Display, time: '10:00 AM', description: 'Broadband Fiber Internet', category: 'Telephone / Internet', amount: 999, remarks: 'BSNL Monthly Fiber', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_10', date: d25Display, time: '04:00 PM', description: 'Branch Hardware & Repairs', category: 'Others', amount: 650, remarks: 'Door Lock Repair', mode: 'Cash', paidBy: 'Field Officer' },
+  { id: 'exp_11', date: '03-05-2026', time: '03:30 PM', description: 'Stationery & Printing', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
+  { id: 'exp_12', date: '02-05-2026', time: '11:30 AM', description: 'Travel & Fuel', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
+  { id: 'exp_13', date: '01-05-2026', time: '10:00 AM', description: 'Office Rent', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' }
 ];
 
 export default function ExpansionView({ 
@@ -201,13 +212,17 @@ export default function ExpansionView({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(p => ({
-            ...p,
-            category: p.category || 'Others',
-            mode: String(p.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
-            cashDenominations: p.cashDenominations || (p.id === 'exp_2' ? { d500: 0, d200: 1, d100: 0, d50: 1, d20: 0, d10: 0, coins: 0, total: 250 } : p.id === 'exp_3' ? { d500: 4, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0, total: 2000 } : null),
-            receiptImage: p.receiptImage || p.receiptUrl || (p.id === 'exp_1' ? SAMPLE_UPI_RECEIPT : null)
-          }));
+          return parsed.map(p => {
+            const seed = INITIAL_EXPENSES.find(i => i.id === p.id);
+            return {
+              ...p,
+              time: p.time || (p.createdAt ? formatTime(p.createdAt) : (seed?.time || '10:30 AM')),
+              category: p.category || 'Others',
+              mode: String(p.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
+              cashDenominations: p.cashDenominations || (p.id === 'exp_2' ? { d500: 0, d200: 1, d100: 0, d50: 1, d20: 0, d10: 0, coins: 0, total: 250 } : p.id === 'exp_3' ? { d500: 4, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0, total: 2000 } : null),
+              receiptImage: p.receiptImage || p.receiptUrl || (p.id === 'exp_1' ? SAMPLE_UPI_RECEIPT : null)
+            };
+          });
         }
       }
       return INITIAL_EXPENSES;
@@ -430,13 +445,26 @@ export default function ExpansionView({
       const ymd = formatDateToYmd(item.date);
       if (!ymd) return;
 
+      const [yr, mo, dy] = ymd.split('-').map(Number);
+      const dObj = new Date(yr, mo - 1, dy);
+      const dayName = isNaN(dObj.getTime()) ? 'Day' : dObj.toLocaleDateString('en-US', { weekday: 'long' });
+      const itemTime = item.time || (item.createdAt ? formatTime(item.createdAt) : '10:30 AM');
+
       if (!groupsByYmd[ymd]) {
         groupsByYmd[ymd] = {
           ymd: ymd,
           displayDate: formatDateToDisplay(item.date),
+          dayName: dayName,
+          latestTime: itemTime,
           totalAmount: 0,
           count: 0
         };
+      } else {
+        if (item.time) {
+          groupsByYmd[ymd].latestTime = item.time;
+        } else if (item.createdAt) {
+          groupsByYmd[ymd].latestTime = formatTime(item.createdAt);
+        }
       }
       groupsByYmd[ymd].totalAmount += Number(item.amount || 0);
       groupsByYmd[ymd].count += 1;
@@ -625,9 +653,11 @@ export default function ExpansionView({
       : expForm.category;
 
     const isCash = expForm.mode === 'Cash';
+    const currentTimeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
     const payload = {
       date: expForm.date || formatDateToDisplay(getTodayYmd()),
+      time: editingExp?.time || currentTimeStr,
       description: expForm.description.trim() || 'Expense',
       category: finalCategory,
       rawCategory: expForm.category,
@@ -851,64 +881,10 @@ export default function ExpansionView({
         </div>
       </div>
 
-      {/* 2. Top Unified Row (Card 1: 5 cols, Card 2: 4 cols, Calendar: 3 cols -> Equal Height with items-stretch) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        {/* Card 1: Summary (Expense) — Dynamically synchronized header, compact tall metric boxes */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-2.5">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
-            <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Receipt className="w-3.5 h-3.5 stroke-[2.2]" />
-            </div>
-            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
-              {card1Title}
-            </h3>
-          </div>
-
-          {/* 3 Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1 items-center">
-            {/* 1. Total */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5 min-h-[64px] flex items-center gap-2.5 hover:bg-slate-50 transition shadow-2xs h-full">
-              <div className="w-8 h-8 rounded-lg bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
-                <Coins className="w-4 h-4 stroke-[2.2]" />
-              </div>
-              <div className="min-w-0 flex flex-col justify-center">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Total</span>
-                <span className="text-xs sm:text-sm font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                  {formatCurrency(periodMetrics.total)}
-                </span>
-              </div>
-            </div>
-
-            {/* 2. Cash in Hand */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5 min-h-[64px] flex items-center gap-2.5 hover:bg-slate-50 transition shadow-2xs h-full">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
-                <Wallet className="w-4 h-4 stroke-[2.2]" />
-              </div>
-              <div className="min-w-0 flex flex-col justify-center">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Hand</span>
-                <span className="text-xs sm:text-sm font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                  {formatCurrency(periodMetrics.cash)}
-                </span>
-              </div>
-            </div>
-
-            {/* 3. Cash in Online */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5 min-h-[64px] flex items-center gap-2.5 hover:bg-slate-50 transition shadow-2xs h-full">
-              <div className="w-8 h-8 rounded-lg bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
-                <Smartphone className="w-4 h-4 stroke-[2.2]" />
-              </div>
-              <div className="min-w-0 flex flex-col justify-center">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Cash in Online</span>
-                <span className="text-xs sm:text-sm font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                  {formatCurrency(periodMetrics.online)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Preset Date Filter Panel with Inline Category & Mode Dropdowns */}
-        <div className="lg:col-span-4 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-2">
+      {/* 2. Top Unified Row (Slot 1: Filter Period 4 cols, Slot 2: Summary 5 cols, Slot 3: Calendar 3 cols -> Snapped compact height with items-start) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* Slot 1 (Far Left): Filter Period Panel with Inline Category & Mode Dropdowns */}
+        <div className="lg:col-span-4 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-2 h-fit">
           <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -941,8 +917,8 @@ export default function ExpansionView({
             ))}
           </div>
 
-          {/* Row 2: [ Custom ]  From: [ DD/MM/YYYY ]  To: [ DD/MM/YYYY ]  [ Category ▾ ]  [ Mode ▾ ] */}
-          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+          {/* Row 2: [ Custom ]  From: [ DD/MM/YYYY ]  To: [ DD/MM/YYYY ] */}
+          <div className="flex items-center gap-1.5 w-full">
             {/* Custom Pill */}
             <button
               type="button"
@@ -957,33 +933,36 @@ export default function ExpansionView({
             </button>
 
             {/* From Date */}
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-0.5 shrink-0">
-              <span className="text-[9px] font-black text-slate-400 uppercase">From:</span>
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-0.5 flex-1 min-w-0">
+              <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">From:</span>
               <input
                 type="date"
                 value={formatDateToYmd(fromDate)}
                 onChange={(e) => handleCustomDateChange('from', e.target.value)}
-                className="w-[95px] bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
+                className="w-full bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
               />
             </div>
 
             {/* To Date */}
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-0.5 shrink-0">
-              <span className="text-[9px] font-black text-slate-400 uppercase">To:</span>
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-0.5 flex-1 min-w-0">
+              <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">To:</span>
               <input
                 type="date"
                 value={formatDateToYmd(toDate)}
                 onChange={(e) => handleCustomDateChange('to', e.target.value)}
-                className="w-[95px] bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
+                className="w-full bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
               />
             </div>
+          </div>
 
+          {/* Row 3: Category & Mode Dropdowns */}
+          <div className="flex items-center gap-1.5 w-full">
             {/* Inline Category Dropdown */}
-            <div className="relative shrink-0 flex-1 min-w-[105px]">
+            <div className="relative flex-1 min-w-0">
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2 py-0.5 text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer truncate h-[27px]"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2 py-0.5 text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer truncate h-[28px]"
               >
                 {CATEGORIES.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -992,11 +971,11 @@ export default function ExpansionView({
             </div>
 
             {/* Inline Mode Dropdown */}
-            <div className="relative shrink-0 min-w-[76px]">
+            <div className="relative w-[100px] shrink-0">
               <select
                 value={selectedMode}
                 onChange={(e) => setSelectedMode(e.target.value)}
-                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2 py-0.5 text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer h-[27px]"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2 py-0.5 text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer h-[28px]"
               >
                 <option value="All Modes">All Modes</option>
                 <option value="Cash">Cash</option>
@@ -1006,8 +985,68 @@ export default function ExpansionView({
           </div>
         </div>
 
-        {/* Right Calendar Card — Locked Height Sync with Left Cards via items-stretch */}
-        <div className="lg:col-span-3 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-1.5">
+        {/* Slot 2 (Center): Today's Summary (Expense) — Dynamically synchronized header, enhanced typography & icons */}
+        <div className="lg:col-span-5 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-2.5 h-fit">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
+            <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Receipt className="w-3.5 h-3.5 stroke-[2.2]" />
+            </div>
+            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
+              {card1Title}
+            </h3>
+          </div>
+
+          {/* 3 Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* 1. Total Expense */}
+            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs">
+              <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
+                <Coins className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="min-w-0 flex flex-col justify-center">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block truncate">
+                  Total Expense
+                </span>
+                <span className="text-lg sm:text-xl font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                  {formatCurrency(periodMetrics.total)}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Expense from Hand */}
+            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
+                <Wallet className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="min-w-0 flex flex-col justify-center">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block truncate">
+                  Expense from Hand
+                </span>
+                <span className="text-lg sm:text-xl font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                  {formatCurrency(periodMetrics.cash)}
+                </span>
+              </div>
+            </div>
+
+            {/* 3. Expense through Online */}
+            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3 flex items-center gap-3 hover:bg-slate-50 transition shadow-2xs">
+              <div className="w-10 h-10 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
+                <Smartphone className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="min-w-0 flex flex-col justify-center">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block truncate">
+                  Expense through Online
+                </span>
+                <span className="text-lg sm:text-xl font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
+                  {formatCurrency(periodMetrics.online)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Slot 3 (Far Right): Right Calendar Card */}
+        <div className="lg:col-span-3 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-1.5 h-fit">
           {/* Header: Select Date & Date Pill */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-1">
             <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
@@ -1082,13 +1121,13 @@ export default function ExpansionView({
         </div>
       </div>
 
-      {/* 3. Bottom Parallel Row (Expense Entry Table 75% / Recent Expenses 25% starting on exact same baseline) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
-        {/* ================= LEFT 75% (9 cols): PRIMARY EXPENSE ENTRY TABLE ================= */}
-        <div className="lg:col-span-9 bg-white rounded-2xl border border-rose-100/90 shadow-2xs overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-rose-100 flex flex-wrap items-center justify-between gap-3 bg-rose-50/20">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
+      {/* 3. Bottom Parallel Row (Expense Entry Table ~76% / Recent Expenses ~24% starting on exact same baseline) */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start w-full">
+        {/* ================= LEFT ~76%: PRIMARY EXPENSE ENTRY TABLE ================= */}
+        <div className="flex-1 min-w-0 bg-white rounded-2xl border border-rose-100/90 shadow-2xs overflow-hidden">
+          <div className="px-4 py-3 border-b border-rose-100 flex flex-wrap items-center justify-between gap-2.5 bg-rose-50/20">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
                 <Receipt className="w-4 h-4 stroke-[2.4]" />
               </div>
               <div>
@@ -1101,13 +1140,13 @@ export default function ExpansionView({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Date Sorting Toggle: Date : NEWEST ⇅ OLDEST */}
               <button
                 type="button"
                 onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
                 title={`Sort by Date: currently ${sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}. Click to toggle.`}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-700 shadow-2xs cursor-pointer active:scale-95 transition"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-700 shadow-2xs cursor-pointer active:scale-95 transition"
               >
                 <ArrowUpDown className="w-3.5 h-3.5 text-blue-600" />
                 <span className="text-slate-400 font-semibold">Date :</span>
@@ -1116,14 +1155,14 @@ export default function ExpansionView({
                 <span className={`px-1.5 py-0.5 rounded-md ${sortOrder === 'asc' ? 'bg-blue-600 text-white font-black' : 'text-slate-500 font-bold'}`}>OLDEST</span>
               </button>
 
-              <div className="px-3 py-1.5 bg-white border border-rose-200/80 rounded-xl text-xs font-extrabold text-rose-700 shadow-2xs">
+              <div className="px-2.5 py-1.5 bg-white border border-rose-200/80 rounded-xl text-xs font-extrabold text-rose-700 shadow-2xs">
                 Total: {formatCurrency(totalFilteredExpense)}
               </div>
 
               <button
                 type="button"
                 onClick={handleOpenAddExpense}
-                className="bg-[#dc2626] hover:bg-[#b91c1c] text-white font-extrabold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs active:scale-95 transition cursor-pointer"
+                className="bg-[#dc2626] hover:bg-[#b91c1c] text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs active:scale-95 transition cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Add Expense</span>
@@ -1131,91 +1170,91 @@ export default function ExpansionView({
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          {/* Table Container with ZERO horizontal scrolling */}
+          <div className="overflow-x-hidden w-full">
+            <table className="w-full text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  <th className="py-3 px-3 text-center w-12">S.No</th>
-                  <th className="py-3 px-3 w-28">Date</th>
-                  <th className="py-3 px-3 min-w-[150px]">Description</th>
-                  <th className="py-3 px-3 w-28">Category</th>
-                  <th className="py-3 px-3 text-right w-28">Amount (₹)</th>
-                  <th className="py-3 px-3 min-w-[130px]">Remarks</th>
-                  <th className="py-3 px-3 text-center w-24">Mode</th>
-                  <th className="py-3 px-3 text-center w-36">Source</th>
-                  <th className="py-3 px-3 w-32">Paid By</th>
-                  <th className="py-3 px-3 text-center w-20">Actions</th>
+                  <th className="py-2.5 px-2 text-center w-8">S.No</th>
+                  <th className="py-2.5 px-2 w-24">Date</th>
+                  <th className="py-2.5 px-2 min-w-[120px]">Description</th>
+                  <th className="py-2.5 px-2 w-24">Category</th>
+                  <th className="py-2.5 px-2 text-right w-20">Amount (₹)</th>
+                  <th className="py-2.5 px-2 min-w-[100px]">Remarks</th>
+                  <th className="py-2.5 px-2 text-center w-16">Mode</th>
+                  <th className="py-2.5 px-2 text-center w-28">Source</th>
+                  <th className="py-2.5 px-2 w-24">Paid By</th>
+                  <th className="py-2.5 px-2 text-center w-14">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {sortedFilteredExpenses.map((item, idx) => (
                   <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-3 text-center font-bold text-slate-400">
+                    <td className="py-2.5 px-2 text-center font-bold text-slate-400">
                       {idx + 1}
                     </td>
-                    <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
+                    <td className="py-2.5 px-2 font-semibold text-slate-700 whitespace-nowrap text-xs">
                       {item.date}
                     </td>
-                    <td className="py-3 px-3 font-bold text-slate-800">
+                    <td className="py-2.5 px-2 font-bold text-slate-800 text-xs">
                       {item.description}
                     </td>
-                    <td className="py-3 px-3">
-                      <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 max-w-[130px] truncate" title={item.customCategory || item.category || 'Others'}>
+                    <td className="py-2.5 px-2">
+                      <span className="inline-block px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 max-w-[110px] truncate" title={item.customCategory || item.category || 'Others'}>
                         {item.customCategory || item.category || 'Others'}
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
+                    <td className="py-2.5 px-2 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
                       {formatCurrency(item.amount)}
                     </td>
-                    <td className="py-3 px-3 text-slate-500 font-medium">
+                    <td className="py-2.5 px-2 text-slate-500 font-medium text-xs truncate max-w-[130px]" title={item.remarks}>
                       {item.remarks || '-'}
                     </td>
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-2.5 px-2 text-center">
                       {renderModeBadge(item.mode)}
                     </td>
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap">
                       {item.mode === 'Cash' && item.cashDenominations && (item.cashDenominations.total > 0 || Object.values(item.cashDenominations).some(v => Number(v) > 0)) ? (
                         <button
                           type="button"
                           onClick={() => setActiveDenomViewer(item)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs transition active:scale-95 cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs transition active:scale-95 cursor-pointer"
                           title="Click to view recorded Cash Denomination Breakdown"
                         >
-                          <Banknote className="w-3 h-3 text-emerald-600" />
+                          <Banknote className="w-2.5 h-2.5 text-emerald-600" />
                           <span>Cash Breakdown</span>
                         </button>
                       ) : (item.receiptImage || item.receiptUrl) ? (
                         <button
                           type="button"
                           onClick={() => setActiveReceiptModal(item)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs transition active:scale-95 cursor-pointer group"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs transition active:scale-95 cursor-pointer"
                           title="Click to view Payment Screenshot / Receipt"
                         >
-                          <Camera className="w-3 h-3 text-purple-600" />
+                          <Camera className="w-2.5 h-2.5 text-purple-600" />
                           <span>Receipt</span>
                         </button>
                       ) : (
                         <span className="text-slate-300 font-bold text-xs">-</span>
                       )}
                     </td>
-                    <td className="py-3 px-3">
+                    <td className="py-2.5 px-2">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-bold shrink-0">
-                          <User className="w-3 h-3" />
+                        <div className="w-4.5 h-4.5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] font-bold shrink-0">
+                          <User className="w-2.5 h-2.5" />
                         </div>
-                        <span className="font-semibold text-slate-700 text-xs truncate max-w-[90px]">
+                        <span className="font-semibold text-slate-700 text-xs truncate max-w-[80px]" title={item.paidBy || 'Admin'}>
                           {item.paidBy || 'Admin'}
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-2.5 px-2 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
                           onClick={() => handleOpenEditExpense(item)}
                           title="Edit"
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -1223,7 +1262,7 @@ export default function ExpansionView({
                           type="button"
                           onClick={() => handleDeleteExpense(item.id)}
                           title="Delete"
-                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1244,13 +1283,13 @@ export default function ExpansionView({
               {/* Summary Footer Calculating Total Expenses */}
               <tfoot>
                 <tr className="bg-rose-50/70 font-black border-t-2 border-rose-200/80 text-xs">
-                  <td colSpan={4} className="py-3 px-3 text-slate-800 font-extrabold uppercase tracking-wide">
+                  <td colSpan={4} className="py-2.5 px-2 text-slate-800 font-extrabold uppercase tracking-wide">
                     Total Expenses
                   </td>
-                  <td className="py-3 px-3 text-right text-rose-700 font-black text-sm whitespace-nowrap">
+                  <td className="py-2.5 px-2 text-right text-rose-700 font-black text-xs sm:text-sm whitespace-nowrap">
                     {formatCurrency(totalFilteredExpense)}
                   </td>
-                  <td colSpan={5} className="py-3 px-3 text-right text-slate-500 font-bold text-xs">
+                  <td colSpan={5} className="py-2.5 px-2 text-right text-slate-500 font-bold text-xs">
                     {sortedFilteredExpenses.length} {sortedFilteredExpenses.length === 1 ? 'Entry' : 'Entries'} Recorded
                   </td>
                 </tr>
@@ -1259,8 +1298,8 @@ export default function ExpansionView({
           </div>
         </div>
 
-        {/* ================= RIGHT 25% (3 cols): QUICK EXPENSE HISTORY LEDGER (Unique Dates, Capped Viewport) ================= */}
-        <div className="lg:col-span-3 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2 flex flex-col">
+        {/* ================= RIGHT ~24%: QUICK EXPENSE HISTORY LEDGER (Unique Dates with Day & Time) ================= */}
+        <div className="w-full lg:w-[24%] lg:min-w-[240px] bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2 flex flex-col shrink-0">
           {/* Header: Title + Dynamic count pill of Unique Days */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
@@ -1272,12 +1311,12 @@ export default function ExpansionView({
             </span>
           </div>
 
-          {/* Fixed 4-5 Row Viewport with Independent Internal Scrollbar (max-h-[200px]) */}
+          {/* Fixed 4-5 Row Viewport with Independent Internal Scrollbar */}
           <div className="max-h-[200px] overflow-y-auto pr-1 divide-y divide-slate-100">
             <table className="w-full text-left border-collapse text-xs">
               <thead className="sticky top-0 bg-white/95 backdrop-blur-xs z-10 border-b border-slate-100">
                 <tr className="text-[9px] font-black uppercase text-slate-400">
-                  <th className="py-1.5 px-2 text-center w-8">S.No</th>
+                  <th className="py-1.5 px-2 text-center w-7">S.No</th>
                   <th className="py-1.5 px-2">Date</th>
                   <th className="py-1.5 px-2 text-right">Expense (₹)</th>
                 </tr>
@@ -1296,13 +1335,18 @@ export default function ExpansionView({
                       }`}
                       title={`Click to focus on ${group.displayDate} (Total: ${formatCurrency(group.totalAmount)})`}
                     >
-                      <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600">
+                      <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600 align-middle">
                         {idx + 1}
                       </td>
-                      <td className="py-2 px-2 whitespace-nowrap font-medium">
-                        {group.displayDate}
+                      <td className="py-2 px-2 whitespace-nowrap align-middle">
+                        <div className="font-semibold text-slate-800 text-xs leading-tight">
+                          {group.displayDate}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">
+                          {group.dayName} • {group.latestTime}
+                        </div>
                       </td>
-                      <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap">
+                      <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap align-middle text-xs">
                         {formatCurrency(group.totalAmount)}
                       </td>
                     </tr>
