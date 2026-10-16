@@ -158,35 +158,17 @@ const CATEGORIES = [
   'Others'
 ];
 
-// Seed expenses supporting both current runtime dates & reference screenshot dates
-const todayDisplay = formatDateToDisplay(getTodayYmd());
-const yesterdayDisplay = formatDateToDisplay(getYesterdayYmd());
-const d3Display = formatDateToDisplay(getDaysAgoYmd(3));
-const d5Display = formatDateToDisplay(getDaysAgoYmd(5));
-const d8Display = formatDateToDisplay(getDaysAgoYmd(8));
-const d12Display = formatDateToDisplay(getDaysAgoYmd(12));
-const d18Display = formatDateToDisplay(getDaysAgoYmd(18));
-const d25Display = formatDateToDisplay(getDaysAgoYmd(25));
+const SAMPLE_UPI_RECEIPT = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600"><rect width="100%" height="100%" fill="%23f8fafc"/><rect x="20" y="20" width="360" height="560" rx="20" fill="%23ffffff" stroke="%23e2e8f0" stroke-width="2"/><circle cx="200" cy="90" r="32" fill="%2316a34a"/><path d="M188 90l8 8 16-16" stroke="%23ffffff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="200" y="150" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="%230f172a" text-anchor="middle">Payment Successful</text><text x="200" y="175" font-family="Arial,sans-serif" font-size="12" fill="%2364748b" text-anchor="middle">UPI Ref: 429381029384</text><text x="200" y="225" font-family="Arial,sans-serif" font-size="32" font-weight="900" fill="%230f172a" text-anchor="middle">₹ 5,000.00</text></svg>`;
 
-const SAMPLE_UPI_RECEIPT = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600"><rect width="100%" height="100%" fill="%23f8fafc"/><rect x="20" y="20" width="360" height="560" rx="20" fill="%23ffffff" stroke="%23e2e8f0" stroke-width="2"/><circle cx="200" cy="90" r="32" fill="%2316a34a"/><path d="M188 90l8 8 16-16" stroke="%23ffffff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="200" y="150" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="%230f172a" text-anchor="middle">Payment Successful</text><text x="200" y="175" font-family="Arial,sans-serif" font-size="12" fill="%2364748b" text-anchor="middle">UPI Ref: 429381029384</text><text x="200" y="225" font-family="Arial,sans-serif" font-size="32" font-weight="900" fill="%230f172a" text-anchor="middle">₹ 5,000.00</text><line x1="40" y1="260" x2="360" y2="260" stroke="%23e2e8f0" stroke-dasharray="4,4"/><text x="50" y="300" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Paid To</text><text x="350" y="300" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">Building Owner Realty</text><text x="50" y="340" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">From Account</text><text x="350" y="340" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">Everest Microfinance</text><text x="50" y="380" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Payment Mode</text><text x="350" y="380" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%2316a34a" text-anchor="end">UPI Transfer</text><text x="50" y="420" font-family="Arial,sans-serif" font-size="12" fill="%2364748b">Transaction Time</text><text x="350" y="420" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a" text-anchor="end">15-10-2026 10:15 AM</text><rect x="40" y="460" width="320" height="70" rx="12" fill="%23f1f5f9"/><text x="60" y="490" font-family="Arial,sans-serif" font-size="11" fill="%2364748b">Note</text><text x="60" y="512" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%230f172a">Monthly Branch Rent - October 2026</text></svg>`;
+const SAMPLE_CASH_BILL = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="550" viewBox="0 0 400 550"><rect width="100%" height="100%" fill="%23fef3c7"/><rect x="20" y="20" width="360" height="510" rx="16" fill="%23ffffff" stroke="%23f59e0b" stroke-width="2"/><text x="200" y="70" font-family="Arial,sans-serif" font-size="20" font-weight="900" fill="%2392400e" text-anchor="middle">BRANCH CASH VOUCHER</text><text x="200" y="95" font-family="Arial,sans-serif" font-size="12" fill="%2378350f" text-anchor="middle">Cash Expense Voucher</text></svg>`;
 
-const SAMPLE_CASH_BILL = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="550" viewBox="0 0 400 550"><rect width="100%" height="100%" fill="%23fef3c7"/><rect x="20" y="20" width="360" height="510" rx="16" fill="%23ffffff" stroke="%23f59e0b" stroke-width="2"/><text x="200" y="70" font-family="Arial,sans-serif" font-size="20" font-weight="900" fill="%2392400e" text-anchor="middle">HOTEL ANNAI TEA STALL</text><text x="200" y="95" font-family="Arial,sans-serif" font-size="12" fill="%2378350f" text-anchor="middle">Branch Refreshments Cash Voucher</text><line x1="40" y1="120" x2="360" y2="120" stroke="%23fbbf24" stroke-width="2" stroke-dasharray="4,4"/><text x="50" y="160" font-family="Arial,sans-serif" font-size="13" fill="%23451a03">Tea &amp; Coffee (15 cups)</text><text x="350" y="160" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%23451a03" text-anchor="end">₹ 180.00</text><text x="50" y="200" font-family="Arial,sans-serif" font-size="13" fill="%23451a03">Biscuits &amp; Snacks</text><text x="350" y="200" font-family="Arial,sans-serif" font-size="13" font-weight="bold" fill="%23451a03" text-anchor="end">₹ 70.00</text><line x1="40" y1="240" x2="360" y2="240" stroke="%23fbbf24" stroke-width="2"/><text x="50" y="280" font-family="Arial,sans-serif" font-size="16" font-weight="900" fill="%2392400e">TOTAL PAID (CASH)</text><text x="350" y="280" font-family="Arial,sans-serif" font-size="18" font-weight="900" fill="%23b45309" text-anchor="end">₹ 250.00</text><text x="200" y="340" font-family="Arial,sans-serif" font-size="12" fill="%2378350f" text-anchor="middle">Paid from Branch Cash in Hand</text><text x="200" y="370" font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="%23059669" text-anchor="middle">Verified with Notes Denomination</text></svg>`;
+// Identifiers for static mock records to purge from legacy storage
+const MOCK_EXPENSE_IDS = new Set([
+  'exp_1', 'exp_2', 'exp_3', 'exp_4', 'exp_5', 'exp_6',
+  'exp_7', 'exp_8', 'exp_9', 'exp_10', 'exp_11', 'exp_12', 'exp_13'
+]);
 
-const INITIAL_EXPENSES = [
-  { id: 'exp_1', date: todayDisplay, time: '10:15 AM', description: 'Office Rent & Maintenance', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager', receiptImage: SAMPLE_UPI_RECEIPT },
-  { id: 'exp_2', date: todayDisplay, time: '04:30 PM', description: 'Evening Tea & Refreshments', category: 'Tea & Snacks', amount: 250, remarks: 'Daily Staff Tea', mode: 'Cash', paidBy: 'Admin', cashDenominations: { d500: 0, d200: 1, d100: 0, d50: 1, d20: 0, d10: 0, coins: 0, total: 250 }, receiptImage: SAMPLE_CASH_BILL },
-  { id: 'exp_3', date: yesterdayDisplay, time: '05:45 PM', description: 'Travel & Fuel Allowance', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer', cashDenominations: { d500: 4, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0, total: 2000 } },
-  { id: 'exp_4', date: yesterdayDisplay, time: '11:20 AM', description: 'Electricity Bill', category: 'Electricity / Utilities', amount: 1850, remarks: 'EB Monthly Bill', mode: 'UPI', paidBy: 'Branch Manager' },
-  { id: 'exp_5', date: d3Display, time: '02:15 PM', description: 'Stationery & Register Books', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_6', date: d5Display, time: '11:00 AM', description: 'Printer Toner Cartridge', category: 'Printing', amount: 1200, remarks: 'HP LaserJet Toner', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_7', date: d8Display, time: '03:45 PM', description: 'Air Conditioner Servicing', category: 'Maintenance', amount: 1800, remarks: 'Bi-annual Maintenance', mode: 'Cash', paidBy: 'Admin' },
-  { id: 'exp_8', date: d12Display, time: '01:30 PM', description: 'Staff Field Advance', category: 'Staff Salary / Advance', amount: 3000, remarks: 'Festival Advance', mode: 'UPI', paidBy: 'Branch Manager' },
-  { id: 'exp_9', date: d18Display, time: '10:00 AM', description: 'Broadband Fiber Internet', category: 'Telephone / Internet', amount: 999, remarks: 'BSNL Monthly Fiber', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_10', date: d25Display, time: '04:00 PM', description: 'Branch Hardware & Repairs', category: 'Others', amount: 650, remarks: 'Door Lock Repair', mode: 'Cash', paidBy: 'Field Officer' },
-  { id: 'exp_11', date: '03-05-2026', time: '03:30 PM', description: 'Stationery & Printing', category: 'Stationery', amount: 1500, remarks: 'Passbooks & Forms', mode: 'UPI', paidBy: 'Admin' },
-  { id: 'exp_12', date: '02-05-2026', time: '11:30 AM', description: 'Travel & Fuel', category: 'Fuel/Travel', amount: 2000, remarks: 'Field Collection Visit', mode: 'Cash', paidBy: 'Field Officer' },
-  { id: 'exp_13', date: '01-05-2026', time: '10:00 AM', description: 'Office Rent', category: 'Office Rent', amount: 5000, remarks: 'Monthly Branch Rent', mode: 'UPI', paidBy: 'Branch Manager' }
-];
+const INITIAL_EXPENSES = [];
 
 export default function ExpansionView({ 
   activeBranch = { id: 'main', name: 'Main Branch' }, 
@@ -228,29 +210,28 @@ export default function ExpansionView({
   // Storage Key
   const expStorageKey = `everest_expansion_expenses_${branchId}`;
 
-  // Expenses State
+  // Expenses State (Purged of all mock/dummy records, live persistence only)
   const [expenses, setExpenses] = useState(() => {
     try {
       const saved = localStorage.getItem(expStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(p => {
-            const seed = INITIAL_EXPENSES.find(i => i.id === p.id);
-            return {
-              ...p,
-              time: p.time || (p.createdAt ? formatTime(p.createdAt) : (seed?.time || '10:30 AM')),
-              category: p.category || 'Others',
-              mode: String(p.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
-              cashDenominations: p.cashDenominations || (p.id === 'exp_2' ? { d500: 0, d200: 1, d100: 0, d50: 1, d20: 0, d10: 0, coins: 0, total: 250 } : p.id === 'exp_3' ? { d500: 4, d200: 0, d100: 0, d50: 0, d20: 0, d10: 0, coins: 0, total: 2000 } : null),
-              receiptImage: p.receiptImage || p.receiptUrl || (p.id === 'exp_1' ? SAMPLE_UPI_RECEIPT : p.id === 'exp_2' ? SAMPLE_CASH_BILL : null)
-            };
-          });
+          const liveOnly = parsed.filter(p => !MOCK_EXPENSE_IDS.has(p.id) && !p.isMock);
+          localStorage.setItem(expStorageKey, JSON.stringify(liveOnly));
+          return liveOnly.map(p => ({
+            ...p,
+            time: p.time || (p.createdAt ? formatTime(p.createdAt) : '10:30 AM'),
+            category: p.category || 'Others',
+            mode: String(p.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
+            cashDenominations: p.cashDenominations || null,
+            receiptImage: p.receiptImage || p.receiptUrl || null
+          }));
         }
       }
-      return INITIAL_EXPENSES;
+      return [];
     } catch (e) {
-      return INITIAL_EXPENSES;
+      return [];
     }
   });
 
@@ -296,19 +277,27 @@ export default function ExpansionView({
       const qExp = query(collection(db, 'expansion_expenses'), where('branchId', '==', branchId));
       unsubExp = onSnapshot(qExp, (snap) => {
         if (!snap.empty) {
-          const list = snap.docs.map(d => {
-            const data = d.data();
-            return {
-              id: d.id,
-              ...data,
-              category: data.category || 'Others',
-              mode: String(data.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
-              cashDenominations: data.cashDenominations || null,
-              receiptImage: data.receiptImage || data.receiptUrl || null
-            };
-          });
+          const list = snap.docs
+            .map(d => {
+              const data = d.data();
+              return {
+                id: d.id,
+                ...data,
+                category: data.category || 'Others',
+                mode: String(data.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
+                cashDenominations: data.cashDenominations || null,
+                receiptImage: data.receiptImage || data.receiptUrl || null
+              };
+            })
+            .filter(item => !MOCK_EXPENSE_IDS.has(item.id) && !item.isMock);
           setExpenses(list);
           localStorage.setItem(expStorageKey, JSON.stringify(list));
+        } else {
+          setExpenses(prev => {
+            const clean = prev.filter(p => !MOCK_EXPENSE_IDS.has(p.id) && !p.isMock);
+            localStorage.setItem(expStorageKey, JSON.stringify(clean));
+            return clean;
+          });
         }
       }, (err) => console.warn('Firestore expansion_expenses listener notice:', err));
     } catch (e) {}
@@ -904,10 +893,14 @@ export default function ExpansionView({
         </div>
       </div>
 
-      {/* 2. Top Unified Row (Slot 1: Filter Period 4 cols, Slot 2: Summary 5 cols, Slot 3: Calendar 3 cols -> Snapped compact height with items-start) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* Slot 1 (Far Left): Filter Period Panel with Inline Category & Mode Dropdowns */}
-        <div className="lg:col-span-4 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-2 h-fit">
+      {/* 2. Main Content Split: Left (~76%) Operations & Table | Right (~24%) Calendar & History */}
+      <div className="flex flex-col lg:flex-row gap-3.5 items-start w-full">
+        {/* ================= LEFT ~76%: SUMMARY, CONTROLS & PRIMARY EXPENSE TABLE ================= */}
+        <div className="flex-1 min-w-0 flex flex-col gap-3.5">
+          {/* Top Sub-Row: Filter Period (5 cols) & Summary (7 cols) */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-stretch">
+            {/* Slot 1: Filter Period Panel with Inline Category & Mode Dropdowns */}
+            <div className="md:col-span-5 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between gap-2 h-full">
           <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -1008,8 +1001,8 @@ export default function ExpansionView({
           </div>
         </div>
 
-        {/* Slot 2 (Center): Today's Summary (Expense) — Dynamically synchronized header, enhanced typography & icons */}
-        <div className="lg:col-span-5 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-2.5 h-fit">
+            {/* Slot 2: Summary (Expense) Card */}
+            <div className="md:col-span-7 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between gap-2.5 h-full">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
             <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <Receipt className="w-3.5 h-3.5 stroke-[2.2]" />
@@ -1067,89 +1060,10 @@ export default function ExpansionView({
             </div>
           </div>
         </div>
-
-        {/* Slot 3 (Far Right): Right Calendar Card */}
-        <div className="lg:col-span-3 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-1.5 h-fit">
-          {/* Header: Select Date & Date Pill */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-            <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-              <Calendar className="w-3.5 h-3.5 text-blue-600" />
-              <span>Select Date</span>
-            </div>
-            <div className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700">
-              {formatDateToDisplay(selectedDate)}
-            </div>
-          </div>
-
-          {/* Month Navigation */}
-          <div className="flex items-center justify-between px-1">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="w-5 h-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <span className="text-xs font-extrabold text-slate-800">
-              {monthNames[calendarMonth]} {calendarYear}
-            </span>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="w-5 h-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Days of Week Header */}
-          <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-extrabold text-slate-400 uppercase">
-            <span>Sun</span>
-            <span>Mon</span>
-            <span>Tue</span>
-            <span>Wed</span>
-            <span>Thu</span>
-            <span>Fri</span>
-            <span>Sat</span>
-          </div>
-
-          {/* Calendar Grid with Range Coloration */}
-          <div className="grid grid-cols-7 gap-0.5 text-center place-items-center">
-            {calendarDays.map((slot, i) => {
-              const dayClasses = getCalendarDayClasses(slot);
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleCalendarDayClick(slot.dateStr)}
-                  className={`h-5.5 w-5.5 mx-auto text-[10px] font-bold flex items-center justify-center transition cursor-pointer ${dayClasses}`}
-                >
-                  {slot.dayNumber}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Range Color Legend */}
-          {!isSingleDateMode && (
-            <div className="flex items-center justify-center gap-3 pt-0.5 border-t border-slate-100 text-[9px] font-bold text-slate-500">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#16a34a]"></span> From
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#dc2626]"></span> To
-              </span>
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* 3. Bottom Parallel Row (Expense Entry Table ~76% / Recent Expenses ~24% starting on exact same baseline) */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start w-full">
-        {/* ================= LEFT ~76%: PRIMARY EXPENSE ENTRY SECTION ================= */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3">
-          {/* Dedicated Floating Action Toolbar: Title, Subtitle, Date Sort, Total Badge, and Add Expense Button */}
-          <div className="bg-white rounded-2xl px-4 py-3 border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+      {/* Dedicated Floating Action Toolbar: Title, Subtitle, Date Sort, Total Badge, and Add Expense Button */}
+      <div className="bg-white rounded-2xl px-4 py-3 border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
                 <Receipt className="w-4 h-4 stroke-[2.4]" />
@@ -1328,8 +1242,8 @@ export default function ExpansionView({
 
                   {sortedFilteredExpenses.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-slate-400 text-xs font-semibold">
-                        No expenses found matching the selected filter criteria. Click "+ Add Expense" to record a new entry.
+                      <td colSpan={10} className="py-10 text-center text-slate-400 text-xs font-semibold">
+                        No expense records found for this period. Click "+ Add Expense" to record an outflow.
                       </td>
                     </tr>
                   )}
@@ -1354,70 +1268,146 @@ export default function ExpansionView({
           </div>
         </div>
 
-        {/* ================= RIGHT ~24%: QUICK EXPENSE HISTORY LEDGER (Unique Dates with Day & Time) ================= */}
-        <div className="w-full lg:w-[24%] lg:min-w-[240px] bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2 flex flex-col shrink-0">
-          {/* Header: Title + Dynamic count pill of Unique Days */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-              <Receipt className="w-3.5 h-3.5 text-rose-600" />
-              <span>Recent Expenses</span>
+        {/* ================= RIGHT ~24%: CALENDAR & RECENT EXPENSES LEDGER ================= */}
+        <div className="w-full lg:w-[24%] lg:min-w-[250px] flex flex-col gap-3.5 shrink-0">
+          {/* Select Date (Calendar Card) */}
+          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-1.5 h-fit">
+            {/* Header: Select Date & Date Pill */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+              <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                <span>Select Date</span>
+              </div>
+              <div className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700">
+                {formatDateToDisplay(selectedDate)}
+              </div>
             </div>
-            <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
-              Days Recorded: {dailyAggregatedExpenses.length}
-            </span>
+
+            {/* Month Navigation */}
+            <div className="flex items-center justify-between px-1">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                className="w-5 h-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-xs font-extrabold text-slate-800">
+                {monthNames[calendarMonth]} {calendarYear}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="w-5 h-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Days of Week Header */}
+            <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-extrabold text-slate-400 uppercase">
+              <span>Sun</span>
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+            </div>
+
+            {/* Calendar Grid with Range Coloration */}
+            <div className="grid grid-cols-7 gap-0.5 text-center place-items-center">
+              {calendarDays.map((slot, i) => {
+                const dayClasses = getCalendarDayClasses(slot);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleCalendarDayClick(slot.dateStr)}
+                    className={`h-5.5 w-5.5 mx-auto text-[10px] font-bold flex items-center justify-center transition cursor-pointer ${dayClasses}`}
+                  >
+                    {slot.dayNumber}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Range Color Legend */}
+            {!isSingleDateMode && (
+              <div className="flex items-center justify-center gap-3 pt-0.5 border-t border-slate-100 text-[9px] font-bold text-slate-500">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-[#16a34a]"></span> From
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-[#dc2626]"></span> To
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Fixed 4-5 Row Viewport with Independent Internal Scrollbar */}
-          <div className="max-h-[200px] overflow-y-auto pr-1 divide-y divide-slate-100">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="sticky top-0 bg-white/95 backdrop-blur-xs z-10 border-b border-slate-100">
-                <tr className="text-[9px] font-black uppercase text-slate-400">
-                  <th className="py-1.5 px-2 text-center w-7">S.No</th>
-                  <th className="py-1.5 px-2">Date</th>
-                  <th className="py-1.5 px-2 text-right">Expense (₹)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {dailyAggregatedExpenses.map((group, idx) => {
-                  const isSelected = isSameDay(group.ymd, fromDate) && isSameDay(group.ymd, toDate);
-                  return (
-                    <tr
-                      key={group.ymd || idx}
-                      onClick={() => handleDrillDownDate(group.displayDate)}
-                      className={`cursor-pointer transition-colors group ${
-                        isSelected
-                          ? 'bg-rose-50/90 font-bold text-rose-800'
-                          : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                      title={`Click to focus on ${group.displayDate} (Total: ${formatCurrency(group.totalAmount)})`}
-                    >
-                      <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600 align-middle">
-                        {idx + 1}
-                      </td>
-                      <td className="py-2 px-2 whitespace-nowrap align-middle">
-                        <div className="font-semibold text-slate-800 text-xs leading-tight">
-                          {group.displayDate}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">
-                          {group.dayName}
-                        </div>
-                      </td>
-                      <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap align-middle text-xs">
-                        {formatCurrency(group.totalAmount)}
+          {/* Quick Expense History Ledger */}
+          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2 flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                <Receipt className="w-3.5 h-3.5 text-rose-600" />
+                <span>Recent Expenses</span>
+              </div>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                Days Recorded: {dailyAggregatedExpenses.length}
+              </span>
+            </div>
+
+            <div className="max-h-[220px] overflow-y-auto pr-1 divide-y divide-slate-100">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 bg-white/95 backdrop-blur-xs z-10 border-b border-slate-100">
+                  <tr className="text-[9px] font-black uppercase text-slate-400">
+                    <th className="py-1.5 px-2 text-center w-7">S.No</th>
+                    <th className="py-1.5 px-2">Date</th>
+                    <th className="py-1.5 px-2 text-right">Expense (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {dailyAggregatedExpenses.map((group, idx) => {
+                    const isSelected = isSameDay(group.ymd, fromDate) && isSameDay(group.ymd, toDate);
+                    return (
+                      <tr
+                        key={group.ymd || idx}
+                        onClick={() => handleDrillDownDate(group.displayDate)}
+                        className={`cursor-pointer transition-colors group ${
+                          isSelected
+                            ? 'bg-rose-50/90 font-bold text-rose-800'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                        title={`Click to focus on ${group.displayDate} (Total: ${formatCurrency(group.totalAmount)})`}
+                      >
+                        <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600 align-middle">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2 px-2 whitespace-nowrap align-middle">
+                          <div className="font-semibold text-slate-800 text-xs leading-tight">
+                            {group.displayDate}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">
+                            {group.dayName}
+                          </div>
+                        </td>
+                        <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap align-middle text-xs">
+                          {formatCurrency(group.totalAmount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {dailyAggregatedExpenses.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-slate-400 text-xs font-medium">
+                        No expense records found for this period.
                       </td>
                     </tr>
-                  );
-                })}
-
-                {dailyAggregatedExpenses.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center text-slate-400 text-xs font-medium">
-                      No expenses recorded for active filters
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
