@@ -97,6 +97,59 @@ const isSameDay = (dateA, dateB) => {
   return formatDateToYmd(dateA) === formatDateToYmd(dateB);
 };
 
+// Resolves formal category name from expense item
+const resolveExpenseCategory = (exp) => {
+  const cat = String(exp?.category || '').trim();
+  if (cat && cat.toLowerCase() !== 'others' && cat.toLowerCase() !== 'all categories') {
+    return cat;
+  }
+  if (exp?.customCategory && String(exp.customCategory).trim()) {
+    return String(exp.customCategory).trim();
+  }
+  const textToScan = `${exp?.description || ''} ${exp?.details || ''} ${exp?.remarks || ''}`.toLowerCase();
+  if (/\b(fuel|petrol|diesel|travel|conveyance|km|bike|auto|bus|fare)\b/i.test(textToScan) || textToScan.includes('visit customer') || textToScan.includes('travel')) {
+    return 'Fuel/Travel';
+  }
+  if (/\b(tea|coffee|snack|snacks|food|lunch|dinner|breakfast|refreshment|staff)\b/i.test(textToScan)) {
+    return 'Tea & Snacks';
+  }
+  if (/\b(rent|lease|office space)\b/i.test(textToScan)) {
+    return 'Office Rent';
+  }
+  if (/\b(stationery|paper|pen|books|notebook|print|printing|xerox)\b/i.test(textToScan)) {
+    return 'Stationery';
+  }
+  if (/\b(recharge|mobile|phone|sim|internet|wifi|data pack)\b/i.test(textToScan)) {
+    return 'Telephone / Internet';
+  }
+  if (/\b(electricity|eb|power|water|current bill|utility)\b/i.test(textToScan)) {
+    return 'Electricity / Utilities';
+  }
+  if (/\b(repair|maintenance|cleaning|service|plumb|paint)\b/i.test(textToScan)) {
+    return 'Maintenance';
+  }
+  if (/\b(salary|advance|wages|bonus)\b/i.test(textToScan)) {
+    return 'Staff Salary / Advance';
+  }
+  return cat || 'Office Expense';
+};
+
+// Resolves descriptive notes/remarks
+const resolveExpenseRemarks = (exp) => {
+  const notes = [];
+  const cat = String(exp?.category || '').trim().toLowerCase();
+  const desc = String(exp?.description || exp?.details || '').trim();
+  const rem = String(exp?.remarks || '').trim();
+
+  if (desc && desc.toLowerCase() !== cat && desc.toLowerCase() !== 'office expense') {
+    notes.push(desc);
+  }
+  if (rem && rem.toLowerCase() !== desc.toLowerCase() && rem.toLowerCase() !== cat && rem.toLowerCase() !== 'office expense') {
+    notes.push(rem);
+  }
+  return notes.length > 0 ? notes.join(' - ') : '-';
+};
+
 // Reference Sample Data matching UX Specification 1:1 with 5 core loan collection categories
 const REFERENCE_SAMPLE_TRANSACTIONS = [
   { id: 'ref_tx_1', date: '03-05-2026', particulars: 'Daily Collection', type: 'Credit', cashAmount: 38000, upiAmount: 12000, amount: 50000, mode: 'Split', remarks: 'Field EMI Collections' },
@@ -104,16 +157,16 @@ const REFERENCE_SAMPLE_TRANSACTIONS = [
   { id: 'ref_tx_3', date: '03-05-2026', particulars: 'Monthly Collection', type: 'Credit', cashAmount: 15000, upiAmount: 0, amount: 15000, mode: 'Cash', remarks: 'Monthly EMI Counter' },
   { id: 'ref_tx_4', date: '03-05-2026', particulars: 'Agri Loan Collection', type: 'Credit', cashAmount: 0, upiAmount: 10000, amount: 10000, mode: 'UPI', remarks: 'Farmer Crop EMI' },
   { id: 'ref_tx_5', date: '03-05-2026', particulars: 'Personal Loan Collection', type: 'Credit', cashAmount: 10000, upiAmount: 0, amount: 10000, mode: 'Cash', remarks: 'Salaried Individual EMI' },
-  { id: 'ref_tx_6', date: '03-05-2026', particulars: 'Office Expense', type: 'Expense', cashAmount: 2000, upiAmount: 0, amount: 2000, mode: 'Cash', remarks: 'Office supplies & maintenance' },
+  { id: 'ref_tx_6', date: '03-05-2026', particulars: 'Official Expense', type: 'Expense', cashAmount: 200, upiAmount: 350, amount: 550, mode: 'Split', remarks: 'Branch Daily Expenses Combined' },
   { id: 'ref_tx_7', date: '03-05-2026', particulars: 'Investment Entry', type: 'Investment', cashAmount: 0, upiAmount: 0, amount: 0, mode: 'UPI', remarks: 'Capital addition' },
   { id: 'ref_tx_8', date: '03-05-2026', particulars: 'Bank Debit', type: 'Debit', cashAmount: 0, upiAmount: 18000, amount: 18000, mode: 'UPI', remarks: 'Disbursement transfer' },
 ];
 
 const REFERENCE_SAMPLE_EXPENSES = [
-  { id: 'ref_exp_1', date: '03-05-2026', details: 'Office Rent', amount: 1000, mode: 'UPI', cashAmount: 0, upiAmount: 1000, remarks: 'Monthly office lease' },
-  { id: 'ref_exp_2', date: '03-05-2026', details: 'Travel & Conveyance', amount: 500, mode: 'Cash', cashAmount: 500, upiAmount: 0, remarks: 'Field staff fuel allowance' },
-  { id: 'ref_exp_3', date: '02-05-2026', details: 'Mobile Recharge', amount: 300, mode: 'UPI', cashAmount: 0, upiAmount: 300, remarks: 'Official SIM recharge' },
-  { id: 'ref_exp_4', date: '01-05-2026', details: 'Stationery', amount: 200, mode: 'Cash', cashAmount: 200, upiAmount: 0, remarks: 'Ledger paper & pens' },
+  { id: 'ref_exp_1', date: '03-05-2026', category: 'Fuel/Travel', details: 'Fuel/Travel', cashAmount: 200, upiAmount: 0, amount: 200, mode: 'Cash', remarks: 'To visit Customer (up down 35Km)' },
+  { id: 'ref_exp_2', date: '03-05-2026', category: 'Tea & Snacks', details: 'Tea & Snacks', cashAmount: 0, upiAmount: 350, amount: 350, mode: 'UPI', remarks: 'For Office Staff' },
+  { id: 'ref_exp_3', date: '02-05-2026', category: 'Office Rent', details: 'Office Rent', cashAmount: 0, upiAmount: 1000, amount: 1000, mode: 'UPI', remarks: 'Monthly office lease' },
+  { id: 'ref_exp_4', date: '01-05-2026', category: 'Stationery', details: 'Stationery', cashAmount: 200, upiAmount: 0, amount: 200, mode: 'Cash', remarks: 'Ledger paper & pens' },
 ];
 
 export default function CashBook({ 
@@ -576,29 +629,37 @@ export default function CashBook({
         liveExpOnline += amt;
       }
 
+      const categoryName = resolveExpenseCategory(exp);
+      const remarkText = resolveExpenseRemarks(exp);
+
       dynamicExp.push({
         id: exp.id,
         date: formatDateToDisplay(expDate),
-        details: exp.description || exp.category || 'Office Expense',
+        category: categoryName,
+        details: categoryName,
         cashAmount: isCash ? amt : 0,
         upiAmount: isCash ? 0 : amt,
         amount: amt,
         mode: isCash ? 'Cash' : 'UPI',
-        remarks: exp.remarks || 'Branch Outflow'
-      });
-
-      dynamicTx.push({
-        id: `tx_${exp.id}`,
-        date: formatDateToDisplay(expDate),
-        particulars: exp.description || exp.category || 'Office Expense',
-        type: 'Expense',
-        cashAmount: isCash ? amt : 0,
-        upiAmount: isCash ? 0 : amt,
-        amount: amt,
-        mode: isCash ? 'Cash' : 'UPI',
-        remarks: exp.remarks || 'Branch Outflow'
+        remarks: remarkText
       });
     });
+
+    // Consolidate all day's expenses into strictly ONE unified row in Recent Transactions
+    const totalDayExpenses = liveExpCash + liveExpOnline;
+    if (totalDayExpenses > 0) {
+      dynamicTx.push({
+        id: `exp_consolidated_${formatDateToYmd(selectedDate)}`,
+        date: formatDateToDisplay(selectedDate),
+        particulars: 'Official Expense',
+        type: 'Expense',
+        cashAmount: liveExpCash,
+        upiAmount: liveExpOnline,
+        amount: totalDayExpenses,
+        mode: (liveExpCash > 0 && liveExpOnline > 0) ? 'Split' : (liveExpOnline > 0 ? 'UPI' : 'Cash'),
+        remarks: 'Branch Daily Expenses Combined'
+      });
+    }
 
     // 5. Live Investments on selectedDate
     let liveInvCash = 0;
@@ -671,7 +732,7 @@ export default function CashBook({
       tInv = 0;
       tCred = 120000;
       tDeb = 18000;
-      tExp = 2000;
+      tExp = 550;
     }
 
     // Formulas:
@@ -682,8 +743,8 @@ export default function CashBook({
     const netClosing = yTotal + tBal;
 
     // Split estimation
-    const cashShare = (yCash + (hasDynamicData ? (liveCreditCash + liveInvCash - liveDebitCash - liveExpCash) : 100000));
-    const onlineShare = (yBank + (hasDynamicData ? (liveCreditUpi + liveInvBank - liveDebitBank - liveExpOnline) : 0));
+    const cashShare = (yCash + (hasDynamicData ? (liveCreditCash + liveInvCash - liveDebitCash - liveExpCash) : (88000 - 200)));
+    const onlineShare = (yBank + (hasDynamicData ? (liveCreditUpi + liveInvBank - liveDebitBank - liveExpOnline) : (32000 - 18000 - 350)));
 
     return {
       yesterdayTotal: yTotal,
@@ -705,7 +766,7 @@ export default function CashBook({
   // Sliced lists for desktop split containers
   const displayedTransactions = allTransactionsList.slice(0, 6);
   const displayedExpenses = allExpensesList.slice(0, 4);
-  const totalExpensesCalculated = displayedExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const totalExpensesCalculated = allExpensesList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   // Render Type Badge
   const renderTypeBadge = (type) => {
@@ -723,46 +784,6 @@ export default function CashBook({
     }
   };
 
-  // Render Unified Dual-Mode Cell (Single-Row Split Partition)
-  const renderUnifiedModeCell = (item) => {
-    const cashAmt = Number(item.cashAmount || 0);
-    const upiAmt = Number(item.upiAmount || 0);
-    const isSplit = item.mode === 'Split' || (cashAmt > 0 && upiAmt > 0);
-
-    if (isSplit) {
-      return (
-        <div className="inline-flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
-          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/90 font-bold px-2 py-0.5 rounded-md text-[10px] shadow-2xs">
-            <span>💵</span>
-            <span>Cash: {formatCurrency(cashAmt)}</span>
-          </span>
-          <span className="text-slate-300 font-bold text-xs select-none">|</span>
-          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-800 border border-purple-200/90 font-bold px-2 py-0.5 rounded-md text-[10px] shadow-2xs">
-            <span>📱</span>
-            <span>UPI: {formatCurrency(upiAmt)}</span>
-          </span>
-        </div>
-      );
-    }
-
-    const modeStr = String(item.mode || (upiAmt > 0 ? 'UPI' : 'Cash')).toUpperCase();
-    if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK')) {
-      return (
-        <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
-          <span>📱</span>
-          <span>UPI</span>
-        </span>
-      );
-    }
-
-    return (
-      <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-800 border border-sky-200 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
-        <span>💵</span>
-        <span>Cash</span>
-      </span>
-    );
-  };
-
   // Export CSV Handler
   const handleExportCSV = () => {
     if (!allTransactionsList || allTransactionsList.length === 0) {
@@ -770,18 +791,15 @@ export default function CashBook({
       return;
     }
 
-    const headers = ['S.No', 'Date', 'Particulars', 'Type', 'Mode', 'Amount (INR)', 'Remarks'];
+    const headers = ['S.No', 'Date', 'Particulars', 'Type', 'Cash (INR)', 'UPI (INR)', 'Total Amount (INR)', 'Remarks'];
     const rows = allTransactionsList.map((tx, idx) => {
-      let modeDisplay = tx.mode || 'Cash';
-      if (tx.cashAmount > 0 && tx.upiAmount > 0) {
-        modeDisplay = `Cash: ${tx.cashAmount} | UPI: ${tx.upiAmount}`;
-      }
       return [
         idx + 1,
         `"${tx.date || ''}"`,
         `"${(tx.particulars || '').replace(/"/g, '""')}"`,
         `"${tx.type || ''}"`,
-        `"${modeDisplay}"`,
+        tx.cashAmount || 0,
+        tx.upiAmount || 0,
         tx.amount || 0,
         `"${(tx.remarks || '').replace(/"/g, '""')}"`
       ];
@@ -1207,8 +1225,9 @@ export default function CashBook({
                   <th className="py-2.5 px-2.5">Date</th>
                   <th className="py-2.5 px-2.5">Particulars</th>
                   <th className="py-2.5 px-2.5 text-center">Type</th>
-                  <th className="py-2.5 px-2.5 text-center">Mode (Cash / UPI)</th>
-                  <th className="py-2.5 px-2.5 text-right">Amount (₹)</th>
+                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Cash (₹)</th>
+                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">UPI (₹)</th>
+                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Total Amount (₹)</th>
                   <th className="py-2.5 px-2.5">Remarks</th>
                 </tr>
               </thead>
@@ -1219,14 +1238,19 @@ export default function CashBook({
                     <td className="py-2.5 px-2.5 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
                     <td className="py-2.5 px-2.5 font-bold text-slate-800">{tx.particulars}</td>
                     <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
-                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderUnifiedModeCell(tx)}</td>
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap">
+                      {tx.cashAmount > 0 ? formatCurrency(tx.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
+                    </td>
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap">
+                      {tx.upiAmount > 0 ? formatCurrency(tx.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
+                    </td>
                     <td className="py-2.5 px-2.5 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
                     <td className="py-2.5 px-2.5 text-slate-400 text-[11px] truncate max-w-[120px]" title={tx.remarks || '-'}>{tx.remarks || '-'}</td>
                   </tr>
                 ))}
                 {displayedTransactions.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">No transactions recorded for this period.</td>
+                    <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">No transactions recorded for this period.</td>
                   </tr>
                 )}
               </tbody>
@@ -1260,9 +1284,10 @@ export default function CashBook({
                 <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
                   <th className="py-2.5 px-2.5 text-center w-8">S.No</th>
                   <th className="py-2.5 px-2.5">Date</th>
-                  <th className="py-2.5 px-2.5">Expense Details</th>
-                  <th className="py-2.5 px-2.5 text-center">Mode (Cash / UPI)</th>
-                  <th className="py-2.5 px-2.5 text-right">Amount (₹)</th>
+                  <th className="py-2.5 px-2.5">Expense Category</th>
+                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Cash (₹)</th>
+                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">UPI (₹)</th>
+                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Total (₹)</th>
                   <th className="py-2.5 px-2.5">Remarks</th>
                 </tr>
               </thead>
@@ -1271,15 +1296,24 @@ export default function CashBook({
                   <tr key={exp.id || idx} className="hover:bg-slate-50/90 transition-colors">
                     <td className="py-2.5 px-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
                     <td className="py-2.5 px-2.5 whitespace-nowrap text-slate-600 font-bold text-[11px]">{exp.date}</td>
-                    <td className="py-2.5 px-2.5 font-bold text-slate-800">{exp.details}</td>
-                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderUnifiedModeCell(exp)}</td>
+                    <td className="py-2.5 px-2.5 font-bold text-slate-800">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/80 text-[11px] font-extrabold shadow-2xs">
+                        {exp.category || exp.details || 'Office Expense'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap">
+                      {exp.cashAmount > 0 ? formatCurrency(exp.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
+                    </td>
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap">
+                      {exp.upiAmount > 0 ? formatCurrency(exp.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
+                    </td>
                     <td className="py-2.5 px-2.5 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
-                    <td className="py-2.5 px-2.5 text-slate-400 text-[11px] truncate max-w-[120px]" title={exp.remarks || '-'}>{exp.remarks || '-'}</td>
+                    <td className="py-2.5 px-2.5 text-slate-500 font-medium text-[11px] truncate max-w-[130px]" title={exp.remarks || '-'}>{exp.remarks || '-'}</td>
                   </tr>
                 ))}
                 {displayedExpenses.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">No expenses recorded for this period.</td>
+                    <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">No expenses recorded for this period.</td>
                   </tr>
                 )}
               </tbody>
@@ -1637,8 +1671,9 @@ export default function CashBook({
                     <th className="py-2.5 px-2">Date</th>
                     <th className="py-2.5 px-2">Particulars</th>
                     <th className="py-2.5 px-2 text-center">Type</th>
-                    <th className="py-2.5 px-2 text-center">Mode (Cash / UPI)</th>
-                    <th className="py-2.5 px-2 text-right">Amount (₹)</th>
+                    <th className="py-2.5 px-2 text-right whitespace-nowrap">Cash (₹)</th>
+                    <th className="py-2.5 px-2 text-right whitespace-nowrap">UPI (₹)</th>
+                    <th className="py-2.5 px-2 text-right whitespace-nowrap">Total Amount (₹)</th>
                     <th className="py-2.5 px-2">Remarks</th>
                   </tr>
                 </thead>
@@ -1649,14 +1684,19 @@ export default function CashBook({
                       <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
                       <td className="py-2.5 px-2 font-bold text-slate-800">{tx.particulars}</td>
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
-                      <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderUnifiedModeCell(tx)}</td>
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap">
+                        {tx.cashAmount > 0 ? formatCurrency(tx.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap">
+                        {tx.upiAmount > 0 ? formatCurrency(tx.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
+                      </td>
                       <td className="py-2.5 px-2 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
                       <td className="py-2.5 px-2 text-slate-400 text-[11px]">{tx.remarks || '-'}</td>
                     </tr>
                   ))}
                   {allTransactionsList.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">No transactions found.</td>
+                      <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">No transactions found.</td>
                     </tr>
                   )}
                 </tbody>
@@ -1702,9 +1742,10 @@ export default function CashBook({
                   <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
                     <th className="py-2.5 px-2 text-center w-8">S.No</th>
                     <th className="py-2.5 px-2">Date</th>
-                    <th className="py-2.5 px-2">Expense Details</th>
-                    <th className="py-2.5 px-2 text-center">Mode (Cash / UPI)</th>
-                    <th className="py-2.5 px-2 text-right">Amount (₹)</th>
+                    <th className="py-2.5 px-2">Expense Category</th>
+                    <th className="py-2.5 px-2 text-right whitespace-nowrap">Cash (₹)</th>
+                    <th className="py-2.5 px-2 text-right whitespace-nowrap">UPI (₹)</th>
+                    <th className="py-2.5 px-2 text-right whitespace-nowrap">Total (₹)</th>
                     <th className="py-2.5 px-2">Remarks</th>
                   </tr>
                 </thead>
@@ -1713,15 +1754,24 @@ export default function CashBook({
                     <tr key={exp.id || idx} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
                       <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{exp.date}</td>
-                      <td className="py-2.5 px-2 font-bold text-slate-800">{exp.details}</td>
-                      <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderUnifiedModeCell(exp)}</td>
+                      <td className="py-2.5 px-2 font-bold text-slate-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/80 text-[11px] font-extrabold shadow-2xs">
+                          {exp.category || exp.details || 'Office Expense'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap">
+                        {exp.cashAmount > 0 ? formatCurrency(exp.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap">
+                        {exp.upiAmount > 0 ? formatCurrency(exp.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
+                      </td>
                       <td className="py-2.5 px-2 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
-                      <td className="py-2.5 px-2 text-slate-400 text-[11px]">{exp.remarks || '-'}</td>
+                      <td className="py-2.5 px-2 text-slate-500 font-medium text-[11px]">{exp.remarks || '-'}</td>
                     </tr>
                   ))}
                   {allExpensesList.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">No expenses found.</td>
+                      <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">No expenses found.</td>
                     </tr>
                   )}
                 </tbody>
