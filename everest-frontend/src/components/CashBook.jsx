@@ -97,20 +97,23 @@ const isSameDay = (dateA, dateB) => {
   return formatDateToYmd(dateA) === formatDateToYmd(dateB);
 };
 
-// Reference Sample Data matching UX Specification 1:1
+// Reference Sample Data matching UX Specification 1:1 with 5 core loan collection categories
 const REFERENCE_SAMPLE_TRANSACTIONS = [
-  { id: 'ref_tx_1', date: '03-05-2026', particulars: 'Self Collection', type: 'Credit', amount: 120000, mode: 'Cash', remarks: '-' },
-  { id: 'ref_tx_2', date: '03-05-2026', particulars: 'Office Expense', type: 'Expense', amount: 2000, mode: 'Cash', remarks: 'Office supplies' },
-  { id: 'ref_tx_3', date: '03-05-2026', particulars: 'Investment Entry', type: 'Investment', amount: 0, mode: 'UPI', remarks: '-' },
-  { id: 'ref_tx_4', date: '03-05-2026', particulars: 'Bank Debit', type: 'Debit', amount: 18000, mode: 'UPI', remarks: 'Transfer' },
-  { id: 'ref_tx_5', date: '02-05-2026', particulars: 'Interest Collection', type: 'Credit', amount: 8000, mode: 'UPI', remarks: '-' },
+  { id: 'ref_tx_1', date: '03-05-2026', particulars: 'Daily Collection', type: 'Credit', cashAmount: 38000, upiAmount: 12000, amount: 50000, mode: 'Split', remarks: 'Field EMI Collections' },
+  { id: 'ref_tx_2', date: '03-05-2026', particulars: 'Weekly Collection', type: 'Credit', cashAmount: 25000, upiAmount: 10000, amount: 35000, mode: 'Split', remarks: 'Microfinance SHG Groups' },
+  { id: 'ref_tx_3', date: '03-05-2026', particulars: 'Monthly Collection', type: 'Credit', cashAmount: 15000, upiAmount: 0, amount: 15000, mode: 'Cash', remarks: 'Monthly EMI Counter' },
+  { id: 'ref_tx_4', date: '03-05-2026', particulars: 'Agri Loan Collection', type: 'Credit', cashAmount: 0, upiAmount: 10000, amount: 10000, mode: 'UPI', remarks: 'Farmer Crop EMI' },
+  { id: 'ref_tx_5', date: '03-05-2026', particulars: 'Personal Loan Collection', type: 'Credit', cashAmount: 10000, upiAmount: 0, amount: 10000, mode: 'Cash', remarks: 'Salaried Individual EMI' },
+  { id: 'ref_tx_6', date: '03-05-2026', particulars: 'Office Expense', type: 'Expense', cashAmount: 2000, upiAmount: 0, amount: 2000, mode: 'Cash', remarks: 'Office supplies & maintenance' },
+  { id: 'ref_tx_7', date: '03-05-2026', particulars: 'Investment Entry', type: 'Investment', cashAmount: 0, upiAmount: 0, amount: 0, mode: 'UPI', remarks: 'Capital addition' },
+  { id: 'ref_tx_8', date: '03-05-2026', particulars: 'Bank Debit', type: 'Debit', cashAmount: 0, upiAmount: 18000, amount: 18000, mode: 'UPI', remarks: 'Disbursement transfer' },
 ];
 
 const REFERENCE_SAMPLE_EXPENSES = [
-  { id: 'ref_exp_1', date: '03-05-2026', details: 'Office Rent', amount: 1000, mode: 'Bank' },
-  { id: 'ref_exp_2', date: '03-05-2026', details: 'Travel', amount: 500, mode: 'Cash' },
-  { id: 'ref_exp_3', date: '02-05-2026', details: 'Mobile Recharge', amount: 300, mode: 'UPI' },
-  { id: 'ref_exp_4', date: '01-05-2026', details: 'Stationery', amount: 200, mode: 'Cash' },
+  { id: 'ref_exp_1', date: '03-05-2026', details: 'Office Rent', amount: 1000, mode: 'UPI', cashAmount: 0, upiAmount: 1000, remarks: 'Monthly office lease' },
+  { id: 'ref_exp_2', date: '03-05-2026', details: 'Travel & Conveyance', amount: 500, mode: 'Cash', cashAmount: 500, upiAmount: 0, remarks: 'Field staff fuel allowance' },
+  { id: 'ref_exp_3', date: '02-05-2026', details: 'Mobile Recharge', amount: 300, mode: 'UPI', cashAmount: 0, upiAmount: 300, remarks: 'Official SIM recharge' },
+  { id: 'ref_exp_4', date: '01-05-2026', details: 'Stationery', amount: 200, mode: 'Cash', cashAmount: 200, upiAmount: 0, remarks: 'Ledger paper & pens' },
 ];
 
 export default function CashBook({ 
@@ -161,8 +164,33 @@ export default function CashBook({
 
   // Modals
   const [isInvestmentModalOpen, setIsInvestmentModalOpen] = useState(false);
+  const [isAddParticularsModalOpen, setIsAddParticularsModalOpen] = useState(false);
   const [isAllTransactionsModalOpen, setIsAllTransactionsModalOpen] = useState(false);
   const [isAllExpensesModalOpen, setIsAllExpensesModalOpen] = useState(false);
+
+  // Manual Particulars State
+  const particularsKey = `everest_cashbook_particulars_${branchId}`;
+  const [manualParticulars, setManualParticulars] = useState(() => {
+    try {
+      const saved = localStorage.getItem(particularsKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Particulars Form
+  const [particularsForm, setParticularsForm] = useState({
+    date: formatDateToDisplay(selectedDate),
+    particularsCategory: 'Daily Collection',
+    customParticulars: '',
+    type: 'Credit',
+    paymentType: 'Cash',
+    amount: '',
+    cashAmount: '',
+    upiAmount: '',
+    remarks: ''
+  });
 
   // Investment Form
   const [investmentForm, setInvestmentForm] = useState({
@@ -173,9 +201,13 @@ export default function CashBook({
     remarks: ''
   });
 
-  // Keep investment form date synced when selectedDate shifts
+  // Keep forms date synced when selectedDate shifts
   useEffect(() => {
     setInvestmentForm(prev => ({
+      ...prev,
+      date: formatDateToDisplay(selectedDate)
+    }));
+    setParticularsForm(prev => ({
       ...prev,
       date: formatDateToDisplay(selectedDate)
     }));
@@ -212,6 +244,22 @@ export default function CashBook({
     } catch (e) {}
     return () => unsub();
   }, [branchId]);
+
+  // C. CashBook Particulars Listener
+  useEffect(() => {
+    let unsub = () => {};
+    try {
+      const q = query(collection(db, 'cashbook_particulars'), where('branchId', '==', branchId));
+      unsub = onSnapshot(q, (snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setManualParticulars(list);
+          try { localStorage.setItem(particularsKey, JSON.stringify(list)); } catch (e) {}
+        }
+      }, (err) => console.warn('Particulars listener notice in CashBook:', err));
+    } catch (e) {}
+    return () => unsub();
+  }, [branchId, particularsKey]);
 
   // Date Navigation Helpers
   const handleShiftDate = (offsetDays) => {
@@ -267,6 +315,71 @@ export default function CashBook({
     });
   };
 
+  // Handle Save Particulars
+  const handleSaveParticulars = async (e) => {
+    e.preventDefault();
+    let cAmt = 0;
+    let uAmt = 0;
+    let total = 0;
+
+    if (particularsForm.paymentType === 'Split') {
+      cAmt = parseFloat(particularsForm.cashAmount) || 0;
+      uAmt = parseFloat(particularsForm.upiAmount) || 0;
+      total = cAmt + uAmt;
+    } else if (particularsForm.paymentType === 'UPI') {
+      uAmt = parseFloat(particularsForm.amount) || 0;
+      total = uAmt;
+    } else {
+      cAmt = parseFloat(particularsForm.amount) || 0;
+      total = cAmt;
+    }
+
+    if (total <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+
+    const partName = particularsForm.particularsCategory === 'Other / Custom'
+      ? (particularsForm.customParticulars?.trim() || 'Manual Adjustment')
+      : particularsForm.particularsCategory;
+
+    const newPart = {
+      id: 'part_' + Date.now(),
+      branchId,
+      date: formatDateToDisplay(particularsForm.date || selectedDate),
+      particulars: partName,
+      type: particularsForm.type || 'Credit',
+      cashAmount: cAmt,
+      upiAmount: uAmt,
+      amount: total,
+      mode: (cAmt > 0 && uAmt > 0) ? 'Split' : (uAmt > 0 ? 'UPI' : 'Cash'),
+      remarks: particularsForm.remarks?.trim() || 'Manual Particulars Entry',
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = [newPart, ...manualParticulars];
+    setManualParticulars(updated);
+    try {
+      localStorage.setItem(particularsKey, JSON.stringify(updated));
+      await addDoc(collection(db, 'cashbook_particulars'), newPart);
+    } catch (err) {
+      console.warn('Saved manual particulars locally:', err);
+    }
+
+    setIsAddParticularsModalOpen(false);
+    setParticularsForm({
+      date: formatDateToDisplay(selectedDate),
+      particularsCategory: 'Daily Collection',
+      customParticulars: '',
+      type: 'Credit',
+      paymentType: 'Cash',
+      amount: '',
+      cashAmount: '',
+      upiAmount: '',
+      remarks: ''
+    });
+  };
+
   // --- Dynamic Ledger Computation for Selected Date ---
   const {
     yesterdayTotal,
@@ -283,10 +396,25 @@ export default function CashBook({
     allTransactionsList,
     allExpensesList
   } = useMemo(() => {
-    // 1. Customer Collections on selectedDate
+    // 1. Group Customer Collections by Loan Product Category
+    const collectionCategories = [
+      'Daily Collection',
+      'Weekly Collection',
+      'Monthly Collection',
+      'Agri Loan Collection',
+      'Personal Loan Collection'
+    ];
+
+    const collectionBuckets = {
+      'Daily Collection': { cash: 0, upi: 0, count: 0 },
+      'Weekly Collection': { cash: 0, upi: 0, count: 0 },
+      'Monthly Collection': { cash: 0, upi: 0, count: 0 },
+      'Agri Loan Collection': { cash: 0, upi: 0, count: 0 },
+      'Personal Loan Collection': { cash: 0, upi: 0, count: 0 },
+    };
+
     let liveCreditCash = 0;
     let liveCreditUpi = 0;
-    const dynamicTx = [];
 
     (customers || []).forEach(cust => {
       const cBranch = cust.branchId || cust.branch;
@@ -294,8 +422,23 @@ export default function CashBook({
         return;
       }
 
+      // Map loan category for this customer
+      const rawType = String(cust.loanType || cust.scheme || cust.category || '').toLowerCase();
+      let catName = 'Daily Collection';
+      if (rawType.includes('agri')) {
+        catName = 'Agri Loan Collection';
+      } else if (rawType.includes('personal')) {
+        catName = 'Personal Loan Collection';
+      } else if (rawType.includes('monthly')) {
+        catName = 'Monthly Collection';
+      } else if (rawType.includes('weekly') || rawType.includes('micro')) {
+        catName = 'Weekly Collection';
+      } else if (rawType.includes('daily')) {
+        catName = 'Daily Collection';
+      }
+
       const installments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-      installments.forEach((inst, idx) => {
+      installments.forEach((inst) => {
         const instDate = inst.date || inst.paymentDate || inst.createdAt;
         if (!isSameDay(instDate, selectedDate)) return;
 
@@ -322,19 +465,66 @@ export default function CashBook({
         liveCreditCash += cashAmt;
         liveCreditUpi += upiAmt;
 
-        dynamicTx.push({
-          id: `inst_${cust.id}_${idx}`,
-          date: formatDateToDisplay(instDate),
-          particulars: `Collection - ${cust.name || 'Customer'}`,
-          type: 'Credit',
-          amount: totalAmt,
-          mode: upiAmt > 0 && cashAmt > 0 ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
-          remarks: cust.centerName || 'Borrower EMI'
-        });
+        collectionBuckets[catName].cash += cashAmt;
+        collectionBuckets[catName].upi += upiAmt;
+        collectionBuckets[catName].count += 1;
       });
     });
 
-    // 2. Customer Disbursements (Debit) on selectedDate
+    const dynamicTx = [];
+
+    // Push consolidated single row per loan collection category that has collections
+    collectionCategories.forEach((cat) => {
+      const b = collectionBuckets[cat];
+      const sum = b.cash + b.upi;
+      if (sum > 0) {
+        dynamicTx.push({
+          id: `cat_${cat.replace(/\s+/g, '_').toLowerCase()}`,
+          date: formatDateToDisplay(selectedDate),
+          particulars: cat,
+          type: 'Credit',
+          cashAmount: b.cash,
+          upiAmount: b.upi,
+          amount: sum,
+          mode: (b.cash > 0 && b.upi > 0) ? 'Split' : (b.upi > 0 ? 'UPI' : 'Cash'),
+          remarks: `${b.count} EMI payment${b.count > 1 ? 's' : ''}`
+        });
+      }
+    });
+
+    // 2. Manual Particulars entries on selectedDate
+    (manualParticulars || []).forEach((part) => {
+      const pDate = part.date || part.createdAt;
+      if (!isSameDay(pDate, selectedDate)) return;
+
+      const amt = Number(part.amount || 0);
+      if (amt <= 0) return;
+
+      const cAmt = Number(part.cashAmount || 0);
+      const uAmt = Number(part.upiAmount || 0);
+
+      if (part.type === 'Debit') {
+        liveDebitCash += cAmt;
+        liveDebitBank += uAmt;
+      } else {
+        liveCreditCash += cAmt;
+        liveCreditUpi += uAmt;
+      }
+
+      dynamicTx.push({
+        id: part.id,
+        date: formatDateToDisplay(pDate),
+        particulars: part.particulars || 'Manual Adjustment',
+        type: part.type || 'Credit',
+        cashAmount: cAmt,
+        upiAmount: uAmt,
+        amount: amt,
+        mode: part.mode || ((cAmt > 0 && uAmt > 0) ? 'Split' : (uAmt > 0 ? 'UPI' : 'Cash')),
+        remarks: part.remarks || 'Manual Adjustment'
+      });
+    });
+
+    // 3. Customer Disbursements (Debit) on selectedDate
     let liveDebitCash = 0;
     let liveDebitBank = 0;
     (customers || []).forEach(cust => {
@@ -358,14 +548,16 @@ export default function CashBook({
           date: formatDateToDisplay(disbDate),
           particulars: `Disbursement - ${cust.name || 'Customer'}`,
           type: 'Debit',
+          cashAmount: isBankDisb ? 0 : disbAmount,
+          upiAmount: isBankDisb ? disbAmount : 0,
           amount: disbAmount,
-          mode: isBankDisb ? 'Bank' : 'Cash',
+          mode: isBankDisb ? 'UPI' : 'Cash',
           remarks: 'Loan Payout'
         });
       }
     });
 
-    // 3. Live Expenses on selectedDate
+    // 4. Live Expenses on selectedDate
     let liveExpCash = 0;
     let liveExpOnline = 0;
     const dynamicExp = [];
@@ -388,8 +580,11 @@ export default function CashBook({
         id: exp.id,
         date: formatDateToDisplay(expDate),
         details: exp.description || exp.category || 'Office Expense',
+        cashAmount: isCash ? amt : 0,
+        upiAmount: isCash ? 0 : amt,
         amount: amt,
-        mode: isCash ? 'Cash' : (String(exp.mode || '').toUpperCase().includes('BANK') ? 'Bank' : 'UPI')
+        mode: isCash ? 'Cash' : 'UPI',
+        remarks: exp.remarks || 'Branch Outflow'
       });
 
       dynamicTx.push({
@@ -397,13 +592,15 @@ export default function CashBook({
         date: formatDateToDisplay(expDate),
         particulars: exp.description || exp.category || 'Office Expense',
         type: 'Expense',
+        cashAmount: isCash ? amt : 0,
+        upiAmount: isCash ? 0 : amt,
         amount: amt,
-        mode: isCash ? 'Cash' : (String(exp.mode || '').toUpperCase().includes('BANK') ? 'Bank' : 'UPI'),
+        mode: isCash ? 'Cash' : 'UPI',
         remarks: exp.remarks || 'Branch Outflow'
       });
     });
 
-    // 4. Live Investments on selectedDate
+    // 5. Live Investments on selectedDate
     let liveInvCash = 0;
     let liveInvBank = 0;
     (investments || []).forEach(inv => {
@@ -425,6 +622,8 @@ export default function CashBook({
         date: formatDateToDisplay(invDate),
         particulars: inv.particulars || 'Investment Entry',
         type: 'Investment',
+        cashAmount: isCash ? amt : 0,
+        upiAmount: isCash ? 0 : amt,
         amount: amt,
         mode: isCash ? 'Cash' : 'UPI',
         remarks: inv.remarks || 'Capital Inflow'
@@ -501,10 +700,10 @@ export default function CashBook({
       allTransactionsList: finalTxList,
       allExpensesList: finalExpList
     };
-  }, [selectedDate, branchId, branchName, customers, liveExpenses, investments, openingBalances]);
+  }, [selectedDate, branchId, branchName, customers, liveExpenses, investments, openingBalances, manualParticulars]);
 
   // Sliced lists for desktop split containers
-  const displayedTransactions = allTransactionsList.slice(0, 5);
+  const displayedTransactions = allTransactionsList.slice(0, 6);
   const displayedExpenses = allExpensesList.slice(0, 4);
   const totalExpensesCalculated = displayedExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
@@ -524,16 +723,44 @@ export default function CashBook({
     }
   };
 
-  // Render Mode Badge
-  const renderModeBadge = (mode) => {
-    const cleanMode = String(mode || 'Cash').toUpperCase();
-    if (cleanMode.includes('CASH')) {
-      return <span className="bg-sky-100 text-sky-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">Cash</span>;
+  // Render Unified Dual-Mode Cell (Single-Row Split Partition)
+  const renderUnifiedModeCell = (item) => {
+    const cashAmt = Number(item.cashAmount || 0);
+    const upiAmt = Number(item.upiAmount || 0);
+    const isSplit = item.mode === 'Split' || (cashAmt > 0 && upiAmt > 0);
+
+    if (isSplit) {
+      return (
+        <div className="inline-flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
+          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/90 font-bold px-2 py-0.5 rounded-md text-[10px] shadow-2xs">
+            <span>💵</span>
+            <span>Cash: {formatCurrency(cashAmt)}</span>
+          </span>
+          <span className="text-slate-300 font-bold text-xs select-none">|</span>
+          <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-800 border border-purple-200/90 font-bold px-2 py-0.5 rounded-md text-[10px] shadow-2xs">
+            <span>📱</span>
+            <span>UPI: {formatCurrency(upiAmt)}</span>
+          </span>
+        </div>
+      );
     }
-    if (cleanMode.includes('UPI')) {
-      return <span className="bg-purple-50 text-purple-700 border border-purple-200 font-bold px-2.5 py-0.5 rounded-full text-[10px]">UPI</span>;
+
+    const modeStr = String(item.mode || (upiAmt > 0 ? 'UPI' : 'Cash')).toUpperCase();
+    if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK')) {
+      return (
+        <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 border border-purple-200 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
+          <span>📱</span>
+          <span>UPI</span>
+        </span>
+      );
     }
-    return <span className="bg-blue-50 text-blue-700 border border-blue-200 font-bold px-2.5 py-0.5 rounded-full text-[10px]">Bank</span>;
+
+    return (
+      <span className="inline-flex items-center gap-1 bg-sky-50 text-sky-800 border border-sky-200 font-bold px-2.5 py-0.5 rounded-full text-[10px]">
+        <span>💵</span>
+        <span>Cash</span>
+      </span>
+    );
   };
 
   // Export CSV Handler
@@ -543,16 +770,22 @@ export default function CashBook({
       return;
     }
 
-    const headers = ['S.No', 'Date', 'Particulars', 'Type', 'Amount (INR)', 'Mode', 'Remarks'];
-    const rows = allTransactionsList.map((tx, idx) => [
-      idx + 1,
-      `"${tx.date || ''}"`,
-      `"${(tx.particulars || '').replace(/"/g, '""')}"`,
-      `"${tx.type || ''}"`,
-      tx.amount || 0,
-      `"${tx.mode || ''}"`,
-      `"${(tx.remarks || '').replace(/"/g, '""')}"`
-    ]);
+    const headers = ['S.No', 'Date', 'Particulars', 'Type', 'Mode', 'Amount (INR)', 'Remarks'];
+    const rows = allTransactionsList.map((tx, idx) => {
+      let modeDisplay = tx.mode || 'Cash';
+      if (tx.cashAmount > 0 && tx.upiAmount > 0) {
+        modeDisplay = `Cash: ${tx.cashAmount} | UPI: ${tx.upiAmount}`;
+      }
+      return [
+        idx + 1,
+        `"${tx.date || ''}"`,
+        `"${(tx.particulars || '').replace(/"/g, '""')}"`,
+        `"${tx.type || ''}"`,
+        `"${modeDisplay}"`,
+        tx.amount || 0,
+        `"${(tx.remarks || '').replace(/"/g, '""')}"`
+      ];
+    });
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -561,7 +794,6 @@ export default function CashBook({
     link.setAttribute('download', `Everest_CashBook_${formatDateToDisplay(selectedDate)}.csv`);
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
   };
 
   return (
@@ -846,17 +1078,17 @@ export default function CashBook({
       </div>
 
       {/* ================= 4. HORIZONTAL EQUATION BANNER (TODAY'S CASH FLOW) ================= */}
-      <div className="bg-white/90 rounded-2xl p-3.5 border border-slate-200/80 shadow-xs space-y-2.5">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+      <div className="w-full space-y-2">
+        <div className="flex items-center gap-2 px-1">
+          <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
             <Coins className="w-3.5 h-3.5 stroke-[2.2]" />
           </div>
-          <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
+          <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
             Today's Cash Flow
           </h3>
         </div>
 
-        <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 overflow-x-auto py-1">
+        <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 overflow-x-auto py-0.5">
           {/* 1. Yesterday Balance */}
           <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
@@ -948,13 +1180,23 @@ export default function CashBook({
                 Recent Transactions
               </h3>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsAllTransactionsModalOpen(true)}
-              className="text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
-            >
-              View All &gt;
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsAddParticularsModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl border border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-800 text-xs font-black shadow-2xs cursor-pointer active:scale-95 transition"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Add Particulars</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAllTransactionsModalOpen(true)}
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
+              >
+                View All &gt;
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-slate-100">
@@ -965,8 +1207,8 @@ export default function CashBook({
                   <th className="py-2.5 px-2.5">Date</th>
                   <th className="py-2.5 px-2.5">Particulars</th>
                   <th className="py-2.5 px-2.5 text-center">Type</th>
+                  <th className="py-2.5 px-2.5 text-center">Mode (Cash / UPI)</th>
                   <th className="py-2.5 px-2.5 text-right">Amount (₹)</th>
-                  <th className="py-2.5 px-2.5 text-center">Mode</th>
                   <th className="py-2.5 px-2.5">Remarks</th>
                 </tr>
               </thead>
@@ -977,8 +1219,8 @@ export default function CashBook({
                     <td className="py-2.5 px-2.5 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
                     <td className="py-2.5 px-2.5 font-bold text-slate-800">{tx.particulars}</td>
                     <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
+                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderUnifiedModeCell(tx)}</td>
                     <td className="py-2.5 px-2.5 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
-                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderModeBadge(tx.mode)}</td>
                     <td className="py-2.5 px-2.5 text-slate-400 text-[11px] truncate max-w-[120px]" title={tx.remarks || '-'}>{tx.remarks || '-'}</td>
                   </tr>
                 ))}
@@ -1019,8 +1261,9 @@ export default function CashBook({
                   <th className="py-2.5 px-2.5 text-center w-8">S.No</th>
                   <th className="py-2.5 px-2.5">Date</th>
                   <th className="py-2.5 px-2.5">Expense Details</th>
+                  <th className="py-2.5 px-2.5 text-center">Mode (Cash / UPI)</th>
                   <th className="py-2.5 px-2.5 text-right">Amount (₹)</th>
-                  <th className="py-2.5 px-2.5 text-center">Mode</th>
+                  <th className="py-2.5 px-2.5">Remarks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold text-slate-700 bg-white">
@@ -1029,13 +1272,14 @@ export default function CashBook({
                     <td className="py-2.5 px-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
                     <td className="py-2.5 px-2.5 whitespace-nowrap text-slate-600 font-bold text-[11px]">{exp.date}</td>
                     <td className="py-2.5 px-2.5 font-bold text-slate-800">{exp.details}</td>
+                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderUnifiedModeCell(exp)}</td>
                     <td className="py-2.5 px-2.5 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
-                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderModeBadge(exp.mode)}</td>
+                    <td className="py-2.5 px-2.5 text-slate-400 text-[11px] truncate max-w-[120px]" title={exp.remarks || '-'}>{exp.remarks || '-'}</td>
                   </tr>
                 ))}
                 {displayedExpenses.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">No expenses recorded for this period.</td>
+                    <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">No expenses recorded for this period.</td>
                   </tr>
                 )}
               </tbody>
@@ -1155,6 +1399,216 @@ export default function CashBook({
         </div>
       )}
 
+      {/* ================= MODAL: ADD PARTICULARS ================= */}
+      {isAddParticularsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-emerald-700" />
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  Add Particulars Entry
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddParticularsModalOpen(false)}
+                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveParticulars} className="p-5 space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Date</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="DD-MM-YYYY"
+                    value={particularsForm.date}
+                    onChange={(e) => setParticularsForm({ ...particularsForm, date: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Transaction Type</label>
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+                    <button
+                      type="button"
+                      onClick={() => setParticularsForm({ ...particularsForm, type: 'Credit' })}
+                      className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                        particularsForm.type === 'Credit'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Credit (+)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setParticularsForm({ ...particularsForm, type: 'Debit' })}
+                      className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                        particularsForm.type === 'Debit'
+                          ? 'bg-rose-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Debit (-)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Particulars Category *</label>
+                <select
+                  value={particularsForm.particularsCategory}
+                  onChange={(e) => setParticularsForm({ ...particularsForm, particularsCategory: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="Daily Collection">Daily Collection</option>
+                  <option value="Weekly Collection">Weekly Collection</option>
+                  <option value="Monthly Collection">Monthly Collection</option>
+                  <option value="Agri Loan Collection">Agri Loan Collection</option>
+                  <option value="Personal Loan Collection">Personal Loan Collection</option>
+                  <option value="Cash Adjustment">Cash Adjustment</option>
+                  <option value="Bank Deposit / Transfer">Bank Deposit / Transfer</option>
+                  <option value="Other / Custom">Other / Custom Description...</option>
+                </select>
+              </div>
+
+              {particularsForm.particularsCategory === 'Other / Custom' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Custom Particulars Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter particulars description"
+                    value={particularsForm.customParticulars}
+                    onChange={(e) => setParticularsForm({ ...particularsForm, customParticulars: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-emerald-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Mode Partition</label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80 mb-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setParticularsForm({ ...particularsForm, paymentType: 'Cash' })}
+                    className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                      particularsForm.paymentType === 'Cash'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    💵 Cash Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setParticularsForm({ ...particularsForm, paymentType: 'UPI' })}
+                    className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                      particularsForm.paymentType === 'UPI'
+                        ? 'bg-purple-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📱 UPI Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setParticularsForm({ ...particularsForm, paymentType: 'Split' })}
+                    className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                      particularsForm.paymentType === 'Split'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🔀 Cash + UPI Split
+                  </button>
+                </div>
+
+                {particularsForm.paymentType === 'Split' ? (
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                    <div>
+                      <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-1">💵 Cash Amount (₹) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={particularsForm.cashAmount}
+                        onChange={(e) => setParticularsForm({ ...particularsForm, cashAmount: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-800 outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-purple-800 uppercase mb-1">📱 UPI Amount (₹) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={particularsForm.upiAmount}
+                        onChange={(e) => setParticularsForm({ ...particularsForm, upiAmount: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-purple-200 rounded-xl text-xs font-black text-slate-800 outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div className="col-span-2 pt-1 flex items-center justify-between text-xs font-black text-slate-700 border-t border-emerald-200/60">
+                      <span>Combined Sum :</span>
+                      <span className="text-emerald-700 text-sm">
+                        {formatCurrency((parseFloat(particularsForm.cashAmount) || 0) + (parseFloat(particularsForm.upiAmount) || 0))}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Amount (₹) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      placeholder="e.g. 25000"
+                      value={particularsForm.amount}
+                      onChange={(e) => setParticularsForm({ ...particularsForm, amount: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-800 outline-none focus:bg-white focus:border-emerald-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Remarks (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="Field agent name, center or audit note"
+                  value={particularsForm.remarks}
+                  onChange={(e) => setParticularsForm({ ...particularsForm, remarks: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAddParticularsModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md cursor-pointer active:scale-95 transition"
+                >
+                  Record Particulars
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL: VIEW ALL RECENT TRANSACTIONS ================= */}
       {isAllTransactionsModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
@@ -1179,13 +1633,13 @@ export default function CashBook({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
-                    <th className="py-2 px-2 text-center w-8">S.No</th>
-                    <th className="py-2 px-2">Date</th>
-                    <th className="py-2 px-2">Particulars</th>
-                    <th className="py-2 px-2 text-center">Type</th>
-                    <th className="py-2 px-2 text-right">Amount (₹)</th>
-                    <th className="py-2 px-2 text-center">Mode</th>
-                    <th className="py-2 px-2">Remarks</th>
+                    <th className="py-2.5 px-2 text-center w-8">S.No</th>
+                    <th className="py-2.5 px-2">Date</th>
+                    <th className="py-2.5 px-2">Particulars</th>
+                    <th className="py-2.5 px-2 text-center">Type</th>
+                    <th className="py-2.5 px-2 text-center">Mode (Cash / UPI)</th>
+                    <th className="py-2.5 px-2 text-right">Amount (₹)</th>
+                    <th className="py-2.5 px-2">Remarks</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
@@ -1195,8 +1649,8 @@ export default function CashBook({
                       <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
                       <td className="py-2.5 px-2 font-bold text-slate-800">{tx.particulars}</td>
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
+                      <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderUnifiedModeCell(tx)}</td>
                       <td className="py-2.5 px-2 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
-                      <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderModeBadge(tx.mode)}</td>
                       <td className="py-2.5 px-2 text-slate-400 text-[11px]">{tx.remarks || '-'}</td>
                     </tr>
                   ))}
@@ -1246,11 +1700,12 @@ export default function CashBook({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
-                    <th className="py-2 px-2 text-center w-8">S.No</th>
-                    <th className="py-2 px-2">Date</th>
-                    <th className="py-2 px-2">Expense Details</th>
-                    <th className="py-2 px-2 text-right">Amount (₹)</th>
-                    <th className="py-2 px-2 text-center">Mode</th>
+                    <th className="py-2.5 px-2 text-center w-8">S.No</th>
+                    <th className="py-2.5 px-2">Date</th>
+                    <th className="py-2.5 px-2">Expense Details</th>
+                    <th className="py-2.5 px-2 text-center">Mode (Cash / UPI)</th>
+                    <th className="py-2.5 px-2 text-right">Amount (₹)</th>
+                    <th className="py-2.5 px-2">Remarks</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
@@ -1259,13 +1714,14 @@ export default function CashBook({
                       <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
                       <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{exp.date}</td>
                       <td className="py-2.5 px-2 font-bold text-slate-800">{exp.details}</td>
+                      <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderUnifiedModeCell(exp)}</td>
                       <td className="py-2.5 px-2 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
-                      <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderModeBadge(exp.mode)}</td>
+                      <td className="py-2.5 px-2 text-slate-400 text-[11px]">{exp.remarks || '-'}</td>
                     </tr>
                   ))}
                   {allExpensesList.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">No expenses found.</td>
+                      <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">No expenses found.</td>
                     </tr>
                   )}
                 </tbody>
