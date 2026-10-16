@@ -330,8 +330,11 @@ export default function CashBook({
   const isYesterdaySelected = isSameDay(selectedDate, getYesterdayYmd());
 
   // Handle Save Investment
-  const handleSaveInvestment = async (e) => {
-    e.preventDefault();
+  const handleSaveInvestment = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const numAmt = parseFloat(investmentForm.amount);
     if (isNaN(numAmt) || numAmt <= 0) {
       alert('Please enter a valid investment amount.');
@@ -349,16 +352,18 @@ export default function CashBook({
       createdAt: new Date().toISOString()
     };
 
+    // 1. Immediately update local state
     const updated = [newInv, ...investments];
     setInvestments(updated);
+
+    // 2. Persist locally
     try {
       localStorage.setItem(investmentsKey, JSON.stringify(updated));
-      await addDoc(collection(db, 'investments'), newInv);
     } catch (err) {
-      console.warn('Saved investment locally:', err);
+      console.warn('LocalStorage investment save notice:', err);
     }
 
-    setIsInvestmentModalOpen(false);
+    // 3. Reset form
     setInvestmentForm({
       date: formatDateToDisplay(selectedDate),
       particulars: '',
@@ -366,11 +371,26 @@ export default function CashBook({
       mode: 'Bank',
       remarks: ''
     });
+
+    // 4. Smoothly close modal immediately
+    setIsInvestmentModalOpen(false);
+
+    // 5. Non-blocking Firestore background sync
+    try {
+      addDoc(collection(db, 'investments'), newInv).catch(err => {
+        console.warn('Firestore investment sync notice (saved locally):', err);
+      });
+    } catch (err) {
+      console.warn('Saved investment locally:', err);
+    }
   };
 
   // Handle Save Particulars
-  const handleSaveParticulars = async (e) => {
-    e.preventDefault();
+  const handleSaveParticulars = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     let cAmt = 0;
     let uAmt = 0;
     let total = 0;
@@ -410,16 +430,18 @@ export default function CashBook({
       createdAt: new Date().toISOString()
     };
 
+    // 1. Immediately update in-memory ledger state
     const updated = [newPart, ...manualParticulars];
     setManualParticulars(updated);
+
+    // 2. Persist locally to localStorage
     try {
       localStorage.setItem(particularsKey, JSON.stringify(updated));
-      await addDoc(collection(db, 'cashbook_particulars'), newPart);
     } catch (err) {
-      console.warn('Saved manual particulars locally:', err);
+      console.warn('LocalStorage particulars save notice:', err);
     }
 
-    setIsAddParticularsModalOpen(false);
+    // 3. Reset form state cleanly
     setParticularsForm({
       date: formatDateToDisplay(selectedDate),
       particularsCategory: 'Daily Collection',
@@ -431,6 +453,18 @@ export default function CashBook({
       upiAmount: '',
       remarks: ''
     });
+
+    // 4. Smoothly close modal immediately
+    setIsAddParticularsModalOpen(false);
+
+    // 5. Non-blocking Firestore background sync
+    try {
+      addDoc(collection(db, 'cashbook_particulars'), newPart).catch(err => {
+        console.warn('Firestore particulars sync notice (saved locally):', err);
+      });
+    } catch (err) {
+      console.warn('Saved manual particulars locally:', err);
+    }
   };
 
   // --- Dynamic Ledger Computation for Selected Date ---
@@ -1170,16 +1204,16 @@ export default function CashBook({
             </div>
           </div>
 
-          <span className="text-sm font-black text-slate-500 px-1">=</span>
+          <span className="text-xl font-black text-slate-700">=</span>
 
-          {/* 6. Net Balance (Vivid Emerald) */}
-          <div className="bg-emerald-100 border-2 border-emerald-400 rounded-xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-emerald-200 text-emerald-800 flex items-center justify-center shrink-0">
-              <Scale className="w-4 h-4" />
+          {/* 6. Net Balance (Highlighted Anchor Card) */}
+          <div className="bg-emerald-100/80 border-2 border-emerald-400 rounded-xl p-3 sm:px-3.5 flex-1 min-w-[145px] flex items-center gap-2.5 shadow-sm text-emerald-950 font-bold">
+            <div className="w-8 h-8 rounded-lg bg-emerald-200 text-emerald-800 flex items-center justify-center shrink-0 shadow-2xs">
+              <Scale className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-extrabold text-emerald-800 block truncate">Net Balance</span>
-              <span className="text-xs sm:text-sm font-black text-emerald-950 block truncate">{formatCurrency(todayNetClosingBalance)}</span>
+              <span className="text-[10px] font-extrabold text-emerald-900 block truncate">Net Balance</span>
+              <span className="text-xs sm:text-base font-black text-emerald-950 block truncate">{formatCurrency(todayNetClosingBalance)}</span>
             </div>
           </div>
         </div>
@@ -1221,14 +1255,17 @@ export default function CashBook({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
-                  <th className="py-2.5 px-2.5 text-center w-8">S.No</th>
-                  <th className="py-2.5 px-2.5">Date</th>
-                  <th className="py-2.5 px-2.5">Particulars</th>
-                  <th className="py-2.5 px-2.5 text-center">Type</th>
-                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Cash (₹)</th>
-                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">UPI (₹)</th>
-                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Total Amount (₹)</th>
-                  <th className="py-2.5 px-2.5">Remarks</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 text-center w-8 align-middle">S.No</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Date</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Particulars</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 text-center align-middle">Type</th>
+                  <th colSpan={2} className="py-1.5 px-2 text-center border-l border-r border-b border-slate-200/90 tracking-widest text-[9.5px]">MODE</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 text-center whitespace-nowrap align-middle">Total Amount (₹)</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Remarks</th>
+                </tr>
+                <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
+                  <th className="py-1 px-2.5 text-right whitespace-nowrap border-l border-slate-200/80">Cash (₹)</th>
+                  <th className="py-1 px-2.5 text-right whitespace-nowrap border-l border-r border-slate-200/80">UPI (₹)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold text-slate-700 bg-white">
@@ -1238,13 +1275,13 @@ export default function CashBook({
                     <td className="py-2.5 px-2.5 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
                     <td className="py-2.5 px-2.5 font-bold text-slate-800">{tx.particulars}</td>
                     <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
-                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap">
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap border-l border-slate-200/80 bg-slate-50/20">
                       {tx.cashAmount > 0 ? formatCurrency(tx.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
                     </td>
-                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap">
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap border-l border-r border-slate-200/80 bg-slate-50/20">
                       {tx.upiAmount > 0 ? formatCurrency(tx.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
                     </td>
-                    <td className="py-2.5 px-2.5 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
+                    <td className="py-2.5 px-2.5 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
                     <td className="py-2.5 px-2.5 text-slate-400 text-[11px] truncate max-w-[120px]" title={tx.remarks || '-'}>{tx.remarks || '-'}</td>
                   </tr>
                 ))}
@@ -1282,13 +1319,16 @@ export default function CashBook({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
-                  <th className="py-2.5 px-2.5 text-center w-8">S.No</th>
-                  <th className="py-2.5 px-2.5">Date</th>
-                  <th className="py-2.5 px-2.5">Expense Category</th>
-                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Cash (₹)</th>
-                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">UPI (₹)</th>
-                  <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Total (₹)</th>
-                  <th className="py-2.5 px-2.5">Remarks</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 text-center w-8 align-middle">S.No</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Date</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Expense Category</th>
+                  <th colSpan={2} className="py-1.5 px-2 text-center border-l border-r border-b border-slate-200/90 tracking-widest text-[9.5px]">MODE</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 text-center whitespace-nowrap align-middle">Total (₹)</th>
+                  <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Remarks</th>
+                </tr>
+                <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
+                  <th className="py-1 px-2.5 text-right whitespace-nowrap border-l border-slate-200/80">Cash (₹)</th>
+                  <th className="py-1 px-2.5 text-right whitespace-nowrap border-l border-r border-slate-200/80">UPI (₹)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold text-slate-700 bg-white">
@@ -1301,13 +1341,13 @@ export default function CashBook({
                         {exp.category || exp.details || 'Office Expense'}
                       </span>
                     </td>
-                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap">
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap border-l border-slate-200/80 bg-slate-50/20">
                       {exp.cashAmount > 0 ? formatCurrency(exp.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
                     </td>
-                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap">
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-700 whitespace-nowrap border-l border-r border-slate-200/80 bg-slate-50/20">
                       {exp.upiAmount > 0 ? formatCurrency(exp.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
                     </td>
-                    <td className="py-2.5 px-2.5 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
+                    <td className="py-2.5 px-2.5 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
                     <td className="py-2.5 px-2.5 text-slate-500 font-medium text-[11px] truncate max-w-[130px]" title={exp.remarks || '-'}>{exp.remarks || '-'}</td>
                   </tr>
                 ))}
@@ -1666,15 +1706,18 @@ export default function CashBook({
             <div className="flex-1 overflow-y-auto p-4">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
-                    <th className="py-2.5 px-2 text-center w-8">S.No</th>
-                    <th className="py-2.5 px-2">Date</th>
-                    <th className="py-2.5 px-2">Particulars</th>
-                    <th className="py-2.5 px-2 text-center">Type</th>
-                    <th className="py-2.5 px-2 text-right whitespace-nowrap">Cash (₹)</th>
-                    <th className="py-2.5 px-2 text-right whitespace-nowrap">UPI (₹)</th>
-                    <th className="py-2.5 px-2 text-right whitespace-nowrap">Total Amount (₹)</th>
-                    <th className="py-2.5 px-2">Remarks</th>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
+                    <th rowSpan={2} className="py-2.5 px-2 text-center w-8 align-middle">S.No</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Date</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Particulars</th>
+                    <th rowSpan={2} className="py-2.5 px-2 text-center align-middle">Type</th>
+                    <th colSpan={2} className="py-1 px-2 text-center border-l border-r border-b border-slate-200 tracking-widest text-[9.5px]">MODE</th>
+                    <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">Total Amount (₹)</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Remarks</th>
+                  </tr>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
+                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-slate-200">Cash (₹)</th>
+                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-r border-slate-200">UPI (₹)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
@@ -1684,13 +1727,13 @@ export default function CashBook({
                       <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
                       <td className="py-2.5 px-2 font-bold text-slate-800">{tx.particulars}</td>
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap">
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-slate-200 bg-slate-50/20">
                         {tx.cashAmount > 0 ? formatCurrency(tx.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
                       </td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap">
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-r border-slate-200 bg-slate-50/20">
                         {tx.upiAmount > 0 ? formatCurrency(tx.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
                       </td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
+                      <td className="py-2.5 px-2 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
                       <td className="py-2.5 px-2 text-slate-400 text-[11px]">{tx.remarks || '-'}</td>
                     </tr>
                   ))}
@@ -1739,14 +1782,17 @@ export default function CashBook({
             <div className="flex-1 overflow-y-auto p-4">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
-                    <th className="py-2.5 px-2 text-center w-8">S.No</th>
-                    <th className="py-2.5 px-2">Date</th>
-                    <th className="py-2.5 px-2">Expense Category</th>
-                    <th className="py-2.5 px-2 text-right whitespace-nowrap">Cash (₹)</th>
-                    <th className="py-2.5 px-2 text-right whitespace-nowrap">UPI (₹)</th>
-                    <th className="py-2.5 px-2 text-right whitespace-nowrap">Total (₹)</th>
-                    <th className="py-2.5 px-2">Remarks</th>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
+                    <th rowSpan={2} className="py-2.5 px-2 text-center w-8 align-middle">S.No</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Date</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Expense Category</th>
+                    <th colSpan={2} className="py-1 px-2 text-center border-l border-r border-b border-slate-200 tracking-widest text-[9.5px]">MODE</th>
+                    <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">Total (₹)</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Remarks</th>
+                  </tr>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
+                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-slate-200">Cash (₹)</th>
+                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-r border-slate-200">UPI (₹)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
@@ -1759,13 +1805,13 @@ export default function CashBook({
                           {exp.category || exp.details || 'Office Expense'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap">
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-slate-200 bg-slate-50/20">
                         {exp.cashAmount > 0 ? formatCurrency(exp.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
                       </td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap">
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-r border-slate-200 bg-slate-50/20">
                         {exp.upiAmount > 0 ? formatCurrency(exp.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
                       </td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
+                      <td className="py-2.5 px-2 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
                       <td className="py-2.5 px-2 text-slate-500 font-medium text-[11px]">{exp.remarks || '-'}</td>
                     </tr>
                   ))}
