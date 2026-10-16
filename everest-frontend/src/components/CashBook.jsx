@@ -54,89 +54,84 @@ const getYesterdayYmd = () => {
   return `${yr}-${mo}-${dy}`;
 };
 
-const formatDateToDisplay = (dateInput) => {
-  if (!dateInput) return '';
-  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
-    const dy = String(dateInput.getDate()).padStart(2, '0');
-    const mo = String(dateInput.getMonth() + 1).padStart(2, '0');
-    const yr = dateInput.getFullYear();
-    return `${dy}-${mo}-${yr}`;
-  }
-  const clean = String(dateInput).trim();
-  // DD-MM-YYYY
-  const dmy = clean.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})/);
-  if (dmy && clean.indexOf('-') === 2) {
-    let yr = dmy[3];
-    if (yr.length === 2) yr = '20' + yr;
-    return `${String(dmy[1]).padStart(2, '0')}-${String(dmy[2]).padStart(2, '0')}-${yr}`;
-  }
-  // YYYY-MM-DD
-  const ymd = clean.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})/);
-  if (ymd) {
-    return `${String(ymd[3]).padStart(2, '0')}-${String(ymd[2]).padStart(2, '0')}-${ymd[1]}`;
-  }
-  // Try Date parse
-  const parsed = new Date(clean);
-  if (!isNaN(parsed.getTime())) {
-    const dy = String(parsed.getDate()).padStart(2, '0');
-    const mo = String(parsed.getMonth() + 1).padStart(2, '0');
-    const yr = parsed.getFullYear();
-    return `${dy}-${mo}-${yr}`;
-  }
-  return clean;
-};
-
-const formatDateToYmd = (dateInput) => {
-  if (!dateInput) return '';
-  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
-    const yr = dateInput.getFullYear();
-    const mo = String(dateInput.getMonth() + 1).padStart(2, '0');
-    const dy = String(dateInput.getDate()).padStart(2, '0');
-    return `${yr}-${mo}-${dy}`;
-  }
-  const clean = String(dateInput).trim();
-  // DD-MM-YYYY
-  const dmy = clean.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})/);
-  if (dmy && clean.indexOf('-') === 2) {
-    let yr = dmy[3];
-    if (yr.length === 2) yr = '20' + yr;
-    return `${yr}-${String(dmy[2]).padStart(2, '0')}-${String(dmy[1]).padStart(2, '0')}`;
-  }
-  // YYYY-MM-DD
-  const ymd = clean.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})/);
-  if (ymd) {
-    return `${ymd[1]}-${String(ymd[2]).padStart(2, '0')}-${String(ymd[3]).padStart(2, '0')}`;
-  }
-  // Try Date parse
-  const parsed = new Date(clean);
-  if (!isNaN(parsed.getTime())) {
-    const yr = parsed.getFullYear();
-    const mo = String(parsed.getMonth() + 1).padStart(2, '0');
-    const dy = String(parsed.getDate()).padStart(2, '0');
-    return `${yr}-${mo}-${dy}`;
-  }
-  return clean;
-};
-
 const parseDateToTimestamp = (dateInput) => {
-  if (!dateInput) return 0;
+  if (!dateInput) return null;
   if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
     return dateInput.getTime();
   }
-  const clean = String(dateInput).trim();
-  const dmy = clean.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
-  if (dmy && clean.indexOf('-') === 2) {
-    let yr = parseInt(dmy[3], 10);
-    if (yr < 100) yr += 2000;
-    const mo = parseInt(dmy[2], 10) - 1;
-    const dy = parseInt(dmy[1], 10);
-    const hh = parseInt(dmy[4] || '0', 10);
-    const mm = parseInt(dmy[5] || '0', 10);
-    const ss = parseInt(dmy[6] || '0', 10);
-    return new Date(yr, mo, dy, hh, mm, ss).getTime();
+  if (typeof dateInput === 'number' && !isNaN(dateInput)) {
+    return dateInput;
   }
-  const t = Date.parse(clean);
-  return isNaN(t) ? 0 : t;
+  if (typeof dateInput === 'object' && dateInput !== null) {
+    if (typeof dateInput.toDate === 'function') {
+      try { return dateInput.toDate().getTime(); } catch (e) {}
+    }
+    if (dateInput.seconds !== undefined) {
+      return dateInput.seconds * 1000;
+    }
+  }
+
+  const clean = String(dateInput).trim();
+  if (!clean || clean === '[object Object]') return null;
+
+  // DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY with optional time
+  const dmyMatch = clean.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?)?/i);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10);
+    let year = parseInt(dmyMatch[3], 10);
+    if (year < 100) year += 2000;
+
+    let hh = dmyMatch[4] ? parseInt(dmyMatch[4], 10) : 0;
+    let mm = dmyMatch[5] ? parseInt(dmyMatch[5], 10) : 0;
+    let ss = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
+    const ampm = dmyMatch[7] ? dmyMatch[7].toUpperCase() : '';
+    if (ampm === 'PM' && hh < 12) hh += 12;
+    if (ampm === 'AM' && hh === 12) hh = 0;
+
+    return new Date(year, month - 1, day, hh, mm, ss).getTime();
+  }
+
+  // YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD with optional time
+  const ymdMatch = clean.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?)?/i);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10);
+    const day = parseInt(ymdMatch[3], 10);
+
+    let hh = ymdMatch[4] ? parseInt(ymdMatch[4], 10) : 0;
+    let mm = ymdMatch[5] ? parseInt(ymdMatch[5], 10) : 0;
+    let ss = ymdMatch[6] ? parseInt(ymdMatch[6], 10) : 0;
+    const ampm = ymdMatch[7] ? ymdMatch[7].toUpperCase() : '';
+    if (ampm === 'PM' && hh < 12) hh += 12;
+    if (ampm === 'AM' && hh === 12) hh = 0;
+
+    return new Date(year, month - 1, day, hh, mm, ss).getTime();
+  }
+
+  // Fallback: Date.parse or new Date()
+  const parsed = new Date(clean);
+  return isNaN(parsed.getTime()) ? null : parsed.getTime();
+};
+
+const formatDateToDisplay = (dateInput) => {
+  const ts = parseDateToTimestamp(dateInput);
+  if (!ts) return '';
+  const d = new Date(ts);
+  const dy = String(d.getDate()).padStart(2, '0');
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const yr = d.getFullYear();
+  return `${dy}-${mo}-${yr}`;
+};
+
+const formatDateToYmd = (dateInput) => {
+  const ts = parseDateToTimestamp(dateInput);
+  if (!ts) return '';
+  const d = new Date(ts);
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${dy}`;
 };
 
 const formatCurrency = (amt) => {
@@ -148,17 +143,22 @@ const formatCurrency = (amt) => {
 };
 
 const isSameDay = (dateA, dateB) => {
-  if (!dateA || !dateB) return false;
-  return formatDateToYmd(dateA) === formatDateToYmd(dateB);
+  const tsA = parseDateToTimestamp(dateA);
+  const tsB = parseDateToTimestamp(dateB);
+  if (!tsA || !tsB) return false;
+  const dA = new Date(tsA).setHours(0, 0, 0, 0);
+  const dB = new Date(tsB).setHours(0, 0, 0, 0);
+  return dA === dB;
 };
 
-const isDateInRange = (dateStr, fromYmd, toYmd) => {
-  if (!dateStr) return false;
-  const itemYmd = formatDateToYmd(dateStr);
-  if (!itemYmd) return false;
-  const start = fromYmd <= toYmd ? fromYmd : toYmd;
-  const end = fromYmd <= toYmd ? toYmd : fromYmd;
-  return itemYmd >= start && itemYmd <= end;
+const isDateInRange = (dateStr, fromDateInput, toDateInput) => {
+  const ts = parseDateToTimestamp(dateStr);
+  const startTs = parseDateToTimestamp(fromDateInput);
+  const endTs = parseDateToTimestamp(toDateInput);
+  if (!ts || !startTs || !endTs) return false;
+  const s = Math.min(new Date(startTs).setHours(0, 0, 0, 0), new Date(endTs).setHours(0, 0, 0, 0));
+  const e = Math.max(new Date(startTs).setHours(23, 59, 59, 999), new Date(endTs).setHours(23, 59, 59, 999));
+  return ts >= s && ts <= e;
 };
 
 // Resolves formal category name from expense item
@@ -384,17 +384,18 @@ export default function CashBook({
 
   // Date Navigation Helpers (Shift both From & To dates)
   const handleShiftDate = (offsetDays) => {
-    const shiftYmd = (ymdStr) => {
-      const d = new Date(ymdStr);
-      if (isNaN(d.getTime())) return ymdStr;
+    const shift = (dInput) => {
+      const ts = parseDateToTimestamp(dInput);
+      if (!ts) return dInput;
+      const d = new Date(ts);
       d.setDate(d.getDate() + offsetDays);
-      const yr = d.getFullYear();
-      const mo = String(d.getMonth() + 1).padStart(2, '0');
       const dy = String(d.getDate()).padStart(2, '0');
-      return `${yr}-${mo}-${dy}`;
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const yr = d.getFullYear();
+      return `${dy}-${mo}-${yr}`;
     };
-    setFromDate(prev => shiftYmd(formatDateToYmd(prev)));
-    setToDate(prev => shiftYmd(formatDateToYmd(prev)));
+    setFromDate(prev => shift(prev));
+    setToDate(prev => shift(prev));
   };
 
   const isTodaySelected = isSameDay(fromDate, getTodayYmd()) && isSameDay(toDate, getTodayYmd());
@@ -554,13 +555,18 @@ export default function CashBook({
     allTransactionsList,
     allExpensesList
   } = useMemo(() => {
-    const fromYmd = formatDateToYmd(fromDate);
-    const toYmd = formatDateToYmd(toDate);
-    const startYmd = fromYmd <= toYmd ? fromYmd : toYmd;
-    const endYmd = fromYmd <= toYmd ? toYmd : fromYmd;
+    const fromTs = parseDateToTimestamp(fromDate);
+    const toTs = parseDateToTimestamp(toDate);
+    const startDayTs = fromTs ? new Date(fromTs).setHours(0, 0, 0, 0) : 0;
+    const endDayTs = toTs ? new Date(toTs).setHours(23, 59, 59, 999) : 0;
+    const rangeStartTs = Math.min(startDayTs, endDayTs);
+    const rangeEndTs = Math.max(startDayTs, endDayTs);
+
+    const startYmd = formatDateToYmd(new Date(rangeStartTs));
+    const endYmd = formatDateToYmd(new Date(rangeEndTs));
 
     // Direct access to customers prop or localStorage backup
-    const allCust = (customers && customers.length > 0) ? customers : (() => {
+    let allCust = (customers && customers.length > 0) ? customers : (() => {
       try {
         const saved = localStorage.getItem('everest_customers');
         return saved ? JSON.parse(saved) : [];
@@ -569,7 +575,14 @@ export default function CashBook({
       }
     })();
 
-    // Cumulative historical accumulators up to Yesterday (strictly < startYmd)
+    if (!allCust || allCust.length === 0) {
+      try {
+        const saved = localStorage.getItem('everest_customers');
+        if (saved) allCust = JSON.parse(saved);
+      } catch (e) {}
+    }
+
+    // Cumulative historical accumulators up to Yesterday (strictly < rangeStartTs)
     let histCreditCash = 0;
     let histCreditUpi = 0;
     let histDebitCash = 0;
@@ -579,7 +592,7 @@ export default function CashBook({
     let histExpCash = 0;
     let histExpOnline = 0;
 
-    // Active period accumulators ([startYmd, endYmd])
+    // Active period accumulators ([rangeStartTs, rangeEndTs])
     let liveCreditCash = 0;
     let liveCreditUpi = 0;
     let liveDebitCash = 0;
@@ -596,18 +609,17 @@ export default function CashBook({
       ? formatDateToDisplay(startYmd)
       : `${formatDateToDisplay(startYmd)} - ${formatDateToDisplay(endYmd)}`;
 
-    // 1. Process Customer Collections (Credit Inflows)
-    const collectionBuckets = {
-      'Daily Collection': { cash: 0, upi: 0, count: 0 },
-      'Weekly Collection': { cash: 0, upi: 0, count: 0 },
-      'Monthly Collection': { cash: 0, upi: 0, count: 0 },
-      'Agri Loan Collection': { cash: 0, upi: 0, count: 0 },
-      'Personal Loan Collection': { cash: 0, upi: 0, count: 0 }
-    };
+    const isMainBranch = 
+      branchId === 'all' || 
+      branchId === 'main' || 
+      String(branchName || '').toLowerCase() === 'main branch' || 
+      String(branchName || '').toLowerCase() === 'main';
 
+    // 1. Process Customer Collections (Credit Inflows)
     (allCust || []).forEach(cust => {
+      if (!cust) return;
       const cBranch = cust.branchId || cust.branch;
-      if (branchId !== 'all' && cBranch && cBranch !== branchId && cBranch !== branchName) {
+      if (!isMainBranch && cBranch && cBranch !== branchId && cBranch !== branchName) {
         return;
       }
 
@@ -624,13 +636,29 @@ export default function CashBook({
         catName = 'Weekly Collection';
       } else if (rawType.includes('daily')) {
         catName = 'Daily Collection';
+      } else if (cust.loanType || cust.scheme) {
+        catName = cust.loanType || cust.scheme;
       }
 
-      const installments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-      installments.forEach((inst) => {
+      let rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
+      try {
+        const localLedger = localStorage.getItem(`everest_ledger_${cust.id}`);
+        if (localLedger) {
+          const parsed = JSON.parse(localLedger);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            if (!Array.isArray(rawInstallments) || rawInstallments.length === 0) {
+              rawInstallments = parsed;
+            } else if (parsed.length > rawInstallments.length) {
+              rawInstallments = parsed;
+            }
+          }
+        }
+      } catch (e) {}
+
+      (rawInstallments || []).forEach((inst, idx) => {
         const instDate = inst.date || inst.paymentDate || inst.createdAt;
-        const instYmd = formatDateToYmd(instDate);
-        if (!instYmd) return;
+        const instTs = parseDateToTimestamp(instDate);
+        if (!instTs) return;
 
         const status = String(inst.status || '').toUpperCase();
         if (status === 'BOUNCED' || status === 'CANCELLED') return;
@@ -652,83 +680,78 @@ export default function CashBook({
           }
         }
 
-        // Cumulative history up to Yesterday (< startYmd)
-        if (instYmd < startYmd) {
+        // Cumulative history strictly prior to fromDate (< rangeStartTs)
+        if (instTs < rangeStartTs) {
           histCreditCash += cashAmt;
           histCreditUpi += upiAmt;
         }
 
-        // Active range [startYmd, endYmd]
-        if (instYmd >= startYmd && instYmd <= endYmd) {
+        // Active range [rangeStartTs, rangeEndTs]
+        if (instTs >= rangeStartTs && instTs <= rangeEndTs) {
           liveCreditCash += cashAmt;
           liveCreditUpi += upiAmt;
 
-          if (!collectionBuckets[catName]) {
-            collectionBuckets[catName] = { cash: 0, upi: 0, count: 0 };
+          const custName = cust.name || cust.customerName || 'Customer';
+          const centerOrPhone = cust.centerName || cust.center || cust.groupName || '';
+          const remarksInfo = centerOrPhone ? `${custName} (${centerOrPhone})` : custName;
+
+          const timeStr = inst.timeStr || inst.time || '';
+          let displayDate = formatDateToDisplay(instDate);
+          if (timeStr) {
+            displayDate = `${displayDate} • ${timeStr}`;
+          } else {
+            const d = new Date(instTs);
+            const timeFormatted = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+            if (timeFormatted && !timeFormatted.startsWith('12:00:00') && !timeFormatted.startsWith('12:00 AM')) {
+              displayDate = `${displayDate} • ${timeFormatted}`;
+            }
           }
-          collectionBuckets[catName].cash += cashAmt;
-          collectionBuckets[catName].upi += upiAmt;
-          collectionBuckets[catName].count += 1;
+
+          dynamicTx.push({
+            id: `col_${cust.id}_${inst.id || idx}_${instTs}`,
+            date: displayDate,
+            particulars: catName,
+            type: 'Credit',
+            cashAmount: cashAmt,
+            upiAmount: upiAmt,
+            amount: totalAmt,
+            mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
+            remarks: remarksInfo,
+            rawTimestamp: instTs
+          });
         }
       });
     });
 
-    // Push aggregated collection category batches into dynamicTx
-    const standardCategories = [
-      'Daily Collection',
-      'Weekly Collection',
-      'Monthly Collection',
-      'Agri Loan Collection',
-      'Personal Loan Collection'
-    ];
-    const presentCategories = Array.from(new Set([...standardCategories, ...Object.keys(collectionBuckets)]));
-    presentCategories.forEach((cat) => {
-      const b = collectionBuckets[cat];
-      if (b && (b.cash > 0 || b.upi > 0)) {
-        const totalCatAmt = b.cash + b.upi;
-        dynamicTx.push({
-          id: `col_cat_${cat.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-          date: rangeDateLabel,
-          particulars: cat,
-          type: 'Credit',
-          cashAmount: b.cash,
-          upiAmount: b.upi,
-          amount: totalCatAmt,
-          mode: (b.cash > 0 && b.upi > 0) ? 'Split' : (b.upi > 0 ? 'UPI' : 'Cash'),
-          remarks: `${b.count} Collection${b.count > 1 ? 's' : ''}`,
-          rawTimestamp: parseDateToTimestamp(endYmd) + 200
-        });
-      }
-    });
-
     // 2. Customer Disbursements (Debit Outflows)
     (allCust || []).forEach(cust => {
+      if (!cust) return;
       const cBranch = cust.branchId || cust.branch;
-      if (branchId !== 'all' && cBranch && cBranch !== branchId && cBranch !== branchName) {
+      if (!isMainBranch && cBranch && cBranch !== branchId && cBranch !== branchName) {
         return;
       }
 
       const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.date || cust.disbursementDate;
-      const disbYmd = formatDateToYmd(disbDate);
+      const disbTs = parseDateToTimestamp(disbDate);
       const custStatus = String(cust.status || '').toLowerCase();
       const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
       const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
 
-      if (isApprovedOrDisbursed && disbAmount > 0 && disbYmd) {
+      if (isApprovedOrDisbursed && disbAmount > 0 && disbTs) {
         const disbMode = String(cust.disbursementMode || cust.paymentMode || 'Cash').toUpperCase();
         const isBankDisb = disbMode.includes('BANK') || disbMode.includes('UPI') || disbMode.includes('ONLINE');
 
         const disbCash = isBankDisb ? 0 : disbAmount;
         const disbUpi = isBankDisb ? disbAmount : 0;
 
-        // Cumulative history up to Yesterday (< startYmd)
-        if (disbYmd < startYmd) {
+        // Cumulative history strictly prior to fromDate (< rangeStartTs)
+        if (disbTs < rangeStartTs) {
           histDebitCash += disbCash;
           histDebitBank += disbUpi;
         }
 
-        // Active range [startYmd, endYmd]
-        if (disbYmd >= startYmd && disbYmd <= endYmd) {
+        // Active range [rangeStartTs, rangeEndTs]
+        if (disbTs >= rangeStartTs && disbTs <= rangeEndTs) {
           liveDebitCash += disbCash;
           liveDebitBank += disbUpi;
 
@@ -738,7 +761,7 @@ export default function CashBook({
           const staffNote = cust.staffName || cust.agentName || 'Loan Payout';
 
           dynamicTx.push({
-            id: `disb_${cust.id}`,
+            id: `disb_${cust.id}_${disbTs}`,
             date: formatDateToDisplay(disbDate),
             particulars: `Disbursement - ${custName} (${scheme})`,
             type: 'Debit',
@@ -747,7 +770,7 @@ export default function CashBook({
             amount: disbAmount,
             mode: isBankDisb ? 'UPI' : 'Cash',
             remarks: loanId ? `Loan #${loanId} · ${staffNote}` : staffNote,
-            rawTimestamp: parseDateToTimestamp(disbDate)
+            rawTimestamp: disbTs
           });
         }
       }
@@ -756,8 +779,8 @@ export default function CashBook({
     // 3. Manual Particulars entries
     (manualParticulars || []).forEach((part) => {
       const pDate = part.date || part.createdAt;
-      const pYmd = formatDateToYmd(pDate);
-      if (!pYmd) return;
+      const pTs = parseDateToTimestamp(pDate);
+      if (!pTs) return;
 
       const amt = Number(part.amount || 0);
       if (amt <= 0) return;
@@ -765,8 +788,8 @@ export default function CashBook({
       const cAmt = Number(part.cashAmount || 0);
       const uAmt = Number(part.upiAmount || 0);
 
-      // Cumulative up to yesterday (< startYmd)
-      if (pYmd < startYmd) {
+      // Cumulative up to yesterday (< rangeStartTs)
+      if (pTs < rangeStartTs) {
         if (part.type === 'Debit') {
           histDebitCash += cAmt;
           histDebitBank += uAmt;
@@ -776,8 +799,8 @@ export default function CashBook({
         }
       }
 
-      // Active range [startYmd, endYmd]
-      if (pYmd >= startYmd && pYmd <= endYmd) {
+      // Active range [rangeStartTs, rangeEndTs]
+      if (pTs >= rangeStartTs && pTs <= rangeEndTs) {
         if (part.type === 'Debit') {
           liveDebitCash += cAmt;
           liveDebitBank += uAmt;
@@ -796,7 +819,7 @@ export default function CashBook({
           amount: amt,
           mode: part.mode || ((cAmt > 0 && uAmt > 0) ? 'Split' : (uAmt > 0 ? 'UPI' : 'Cash')),
           remarks: part.remarks || 'Manual Adjustment',
-          rawTimestamp: parseDateToTimestamp(pDate)
+          rawTimestamp: pTs
         });
       }
     });
@@ -804,8 +827,8 @@ export default function CashBook({
     // 4. Live Expenses
     (liveExpenses || []).forEach(exp => {
       const expDate = exp.date || exp.createdAt;
-      const expYmd = formatDateToYmd(expDate);
-      if (!expYmd) return;
+      const expTs = parseDateToTimestamp(expDate);
+      if (!expTs) return;
 
       const amt = Number(exp.amount || 0);
       if (amt <= 0) return;
@@ -814,14 +837,14 @@ export default function CashBook({
       const eCash = isCash ? amt : 0;
       const eOnline = isCash ? 0 : amt;
 
-      // Cumulative up to yesterday (< startYmd)
-      if (expYmd < startYmd) {
+      // Cumulative up to yesterday (< rangeStartTs)
+      if (expTs < rangeStartTs) {
         histExpCash += eCash;
         histExpOnline += eOnline;
       }
 
-      // Active range [startYmd, endYmd]
-      if (expYmd >= startYmd && expYmd <= endYmd) {
+      // Active range [rangeStartTs, rangeEndTs]
+      if (expTs >= rangeStartTs && expTs <= rangeEndTs) {
         liveExpCash += eCash;
         liveExpOnline += eOnline;
 
@@ -838,7 +861,7 @@ export default function CashBook({
           amount: amt,
           mode: isCash ? 'Cash' : 'UPI',
           remarks: remarkText,
-          rawTimestamp: parseDateToTimestamp(expDate)
+          rawTimestamp: expTs
         });
       }
     });
@@ -847,7 +870,7 @@ export default function CashBook({
     const totalPeriodExpenses = liveExpCash + liveExpOnline;
     if (totalPeriodExpenses > 0) {
       dynamicTx.push({
-        id: `exp_consolidated_${startYmd}_${endYmd}`,
+        id: `exp_consolidated_${rangeStartTs}_${rangeEndTs}`,
         date: rangeDateLabel,
         particulars: 'Official Expense',
         type: 'Expense',
@@ -855,16 +878,16 @@ export default function CashBook({
         upiAmount: liveExpOnline,
         amount: totalPeriodExpenses,
         mode: (liveExpCash > 0 && liveExpOnline > 0) ? 'Split' : (liveExpOnline > 0 ? 'UPI' : 'Cash'),
-        remarks: 'Branch Expenses Combined',
-        rawTimestamp: parseDateToTimestamp(endYmd)
+        remarks: `${dynamicExp.length} Branch Expense${dynamicExp.length > 1 ? 's' : ''} Combined`,
+        rawTimestamp: rangeEndTs
       });
     }
 
     // 5. Live Investments
     (investments || []).forEach(inv => {
       const invDate = inv.date || inv.createdAt;
-      const invYmd = formatDateToYmd(invDate);
-      if (!invYmd) return;
+      const invTs = parseDateToTimestamp(invDate);
+      if (!invTs) return;
 
       const amt = Number(inv.amount || 0);
       if (amt <= 0) return;
@@ -873,14 +896,14 @@ export default function CashBook({
       const iCash = isCash ? amt : 0;
       const iBank = isCash ? 0 : amt;
 
-      // Cumulative up to yesterday (< startYmd)
-      if (invYmd < startYmd) {
+      // Cumulative up to yesterday (< rangeStartTs)
+      if (invTs < rangeStartTs) {
         histInvCash += iCash;
         histInvBank += iBank;
       }
 
-      // Active range [startYmd, endYmd]
-      if (invYmd >= startYmd && invYmd <= endYmd) {
+      // Active range [rangeStartTs, rangeEndTs]
+      if (invTs >= rangeStartTs && invTs <= rangeEndTs) {
         liveInvCash += iCash;
         liveInvBank += iBank;
 
@@ -894,7 +917,7 @@ export default function CashBook({
           amount: amt,
           mode: isCash ? 'Cash' : 'UPI',
           remarks: inv.remarks || 'Capital Inflow',
-          rawTimestamp: parseDateToTimestamp(invDate)
+          rawTimestamp: invTs
         });
       }
     });
@@ -956,9 +979,9 @@ export default function CashBook({
     };
   }, [fromDate, toDate, branchId, branchName, customers, liveExpenses, investments, openingBalances, manualParticulars]);
 
-  // Sliced lists for desktop split containers (up to 10 rows for immediate visibility)
-  const displayedTransactions = allTransactionsList.slice(0, 10);
-  const displayedExpenses = allExpensesList.slice(0, 10);
+  // Sliced lists for desktop split containers (up to 20 rows for immediate visibility)
+  const displayedTransactions = allTransactionsList.slice(0, 20);
+  const displayedExpenses = allExpensesList.slice(0, 20);
   const totalExpensesCalculated = allExpensesList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   // Render Type Badge
@@ -1236,7 +1259,7 @@ export default function CashBook({
               <Coins className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <span className="text-[10px] font-bold text-sky-800/80 uppercase tracking-wider block">Total Balance</span>
+              <span className="text-[10px] font-bold text-sky-800/80 uppercase tracking-wider block">Today Opening Balance</span>
               <span className="text-xl sm:text-2xl font-black text-sky-950 tracking-tight">
                 {formatCurrency(yesterdayTotal)}
               </span>
@@ -1336,7 +1359,7 @@ export default function CashBook({
               <Coins className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <span className="text-[10px] font-bold text-purple-800/80 uppercase tracking-wider block">Total Balance</span>
+              <span className="text-[10px] font-bold text-purple-800/80 uppercase tracking-wider block">Today Closing Balance</span>
               <span className="text-xl sm:text-2xl font-black text-purple-950 tracking-tight">
                 {formatCurrency(todayNetClosingBalance)}
               </span>
