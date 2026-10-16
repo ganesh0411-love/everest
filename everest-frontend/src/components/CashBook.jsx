@@ -97,6 +97,15 @@ const isSameDay = (dateA, dateB) => {
   return formatDateToYmd(dateA) === formatDateToYmd(dateB);
 };
 
+const isDateInRange = (dateStr, fromYmd, toYmd) => {
+  if (!dateStr) return false;
+  const itemYmd = formatDateToYmd(dateStr);
+  if (!itemYmd) return false;
+  const start = fromYmd <= toYmd ? fromYmd : toYmd;
+  const end = fromYmd <= toYmd ? toYmd : fromYmd;
+  return itemYmd >= start && itemYmd <= end;
+};
+
 // Resolves formal category name from expense item
 const resolveExpenseCategory = (exp) => {
   const cat = String(exp?.category || '').trim();
@@ -180,8 +189,9 @@ export default function CashBook({
   const branchId = activeBranch?.id || 'main';
   const branchName = activeBranch?.name || 'Main Branch';
 
-  // Active Selected Date (default: Today or initial '03-05-2026' when inspecting reference demo)
-  const [selectedDate, setSelectedDate] = useState(() => getTodayYmd());
+  // Active Date Range Filter (default: Today)
+  const [fromDate, setFromDate] = useState(() => getTodayYmd());
+  const [toDate, setToDate] = useState(() => getTodayYmd());
 
   // 1. Investments State
   const investmentsKey = `everest_cashbook_investments_${branchId}`;
@@ -234,7 +244,7 @@ export default function CashBook({
 
   // Particulars Form
   const [particularsForm, setParticularsForm] = useState({
-    date: formatDateToDisplay(selectedDate),
+    date: formatDateToDisplay(toDate || fromDate),
     particularsCategory: 'Daily Collection',
     customParticulars: '',
     type: 'Credit',
@@ -247,24 +257,24 @@ export default function CashBook({
 
   // Investment Form
   const [investmentForm, setInvestmentForm] = useState({
-    date: formatDateToDisplay(selectedDate),
+    date: formatDateToDisplay(toDate || fromDate),
     particulars: '',
     amount: '',
     mode: 'Bank',
     remarks: ''
   });
 
-  // Keep forms date synced when selectedDate shifts
+  // Keep forms date synced when fromDate/toDate shifts
   useEffect(() => {
     setInvestmentForm(prev => ({
       ...prev,
-      date: formatDateToDisplay(selectedDate)
+      date: formatDateToDisplay(toDate || fromDate)
     }));
     setParticularsForm(prev => ({
       ...prev,
-      date: formatDateToDisplay(selectedDate)
+      date: formatDateToDisplay(toDate || fromDate)
     }));
-  }, [selectedDate]);
+  }, [fromDate, toDate]);
 
   // --- Real-time Listeners ---
   // A. Investments Listener
@@ -314,20 +324,23 @@ export default function CashBook({
     return () => unsub();
   }, [branchId, particularsKey]);
 
-  // Date Navigation Helpers
+  // Date Navigation Helpers (Shift both From & To dates)
   const handleShiftDate = (offsetDays) => {
-    const ymd = formatDateToYmd(selectedDate);
-    const d = new Date(ymd);
-    if (isNaN(d.getTime())) return;
-    d.setDate(d.getDate() + offsetDays);
-    const yr = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const dy = String(d.getDate()).padStart(2, '0');
-    setSelectedDate(`${yr}-${mo}-${dy}`);
+    const shiftYmd = (ymdStr) => {
+      const d = new Date(ymdStr);
+      if (isNaN(d.getTime())) return ymdStr;
+      d.setDate(d.getDate() + offsetDays);
+      const yr = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const dy = String(d.getDate()).padStart(2, '0');
+      return `${yr}-${mo}-${dy}`;
+    };
+    setFromDate(prev => shiftYmd(formatDateToYmd(prev)));
+    setToDate(prev => shiftYmd(formatDateToYmd(prev)));
   };
 
-  const isTodaySelected = isSameDay(selectedDate, getTodayYmd());
-  const isYesterdaySelected = isSameDay(selectedDate, getYesterdayYmd());
+  const isTodaySelected = isSameDay(fromDate, getTodayYmd()) && isSameDay(toDate, getTodayYmd());
+  const isYesterdaySelected = isSameDay(fromDate, getYesterdayYmd()) && isSameDay(toDate, getYesterdayYmd());
 
   // Handle Save Investment
   const handleSaveInvestment = (e) => {
@@ -344,7 +357,7 @@ export default function CashBook({
     const newInv = {
       id: 'inv_' + Date.now(),
       branchId,
-      date: formatDateToDisplay(investmentForm.date || selectedDate),
+      date: formatDateToDisplay(investmentForm.date || toDate || fromDate),
       particulars: investmentForm.particulars?.trim() || 'Investment Entry',
       amount: numAmt,
       mode: investmentForm.mode || 'Bank',
@@ -365,7 +378,7 @@ export default function CashBook({
 
     // 3. Reset form
     setInvestmentForm({
-      date: formatDateToDisplay(selectedDate),
+      date: formatDateToDisplay(toDate || fromDate),
       particulars: '',
       amount: '',
       mode: 'Bank',
@@ -419,7 +432,7 @@ export default function CashBook({
     const newPart = {
       id: 'part_' + Date.now(),
       branchId,
-      date: formatDateToDisplay(particularsForm.date || selectedDate),
+      date: formatDateToDisplay(particularsForm.date || toDate || fromDate),
       particulars: partName,
       type: particularsForm.type || 'Credit',
       cashAmount: cAmt,
@@ -443,7 +456,7 @@ export default function CashBook({
 
     // 3. Reset form state cleanly
     setParticularsForm({
-      date: formatDateToDisplay(selectedDate),
+      date: formatDateToDisplay(toDate || fromDate),
       particularsCategory: 'Daily Collection',
       customParticulars: '',
       type: 'Credit',
@@ -467,7 +480,7 @@ export default function CashBook({
     }
   };
 
-  // --- Dynamic Ledger Computation for Selected Date ---
+  // --- Dynamic Ledger Computation for Selected Date Range ---
   const {
     yesterdayTotal,
     yesterdayCash,
@@ -483,6 +496,12 @@ export default function CashBook({
     allTransactionsList,
     allExpensesList
   } = useMemo(() => {
+    const fromYmd = formatDateToYmd(fromDate);
+    const toYmd = formatDateToYmd(toDate);
+    const startYmd = fromYmd <= toYmd ? fromYmd : toYmd;
+    const endYmd = fromYmd <= toYmd ? toYmd : fromYmd;
+    const inRange = (dStr) => isDateInRange(dStr, startYmd, endYmd);
+
     // 1. Group Customer Collections by Loan Product Category
     const collectionCategories = [
       'Daily Collection',
@@ -527,7 +546,7 @@ export default function CashBook({
       const installments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
       installments.forEach((inst) => {
         const instDate = inst.date || inst.paymentDate || inst.createdAt;
-        if (!isSameDay(instDate, selectedDate)) return;
+        if (!inRange(instDate)) return;
 
         const status = String(inst.status || '').toUpperCase();
         if (status === 'BOUNCED' || status === 'CANCELLED') return;
@@ -560,6 +579,10 @@ export default function CashBook({
 
     const dynamicTx = [];
 
+    const rangeDateLabel = startYmd === endYmd
+      ? formatDateToDisplay(startYmd)
+      : `${formatDateToDisplay(startYmd)} - ${formatDateToDisplay(endYmd)}`;
+
     // Push consolidated single row per loan collection category that has collections
     collectionCategories.forEach((cat) => {
       const b = collectionBuckets[cat];
@@ -567,7 +590,7 @@ export default function CashBook({
       if (sum > 0) {
         dynamicTx.push({
           id: `cat_${cat.replace(/\s+/g, '_').toLowerCase()}`,
-          date: formatDateToDisplay(selectedDate),
+          date: rangeDateLabel,
           particulars: cat,
           type: 'Credit',
           cashAmount: b.cash,
@@ -579,10 +602,10 @@ export default function CashBook({
       }
     });
 
-    // 2. Manual Particulars entries on selectedDate
+    // 2. Manual Particulars entries in range
     (manualParticulars || []).forEach((part) => {
       const pDate = part.date || part.createdAt;
-      if (!isSameDay(pDate, selectedDate)) return;
+      if (!inRange(pDate)) return;
 
       const amt = Number(part.amount || 0);
       if (amt <= 0) return;
@@ -611,7 +634,7 @@ export default function CashBook({
       });
     });
 
-    // 3. Customer Disbursements (Debit) on selectedDate
+    // 3. Customer Disbursements (Debit) in range
     let liveDebitCash = 0;
     let liveDebitBank = 0;
     (customers || []).forEach(cust => {
@@ -620,7 +643,7 @@ export default function CashBook({
       const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
       const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
 
-      if (isApprovedOrDisbursed && disbAmount > 0 && isSameDay(disbDate, selectedDate)) {
+      if (isApprovedOrDisbursed && disbAmount > 0 && inRange(disbDate)) {
         const disbMode = String(cust.disbursementMode || cust.paymentMode || 'Cash').toUpperCase();
         const isBankDisb = disbMode.includes('BANK') || disbMode.includes('UPI') || disbMode.includes('ONLINE');
 
@@ -644,14 +667,14 @@ export default function CashBook({
       }
     });
 
-    // 4. Live Expenses on selectedDate
+    // 4. Live Expenses in range
     let liveExpCash = 0;
     let liveExpOnline = 0;
     const dynamicExp = [];
 
     (liveExpenses || []).forEach(exp => {
       const expDate = exp.date || exp.createdAt;
-      if (!isSameDay(expDate, selectedDate)) return;
+      if (!inRange(expDate)) return;
 
       const amt = Number(exp.amount || 0);
       if (amt <= 0) return;
@@ -679,28 +702,28 @@ export default function CashBook({
       });
     });
 
-    // Consolidate all day's expenses into strictly ONE unified row in Recent Transactions
+    // Consolidate all period expenses into strictly ONE unified row in Recent Transactions
     const totalDayExpenses = liveExpCash + liveExpOnline;
     if (totalDayExpenses > 0) {
       dynamicTx.push({
-        id: `exp_consolidated_${formatDateToYmd(selectedDate)}`,
-        date: formatDateToDisplay(selectedDate),
+        id: `exp_consolidated_${startYmd}_${endYmd}`,
+        date: rangeDateLabel,
         particulars: 'Official Expense',
         type: 'Expense',
         cashAmount: liveExpCash,
         upiAmount: liveExpOnline,
         amount: totalDayExpenses,
         mode: (liveExpCash > 0 && liveExpOnline > 0) ? 'Split' : (liveExpOnline > 0 ? 'UPI' : 'Cash'),
-        remarks: 'Branch Daily Expenses Combined'
+        remarks: 'Branch Expenses Combined'
       });
     }
 
-    // 5. Live Investments on selectedDate
+    // 5. Live Investments in range
     let liveInvCash = 0;
     let liveInvBank = 0;
     (investments || []).forEach(inv => {
       const invDate = inv.date || inv.createdAt;
-      if (!isSameDay(invDate, selectedDate)) return;
+      if (!inRange(invDate)) return;
 
       const amt = Number(inv.amount || 0);
       if (amt <= 0) return;
@@ -725,7 +748,7 @@ export default function CashBook({
       });
     });
 
-    // Determine if dynamic data exists for the selected date
+    // Determine if dynamic data exists for the selected date range
     const hasDynamicData = dynamicTx.length > 0 || dynamicExp.length > 0;
 
     let finalTxList = [];
@@ -749,8 +772,8 @@ export default function CashBook({
       tDeb = liveDebitCash + liveDebitBank;
       tExp = liveExpCash + liveExpOnline;
 
-      // Opening balance lookup
-      const openingDocId = `${branchId}_${formatDateToYmd(selectedDate)}`;
+      // Opening balance lookup (start date)
+      const openingDocId = `${branchId}_${startYmd}`;
       const dayOpening = openingBalances[openingDocId] || { cash: 100000, bank: 20000 };
       yCash = Number(dayOpening.cash ?? 100000);
       yBank = Number(dayOpening.bank ?? 20000);
@@ -795,7 +818,7 @@ export default function CashBook({
       allTransactionsList: finalTxList,
       allExpensesList: finalExpList
     };
-  }, [selectedDate, branchId, branchName, customers, liveExpenses, investments, openingBalances, manualParticulars]);
+  }, [fromDate, toDate, branchId, branchName, customers, liveExpenses, investments, openingBalances, manualParticulars]);
 
   // Sliced lists for desktop split containers
   const displayedTransactions = allTransactionsList.slice(0, 6);
@@ -843,7 +866,10 @@ export default function CashBook({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Everest_CashBook_${formatDateToDisplay(selectedDate)}.csv`);
+    const dateLabel = formatDateToDisplay(fromDate) === formatDateToDisplay(toDate)
+      ? formatDateToDisplay(fromDate)
+      : `${formatDateToDisplay(fromDate)}_to_${formatDateToDisplay(toDate)}`;
+    link.setAttribute('download', `Everest_CashBook_${dateLabel}.csv`);
     document.body.appendChild(link);
     link.click();
   };
@@ -879,7 +905,12 @@ export default function CashBook({
         <div className="flex items-center gap-3 self-end sm:self-auto">
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700">
             <Calendar className="w-3.5 h-3.5 text-blue-600" />
-            <span>{formatDateToDisplay(selectedDate)} <span className="text-slate-400 font-normal">(Generated)</span></span>
+            <span>
+              {formatDateToDisplay(fromDate) === formatDateToDisplay(toDate)
+                ? formatDateToDisplay(fromDate)
+                : `${formatDateToDisplay(fromDate)} → ${formatDateToDisplay(toDate)}`}{' '}
+              <span className="text-slate-400 font-normal">(Generated)</span>
+            </span>
           </div>
 
           <button
@@ -896,9 +927,9 @@ export default function CashBook({
 
       {/* ================= 2. CONTROLS & FILTER BAR ================= */}
       <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Date Stepper & Presets */}
+        {/* Left: Dual Date Range Stepper & Presets */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               type="button"
               onClick={() => handleShiftDate(-1)}
@@ -908,16 +939,43 @@ export default function CashBook({
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            {/* Date Picker Button with hidden native date input */}
-            <label className="relative flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-xs font-extrabold text-slate-800 cursor-pointer transition">
+            {/* From Date Picker */}
+            <label className="relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-xs font-extrabold text-slate-800 cursor-pointer transition shadow-2xs">
               <Calendar className="w-3.5 h-3.5 text-blue-600" />
-              <span>{formatDateToDisplay(selectedDate)}</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">FROM:</span>
+              <span>{formatDateToDisplay(fromDate)}</span>
               <span className="text-[10px] text-slate-400">▾</span>
               <input
                 type="date"
-                value={formatDateToYmd(selectedDate)}
+                value={formatDateToYmd(fromDate)}
                 onChange={(e) => {
-                  if (e.target.value) setSelectedDate(e.target.value);
+                  if (e.target.value) {
+                    const newFrom = e.target.value;
+                    setFromDate(newFrom);
+                    if (newFrom > toDate) setToDate(newFrom);
+                  }
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+            </label>
+
+            <span className="text-slate-400 font-bold text-xs select-none px-0.5">→</span>
+
+            {/* To Date Picker */}
+            <label className="relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-xs font-extrabold text-slate-800 cursor-pointer transition shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <span className="text-[10px] uppercase font-bold text-slate-400">TO:</span>
+              <span>{formatDateToDisplay(toDate)}</span>
+              <span className="text-[10px] text-slate-400">▾</span>
+              <input
+                type="date"
+                value={formatDateToYmd(toDate)}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    const newTo = e.target.value;
+                    setToDate(newTo);
+                    if (newTo < fromDate) setFromDate(newTo);
+                  }
                 }}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
               />
@@ -937,7 +995,11 @@ export default function CashBook({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setSelectedDate(getYesterdayYmd())}
+              onClick={() => {
+                const yest = getYesterdayYmd();
+                setFromDate(yest);
+                setToDate(yest);
+              }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 isYesterdaySelected
                   ? 'bg-blue-600 text-white font-extrabold shadow-2xs'
@@ -948,7 +1010,11 @@ export default function CashBook({
             </button>
             <button
               type="button"
-              onClick={() => setSelectedDate(getTodayYmd())}
+              onClick={() => {
+                const today = getTodayYmd();
+                setFromDate(today);
+                setToDate(today);
+              }}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 isTodaySelected
                   ? 'bg-blue-600 text-white font-extrabold shadow-2xs'
