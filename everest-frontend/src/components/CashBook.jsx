@@ -193,6 +193,19 @@ export default function CashBook({
   const [fromDate, setFromDate] = useState(() => getTodayYmd());
   const [toDate, setToDate] = useState(() => getTodayYmd());
 
+  // Input refs for programmatic showPicker() trigger
+  const fromDateInputRef = useRef(null);
+  const toDateInputRef = useRef(null);
+
+  // Dynamic Yesterday calendar date for header based on active fromDate
+  const yesterdayHeaderDate = useMemo(() => {
+    const fromYmd = formatDateToYmd(fromDate);
+    const d = new Date(fromYmd);
+    if (isNaN(d.getTime())) return formatDateToDisplay(getYesterdayYmd());
+    d.setDate(d.getDate() - 1);
+    return formatDateToDisplay(d);
+  }, [fromDate]);
+
   // 1. Investments State
   const investmentsKey = `everest_cashbook_investments_${branchId}`;
   const [investments, setInvestments] = useState(() => {
@@ -940,12 +953,28 @@ export default function CashBook({
             </button>
 
             {/* From Date Picker */}
-            <label className="relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-xs font-extrabold text-slate-800 cursor-pointer transition shadow-2xs">
-              <Calendar className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-[10px] uppercase font-bold text-slate-400">FROM:</span>
-              <span>{formatDateToDisplay(fromDate)}</span>
-              <span className="text-[10px] text-slate-400">▾</span>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  if (typeof fromDateInputRef.current?.showPicker === 'function') {
+                    fromDateInputRef.current.showPicker();
+                  } else {
+                    fromDateInputRef.current?.focus();
+                  }
+                } catch (err) {
+                  fromDateInputRef.current?.focus();
+                }
+              }}
+              title="Select From Date"
+              className="relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-xs font-extrabold text-slate-800 cursor-pointer transition shadow-2xs select-none active:scale-[0.98]"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0 pointer-events-none" />
+              <span className="text-[10px] uppercase font-bold text-slate-400 pointer-events-none">FROM:</span>
+              <span className="pointer-events-none">{formatDateToDisplay(fromDate)}</span>
+              <span className="text-[10px] text-slate-400 pointer-events-none">▾</span>
               <input
+                ref={fromDateInputRef}
                 type="date"
                 value={formatDateToYmd(fromDate)}
                 onChange={(e) => {
@@ -955,19 +984,37 @@ export default function CashBook({
                     if (newFrom > toDate) setToDate(newFrom);
                   }
                 }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                tabIndex={-1}
+                aria-hidden="true"
+                className="absolute inset-0 opacity-0 pointer-events-none w-full h-full"
               />
-            </label>
+            </button>
 
             <span className="text-slate-400 font-bold text-xs select-none px-0.5">→</span>
 
             {/* To Date Picker */}
-            <label className="relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-xs font-extrabold text-slate-800 cursor-pointer transition shadow-2xs">
-              <Calendar className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-[10px] uppercase font-bold text-slate-400">TO:</span>
-              <span>{formatDateToDisplay(toDate)}</span>
-              <span className="text-[10px] text-slate-400">▾</span>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  if (typeof toDateInputRef.current?.showPicker === 'function') {
+                    toDateInputRef.current.showPicker();
+                  } else {
+                    toDateInputRef.current?.focus();
+                  }
+                } catch (err) {
+                  toDateInputRef.current?.focus();
+                }
+              }}
+              title="Select To Date"
+              className="relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-xs font-extrabold text-slate-800 cursor-pointer transition shadow-2xs select-none active:scale-[0.98]"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0 pointer-events-none" />
+              <span className="text-[10px] uppercase font-bold text-slate-400 pointer-events-none">TO:</span>
+              <span className="pointer-events-none">{formatDateToDisplay(toDate)}</span>
+              <span className="text-[10px] text-slate-400 pointer-events-none">▾</span>
               <input
+                ref={toDateInputRef}
                 type="date"
                 value={formatDateToYmd(toDate)}
                 onChange={(e) => {
@@ -977,9 +1024,11 @@ export default function CashBook({
                     if (newTo < fromDate) setFromDate(newTo);
                   }
                 }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                tabIndex={-1}
+                aria-hidden="true"
+                className="absolute inset-0 opacity-0 pointer-events-none w-full h-full"
               />
-            </label>
+            </button>
 
             <button
               type="button"
@@ -1056,7 +1105,7 @@ export default function CashBook({
             <div className="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
               <Calendar className="w-3.5 h-3.5" />
             </div>
-            <span>Yesterday Till</span>
+            <span>Yesterday Till ({yesterdayHeaderDate})</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1072,23 +1121,23 @@ export default function CashBook({
           </div>
 
           <div className="grid grid-cols-2 gap-2 border-t border-sky-200/60 pt-3">
-            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-2 border border-sky-100/90 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2 bg-transparent p-1">
+              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                 <Banknote className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Hand</span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-900 block truncate">{formatCurrency(yesterdayCash)}</span>
+                <span className="text-[10px] font-bold text-sky-900/70 block truncate">Cash in Hand</span>
+                <span className="text-xs sm:text-sm font-black text-sky-950 block truncate">{formatCurrency(yesterdayCash)}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-2 border border-sky-100/90 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2 bg-transparent p-1">
+              <div className="w-7 h-7 rounded-lg bg-sky-200/80 text-sky-800 flex items-center justify-center shrink-0">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Online</span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-900 block truncate">{formatCurrency(yesterdayBank)}</span>
+                <span className="text-[10px] font-bold text-sky-900/70 block truncate">Cash in Online</span>
+                <span className="text-xs sm:text-sm font-black text-sky-950 block truncate">{formatCurrency(yesterdayBank)}</span>
               </div>
             </div>
           </div>
@@ -1172,23 +1221,23 @@ export default function CashBook({
           </div>
 
           <div className="grid grid-cols-2 gap-2 border-t border-purple-200/60 pt-3">
-            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-2 border border-purple-100/90 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2 bg-transparent p-1">
+              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                 <Banknote className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Hand</span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-900 block truncate">{formatCurrency(todayCashInHand)}</span>
+                <span className="text-[10px] font-bold text-purple-900/70 block truncate">Cash in Hand</span>
+                <span className="text-xs sm:text-sm font-black text-purple-950 block truncate">{formatCurrency(todayCashInHand)}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-2 border border-purple-100/90 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2 bg-transparent p-1">
+              <div className="w-7 h-7 rounded-lg bg-purple-200/80 text-purple-800 flex items-center justify-center shrink-0">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Online</span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-900 block truncate">{formatCurrency(todayCashOnline)}</span>
+                <span className="text-[10px] font-bold text-purple-900/70 block truncate">Cash in Online</span>
+                <span className="text-xs sm:text-sm font-black text-purple-950 block truncate">{formatCurrency(todayCashOnline)}</span>
               </div>
             </div>
           </div>
