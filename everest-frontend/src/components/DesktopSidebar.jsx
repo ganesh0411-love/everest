@@ -11,7 +11,6 @@ import {
   Settings,
   ShieldCheck,
   Trash2,
-  Receipt,
   BookOpen,
   TrendingUp
 } from 'lucide-react';
@@ -37,7 +36,6 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     { name: 'Center Management', view: 'Centers', icon: Building2 },
     { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: UserPlus },
     { name: 'Expansion', view: 'Expansion', icon: TrendingUp },
-    { name: 'Expenses', view: 'Expenses', icon: Receipt },
     { name: 'Cash Book', view: 'Cash Book', icon: BookOpen },
     { name: 'Staff Management', view: 'Staff Management', icon: UserCheck },
     { name: 'Application Status', view: 'Application Status', icon: ClipboardList },
@@ -53,7 +51,6 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
     if (item.name === 'Expansion') return isAdmin || permissions.expansion === true || true;
-    if (item.name === 'Expenses') return isAdmin || permissions.expenses === true;
     if (item.name === 'Cash Book') return isAdmin || permissions.cashBook === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 

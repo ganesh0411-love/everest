@@ -16,7 +16,6 @@ import {
 } from './components/Placeholders';
 import AddBulkCustomer from './components/AddBulkCustomer';
 import ExpansionView from './components/ExpansionView';
-import Expenses from './components/Expenses';
 import CashBook from './components/CashBook';
 import CenterManagement from './components/CenterManagement';
 import Settings from './components/Settings';
@@ -575,6 +574,9 @@ function App() {
   useEffect(() => {
     if (currentView !== 'Home') {
       setIsCollectionReportOpen(false);
+    }
+    if (currentView === 'Expenses') {
+      setCurrentView('Expansion');
     }
   }, [currentView]);
 
@@ -1355,7 +1357,6 @@ function App() {
             />
           </div>
         );
-      case 'Expenses': return <div className="flex-1 overflow-y-auto"><Expenses activeBranch={activeBranch} userProfile={userProfile} branches={branches} onBack={() => navigateToView('Home')} /></div>;
       case 'Cash Book': return <div className="flex-1 overflow-y-auto"><CashBook activeBranch={activeBranch} userProfile={userProfile} branches={branches} customers={customers} onBack={() => navigateToView('Home')} /></div>;
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} branches={branches} /></div>;
       case 'Settings': return <Settings branches={branches} userProfile={userProfile} activeBranch={activeBranch} />;

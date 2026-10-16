@@ -22,6 +22,7 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
     collectionReportRole: 'Staff', // 'Staff' or 'Admin'
     attendance: false,
     attendanceRole: 'Staff', // 'Staff' or 'Admin'
+    expansion: false,
     expenses: false,
     cashBook: false,
     recycleBin: false,
@@ -332,16 +333,19 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
               </div>
             </div>
 
-            {/* Expenses */}
-            <div className={`flex items-center p-3 border rounded-xl transition-colors ${permissions.expenses ? 'border-purple-200 bg-purple-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+            {/* Expansion */}
+            <div className={`flex items-center p-3 border rounded-xl transition-colors ${permissions.expansion || permissions.expenses ? 'border-purple-200 bg-purple-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
               <label className="flex items-center cursor-pointer flex-1">
                 <input 
                   type="checkbox"
                   className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
-                  checked={permissions.expenses}
-                  onChange={() => handleToggle('expenses')}
+                  checked={Boolean(permissions.expansion || permissions.expenses)}
+                  onChange={() => {
+                    const nextVal = !(permissions.expansion || permissions.expenses);
+                    setPermissions(prev => ({ ...prev, expansion: nextVal, expenses: nextVal }));
+                  }}
                 />
-                <span className="text-sm font-bold text-slate-700">Expenses</span>
+                <span className="text-sm font-bold text-slate-700">Expansion</span>
               </label>
             </div>
 
