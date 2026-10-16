@@ -140,7 +140,11 @@ const parseDateToTimestamp = (dateInput) => {
 };
 
 const formatCurrency = (amt) => {
-  return '₹ ' + Number(amt || 0).toLocaleString('en-IN');
+  const val = Number(amt || 0);
+  if (val < 0) {
+    return '-₹ ' + Math.abs(val).toLocaleString('en-IN');
+  }
+  return '₹ ' + val.toLocaleString('en-IN');
 };
 
 const isSameDay = (dateA, dateB) => {
@@ -209,25 +213,6 @@ const resolveExpenseRemarks = (exp) => {
   }
   return notes.length > 0 ? notes.join(' - ') : '-';
 };
-
-// Reference Sample Data matching UX Specification 1:1 with 5 core loan collection categories
-const REFERENCE_SAMPLE_TRANSACTIONS = [
-  { id: 'ref_tx_1', date: '03-05-2026', particulars: 'Daily Collection', type: 'Credit', cashAmount: 38000, upiAmount: 12000, amount: 50000, mode: 'Split', remarks: 'Field EMI Collections' },
-  { id: 'ref_tx_2', date: '03-05-2026', particulars: 'Weekly Collection', type: 'Credit', cashAmount: 25000, upiAmount: 10000, amount: 35000, mode: 'Split', remarks: 'Microfinance SHG Groups' },
-  { id: 'ref_tx_3', date: '03-05-2026', particulars: 'Monthly Collection', type: 'Credit', cashAmount: 15000, upiAmount: 0, amount: 15000, mode: 'Cash', remarks: 'Monthly EMI Counter' },
-  { id: 'ref_tx_4', date: '03-05-2026', particulars: 'Agri Loan Collection', type: 'Credit', cashAmount: 0, upiAmount: 10000, amount: 10000, mode: 'UPI', remarks: 'Farmer Crop EMI' },
-  { id: 'ref_tx_5', date: '03-05-2026', particulars: 'Personal Loan Collection', type: 'Credit', cashAmount: 10000, upiAmount: 0, amount: 10000, mode: 'Cash', remarks: 'Salaried Individual EMI' },
-  { id: 'ref_tx_6', date: '03-05-2026', particulars: 'Official Expense', type: 'Expense', cashAmount: 200, upiAmount: 350, amount: 550, mode: 'Split', remarks: 'Branch Daily Expenses Combined' },
-  { id: 'ref_tx_7', date: '03-05-2026', particulars: 'Investment Entry', type: 'Investment', cashAmount: 0, upiAmount: 0, amount: 0, mode: 'UPI', remarks: 'Capital addition' },
-  { id: 'ref_tx_8', date: '03-05-2026', particulars: 'Bank Debit', type: 'Debit', cashAmount: 0, upiAmount: 18000, amount: 18000, mode: 'UPI', remarks: 'Disbursement transfer' },
-];
-
-const REFERENCE_SAMPLE_EXPENSES = [
-  { id: 'ref_exp_1', date: '03-05-2026', category: 'Fuel/Travel', details: 'Fuel/Travel', cashAmount: 200, upiAmount: 0, amount: 200, mode: 'Cash', remarks: 'To visit Customer (up down 35Km)' },
-  { id: 'ref_exp_2', date: '03-05-2026', category: 'Tea & Snacks', details: 'Tea & Snacks', cashAmount: 0, upiAmount: 350, amount: 350, mode: 'UPI', remarks: 'For Office Staff' },
-  { id: 'ref_exp_3', date: '02-05-2026', category: 'Office Rent', details: 'Office Rent', cashAmount: 0, upiAmount: 1000, amount: 1000, mode: 'UPI', remarks: 'Monthly office lease' },
-  { id: 'ref_exp_4', date: '01-05-2026', category: 'Stationery', details: 'Stationery', cashAmount: 200, upiAmount: 0, amount: 200, mode: 'Cash', remarks: 'Ledger paper & pens' },
-];
 
 export default function CashBook({ 
   activeBranch = { id: 'main', name: 'Main Branch' }, 
@@ -612,6 +597,14 @@ export default function CashBook({
       : `${formatDateToDisplay(startYmd)} - ${formatDateToDisplay(endYmd)}`;
 
     // 1. Process Customer Collections (Credit Inflows)
+    const collectionBuckets = {
+      'Daily Collection': { cash: 0, upi: 0, count: 0 },
+      'Weekly Collection': { cash: 0, upi: 0, count: 0 },
+      'Monthly Collection': { cash: 0, upi: 0, count: 0 },
+      'Agri Loan Collection': { cash: 0, upi: 0, count: 0 },
+      'Personal Loan Collection': { cash: 0, upi: 0, count: 0 }
+    };
+
     (allCust || []).forEach(cust => {
       const cBranch = cust.branchId || cust.branch;
       if (branchId !== 'all' && cBranch && cBranch !== branchId && cBranch !== branchName) {
@@ -633,12 +626,8 @@ export default function CashBook({
         catName = 'Daily Collection';
       }
 
-      const custName = cust.name || cust.customerName || 'Customer';
-      const centerOrPhone = cust.centerName || cust.center || cust.groupName || cust.phone || '';
-      const remarksInfo = centerOrPhone ? `${custName} (${centerOrPhone})` : custName;
-
       const installments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-      installments.forEach((inst, idx) => {
+      installments.forEach((inst) => {
         const instDate = inst.date || inst.paymentDate || inst.createdAt;
         const instYmd = formatDateToYmd(instDate);
         if (!instYmd) return;
@@ -674,23 +663,42 @@ export default function CashBook({
           liveCreditCash += cashAmt;
           liveCreditUpi += upiAmt;
 
-          const timeStr = inst.timeStr || inst.time || '';
-          const displayDate = timeStr ? `${formatDateToDisplay(instDate)} ${timeStr}` : formatDateToDisplay(instDate);
-
-          dynamicTx.push({
-            id: `col_${cust.id}_${inst.id || idx}_${instYmd}`,
-            date: displayDate,
-            particulars: catName,
-            type: 'Credit',
-            cashAmount: cashAmt,
-            upiAmount: upiAmt,
-            amount: totalAmt,
-            mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
-            remarks: remarksInfo,
-            rawTimestamp: parseDateToTimestamp(instDate)
-          });
+          if (!collectionBuckets[catName]) {
+            collectionBuckets[catName] = { cash: 0, upi: 0, count: 0 };
+          }
+          collectionBuckets[catName].cash += cashAmt;
+          collectionBuckets[catName].upi += upiAmt;
+          collectionBuckets[catName].count += 1;
         }
       });
+    });
+
+    // Push aggregated collection category batches into dynamicTx
+    const standardCategories = [
+      'Daily Collection',
+      'Weekly Collection',
+      'Monthly Collection',
+      'Agri Loan Collection',
+      'Personal Loan Collection'
+    ];
+    const presentCategories = Array.from(new Set([...standardCategories, ...Object.keys(collectionBuckets)]));
+    presentCategories.forEach((cat) => {
+      const b = collectionBuckets[cat];
+      if (b && (b.cash > 0 || b.upi > 0)) {
+        const totalCatAmt = b.cash + b.upi;
+        dynamicTx.push({
+          id: `col_cat_${cat.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+          date: rangeDateLabel,
+          particulars: cat,
+          type: 'Credit',
+          cashAmount: b.cash,
+          upiAmount: b.upi,
+          amount: totalCatAmt,
+          mode: (b.cash > 0 && b.upi > 0) ? 'Split' : (b.upi > 0 ? 'UPI' : 'Cash'),
+          remarks: `${b.count} Collection${b.count > 1 ? 's' : ''}`,
+          rawTimestamp: parseDateToTimestamp(endYmd) + 200
+        });
+      }
     });
 
     // 2. Customer Disbursements (Debit Outflows)
@@ -897,13 +905,13 @@ export default function CashBook({
 
     // Cumulative Opening Balances as of the day before fromDate
     const openingDocId = `${branchId}_${startYmd}`;
-    const dayOpening = openingBalances[openingDocId] || { cash: 100000, bank: 0 };
-    const baseOpeningCash = Number(dayOpening.cash ?? 100000);
+    const dayOpening = openingBalances[openingDocId] || openingBalances[branchId] || openingBalances['initial'] || { cash: 0, bank: 0 };
+    const baseOpeningCash = Number(dayOpening.cash ?? 0);
     const baseOpeningBank = Number(dayOpening.bank ?? 0);
 
     // Formula:
-    // Cash in Hand (₹): Cash Collections + Cash Investments - Cash Disbursements - Cash Expenses up to yesterday
-    // Cash in Online (₹): UPI Collections + UPI Investments - UPI Disbursements - UPI Expenses up to yesterday
+    // Cash in Hand (₹): Base Opening Cash + Cash Collections + Cash Investments - Cash Disbursements - Cash Expenses up to yesterday
+    // Cash in Online (₹): Base Opening Online + UPI Collections + UPI Investments - UPI Disbursements - UPI Expenses up to yesterday
     const calcYesterdayCash = baseOpeningCash + histCreditCash + histInvCash - histDebitCash - histExpCash;
     const calcYesterdayBank = baseOpeningBank + histCreditUpi + histInvBank - histDebitBank - histExpOnline;
 
@@ -911,34 +919,11 @@ export default function CashBook({
     const yBank = Math.max(0, calcYesterdayBank);
     const yTotal = yCash + yBank;
 
-    // Determine if dynamic data exists for the selected date range
-    const hasDynamicData = dynamicTx.length > 0 || dynamicExp.length > 0;
-
-    let finalTxList = [];
-    let finalExpList = [];
-    let tInv = 0;
-    let tCred = 0;
-    let tDeb = 0;
-    let tExp = 0;
-
-    if (hasDynamicData) {
-      finalTxList = dynamicTx;
-      finalExpList = dynamicExp;
-
-      // Real calculated values for active range
-      tInv = liveInvCash + liveInvBank;
-      tCred = liveCreditCash + liveCreditUpi;
-      tDeb = liveDebitCash + liveDebitBank;
-      tExp = liveExpCash + liveExpOnline;
-    } else {
-      // Fallback to Reference Spec matching Image 1 1:1
-      finalTxList = REFERENCE_SAMPLE_TRANSACTIONS;
-      finalExpList = REFERENCE_SAMPLE_EXPENSES;
-      tInv = 0;
-      tCred = 120000;
-      tDeb = 18000;
-      tExp = 550;
-    }
+    // Real calculated values for active range (strict real data only, zero mock fallbacks)
+    const tInv = liveInvCash + liveInvBank;
+    const tCred = liveCreditCash + liveCreditUpi;
+    const tDeb = liveDebitCash + liveDebitBank;
+    const tExp = liveExpCash + liveExpOnline;
 
     // Formulas:
     // Today's Balance = Total Credit + Investment - Total Debit - Total Expense
@@ -947,9 +932,12 @@ export default function CashBook({
     // Today's Cash Account / Net Balance = Yesterday Balance + Today's Balance
     const netClosing = yTotal + tBal;
 
-    // Split estimation
-    const cashShare = yCash + (hasDynamicData ? (liveCreditCash + liveInvCash - liveDebitCash - liveExpCash) : (88000 - 200));
-    const onlineShare = yBank + (hasDynamicData ? (liveCreditUpi + liveInvBank - liveDebitBank - liveExpOnline) : (32000 - 18000 - 350));
+    // Split for Today's Cash Account:
+    // Cash in Hand = Yesterday Cash in Hand + Today Cash Inflows - Today Cash Outflows
+    // Cash in Online = Yesterday Cash in Online + Today UPI Inflows - Today UPI Outflows
+    // Total Balance = Cash in Hand + Cash in Online (strictly equals Net Balance)
+    const todayCashInHand = yCash + liveCreditCash + liveInvCash - liveDebitCash - liveExpCash;
+    const todayCashOnline = yBank + liveCreditUpi + liveInvBank - liveDebitBank - liveExpOnline;
 
     return {
       yesterdayTotal: yTotal,
@@ -961,16 +949,16 @@ export default function CashBook({
       todayExpense: tExp,
       todayBalance: tBal,
       todayNetClosingBalance: netClosing,
-      todayCashInHand: Math.max(0, cashShare),
-      todayCashOnline: Math.max(0, onlineShare),
-      allTransactionsList: finalTxList,
-      allExpensesList: finalExpList
+      todayCashInHand,
+      todayCashOnline,
+      allTransactionsList: dynamicTx,
+      allExpensesList: dynamicExp
     };
   }, [fromDate, toDate, branchId, branchName, customers, liveExpenses, investments, openingBalances, manualParticulars]);
 
-  // Sliced lists for desktop split containers
-  const displayedTransactions = allTransactionsList.slice(0, 6);
-  const displayedExpenses = allExpensesList.slice(0, 4);
+  // Sliced lists for desktop split containers (up to 10 rows for immediate visibility)
+  const displayedTransactions = allTransactionsList.slice(0, 10);
+  const displayedExpenses = allExpensesList.slice(0, 10);
   const totalExpensesCalculated = allExpensesList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   // Render Type Badge
