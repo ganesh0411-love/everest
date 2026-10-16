@@ -514,11 +514,11 @@ export default function CashBook({
       case 'Credit':
         return <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">Credit</span>;
       case 'Expense':
-        return <span className="bg-rose-100 text-rose-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">Expense</span>;
+        return <span className="bg-amber-100 text-amber-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">Expense</span>;
       case 'Investment':
         return <span className="bg-purple-100 text-purple-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">Investment</span>;
       case 'Debit':
-        return <span className="bg-amber-100 text-amber-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">Debit</span>;
+        return <span className="bg-rose-100 text-rose-800 font-bold px-2.5 py-0.5 rounded-full text-[10px]">Debit</span>;
       default:
         return <span className="bg-slate-100 text-slate-700 font-bold px-2.5 py-0.5 rounded-full text-[10px]">{type || '-'}</span>;
     }
@@ -565,7 +565,7 @@ export default function CashBook({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f0f4f9] text-slate-800 p-4 sm:p-6 lg:p-7 space-y-4 overflow-x-hidden">
+    <div className="w-full min-h-screen bg-[#f1f5f9] text-slate-800 p-4 sm:p-6 lg:p-7 space-y-4 overflow-x-hidden">
       {/* ================= 1. HEADER ROW ================= */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div className="flex items-center gap-3">
@@ -700,141 +700,145 @@ export default function CashBook({
 
       {/* ================= 3. TOP METRIC CARDS (3-COLUMN GRID) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-        {/* Card 1: Yesterday Till */}
-        <div className="bg-white rounded-2xl p-4 border border-blue-100 shadow-2xs flex flex-col justify-between space-y-3">
-          <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700">
-            <Calendar className="w-4 h-4 text-blue-600" />
+        {/* Card 1: Yesterday Till (Soft Sky Blue Theme) */}
+        <div className="bg-sky-50/70 rounded-2xl p-3.5 border border-sky-200/80 shadow-sm flex flex-col justify-between space-y-3">
+          <div className="flex items-center gap-2 text-xs font-black text-sky-950">
+            <div className="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+              <Calendar className="w-3.5 h-3.5" />
+            </div>
             <span>Yesterday Till</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-sky-100/90 text-sky-700 flex items-center justify-center shrink-0">
               <Coins className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Total Balance</span>
-              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              <span className="text-[10px] font-bold text-sky-800/80 uppercase tracking-wider block">Total Balance</span>
+              <span className="text-xl sm:text-2xl font-black text-sky-950 tracking-tight">
                 {formatCurrency(yesterdayTotal)}
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
-            <div className="flex items-center gap-2 bg-slate-50/70 rounded-xl p-2 border border-slate-100">
+          <div className="grid grid-cols-2 gap-2 border-t border-sky-200/60 pt-3">
+            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-2 border border-sky-100/90 shadow-2xs">
               <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <Banknote className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 block truncate">Cash in Hand</span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-800 block truncate">{formatCurrency(yesterdayCash)}</span>
+                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Hand</span>
+                <span className="text-xs sm:text-sm font-extrabold text-slate-900 block truncate">{formatCurrency(yesterdayCash)}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-50/70 rounded-xl p-2 border border-slate-100">
+            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-2 border border-sky-100/90 shadow-2xs">
               <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 block truncate">Cash in Online</span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-800 block truncate">{formatCurrency(yesterdayBank)}</span>
+                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Online</span>
+                <span className="text-xs sm:text-sm font-extrabold text-slate-900 block truncate">{formatCurrency(yesterdayBank)}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Card 2: Today's Summary (Center Highlight with Green Accent) */}
-        <div className="bg-white rounded-2xl p-4 border-2 border-emerald-400/80 shadow-2xs flex flex-col justify-between space-y-3 relative">
-          <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-            <div className="w-5 h-5 rounded-md bg-emerald-500 text-white flex items-center justify-center">
+        {/* Card 2: Today's Summary (Soft Mint Emerald Hero Theme) */}
+        <div className="bg-emerald-50/60 rounded-2xl p-3.5 border-2 border-emerald-300 shadow-sm flex flex-col justify-between space-y-3 relative">
+          <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
+            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
               <TrendingUp className="w-3.5 h-3.5 stroke-[2.5]" />
             </div>
             <span>Today's Summary</span>
           </div>
 
-          {/* 4 Mini metric pills */}
+          {/* 4 Distinct Pastel Mini-Pills */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-2 text-center flex flex-col items-center justify-center">
-              <div className="w-6 h-6 rounded-lg bg-emerald-100/80 text-emerald-600 flex items-center justify-center mb-1">
+            <div className="bg-emerald-100/80 border border-emerald-200 rounded-xl p-2 text-center flex flex-col items-center justify-center">
+              <div className="w-6 h-6 rounded-lg bg-emerald-200/80 text-emerald-800 flex items-center justify-center mb-1">
                 <Landmark className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[10px] font-bold text-slate-500 block">Investment</span>
-              <span className="text-xs sm:text-sm font-black text-slate-900">{formatCurrency(todayInvestment)}</span>
+              <span className="text-[10px] font-bold text-emerald-800/80 block">Investment</span>
+              <span className="text-xs sm:text-sm font-black text-emerald-950">{formatCurrency(todayInvestment)}</span>
             </div>
 
-            <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2 text-center flex flex-col items-center justify-center">
-              <div className="w-6 h-6 rounded-lg bg-blue-100/80 text-blue-600 flex items-center justify-center mb-1">
+            <div className="bg-blue-100/80 border border-blue-200 rounded-xl p-2 text-center flex flex-col items-center justify-center">
+              <div className="w-6 h-6 rounded-lg bg-blue-200/80 text-blue-800 flex items-center justify-center mb-1">
                 <ArrowDownLeft className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[10px] font-bold text-slate-500 block">Total Credit</span>
-              <span className="text-xs sm:text-sm font-black text-slate-900">{formatCurrency(todayCredit)}</span>
+              <span className="text-[10px] font-bold text-blue-800/80 block">Total Credit</span>
+              <span className="text-xs sm:text-sm font-black text-blue-950">{formatCurrency(todayCredit)}</span>
             </div>
 
-            <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-2 text-center flex flex-col items-center justify-center">
-              <div className="w-6 h-6 rounded-lg bg-rose-100/80 text-rose-600 flex items-center justify-center mb-1">
+            <div className="bg-rose-100/80 border border-rose-200 rounded-xl p-2 text-center flex flex-col items-center justify-center">
+              <div className="w-6 h-6 rounded-lg bg-rose-200/80 text-rose-800 flex items-center justify-center mb-1">
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[10px] font-bold text-slate-500 block">Total Debit</span>
-              <span className="text-xs sm:text-sm font-black text-rose-600">{formatCurrency(todayDebit)}</span>
+              <span className="text-[10px] font-bold text-rose-800/80 block">Total Debit</span>
+              <span className="text-xs sm:text-sm font-black text-rose-950">{formatCurrency(todayDebit)}</span>
             </div>
 
-            <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2 text-center flex flex-col items-center justify-center">
-              <div className="w-6 h-6 rounded-lg bg-amber-100/80 text-amber-600 flex items-center justify-center mb-1">
+            <div className="bg-amber-100/80 border border-amber-200 rounded-xl p-2 text-center flex flex-col items-center justify-center">
+              <div className="w-6 h-6 rounded-lg bg-amber-200/80 text-amber-800 flex items-center justify-center mb-1">
                 <Receipt className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[10px] font-bold text-slate-500 block">Total Expense</span>
-              <span className="text-xs sm:text-sm font-black text-amber-700">{formatCurrency(todayExpense)}</span>
+              <span className="text-[10px] font-bold text-amber-800/80 block">Total Expense</span>
+              <span className="text-xs sm:text-sm font-black text-amber-950">{formatCurrency(todayExpense)}</span>
             </div>
           </div>
 
-          {/* Bottom Banner */}
-          <div className="bg-blue-50/90 border border-blue-200/80 rounded-xl px-3.5 py-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-700 font-extrabold text-xs">
-              <Wallet className="w-4 h-4 text-blue-600" />
+          {/* Bottom Banner (Crisp High-Contrast White with Clean Emerald Border) */}
+          <div className="bg-white border border-emerald-300 rounded-xl py-2 px-3.5 flex items-center justify-between shadow-2xs">
+            <div className="flex items-center gap-2 text-emerald-950 font-extrabold text-xs">
+              <Wallet className="w-4 h-4 text-emerald-600" />
               <span>Today's Balance :</span>
             </div>
-            <span className="text-base sm:text-lg font-black text-blue-700 tracking-tight">
+            <span className={`text-base sm:text-lg font-black tracking-tight ${todayBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               {formatCurrency(todayBalance)}
             </span>
           </div>
         </div>
 
-        {/* Card 3: Today's Cash Account */}
-        <div className="bg-white rounded-2xl p-4 border border-purple-100 shadow-2xs flex flex-col justify-between space-y-3">
-          <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700">
-            <Wallet className="w-4 h-4 text-purple-600" />
+        {/* Card 3: Today's Cash Account (Soft Lavender Purple Theme) */}
+        <div className="bg-purple-50/70 rounded-2xl p-3.5 border border-purple-200/80 shadow-sm flex flex-col justify-between space-y-3">
+          <div className="flex items-center gap-2 text-xs font-black text-purple-950">
+            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+              <Wallet className="w-3.5 h-3.5" />
+            </div>
             <span>Today's Cash Account</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-purple-100/90 text-purple-700 flex items-center justify-center shrink-0">
               <Coins className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Total Balance</span>
-              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              <span className="text-[10px] font-bold text-purple-800/80 uppercase tracking-wider block">Total Balance</span>
+              <span className="text-xl sm:text-2xl font-black text-purple-950 tracking-tight">
                 {formatCurrency(todayNetClosingBalance)}
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
-            <div className="flex items-center gap-2 bg-slate-50/70 rounded-xl p-2 border border-slate-100">
+          <div className="grid grid-cols-2 gap-2 border-t border-purple-200/60 pt-3">
+            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-2 border border-purple-100/90 shadow-2xs">
               <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <Banknote className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 block truncate">Cash in Hand</span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-800 block truncate">{formatCurrency(todayCashInHand)}</span>
+                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Hand</span>
+                <span className="text-xs sm:text-sm font-extrabold text-slate-900 block truncate">{formatCurrency(todayCashInHand)}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-50/70 rounded-xl p-2 border border-slate-100">
+            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-2 border border-purple-100/90 shadow-2xs">
               <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 block truncate">Cash in Online</span>
-                <span className="text-xs sm:text-sm font-extrabold text-slate-800 block truncate">{formatCurrency(todayCashOnline)}</span>
+                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Online</span>
+                <span className="text-xs sm:text-sm font-extrabold text-slate-900 block truncate">{formatCurrency(todayCashOnline)}</span>
               </div>
             </div>
           </div>
@@ -842,7 +846,7 @@ export default function CashBook({
       </div>
 
       {/* ================= 4. HORIZONTAL EQUATION BANNER (TODAY'S CASH FLOW) ================= */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
+      <div className="bg-white/90 rounded-2xl p-3.5 border border-slate-200/80 shadow-xs space-y-2.5">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
             <Coins className="w-3.5 h-3.5 stroke-[2.2]" />
@@ -859,12 +863,12 @@ export default function CashBook({
               <Coins className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-500 block truncate">Yesterday Balance</span>
-              <span className="text-xs sm:text-sm font-black text-blue-900 block truncate">{formatCurrency(yesterdayTotal)}</span>
+              <span className="text-[10px] font-bold text-blue-800/80 block truncate">Yesterday Balance</span>
+              <span className="text-xs sm:text-sm font-black text-blue-950 block truncate">{formatCurrency(yesterdayTotal)}</span>
             </div>
           </div>
 
-          <span className="text-base font-black text-slate-400 px-1">+</span>
+          <span className="text-sm font-black text-slate-500 px-1">+</span>
 
           {/* 2. Collection / Credit */}
           <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
@@ -872,12 +876,12 @@ export default function CashBook({
               <ArrowDownLeft className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-500 block truncate">Collection / Credit</span>
-              <span className="text-xs sm:text-sm font-black text-emerald-900 block truncate">{formatCurrency(todayCredit)}</span>
+              <span className="text-[10px] font-bold text-emerald-800/80 block truncate">Collection / Credit</span>
+              <span className="text-xs sm:text-sm font-black text-emerald-950 block truncate">{formatCurrency(todayCredit)}</span>
             </div>
           </div>
 
-          <span className="text-base font-black text-slate-400 px-1">+</span>
+          <span className="text-sm font-black text-slate-500 px-1">+</span>
 
           {/* 3. Investment */}
           <div className="bg-purple-50/90 border border-purple-200 rounded-xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
@@ -885,12 +889,12 @@ export default function CashBook({
               <Landmark className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-500 block truncate">Investment</span>
-              <span className="text-xs sm:text-sm font-black text-purple-900 block truncate">{formatCurrency(todayInvestment)}</span>
+              <span className="text-[10px] font-bold text-purple-800/80 block truncate">Investment</span>
+              <span className="text-xs sm:text-sm font-black text-purple-950 block truncate">{formatCurrency(todayInvestment)}</span>
             </div>
           </div>
 
-          <span className="text-base font-black text-slate-400 px-1">-</span>
+          <span className="text-sm font-black text-slate-500 px-1">-</span>
 
           {/* 4. Debit */}
           <div className="bg-rose-50/90 border border-rose-200 rounded-xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
@@ -898,12 +902,12 @@ export default function CashBook({
               <ArrowUpRight className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-500 block truncate">Debit</span>
-              <span className="text-xs sm:text-sm font-black text-rose-900 block truncate">{formatCurrency(todayDebit)}</span>
+              <span className="text-[10px] font-bold text-rose-800/80 block truncate">Debit</span>
+              <span className="text-xs sm:text-sm font-black text-rose-950 block truncate">{formatCurrency(todayDebit)}</span>
             </div>
           </div>
 
-          <span className="text-base font-black text-slate-400 px-1">-</span>
+          <span className="text-sm font-black text-slate-500 px-1">-</span>
 
           {/* 5. Expense */}
           <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
@@ -911,21 +915,21 @@ export default function CashBook({
               <Receipt className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-500 block truncate">Expense</span>
-              <span className="text-xs sm:text-sm font-black text-amber-900 block truncate">{formatCurrency(todayExpense)}</span>
+              <span className="text-[10px] font-bold text-amber-800/80 block truncate">Expense</span>
+              <span className="text-xs sm:text-sm font-black text-amber-950 block truncate">{formatCurrency(todayExpense)}</span>
             </div>
           </div>
 
-          <span className="text-base font-black text-slate-400 px-1">=</span>
+          <span className="text-sm font-black text-slate-500 px-1">=</span>
 
-          {/* 6. Net Balance */}
-          <div className="bg-teal-50/90 border-2 border-teal-300 rounded-xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+          {/* 6. Net Balance (Vivid Emerald) */}
+          <div className="bg-emerald-100 border-2 border-emerald-400 rounded-xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-lg bg-emerald-200 text-emerald-800 flex items-center justify-center shrink-0">
               <Scale className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-500 block truncate">Net Balance</span>
-              <span className="text-xs sm:text-sm font-black text-teal-900 block truncate">{formatCurrency(todayNetClosingBalance)}</span>
+              <span className="text-[10px] font-extrabold text-emerald-800 block truncate">Net Balance</span>
+              <span className="text-xs sm:text-sm font-black text-emerald-950 block truncate">{formatCurrency(todayNetClosingBalance)}</span>
             </div>
           </div>
         </div>
@@ -934,7 +938,7 @@ export default function CashBook({
       {/* ================= 5. BOTTOM SPLIT LEDGERS (SIDE-BY-SIDE) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left Container (~58% / 7 cols): Recent Transactions */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3 lg:col-span-7 flex flex-col justify-between">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3 lg:col-span-7 flex flex-col justify-between overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -953,29 +957,29 @@ export default function CashBook({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
-                  <th className="py-2 px-2 text-center w-8">S.No</th>
-                  <th className="py-2 px-2">Date</th>
-                  <th className="py-2 px-2">Particulars</th>
-                  <th className="py-2 px-2 text-center">Type</th>
-                  <th className="py-2 px-2 text-right">Amount (₹)</th>
-                  <th className="py-2 px-2 text-center">Mode</th>
-                  <th className="py-2 px-2">Remarks</th>
+                <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
+                  <th className="py-2.5 px-2.5 text-center w-8">S.No</th>
+                  <th className="py-2.5 px-2.5">Date</th>
+                  <th className="py-2.5 px-2.5">Particulars</th>
+                  <th className="py-2.5 px-2.5 text-center">Type</th>
+                  <th className="py-2.5 px-2.5 text-right">Amount (₹)</th>
+                  <th className="py-2.5 px-2.5 text-center">Mode</th>
+                  <th className="py-2.5 px-2.5">Remarks</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+              <tbody className="divide-y divide-slate-100 font-semibold text-slate-700 bg-white">
                 {displayedTransactions.map((tx, idx) => (
-                  <tr key={tx.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
-                    <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
-                    <td className="py-2.5 px-2 font-bold text-slate-800">{tx.particulars}</td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
-                    <td className="py-2.5 px-2 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderModeBadge(tx.mode)}</td>
-                    <td className="py-2.5 px-2 text-slate-400 text-[11px] truncate max-w-[120px]" title={tx.remarks || '-'}>{tx.remarks || '-'}</td>
+                  <tr key={tx.id || idx} className="hover:bg-slate-50/90 transition-colors">
+                    <td className="py-2.5 px-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
+                    <td className="py-2.5 px-2.5 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
+                    <td className="py-2.5 px-2.5 font-bold text-slate-800">{tx.particulars}</td>
+                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
+                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderModeBadge(tx.mode)}</td>
+                    <td className="py-2.5 px-2.5 text-slate-400 text-[11px] truncate max-w-[120px]" title={tx.remarks || '-'}>{tx.remarks || '-'}</td>
                   </tr>
                 ))}
                 {displayedTransactions.length === 0 && (
@@ -989,7 +993,7 @@ export default function CashBook({
         </div>
 
         {/* Right Container (~42% / 5 cols): Expense Calculation */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3 lg:col-span-5 flex flex-col justify-between">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3 lg:col-span-5 flex flex-col justify-between overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -1008,25 +1012,25 @@ export default function CashBook({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
-                  <th className="py-2 px-2 text-center w-8">S.No</th>
-                  <th className="py-2 px-2">Date</th>
-                  <th className="py-2 px-2">Expense Details</th>
-                  <th className="py-2 px-2 text-right">Amount (₹)</th>
-                  <th className="py-2 px-2 text-center">Mode</th>
+                <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
+                  <th className="py-2.5 px-2.5 text-center w-8">S.No</th>
+                  <th className="py-2.5 px-2.5">Date</th>
+                  <th className="py-2.5 px-2.5">Expense Details</th>
+                  <th className="py-2.5 px-2.5 text-right">Amount (₹)</th>
+                  <th className="py-2.5 px-2.5 text-center">Mode</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+              <tbody className="divide-y divide-slate-100 font-semibold text-slate-700 bg-white">
                 {displayedExpenses.map((exp, idx) => (
-                  <tr key={exp.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
-                    <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{exp.date}</td>
-                    <td className="py-2.5 px-2 font-bold text-slate-800">{exp.details}</td>
-                    <td className="py-2.5 px-2 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderModeBadge(exp.mode)}</td>
+                  <tr key={exp.id || idx} className="hover:bg-slate-50/90 transition-colors">
+                    <td className="py-2.5 px-2.5 text-center text-slate-400 font-bold">{idx + 1}</td>
+                    <td className="py-2.5 px-2.5 whitespace-nowrap text-slate-600 font-bold text-[11px]">{exp.date}</td>
+                    <td className="py-2.5 px-2.5 font-bold text-slate-800">{exp.details}</td>
+                    <td className="py-2.5 px-2.5 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
+                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{renderModeBadge(exp.mode)}</td>
                   </tr>
                 ))}
                 {displayedExpenses.length === 0 && (
@@ -1039,7 +1043,7 @@ export default function CashBook({
           </div>
 
           {/* Footer Banner */}
-          <div className="bg-purple-50/80 border border-purple-100 rounded-xl px-4 py-2.5 flex items-center justify-between">
+          <div className="bg-purple-50/60 border border-purple-100 rounded-xl px-4 py-2.5 flex items-center justify-between">
             <span className="text-xs font-extrabold text-slate-700">Total Expense</span>
             <span className="text-sm font-black text-purple-700 tracking-tight">
               {formatCurrency(totalExpensesCalculated)}
