@@ -79,6 +79,27 @@ const formatTime = (isoString) => {
   }
 };
 
+// Resolves item date, day name, and timestamp
+const getItemDayAndDate = (item) => {
+  const displayDate = formatDateToDisplay(item?.date) || '';
+  const ymd = formatDateToYmd(item?.date);
+  let dayName = '';
+  if (ymd) {
+    const [yr, mo, dy] = ymd.split('-').map(Number);
+    const dObj = new Date(yr, mo - 1, dy);
+    if (!isNaN(dObj.getTime())) {
+      dayName = dObj.toLocaleDateString('en-US', { weekday: 'long' });
+    }
+  }
+  const timeStr = item?.time || (item?.createdAt ? formatTime(item.createdAt) : '10:30 AM');
+  return {
+    displayDate,
+    dayName,
+    timeStr,
+    subLabel: dayName && timeStr ? `${dayName} • ${timeStr}` : (dayName || timeStr || '')
+  };
+};
+
 // Robust day comparison
 const isSameDay = (dateA, dateB) => {
   if (!dateA || !dateB) return false;
@@ -1180,7 +1201,7 @@ export default function ExpansionView({
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-500">
                     <th className="py-2.5 px-2 text-center w-8">S.No</th>
-                    <th className="py-2.5 px-2 w-24">Date</th>
+                    <th className="py-2.5 px-2 w-28">Date</th>
                     <th className="py-2.5 px-2 min-w-[120px]">Description</th>
                     <th className="py-2.5 px-2 w-24">Category</th>
                     <th className="py-2.5 px-2 text-right w-20">Amount (₹)</th>
@@ -1192,110 +1213,118 @@ export default function ExpansionView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {sortedFilteredExpenses.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 px-2 text-center font-bold text-slate-400">
-                        {idx + 1}
-                      </td>
-                      <td className="py-2.5 px-2 font-semibold text-slate-700 whitespace-nowrap text-xs">
-                        {item.date}
-                      </td>
-                      <td className="py-2.5 px-2 font-bold text-slate-800 text-xs">
-                        {item.description}
-                      </td>
-                      <td className="py-2.5 px-2">
-                        <span className="inline-block px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 max-w-[110px] truncate" title={item.customCategory || item.category || 'Others'}>
-                          {item.customCategory || item.category || 'Others'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-2 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="py-2.5 px-2 text-slate-500 font-medium text-xs truncate max-w-[130px]" title={item.remarks}>
-                        {item.remarks || '-'}
-                      </td>
-                      <td className="py-2.5 px-2 text-center">
-                        {renderModeBadge(item.mode)}
-                      </td>
-                      <td className="py-2.5 px-2 text-center">
-                        <div className="flex items-center justify-center gap-1 flex-wrap">
-                          {item.mode === 'Cash' ? (
-                            <>
-                              {item.cashDenominations && (item.cashDenominations.total > 0 || Object.values(item.cashDenominations).some(v => Number(v) > 0)) && (
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveDenomViewer(item)}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs transition active:scale-95 cursor-pointer"
-                                  title="Click to view recorded Cash Denomination Breakdown"
-                                >
-                                  <Banknote className="w-2.5 h-2.5 text-emerald-600" />
-                                  <span>Cash Breakdown</span>
-                                </button>
-                              )}
-                              {(item.receiptImage || item.receiptUrl) && (
+                  {sortedFilteredExpenses.map((item, idx) => {
+                    const dateInfo = getItemDayAndDate(item);
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-2.5 px-2 text-center font-bold text-slate-400">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-2 whitespace-nowrap">
+                          <div className="font-bold text-slate-800 text-xs leading-tight">
+                            {dateInfo.displayDate}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">
+                            {dateInfo.subLabel}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-2 font-bold text-slate-800 text-xs">
+                          {item.description}
+                        </td>
+                        <td className="py-2.5 px-2">
+                          <span className="inline-block px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 max-w-[110px] truncate" title={item.customCategory || item.category || 'Others'}>
+                            {item.customCategory || item.category || 'Others'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-2 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
+                          {formatCurrency(item.amount)}
+                        </td>
+                        <td className="py-2.5 px-2 text-slate-500 font-medium text-xs truncate max-w-[130px]" title={item.remarks}>
+                          {item.remarks || '-'}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          {renderModeBadge(item.mode)}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
+                            {item.mode === 'Cash' ? (
+                              <>
+                                {item.cashDenominations && (item.cashDenominations.total > 0 || Object.values(item.cashDenominations).some(v => Number(v) > 0)) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveDenomViewer(item)}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs transition active:scale-95 cursor-pointer"
+                                    title="Click to view recorded Cash Denomination Breakdown"
+                                  >
+                                    <Banknote className="w-2.5 h-2.5 text-emerald-600" />
+                                    <span>Denom</span>
+                                  </button>
+                                )}
+                                {(item.receiptImage || item.receiptUrl) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveReceiptModal(item)}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs transition active:scale-95 cursor-pointer"
+                                    title="Click to view Cash Bill / Receipt"
+                                  >
+                                    <Camera className="w-2.5 h-2.5 text-amber-600" />
+                                    <span>Bill</span>
+                                  </button>
+                                )}
+                                {!((item.cashDenominations && (item.cashDenominations.total > 0 || Object.values(item.cashDenominations).some(v => Number(v) > 0))) || item.receiptImage || item.receiptUrl) && (
+                                  <span className="text-slate-300 font-bold text-xs">-</span>
+                                )}
+                              </>
+                            ) : (
+                              (item.receiptImage || item.receiptUrl) ? (
                                 <button
                                   type="button"
                                   onClick={() => setActiveReceiptModal(item)}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs transition active:scale-95 cursor-pointer"
-                                  title="Click to view Cash Bill / Receipt"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs transition active:scale-95 cursor-pointer"
+                                  title="Click to view Payment Screenshot / Receipt"
                                 >
-                                  <Camera className="w-2.5 h-2.5 text-amber-600" />
-                                  <span>Bill</span>
+                                  <Camera className="w-2.5 h-2.5 text-purple-600" />
+                                  <span>Receipt</span>
                                 </button>
-                              )}
-                              {!((item.cashDenominations && (item.cashDenominations.total > 0 || Object.values(item.cashDenominations).some(v => Number(v) > 0))) || item.receiptImage || item.receiptUrl) && (
+                              ) : (
                                 <span className="text-slate-300 font-bold text-xs">-</span>
-                              )}
-                            </>
-                          ) : (
-                            (item.receiptImage || item.receiptUrl) ? (
-                              <button
-                                type="button"
-                                onClick={() => setActiveReceiptModal(item)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs transition active:scale-95 cursor-pointer"
-                                title="Click to view Payment Screenshot / Receipt"
-                              >
-                                <Camera className="w-2.5 h-2.5 text-purple-600" />
-                                <span>Receipt</span>
-                              </button>
-                            ) : (
-                              <span className="text-slate-300 font-bold text-xs">-</span>
-                            )
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-2">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-4.5 h-4.5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] font-bold shrink-0">
-                            <User className="w-2.5 h-2.5" />
+                              )
+                            )}
                           </div>
-                          <span className="font-semibold text-slate-700 text-xs truncate max-w-[80px]" title={item.paidBy || 'Admin'}>
-                            {item.paidBy || 'Admin'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-2 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditExpense(item)}
-                            title="Edit"
-                            className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteExpense(item.id)}
-                            title="Delete"
-                            className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-2.5 px-2">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-4.5 h-4.5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] font-bold shrink-0">
+                              <User className="w-2.5 h-2.5" />
+                            </div>
+                            <span className="font-semibold text-slate-700 text-xs truncate max-w-[80px]" title={item.paidBy || 'Admin'}>
+                              {item.paidBy || 'Admin'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditExpense(item)}
+                              title="Edit"
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExpense(item.id)}
+                              title="Delete"
+                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {sortedFilteredExpenses.length === 0 && (
                     <tr>
@@ -1370,7 +1399,7 @@ export default function ExpansionView({
                           {group.displayDate}
                         </div>
                         <div className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">
-                          {group.dayName} • {group.latestTime}
+                          {group.dayName}
                         </div>
                       </td>
                       <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap align-middle text-xs">
