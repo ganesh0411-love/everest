@@ -54,25 +54,47 @@ const getYesterdayYmd = () => {
   return `${yr}-${mo}-${dy}`;
 };
 
-const formatDateToDisplay = (dateStr) => {
-  if (!dateStr) return '';
-  const clean = String(dateStr).trim();
-  // If already DD-MM-YYYY
+const formatDateToDisplay = (dateInput) => {
+  if (!dateInput) return '';
+  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+    const dy = String(dateInput.getDate()).padStart(2, '0');
+    const mo = String(dateInput.getMonth() + 1).padStart(2, '0');
+    const yr = dateInput.getFullYear();
+    return `${dy}-${mo}-${yr}`;
+  }
+  const clean = String(dateInput).trim();
+  // DD-MM-YYYY
   const dmy = clean.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})/);
   if (dmy && clean.indexOf('-') === 2) {
-    return clean;
+    let yr = dmy[3];
+    if (yr.length === 2) yr = '20' + yr;
+    return `${String(dmy[1]).padStart(2, '0')}-${String(dmy[2]).padStart(2, '0')}-${yr}`;
   }
   // YYYY-MM-DD
   const ymd = clean.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})/);
   if (ymd) {
     return `${String(ymd[3]).padStart(2, '0')}-${String(ymd[2]).padStart(2, '0')}-${ymd[1]}`;
   }
+  // Try Date parse
+  const parsed = new Date(clean);
+  if (!isNaN(parsed.getTime())) {
+    const dy = String(parsed.getDate()).padStart(2, '0');
+    const mo = String(parsed.getMonth() + 1).padStart(2, '0');
+    const yr = parsed.getFullYear();
+    return `${dy}-${mo}-${yr}`;
+  }
   return clean;
 };
 
-const formatDateToYmd = (dateStr) => {
-  if (!dateStr) return '';
-  const clean = String(dateStr).trim();
+const formatDateToYmd = (dateInput) => {
+  if (!dateInput) return '';
+  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+    const yr = dateInput.getFullYear();
+    const mo = String(dateInput.getMonth() + 1).padStart(2, '0');
+    const dy = String(dateInput.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${dy}`;
+  }
+  const clean = String(dateInput).trim();
   // DD-MM-YYYY
   const dmy = clean.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})/);
   if (dmy && clean.indexOf('-') === 2) {
@@ -85,7 +107,36 @@ const formatDateToYmd = (dateStr) => {
   if (ymd) {
     return `${ymd[1]}-${String(ymd[2]).padStart(2, '0')}-${String(ymd[3]).padStart(2, '0')}`;
   }
+  // Try Date parse
+  const parsed = new Date(clean);
+  if (!isNaN(parsed.getTime())) {
+    const yr = parsed.getFullYear();
+    const mo = String(parsed.getMonth() + 1).padStart(2, '0');
+    const dy = String(parsed.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${dy}`;
+  }
   return clean;
+};
+
+const parseDateToTimestamp = (dateInput) => {
+  if (!dateInput) return 0;
+  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+    return dateInput.getTime();
+  }
+  const clean = String(dateInput).trim();
+  const dmy = clean.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (dmy && clean.indexOf('-') === 2) {
+    let yr = parseInt(dmy[3], 10);
+    if (yr < 100) yr += 2000;
+    const mo = parseInt(dmy[2], 10) - 1;
+    const dy = parseInt(dmy[1], 10);
+    const hh = parseInt(dmy[4] || '0', 10);
+    const mm = parseInt(dmy[5] || '0', 10);
+    const ss = parseInt(dmy[6] || '0', 10);
+    return new Date(yr, mo, dy, hh, mm, ss).getTime();
+  }
+  const t = Date.parse(clean);
+  return isNaN(t) ? 0 : t;
 };
 
 const formatCurrency = (amt) => {
@@ -200,10 +251,19 @@ export default function CashBook({
   // Dynamic Yesterday calendar date for header based on active fromDate
   const yesterdayHeaderDate = useMemo(() => {
     const fromYmd = formatDateToYmd(fromDate);
-    const d = new Date(fromYmd);
-    if (isNaN(d.getTime())) return formatDateToDisplay(getYesterdayYmd());
-    d.setDate(d.getDate() - 1);
-    return formatDateToDisplay(d);
+    const parts = String(fromYmd).split('-');
+    if (parts.length === 3) {
+      const yr = parseInt(parts[0], 10);
+      const mo = parseInt(parts[1], 10) - 1;
+      const dy = parseInt(parts[2], 10);
+      const d = new Date(yr, mo, dy);
+      d.setDate(d.getDate() - 1);
+      const yDy = String(d.getDate()).padStart(2, '0');
+      const yMo = String(d.getMonth() + 1).padStart(2, '0');
+      const yYr = d.getFullYear();
+      return `${yDy}-${yMo}-${yYr}`;
+    }
+    return formatDateToDisplay(getYesterdayYmd());
   }, [fromDate]);
 
   // 1. Investments State
@@ -513,35 +573,52 @@ export default function CashBook({
     const toYmd = formatDateToYmd(toDate);
     const startYmd = fromYmd <= toYmd ? fromYmd : toYmd;
     const endYmd = fromYmd <= toYmd ? toYmd : fromYmd;
-    const inRange = (dStr) => isDateInRange(dStr, startYmd, endYmd);
 
-    // 1. Group Customer Collections by Loan Product Category
-    const collectionCategories = [
-      'Daily Collection',
-      'Weekly Collection',
-      'Monthly Collection',
-      'Agri Loan Collection',
-      'Personal Loan Collection'
-    ];
+    // Direct access to customers prop or localStorage backup
+    const allCust = (customers && customers.length > 0) ? customers : (() => {
+      try {
+        const saved = localStorage.getItem('everest_customers');
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
+    })();
 
-    const collectionBuckets = {
-      'Daily Collection': { cash: 0, upi: 0, count: 0 },
-      'Weekly Collection': { cash: 0, upi: 0, count: 0 },
-      'Monthly Collection': { cash: 0, upi: 0, count: 0 },
-      'Agri Loan Collection': { cash: 0, upi: 0, count: 0 },
-      'Personal Loan Collection': { cash: 0, upi: 0, count: 0 },
-    };
+    // Cumulative historical accumulators up to Yesterday (strictly < startYmd)
+    let histCreditCash = 0;
+    let histCreditUpi = 0;
+    let histDebitCash = 0;
+    let histDebitBank = 0;
+    let histInvCash = 0;
+    let histInvBank = 0;
+    let histExpCash = 0;
+    let histExpOnline = 0;
 
+    // Active period accumulators ([startYmd, endYmd])
     let liveCreditCash = 0;
     let liveCreditUpi = 0;
+    let liveDebitCash = 0;
+    let liveDebitBank = 0;
+    let liveInvCash = 0;
+    let liveInvBank = 0;
+    let liveExpCash = 0;
+    let liveExpOnline = 0;
 
-    (customers || []).forEach(cust => {
+    const dynamicTx = [];
+    const dynamicExp = [];
+
+    const rangeDateLabel = startYmd === endYmd
+      ? formatDateToDisplay(startYmd)
+      : `${formatDateToDisplay(startYmd)} - ${formatDateToDisplay(endYmd)}`;
+
+    // 1. Process Customer Collections (Credit Inflows)
+    (allCust || []).forEach(cust => {
       const cBranch = cust.branchId || cust.branch;
       if (branchId !== 'all' && cBranch && cBranch !== branchId && cBranch !== branchName) {
         return;
       }
 
-      // Map loan category for this customer
+      // Map dynamic loan product name for this customer
       const rawType = String(cust.loanType || cust.scheme || cust.category || '').toLowerCase();
       let catName = 'Daily Collection';
       if (rawType.includes('agri')) {
@@ -556,10 +633,15 @@ export default function CashBook({
         catName = 'Daily Collection';
       }
 
+      const custName = cust.name || cust.customerName || 'Customer';
+      const centerOrPhone = cust.centerName || cust.center || cust.groupName || cust.phone || '';
+      const remarksInfo = centerOrPhone ? `${custName} (${centerOrPhone})` : custName;
+
       const installments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-      installments.forEach((inst) => {
+      installments.forEach((inst, idx) => {
         const instDate = inst.date || inst.paymentDate || inst.createdAt;
-        if (!inRange(instDate)) return;
+        const instYmd = formatDateToYmd(instDate);
+        if (!instYmd) return;
 
         const status = String(inst.status || '').toUpperCase();
         if (status === 'BOUNCED' || status === 'CANCELLED') return;
@@ -573,52 +655,101 @@ export default function CashBook({
           cashAmt = Number(inst.cashAmount || 0);
           upiAmt = Number(inst.upiAmount || 0);
         } else {
-          const modeStr = String(inst.paymentMode || inst.mode || '').toUpperCase();
-          if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK')) {
+          const modeStr = String(inst.paymentMode || inst.mode || inst.instrument || '').toUpperCase();
+          if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK') || modeStr.includes('GPAY') || modeStr.includes('PHONEPE')) {
             upiAmt = totalAmt;
           } else {
             cashAmt = totalAmt;
           }
         }
 
-        liveCreditCash += cashAmt;
-        liveCreditUpi += upiAmt;
+        // Cumulative history up to Yesterday (< startYmd)
+        if (instYmd < startYmd) {
+          histCreditCash += cashAmt;
+          histCreditUpi += upiAmt;
+        }
 
-        collectionBuckets[catName].cash += cashAmt;
-        collectionBuckets[catName].upi += upiAmt;
-        collectionBuckets[catName].count += 1;
+        // Active range [startYmd, endYmd]
+        if (instYmd >= startYmd && instYmd <= endYmd) {
+          liveCreditCash += cashAmt;
+          liveCreditUpi += upiAmt;
+
+          const timeStr = inst.timeStr || inst.time || '';
+          const displayDate = timeStr ? `${formatDateToDisplay(instDate)} ${timeStr}` : formatDateToDisplay(instDate);
+
+          dynamicTx.push({
+            id: `col_${cust.id}_${inst.id || idx}_${instYmd}`,
+            date: displayDate,
+            particulars: catName,
+            type: 'Credit',
+            cashAmount: cashAmt,
+            upiAmount: upiAmt,
+            amount: totalAmt,
+            mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
+            remarks: remarksInfo,
+            rawTimestamp: parseDateToTimestamp(instDate)
+          });
+        }
       });
     });
 
-    const dynamicTx = [];
+    // 2. Customer Disbursements (Debit Outflows)
+    (allCust || []).forEach(cust => {
+      const cBranch = cust.branchId || cust.branch;
+      if (branchId !== 'all' && cBranch && cBranch !== branchId && cBranch !== branchName) {
+        return;
+      }
 
-    const rangeDateLabel = startYmd === endYmd
-      ? formatDateToDisplay(startYmd)
-      : `${formatDateToDisplay(startYmd)} - ${formatDateToDisplay(endYmd)}`;
+      const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.date || cust.disbursementDate;
+      const disbYmd = formatDateToYmd(disbDate);
+      const custStatus = String(cust.status || '').toLowerCase();
+      const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
+      const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
 
-    // Push consolidated single row per loan collection category that has collections
-    collectionCategories.forEach((cat) => {
-      const b = collectionBuckets[cat];
-      const sum = b.cash + b.upi;
-      if (sum > 0) {
-        dynamicTx.push({
-          id: `cat_${cat.replace(/\s+/g, '_').toLowerCase()}`,
-          date: rangeDateLabel,
-          particulars: cat,
-          type: 'Credit',
-          cashAmount: b.cash,
-          upiAmount: b.upi,
-          amount: sum,
-          mode: (b.cash > 0 && b.upi > 0) ? 'Split' : (b.upi > 0 ? 'UPI' : 'Cash'),
-          remarks: `${b.count} EMI payment${b.count > 1 ? 's' : ''}`
-        });
+      if (isApprovedOrDisbursed && disbAmount > 0 && disbYmd) {
+        const disbMode = String(cust.disbursementMode || cust.paymentMode || 'Cash').toUpperCase();
+        const isBankDisb = disbMode.includes('BANK') || disbMode.includes('UPI') || disbMode.includes('ONLINE');
+
+        const disbCash = isBankDisb ? 0 : disbAmount;
+        const disbUpi = isBankDisb ? disbAmount : 0;
+
+        // Cumulative history up to Yesterday (< startYmd)
+        if (disbYmd < startYmd) {
+          histDebitCash += disbCash;
+          histDebitBank += disbUpi;
+        }
+
+        // Active range [startYmd, endYmd]
+        if (disbYmd >= startYmd && disbYmd <= endYmd) {
+          liveDebitCash += disbCash;
+          liveDebitBank += disbUpi;
+
+          const custName = cust.name || cust.customerName || 'Customer';
+          const scheme = cust.loanType || cust.scheme || 'Loan';
+          const loanId = cust.loanId || cust.id || '';
+          const staffNote = cust.staffName || cust.agentName || 'Loan Payout';
+
+          dynamicTx.push({
+            id: `disb_${cust.id}`,
+            date: formatDateToDisplay(disbDate),
+            particulars: `Disbursement - ${custName} (${scheme})`,
+            type: 'Debit',
+            cashAmount: disbCash,
+            upiAmount: disbUpi,
+            amount: disbAmount,
+            mode: isBankDisb ? 'UPI' : 'Cash',
+            remarks: loanId ? `Loan #${loanId} · ${staffNote}` : staffNote,
+            rawTimestamp: parseDateToTimestamp(disbDate)
+          });
+        }
       }
     });
 
-    // 2. Manual Particulars entries in range
+    // 3. Manual Particulars entries
     (manualParticulars || []).forEach((part) => {
       const pDate = part.date || part.createdAt;
-      if (!inRange(pDate)) return;
+      const pYmd = formatDateToYmd(pDate);
+      if (!pYmd) return;
 
       const amt = Number(part.amount || 0);
       if (amt <= 0) return;
@@ -626,98 +757,87 @@ export default function CashBook({
       const cAmt = Number(part.cashAmount || 0);
       const uAmt = Number(part.upiAmount || 0);
 
-      if (part.type === 'Debit') {
-        liveDebitCash += cAmt;
-        liveDebitBank += uAmt;
-      } else {
-        liveCreditCash += cAmt;
-        liveCreditUpi += uAmt;
+      // Cumulative up to yesterday (< startYmd)
+      if (pYmd < startYmd) {
+        if (part.type === 'Debit') {
+          histDebitCash += cAmt;
+          histDebitBank += uAmt;
+        } else {
+          histCreditCash += cAmt;
+          histCreditUpi += uAmt;
+        }
       }
 
-      dynamicTx.push({
-        id: part.id,
-        date: formatDateToDisplay(pDate),
-        particulars: part.particulars || 'Manual Adjustment',
-        type: part.type || 'Credit',
-        cashAmount: cAmt,
-        upiAmount: uAmt,
-        amount: amt,
-        mode: part.mode || ((cAmt > 0 && uAmt > 0) ? 'Split' : (uAmt > 0 ? 'UPI' : 'Cash')),
-        remarks: part.remarks || 'Manual Adjustment'
-      });
-    });
-
-    // 3. Customer Disbursements (Debit) in range
-    let liveDebitCash = 0;
-    let liveDebitBank = 0;
-    (customers || []).forEach(cust => {
-      const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.date;
-      const custStatus = String(cust.status || '').toLowerCase();
-      const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
-      const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
-
-      if (isApprovedOrDisbursed && disbAmount > 0 && inRange(disbDate)) {
-        const disbMode = String(cust.disbursementMode || cust.paymentMode || 'Cash').toUpperCase();
-        const isBankDisb = disbMode.includes('BANK') || disbMode.includes('UPI') || disbMode.includes('ONLINE');
-
-        if (isBankDisb) {
-          liveDebitBank += disbAmount;
+      // Active range [startYmd, endYmd]
+      if (pYmd >= startYmd && pYmd <= endYmd) {
+        if (part.type === 'Debit') {
+          liveDebitCash += cAmt;
+          liveDebitBank += uAmt;
         } else {
-          liveDebitCash += disbAmount;
+          liveCreditCash += cAmt;
+          liveCreditUpi += uAmt;
         }
 
         dynamicTx.push({
-          id: `disb_${cust.id}`,
-          date: formatDateToDisplay(disbDate),
-          particulars: `Disbursement - ${cust.name || 'Customer'}`,
-          type: 'Debit',
-          cashAmount: isBankDisb ? 0 : disbAmount,
-          upiAmount: isBankDisb ? disbAmount : 0,
-          amount: disbAmount,
-          mode: isBankDisb ? 'UPI' : 'Cash',
-          remarks: 'Loan Payout'
+          id: part.id,
+          date: formatDateToDisplay(pDate),
+          particulars: part.particulars || 'Manual Adjustment',
+          type: part.type || 'Credit',
+          cashAmount: cAmt,
+          upiAmount: uAmt,
+          amount: amt,
+          mode: part.mode || ((cAmt > 0 && uAmt > 0) ? 'Split' : (uAmt > 0 ? 'UPI' : 'Cash')),
+          remarks: part.remarks || 'Manual Adjustment',
+          rawTimestamp: parseDateToTimestamp(pDate)
         });
       }
     });
 
-    // 4. Live Expenses in range
-    let liveExpCash = 0;
-    let liveExpOnline = 0;
-    const dynamicExp = [];
-
+    // 4. Live Expenses
     (liveExpenses || []).forEach(exp => {
       const expDate = exp.date || exp.createdAt;
-      if (!inRange(expDate)) return;
+      const expYmd = formatDateToYmd(expDate);
+      if (!expYmd) return;
 
       const amt = Number(exp.amount || 0);
       if (amt <= 0) return;
 
       const isCash = String(exp.mode || '').toUpperCase().includes('CASH');
-      if (isCash) {
-        liveExpCash += amt;
-      } else {
-        liveExpOnline += amt;
+      const eCash = isCash ? amt : 0;
+      const eOnline = isCash ? 0 : amt;
+
+      // Cumulative up to yesterday (< startYmd)
+      if (expYmd < startYmd) {
+        histExpCash += eCash;
+        histExpOnline += eOnline;
       }
 
-      const categoryName = resolveExpenseCategory(exp);
-      const remarkText = resolveExpenseRemarks(exp);
+      // Active range [startYmd, endYmd]
+      if (expYmd >= startYmd && expYmd <= endYmd) {
+        liveExpCash += eCash;
+        liveExpOnline += eOnline;
 
-      dynamicExp.push({
-        id: exp.id,
-        date: formatDateToDisplay(expDate),
-        category: categoryName,
-        details: categoryName,
-        cashAmount: isCash ? amt : 0,
-        upiAmount: isCash ? 0 : amt,
-        amount: amt,
-        mode: isCash ? 'Cash' : 'UPI',
-        remarks: remarkText
-      });
+        const categoryName = resolveExpenseCategory(exp);
+        const remarkText = resolveExpenseRemarks(exp);
+
+        dynamicExp.push({
+          id: exp.id,
+          date: formatDateToDisplay(expDate),
+          category: categoryName,
+          details: categoryName,
+          cashAmount: eCash,
+          upiAmount: eOnline,
+          amount: amt,
+          mode: isCash ? 'Cash' : 'UPI',
+          remarks: remarkText,
+          rawTimestamp: parseDateToTimestamp(expDate)
+        });
+      }
     });
 
-    // Consolidate all period expenses into strictly ONE unified row in Recent Transactions
-    const totalDayExpenses = liveExpCash + liveExpOnline;
-    if (totalDayExpenses > 0) {
+    // Consolidate period expenses into single row in Recent Transactions
+    const totalPeriodExpenses = liveExpCash + liveExpOnline;
+    if (totalPeriodExpenses > 0) {
       dynamicTx.push({
         id: `exp_consolidated_${startYmd}_${endYmd}`,
         date: rangeDateLabel,
@@ -725,80 +845,95 @@ export default function CashBook({
         type: 'Expense',
         cashAmount: liveExpCash,
         upiAmount: liveExpOnline,
-        amount: totalDayExpenses,
+        amount: totalPeriodExpenses,
         mode: (liveExpCash > 0 && liveExpOnline > 0) ? 'Split' : (liveExpOnline > 0 ? 'UPI' : 'Cash'),
-        remarks: 'Branch Expenses Combined'
+        remarks: 'Branch Expenses Combined',
+        rawTimestamp: parseDateToTimestamp(endYmd)
       });
     }
 
-    // 5. Live Investments in range
-    let liveInvCash = 0;
-    let liveInvBank = 0;
+    // 5. Live Investments
     (investments || []).forEach(inv => {
       const invDate = inv.date || inv.createdAt;
-      if (!inRange(invDate)) return;
+      const invYmd = formatDateToYmd(invDate);
+      if (!invYmd) return;
 
       const amt = Number(inv.amount || 0);
       if (amt <= 0) return;
 
       const isCash = String(inv.mode || '').toUpperCase().includes('CASH');
-      if (isCash) {
-        liveInvCash += amt;
-      } else {
-        liveInvBank += amt;
+      const iCash = isCash ? amt : 0;
+      const iBank = isCash ? 0 : amt;
+
+      // Cumulative up to yesterday (< startYmd)
+      if (invYmd < startYmd) {
+        histInvCash += iCash;
+        histInvBank += iBank;
       }
 
-      dynamicTx.push({
-        id: inv.id,
-        date: formatDateToDisplay(invDate),
-        particulars: inv.particulars || 'Investment Entry',
-        type: 'Investment',
-        cashAmount: isCash ? amt : 0,
-        upiAmount: isCash ? 0 : amt,
-        amount: amt,
-        mode: isCash ? 'Cash' : 'UPI',
-        remarks: inv.remarks || 'Capital Inflow'
-      });
+      // Active range [startYmd, endYmd]
+      if (invYmd >= startYmd && invYmd <= endYmd) {
+        liveInvCash += iCash;
+        liveInvBank += iBank;
+
+        dynamicTx.push({
+          id: inv.id,
+          date: formatDateToDisplay(invDate),
+          particulars: inv.particulars || 'Investment Entry',
+          type: 'Investment',
+          cashAmount: iCash,
+          upiAmount: iBank,
+          amount: amt,
+          mode: isCash ? 'Cash' : 'UPI',
+          remarks: inv.remarks || 'Capital Inflow',
+          rawTimestamp: parseDateToTimestamp(invDate)
+        });
+      }
     });
+
+    // Sort recent transactions by timestamp descending
+    dynamicTx.sort((a, b) => (b.rawTimestamp || 0) - (a.rawTimestamp || 0));
+    dynamicExp.sort((a, b) => (b.rawTimestamp || 0) - (a.rawTimestamp || 0));
+
+    // Cumulative Opening Balances as of the day before fromDate
+    const openingDocId = `${branchId}_${startYmd}`;
+    const dayOpening = openingBalances[openingDocId] || { cash: 100000, bank: 0 };
+    const baseOpeningCash = Number(dayOpening.cash ?? 100000);
+    const baseOpeningBank = Number(dayOpening.bank ?? 0);
+
+    // Formula:
+    // Cash in Hand (₹): Cash Collections + Cash Investments - Cash Disbursements - Cash Expenses up to yesterday
+    // Cash in Online (₹): UPI Collections + UPI Investments - UPI Disbursements - UPI Expenses up to yesterday
+    const calcYesterdayCash = baseOpeningCash + histCreditCash + histInvCash - histDebitCash - histExpCash;
+    const calcYesterdayBank = baseOpeningBank + histCreditUpi + histInvBank - histDebitBank - histExpOnline;
+
+    const yCash = Math.max(0, calcYesterdayCash);
+    const yBank = Math.max(0, calcYesterdayBank);
+    const yTotal = yCash + yBank;
 
     // Determine if dynamic data exists for the selected date range
     const hasDynamicData = dynamicTx.length > 0 || dynamicExp.length > 0;
 
     let finalTxList = [];
     let finalExpList = [];
-    let yTotal = 120000;
-    let yCash = 100000;
-    let yBank = 20000;
-
     let tInv = 0;
-    let tCred = 120000;
-    let tDeb = 18000;
-    let tExp = 2000;
+    let tCred = 0;
+    let tDeb = 0;
+    let tExp = 0;
 
     if (hasDynamicData) {
       finalTxList = dynamicTx;
       finalExpList = dynamicExp;
 
-      // Real calculated values
+      // Real calculated values for active range
       tInv = liveInvCash + liveInvBank;
       tCred = liveCreditCash + liveCreditUpi;
       tDeb = liveDebitCash + liveDebitBank;
       tExp = liveExpCash + liveExpOnline;
-
-      // Opening balance lookup (start date)
-      const openingDocId = `${branchId}_${startYmd}`;
-      const dayOpening = openingBalances[openingDocId] || { cash: 100000, bank: 20000 };
-      yCash = Number(dayOpening.cash ?? 100000);
-      yBank = Number(dayOpening.bank ?? 20000);
-      yTotal = yCash + yBank;
     } else {
       // Fallback to Reference Spec matching Image 1 1:1
       finalTxList = REFERENCE_SAMPLE_TRANSACTIONS;
       finalExpList = REFERENCE_SAMPLE_EXPENSES;
-      yTotal = 120000;
-      yCash = 100000;
-      yBank = 20000;
-
       tInv = 0;
       tCred = 120000;
       tDeb = 18000;
@@ -813,8 +948,8 @@ export default function CashBook({
     const netClosing = yTotal + tBal;
 
     // Split estimation
-    const cashShare = (yCash + (hasDynamicData ? (liveCreditCash + liveInvCash - liveDebitCash - liveExpCash) : (88000 - 200)));
-    const onlineShare = (yBank + (hasDynamicData ? (liveCreditUpi + liveInvBank - liveDebitBank - liveExpOnline) : (32000 - 18000 - 350)));
+    const cashShare = yCash + (hasDynamicData ? (liveCreditCash + liveInvCash - liveDebitCash - liveExpCash) : (88000 - 200));
+    const onlineShare = yBank + (hasDynamicData ? (liveCreditUpi + liveInvBank - liveDebitBank - liveExpOnline) : (32000 - 18000 - 350));
 
     return {
       yesterdayTotal: yTotal,
