@@ -3,6 +3,7 @@ import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, AlertTria
 import CollectionReportDownloadModal from './CollectionReportDownloadModal';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { isCustomerActive } from './CashBook';
 
 const getTodayStr = () => {
   const today = new Date();
@@ -615,6 +616,7 @@ export default function CollectionReportModal({
     // 1. Scope Customers by Branch & Staff RBAC
     const scopedCustomers = (rawCustomers || []).filter((customer) => {
       if (!customer) return false;
+      if (!isCustomerActive(customer)) return false;
       const custBranchId = String(customer.branchId || customer.branchCode || '').toLowerCase().trim();
       const custBranchName = String(customer.branch || customer.branchName || '').toLowerCase().trim();
 

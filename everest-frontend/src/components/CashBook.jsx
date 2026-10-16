@@ -214,6 +214,85 @@ const resolveExpenseRemarks = (exp) => {
   return notes.length > 0 ? notes.join(' - ') : '-';
 };
 
+// Strict Active Customer Validation:
+// Identifies and excludes deleted, soft-deleted (Recycled), cancelled, or draft records.
+export const isCustomerActive = (cust) => {
+  if (!cust || typeof cust !== 'object') return false;
+
+  // 1. Explicit deletion boolean flags
+  if (
+    cust.isDeleted === true ||
+    cust.is_deleted === true ||
+    cust.deleted === true ||
+    cust.inRecycleBin === true ||
+    cust.in_recycle_bin === true ||
+    String(cust.isDeleted).toLowerCase() === 'true' ||
+    String(cust.is_deleted).toLowerCase() === 'true' ||
+    String(cust.deleted).toLowerCase() === 'true' ||
+    cust.isArchived === true ||
+    cust.archived === true
+  ) {
+    return false;
+  }
+
+  // 2. Deletion / recycling timestamp indicators
+  if (
+    cust.deletedAt ||
+    cust.deleted_at ||
+    cust.recycledAt ||
+    cust.recycled_at ||
+    cust.archivedAt
+  ) {
+    return false;
+  }
+
+  // 3. Customer status string check (e.g. Recycled, Deleted, Draft, Cancelled)
+  const status = String(cust.status || '').trim().toLowerCase();
+  if (
+    status === 'recycled' ||
+    status === 'deleted' ||
+    status === 'inactive' ||
+    status === 'draft' ||
+    status === 'rejected' ||
+    status === 'cancelled' ||
+    status === 'canceled'
+  ) {
+    return false;
+  }
+
+  // 4. Loan status string check
+  const loanStatus = String(cust.loanStatus || '').trim().toLowerCase();
+  if (
+    loanStatus === 'recycled' ||
+    loanStatus === 'deleted' ||
+    loanStatus === 'cancelled' ||
+    loanStatus === 'canceled' ||
+    loanStatus === 'rejected'
+  ) {
+    return false;
+  }
+
+  // 5. Customer status field check
+  const custStatus = String(cust.customerStatus || '').trim().toLowerCase();
+  if (
+    custStatus === 'recycled' ||
+    custStatus === 'deleted' ||
+    custStatus === 'inactive' ||
+    custStatus === 'cancelled' ||
+    custStatus === 'canceled'
+  ) {
+    return false;
+  }
+
+  // 6. Name-based deletion tag check (e.g. "[DELETED] Mr. Prabhu")
+  const name = String(cust.name || cust.customerName || '').toLowerCase();
+  if (name.includes('[deleted]') || name.includes('(deleted)') || name.includes('[recycled]')) {
+    return false;
+  }
+
+  return true;
+};
+
 export default function CashBook({ 
   activeBranch = { id: 'main', name: 'Main Branch' }, 
   userProfile = null, 
@@ -565,8 +644,15 @@ export default function CashBook({
     const startYmd = formatDateToYmd(new Date(rangeStartTs));
     const endYmd = formatDateToYmd(new Date(rangeEndTs));
 
-    // Direct access to customers prop or localStorage backup
-    let allCust = (customers && customers.length > 0) ? customers : (() => {
+    // Strict Active Customer Filter Pipeline:
+    // Build active customer directory and identify soft-deleted, recycled, or purged records.
+    const activeCustomerIds = new Set();
+    const activeCustomerNames = new Set();
+    const deletedCustomerIds = new Set();
+    const deletedCustomerNames = new Set();
+
+    const hasPropCustomers = Array.isArray(customers) && customers.length > 0;
+    const rawCustomerSource = hasPropCustomers ? customers : (() => {
       try {
         const saved = localStorage.getItem('everest_customers');
         return saved ? JSON.parse(saved) : [];
@@ -575,12 +661,48 @@ export default function CashBook({
       }
     })();
 
-    if (!allCust || allCust.length === 0) {
-      try {
-        const saved = localStorage.getItem('everest_customers');
-        if (saved) allCust = JSON.parse(saved);
-      } catch (e) {}
-    }
+    (rawCustomerSource || []).forEach(c => {
+      if (!c || typeof c !== 'object') return;
+      const cId = String(c.id || c.customerId || c.docId || '').trim();
+      const cName = String(c.name || c.customerName || '').trim().toLowerCase();
+
+      if (isCustomerActive(c)) {
+        if (cId) activeCustomerIds.add(cId);
+        if (cName) activeCustomerNames.add(cName);
+      } else {
+        if (cId) deletedCustomerIds.add(cId);
+        if (cName) deletedCustomerNames.add(cName);
+      }
+    });
+
+    // Also inspect known deleted records from local storage if any
+    try {
+      const savedDeleted = localStorage.getItem('everest_deleted_customers');
+      if (savedDeleted) {
+        const parsedDel = JSON.parse(savedDeleted);
+        if (Array.isArray(parsedDel)) {
+          parsedDel.forEach(dc => {
+            const dcId = String(dc.id || dc.customerId || '').trim();
+            const dcName = String(dc.name || dc.customerName || '').trim().toLowerCase();
+            if (dcId) deletedCustomerIds.add(dcId);
+            if (dcName) deletedCustomerNames.add(dcName);
+          });
+        }
+      }
+    } catch (e) {}
+
+    // Verified Active Customers List:
+    // Strictly drops any customer marked as deleted/recycled or matching deleted registries.
+    const allCust = (rawCustomerSource || []).filter(c => {
+      if (!isCustomerActive(c)) return false;
+      const cId = String(c.id || c.customerId || c.docId || '').trim();
+      const cName = String(c.name || c.customerName || '').trim().toLowerCase();
+
+      if (cId && deletedCustomerIds.has(cId)) return false;
+      if (cName && deletedCustomerNames.has(cName)) return false;
+
+      return true;
+    });
 
     // Cumulative historical accumulators up to Yesterday (strictly < rangeStartTs)
     let histCreditCash = 0;
@@ -623,6 +745,13 @@ export default function CashBook({
         return;
       }
 
+      // Re-verify active customer status
+      if (!isCustomerActive(cust)) return;
+
+      const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
+      const cName = String(cust.name || cust.customerName || '').trim().toLowerCase();
+      if (deletedCustomerIds.has(cId) || deletedCustomerNames.has(cName)) return;
+
       // Map dynamic loan product name for this customer
       const rawType = String(cust.loanType || cust.scheme || cust.category || '').toLowerCase();
       let catName = 'Daily Collection';
@@ -656,12 +785,32 @@ export default function CashBook({
       } catch (e) {}
 
       (rawInstallments || []).forEach((inst, idx) => {
+        if (!inst || typeof inst !== 'object') return;
+        if (
+          inst.isDeleted === true ||
+          inst.deleted === true ||
+          inst.is_deleted === true ||
+          inst.deletedAt ||
+          inst.deleted_at
+        ) {
+          return;
+        }
+
         const instDate = inst.date || inst.paymentDate || inst.createdAt;
         const instTs = parseDateToTimestamp(instDate);
         if (!instTs) return;
 
         const status = String(inst.status || '').toUpperCase();
-        if (status === 'BOUNCED' || status === 'CANCELLED') return;
+        if (
+          status === 'BOUNCED' ||
+          status === 'CANCELLED' ||
+          status === 'DELETED' ||
+          status === 'RECYCLED' ||
+          status === 'VOID'
+        ) {
+          return;
+        }
+        if (inst.mode === 'BOUNCED') return;
 
         const totalAmt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
         if (totalAmt <= 0) return;
@@ -731,6 +880,19 @@ export default function CashBook({
         return;
       }
 
+      // Re-verify active customer status
+      if (!isCustomerActive(cust)) return;
+
+      const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
+      const cName = String(cust.name || cust.customerName || '').trim().toLowerCase();
+      if (deletedCustomerIds.has(cId) || deletedCustomerNames.has(cName)) return;
+
+      // Loan status MUST NOT be deleted / cancelled / rejected
+      const loanStatus = String(cust.loanStatus || '').toLowerCase();
+      if (loanStatus === 'deleted' || loanStatus === 'cancelled' || loanStatus === 'canceled' || loanStatus === 'rejected') {
+        return;
+      }
+
       const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.date || cust.disbursementDate;
       const disbTs = parseDateToTimestamp(disbDate);
       const custStatus = String(cust.status || '').toLowerCase();
@@ -778,6 +940,41 @@ export default function CashBook({
 
     // 3. Manual Particulars entries
     (manualParticulars || []).forEach((part) => {
+      if (!part || typeof part !== 'object') return;
+      if (
+        part.isDeleted === true ||
+        part.deleted === true ||
+        part.is_deleted === true ||
+        part.inRecycleBin === true ||
+        part.deletedAt ||
+        part.deleted_at
+      ) {
+        return;
+      }
+      const pStatus = String(part.status || '').toLowerCase();
+      if (pStatus === 'deleted' || pStatus === 'recycled' || pStatus === 'cancelled' || pStatus === 'canceled') {
+        return;
+      }
+
+      // Orphaned customer transaction check: If manual entry is linked to a customer, verify customer is active in directory
+      const partCustId = String(part.customerId || part.custId || '').trim();
+      if (partCustId && (!activeCustomerIds.has(partCustId) || deletedCustomerIds.has(partCustId))) {
+        return; // Orphaned transaction referencing deleted customer
+      }
+
+      // If remarks or particulars mention a known deleted customer, exclude it
+      const partText = `${part.particulars || ''} ${part.remarks || ''}`.toLowerCase();
+      if (deletedCustomerNames.size > 0) {
+        let isAssociatedWithDeleted = false;
+        for (const delName of deletedCustomerNames) {
+          if (delName && delName.length > 2 && partText.includes(delName)) {
+            isAssociatedWithDeleted = true;
+            break;
+          }
+        }
+        if (isAssociatedWithDeleted) return;
+      }
+
       const pDate = part.date || part.createdAt;
       const pTs = parseDateToTimestamp(pDate);
       if (!pTs) return;
@@ -826,6 +1023,19 @@ export default function CashBook({
 
     // 4. Live Expenses
     (liveExpenses || []).forEach(exp => {
+      if (!exp || typeof exp !== 'object') return;
+      if (
+        exp.isDeleted === true ||
+        exp.deleted === true ||
+        exp.is_deleted === true ||
+        exp.deletedAt ||
+        exp.deleted_at ||
+        String(exp.status || '').toLowerCase() === 'deleted' ||
+        String(exp.status || '').toLowerCase() === 'recycled'
+      ) {
+        return;
+      }
+
       const expDate = exp.date || exp.createdAt;
       const expTs = parseDateToTimestamp(expDate);
       if (!expTs) return;
@@ -885,6 +1095,19 @@ export default function CashBook({
 
     // 5. Live Investments
     (investments || []).forEach(inv => {
+      if (!inv || typeof inv !== 'object') return;
+      if (
+        inv.isDeleted === true ||
+        inv.deleted === true ||
+        inv.is_deleted === true ||
+        inv.deletedAt ||
+        inv.deleted_at ||
+        String(inv.status || '').toLowerCase() === 'deleted' ||
+        String(inv.status || '').toLowerCase() === 'recycled'
+      ) {
+        return;
+      }
+
       const invDate = inv.date || inv.createdAt;
       const invTs = parseDateToTimestamp(invDate);
       if (!invTs) return;
