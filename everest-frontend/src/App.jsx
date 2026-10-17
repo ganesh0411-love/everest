@@ -403,11 +403,8 @@ function App() {
       try {
         let q;
         if (userProfile.role === 'admin' || userProfile.role === 'staff') {
-          if (activeBranch.id !== 'main') {
-            q = query(collection(db, 'customers'), where('branchId', '==', activeBranch.id));
-          } else {
-            q = collection(db, 'customers');
-          }
+          // Stream complete customers collection to prevent branchId field mismatch drops
+          q = collection(db, 'customers');
         } else {
           // Customer role
           q = query(collection(db, 'customers'), where('phone', '==', user.phoneNumber));
@@ -817,7 +814,7 @@ function App() {
           return false;
         }
 
-        // Branch Consolidation Filter for Main Branch
+        // Branch Consolidation Filter for Main Branch vs Sub-Branches
         if (activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') {
           const excludedIds = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.id));
           const excludedNames = branches.filter(b => b.includeInConsolidatedTotals === false).map(b => String(b.name).toLowerCase());
@@ -826,6 +823,14 @@ function App() {
           
           if (excludedIds.includes(cId)) return false;
           if (excludedNames.includes(cName)) return false;
+        } else if (activeBranch?.id || activeBranch?.name) {
+          const targetId = String(activeBranch?.id || '').trim().toLowerCase();
+          const targetName = String(activeBranch?.name || '').trim().toLowerCase();
+          const cId = String(c.branchId || c.branchCode || '').trim().toLowerCase();
+          const cName = String(c.branch || c.branchName || c.assignedBranch || '').trim().toLowerCase();
+          const matches = (targetId && (cId === targetId || cName === targetId)) ||
+                          (targetName && (cName === targetName || cId === targetName || cName.includes(targetName) || targetName.includes(cName)));
+          if (!matches) return false;
         }
         
         return true;

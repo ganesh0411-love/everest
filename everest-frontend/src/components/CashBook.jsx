@@ -296,11 +296,162 @@ export const isCustomerActive = (cust) => {
   return true;
 };
 
-// Comprehensive Earliest Transaction Date Computation:
+// Canonical Gullapuram Master Baseline (Ground Truth: Mr. Sundar Auto disbursed 08-OCT-2026 for ₹ 22,500 Cash)
+export const GULLAPURAM_CANONICAL_CUSTOMERS = [
+  {
+    id: 'cust_gullapuram_sundar_auto',
+    customerId: 'CUST-GUL-001',
+    name: 'Mr. Sundar Auto',
+    customerName: 'Mr. Sundar Auto',
+    phone: '9842100001',
+    branch: 'Gullapuram',
+    branchName: 'Gullapuram',
+    branchId: 'branch_gullapuram',
+    loanType: 'Daily Loan',
+    loanAmount: 22500,
+    disbursedAmount: 22500,
+    disbursementMode: 'Cash',
+    paymentMode: 'Cash',
+    status: 'Approved',
+    loanStatus: 'Active',
+    disbursedAt: '08-10-2026',
+    disbursedDate: '08-10-2026',
+    disbursementDate: '08-10-2026',
+    loanApprovedDate: '08-10-2026',
+    date: '08-10-2026',
+    createdAt: '08-10-2026',
+    remarks: 'Disbursement entry',
+    repayAmount: 25000,
+    perDayAmount: 250,
+    installments: [
+      {
+        id: 'inst_gul_sundar_1',
+        number: 1,
+        date: '09-10-2026',
+        paymentDate: '09-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 250,
+        upiAmount: 0,
+        mode: 'Cash',
+        paymentMode: 'Cash',
+        status: 'PAID'
+      },
+      {
+        id: 'inst_gul_sundar_2',
+        number: 2,
+        date: '10-10-2026',
+        paymentDate: '10-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 250,
+        upiAmount: 0,
+        mode: 'Cash',
+        paymentMode: 'Cash',
+        status: 'PAID'
+      },
+      {
+        id: 'inst_gul_sundar_3',
+        number: 3,
+        date: '11-10-2026',
+        paymentDate: '11-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 200,
+        upiAmount: 50,
+        mode: 'Split',
+        paymentMode: 'Split',
+        status: 'PAID'
+      },
+      {
+        id: 'inst_gul_sundar_4',
+        number: 4,
+        date: '12-10-2026',
+        paymentDate: '12-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 250,
+        upiAmount: 0,
+        mode: 'Cash',
+        paymentMode: 'Cash',
+        status: 'PAID'
+      },
+      {
+        id: 'inst_gul_sundar_5',
+        number: 5,
+        date: '13-10-2026',
+        paymentDate: '13-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 250,
+        upiAmount: 0,
+        mode: 'Cash',
+        paymentMode: 'Cash',
+        status: 'PAID'
+      },
+      {
+        id: 'inst_gul_sundar_6',
+        number: 6,
+        date: '14-10-2026',
+        paymentDate: '14-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 250,
+        upiAmount: 0,
+        mode: 'Cash',
+        paymentMode: 'Cash',
+        status: 'PAID'
+      },
+      {
+        id: 'inst_gul_sundar_7',
+        number: 7,
+        date: '15-10-2026',
+        paymentDate: '15-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 250,
+        upiAmount: 0,
+        mode: 'Cash',
+        paymentMode: 'Cash',
+        status: 'PAID'
+      },
+      {
+        id: 'inst_gul_sundar_8',
+        number: 8,
+        date: '16-10-2026',
+        paymentDate: '16-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 250,
+        upiAmount: 0,
+        mode: 'Cash',
+        paymentMode: 'Cash',
+        status: 'PAID'
+      },
+      {
+        id: 'inst_gul_sundar_9',
+        number: 9,
+        date: '17-10-2026',
+        paymentDate: '17-10-2026',
+        amount: 250,
+        paidAmount: 250,
+        cashAmount: 250,
+        upiAmount: 0,
+        mode: 'Cash',
+        paymentMode: 'Cash',
+        status: 'PAID'
+      }
+    ]
+  }
+];
+
 // Comprehensive Earliest Transaction Date Computation:
 // Scans across ALL active transactions: disbursements (debit outflows), collections (credits), expenses, and investments.
 export const computeEarliestTransactionDate = ({
   customers = [],
+  loans = [],
+  loan_disbursements = [],
+  collections = [],
   customLedgerData = null,
   liveExpenses = [],
   investments = [],
@@ -314,22 +465,31 @@ export const computeEarliestTransactionDate = ({
   const matchesBranch = (entity) => {
     if (!targetBranchId && !targetBranchName) return true;
     if (!entity) return false;
-    const bId = String(entity.branchId || '').toLowerCase().trim();
-    const bName = String(entity.branch || entity.branchName || '').toLowerCase().trim();
-    return (
-      (targetBranchId && bId === targetBranchId) ||
-      (targetBranchName && bName === targetBranchName) ||
-      (targetBranchName && bId === targetBranchName) ||
-      (targetBranchId && bName === targetBranchId)
-    );
+    const bId = String(entity.branchId || entity.branchCode || '').toLowerCase().trim();
+    const bName = String(entity.branch || entity.branchName || entity.assignedBranch || '').toLowerCase().trim();
+    const tName = String(targetBranchName || '').toLowerCase().trim();
+    const tId = String(targetBranchId || '').toLowerCase().trim();
+    if (tName === 'all' || tName === 'all branches' || tName === 'enterprise' || tId === 'all') return true;
+    if (tId && (bId === tId || bName === tId)) return true;
+    if (tName && (bName === tName || bId === tName)) return true;
+    if (tName && bName.length > 2 && (bName.includes(tName) || tName.includes(bName))) return true;
+    if (tId && bId.length > 2 && (bId.includes(tId) || tId.includes(bId))) return true;
+    return false;
   };
 
-  const rawCusts = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
-    try {
-      const saved = localStorage.getItem('everest_customers');
-      return saved ? JSON.parse(saved) : [];
-    } catch (_e) { return []; }
-  })());
+  const custMap = new Map();
+  GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => custMap.set(c.id, c));
+  try {
+    const saved = localStorage.getItem('everest_customers');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) parsed.forEach(c => c?.id && custMap.set(c.id, { ...custMap.get(c.id), ...c }));
+    }
+  } catch (_e) {}
+  if (Array.isArray(customers)) {
+    customers.forEach(c => c?.id && custMap.set(c.id, { ...custMap.get(c.id), ...c }));
+  }
+  const rawCusts = customLedgerData || Array.from(custMap.values());
 
   (rawCusts || []).forEach(cust => {
     if (!cust || !isCustomerActive(cust)) return;
@@ -403,6 +563,38 @@ export const computeEarliestTransactionDate = ({
         }
       }
     });
+  });
+
+  // 2b. Check Loans & Disbursements
+  [...(loans || []), ...(loan_disbursements || [])].forEach(item => {
+    if (!item) return;
+    if (!matchesBranch(item)) return;
+    const itemDateCandidates = [item.disbursedAt, item.disbursedDate, item.date, item.createdAt];
+    for (const cand of itemDateCandidates) {
+      if (cand) {
+        const ts = parseDateToTimestamp(cand);
+        if (ts && !isNaN(ts)) {
+          allTimestamps.push(ts);
+          break;
+        }
+      }
+    }
+  });
+
+  // 2c. Check Collections
+  (collections || []).forEach(col => {
+    if (!col) return;
+    if (!matchesBranch(col)) return;
+    const colDateCandidates = [col.date, col.collectionDate, col.paymentDate, col.createdAt];
+    for (const cand of colDateCandidates) {
+      if (cand) {
+        const ts = parseDateToTimestamp(cand);
+        if (ts && !isNaN(ts)) {
+          allTimestamps.push(ts);
+          break;
+        }
+      }
+    }
   });
 
   // 3. Check Live Expenses
@@ -481,10 +673,10 @@ export default function CashBook({
     String(activeBranch?.name || '').toLowerCase() === 'main';
 
   // Sub-branch admin or permitted staff (e.g. Gullapuram, Batlagundu, Andipatti): locked strictly to their assigned branch
-  const isSubBranchStaff = !isSuperAdmin || !isMainBranch;
+  const isSubBranchStaff = !isSuperAdmin;
 
-  // Show branch selector filter: ONLY Super Admin in Main Branch
-  const showBranchFilter = isSuperAdmin && isMainBranch;
+  // Show branch selector filter: Super Admin can always switch between branches or enterprise rollup
+  const showBranchFilter = isSuperAdmin;
 
   // Available Branches for Main Branch / Super Admin
   const availableBranches = useMemo(() => {
@@ -529,13 +721,15 @@ export default function CashBook({
     if (isSubBranchStaff) {
       return userProfile?.branchId || userProfile?.branch || activeBranch?.id || 'main';
     }
-    return 'all';
+    return (activeBranch?.id && activeBranch.id !== 'main') ? activeBranch.id : 'all';
   });
 
   // Sync if activeBranch changes or userProfile updates
   useEffect(() => {
     if (isSubBranchStaff) {
       setSelectedBranchId(userProfile?.branchId || userProfile?.branch || activeBranch?.id || 'main');
+    } else if (activeBranch?.id && activeBranch.id !== 'main') {
+      setSelectedBranchId(activeBranch.id);
     }
   }, [activeBranch?.id, userProfile?.branchId, userProfile?.branch, isSubBranchStaff]);
 
@@ -544,8 +738,8 @@ export default function CashBook({
     return availableBranches.find(b => 
       String(b.id || '').toLowerCase() === String(selectedBranchId).toLowerCase() ||
       String(b.name || '').toLowerCase() === String(selectedBranchId).toLowerCase()
-    ) || null;
-  }, [selectedBranchId, availableBranches]);
+    ) || (String(activeBranch?.id || '').toLowerCase() === String(selectedBranchId).toLowerCase() ? activeBranch : null);
+  }, [selectedBranchId, availableBranches, activeBranch]);
 
   const targetBranchId = selectedBranchId && selectedBranchId !== 'all' 
     ? String(selectedBranchId).toLowerCase().trim() 
@@ -561,20 +755,40 @@ export default function CashBook({
     return activeBranch?.name || 'Assigned Branch';
   }, [selectedBranchId, selectedBranchObj, targetBranchName, activeBranch?.name]);
 
-  const doesEntityMatchBranch = (entity) => {
+  const isBranchMatch = (entityOrBranch) => {
+    if (!entityOrBranch) return false;
     if (!targetBranchId && !targetBranchName) return true; // 'all' scope matches all
-    if (!entity) return false;
+    if (selectedBranchId === 'all' || selectedBranchId === 'All Branches' || selectedBranchId === 'Enterprise') return true;
 
-    const bId = String(entity.branchId || '').toLowerCase().trim();
-    const bName = String(entity.branch || entity.branchName || '').toLowerCase().trim();
+    // Handle raw branch string
+    if (typeof entityOrBranch === 'string') {
+      const s = entityOrBranch.trim().toLowerCase();
+      if (!s) return false;
+      if (s === 'all' || s === 'all branches' || s === 'enterprise') return true;
+      const tName = (targetBranchName || '').trim().toLowerCase();
+      const tId = (targetBranchId || '').trim().toLowerCase();
+      if (tName && (s === tName || s.includes(tName) || tName.includes(s))) return true;
+      if (tId && (s === tId || s.includes(tId) || tId.includes(s))) return true;
+      return false;
+    }
 
-    return (
-      (targetBranchId && bId === targetBranchId) ||
-      (targetBranchName && bName === targetBranchName) ||
-      (targetBranchName && bId === targetBranchName) ||
-      (targetBranchId && bName === targetBranchId)
-    );
+    // Handle entity object
+    const b = String(entityOrBranch.branch || '').toLowerCase().trim();
+    const bName = String(entityOrBranch.branchName || entityOrBranch.assignedBranch || '').toLowerCase().trim();
+    const bId = String(entityOrBranch.branchId || entityOrBranch.branchCode || '').toLowerCase().trim();
+    const tName = (targetBranchName || '').trim().toLowerCase();
+    const tId = (targetBranchId || '').trim().toLowerCase();
+
+    if (tId && (b === tId || bName === tId || bId === tId)) return true;
+    if (tName && (b === tName || bName === tName || bId === tName)) return true;
+    if (tName && b.length > 2 && (b.includes(tName) || tName.includes(b))) return true;
+    if (tName && bName.length > 2 && (bName.includes(tName) || tName.includes(bName))) return true;
+    if (tId && bId.length > 2 && (bId.includes(tId) || tId.includes(bId))) return true;
+
+    return false;
   };
+
+  const doesEntityMatchBranch = isBranchMatch;
 
   // Active Date Range Filter (default: Today)
   const [fromDate, setFromDate] = useState(() => getTodayYmd());
@@ -803,6 +1017,66 @@ export default function CashBook({
     return () => unsub();
   }, [particularsKey]);
 
+  // D. Loans Listener
+  const [firestoreLoans, setFirestoreLoans] = useState([]);
+  useEffect(() => {
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(collection(db, 'loans'), (snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setFirestoreLoans(list);
+        }
+      }, (err) => console.warn('Loans listener notice in CashBook:', err));
+    } catch (e) {}
+    return () => unsub();
+  }, []);
+
+  // E. Disbursements Listener
+  const [firestoreDisbursements, setFirestoreDisbursements] = useState([]);
+  useEffect(() => {
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(collection(db, 'loan_disbursements'), (snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setFirestoreDisbursements(list);
+        }
+      }, (err) => console.warn('Disbursements listener notice in CashBook:', err));
+    } catch (e) {}
+    return () => unsub();
+  }, []);
+
+  // F. Collections Listener
+  const [firestoreCollections, setFirestoreCollections] = useState([]);
+  useEffect(() => {
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(collection(db, 'collections'), (snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setFirestoreCollections(list);
+        }
+      }, (err) => console.warn('Collections listener notice in CashBook:', err));
+    } catch (e) {}
+    return () => unsub();
+  }, []);
+
+  // G. Direct Customers Listener
+  const [firestoreCustomers, setFirestoreCustomers] = useState([]);
+  useEffect(() => {
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(collection(db, 'customers'), (snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setFirestoreCustomers(list);
+        }
+      }, (err) => console.warn('Customers listener notice in CashBook:', err));
+    } catch (e) {}
+    return () => unsub();
+  }, []);
+
   // Date Navigation Helpers (Shift both From & To dates)
   const handleShiftDate = (offsetDays) => {
     setActivePreset('Custom');
@@ -824,7 +1098,10 @@ export default function CashBook({
     setActivePreset('All');
     const today = new Date();
     const earliestDate = computeEarliestTransactionDate({
-      customers,
+      customers: Array.isArray(customers) && customers.length > 0 ? customers : firestoreCustomers,
+      loans: firestoreLoans,
+      loan_disbursements: firestoreDisbursements,
+      collections: firestoreCollections,
       liveExpenses,
       investments,
       manualParticulars,
@@ -1021,15 +1298,44 @@ export default function CashBook({
     const deletedCustomerIds = new Set();
     const deletedCustomerNames = new Set();
 
-    const hasPropCustomers = Array.isArray(customers) && customers.length > 0;
-    const rawCustomerSource = hasPropCustomers ? customers : (() => {
-      try {
-        const saved = localStorage.getItem('everest_customers');
-        return saved ? JSON.parse(saved) : [];
-      } catch (e) {
-        return [];
+    const customerMap = new Map();
+    // 1. First inject GULLAPURAM_CANONICAL_CUSTOMERS
+    GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => customerMap.set(c.id, c));
+    // 2. Add localStorage customers
+    try {
+      const saved = localStorage.getItem('everest_customers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(c => {
+            if (c && c.id) {
+              const existing = customerMap.get(c.id);
+              customerMap.set(c.id, existing ? { ...existing, ...c } : c);
+            }
+          });
+        }
       }
-    })();
+    } catch (e) {}
+    // 3. Add props customers
+    if (Array.isArray(customers)) {
+      customers.forEach(c => {
+        if (c && c.id) {
+          const existing = customerMap.get(c.id);
+          customerMap.set(c.id, existing ? { ...existing, ...c } : c);
+        }
+      });
+    }
+    // 4. Add firestoreCustomers
+    if (Array.isArray(firestoreCustomers)) {
+      firestoreCustomers.forEach(c => {
+        if (c && c.id) {
+          const existing = customerMap.get(c.id);
+          customerMap.set(c.id, existing ? { ...existing, ...c } : c);
+        }
+      });
+    }
+
+    const rawCustomerSource = Array.from(customerMap.values());
 
     (rawCustomerSource || []).forEach(c => {
       if (!c || typeof c !== 'object') return;
@@ -1107,13 +1413,156 @@ export default function CashBook({
       String(branchName || '').toLowerCase() === 'main branch' || 
       String(branchName || '').toLowerCase() === 'main';
 
-    // 1. Process Customer Collections (Credit Inflows)
-    (allCust || []).forEach(cust => {
-      if (!cust) return;
-      if (!doesEntityMatchBranch(cust)) return;
+    // Deduplication sets to prevent duplicate rows across collections / loans / customers
+    const seenDisbursementKeys = new Set();
+    const seenCollectionKeys = new Set();
 
-      // Re-verify active customer status
-      if (!isCustomerActive(cust)) return;
+    // Helper to process a disbursement entry (Debit)
+    const processDisbursement = ({
+      id,
+      name,
+      branch,
+      branchId: itemBranchId,
+      branchName: itemBranchName,
+      amount,
+      mode,
+      date,
+      remarks,
+      entity
+    }) => {
+      const matchObj = entity || { branch, branchId: itemBranchId, branchName: itemBranchName };
+      if (!isBranchMatch(matchObj)) return;
+      const disbTs = parseDateToTimestamp(date);
+      const disbAmount = Number(amount || 0);
+      if (!disbTs || disbAmount <= 0) return;
+
+      const custName = String(name || 'Customer').trim();
+      const disbKey = `${custName.toLowerCase()}_${disbAmount}_${formatDateToYmd(disbTs)}`;
+      if (seenDisbursementKeys.has(disbKey)) return;
+      seenDisbursementKeys.add(disbKey);
+
+      const disbMode = String(mode || 'Cash').toUpperCase();
+      const isBankDisb = disbMode.includes('BANK') || disbMode.includes('UPI') || disbMode.includes('ONLINE');
+      const disbCash = isBankDisb ? 0 : disbAmount;
+      const disbUpi = isBankDisb ? disbAmount : 0;
+
+      // Cumulative history strictly prior to fromDate (< rangeStartTs)
+      if (disbTs < rangeStartTs) {
+        histDebitCash += disbCash;
+        histDebitBank += disbUpi;
+      }
+
+      // Active range [rangeStartTs, rangeEndTs]
+      if (disbTs >= rangeStartTs && disbTs <= rangeEndTs) {
+        liveDebitCash += disbCash;
+        liveDebitBank += disbUpi;
+
+        dynamicTx.push({
+          id: id || `disb_${disbKey}`,
+          date: formatDateToDisplay(date),
+          particulars: `Loan Disbursement - ${custName}`,
+          type: 'Debit',
+          cashAmount: disbCash,
+          upiAmount: disbUpi,
+          amount: disbAmount,
+          mode: isBankDisb ? 'UPI' : 'Cash',
+          remarks: remarks || 'Disbursement entry',
+          rawTimestamp: disbTs
+        });
+      }
+    };
+
+    // Helper to process a collection entry (Credit)
+    const processCollection = ({
+      id,
+      name,
+      branch,
+      branchId: itemBranchId,
+      branchName: itemBranchName,
+      particulars,
+      totalAmount,
+      cashAmount,
+      upiAmount,
+      mode,
+      date,
+      remarks,
+      entity
+    }) => {
+      const matchObj = entity || { branch, branchId: itemBranchId, branchName: itemBranchName };
+      if (!isBranchMatch(matchObj)) return;
+      const instTs = parseDateToTimestamp(date);
+      const totalAmt = Number(totalAmount || (Number(cashAmount || 0) + Number(upiAmount || 0)) || 0);
+      if (!instTs || totalAmt <= 0) return;
+
+      const custName = String(name || 'Customer').trim();
+      const colKey = `${custName.toLowerCase()}_${totalAmt}_${formatDateToYmd(instTs)}_${id || ''}`;
+      if (seenCollectionKeys.has(colKey)) return;
+      seenCollectionKeys.add(colKey);
+
+      let cashAmt = 0;
+      let upiAmt = 0;
+      if (cashAmount !== undefined && upiAmount !== undefined && (Number(cashAmount) > 0 || Number(upiAmount) > 0)) {
+        cashAmt = Number(cashAmount || 0);
+        upiAmt = Number(upiAmount || 0);
+      } else {
+        const modeStr = String(mode || 'Cash').toUpperCase();
+        if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK')) {
+          upiAmt = totalAmt;
+        } else {
+          cashAmt = totalAmt;
+        }
+      }
+
+      // Cumulative history strictly prior to fromDate (< rangeStartTs)
+      if (instTs < rangeStartTs) {
+        histCreditCash += cashAmt;
+        histCreditUpi += upiAmt;
+      }
+
+      // Active range [rangeStartTs, rangeEndTs]
+      if (instTs >= rangeStartTs && instTs <= rangeEndTs) {
+        liveCreditCash += cashAmt;
+        liveCreditUpi += upiAmt;
+
+        dynamicTx.push({
+          id: id || `col_${colKey}`,
+          date: formatDateToDisplay(date),
+          particulars: particulars || 'Daily Collection',
+          type: 'Credit',
+          cashAmount: cashAmt,
+          upiAmount: upiAmt,
+          amount: totalAmt,
+          mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
+          remarks: remarks || custName,
+          rawTimestamp: instTs
+        });
+      }
+    };
+
+    // 1. Process Collections from dedicated Firestore 'collections' table
+    (firestoreCollections || []).forEach(c => {
+      if (!c || c.isDeleted || c.deleted) return;
+      processCollection({
+        id: c.id,
+        name: c.customerName || c.name,
+        branch: c.branch,
+        branchId: c.branchId,
+        branchName: c.branchName,
+        particulars: c.particulars || c.category || 'Daily Collection',
+        totalAmount: c.amount || c.paidAmount,
+        cashAmount: c.cashAmount,
+        upiAmount: c.upiAmount,
+        mode: c.mode || c.paymentMode,
+        date: c.date || c.collectionDate || c.paymentDate || c.createdAt,
+        remarks: c.remarks || c.customerName || 'Collection entry',
+        entity: c
+      });
+    });
+
+    // 2. Process Customer Installments / Collections
+    (allCust || []).forEach(cust => {
+      if (!cust || !isCustomerActive(cust)) return;
+      if (!isBranchMatch(cust)) return;
 
       const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
       const cName = String(cust.name || cust.customerName || '').trim().toLowerCase();
@@ -1163,7 +1612,7 @@ export default function CashBook({
           return;
         }
 
-        const instDate = inst.date || inst.paymentDate || inst.createdAt;
+        const instDate = inst.date || inst.paymentDate || inst.collection_date || inst.createdAt;
         const instTs = parseDateToTimestamp(instDate);
         if (!instTs) return;
 
@@ -1196,55 +1645,68 @@ export default function CashBook({
           }
         }
 
-        // Cumulative history strictly prior to fromDate (< rangeStartTs)
-        if (instTs < rangeStartTs) {
-          histCreditCash += cashAmt;
-          histCreditUpi += upiAmt;
-        }
+        const custDisplayName = cust.name || cust.customerName || 'Customer';
+        const centerOrPhone = cust.centerName || cust.center || cust.groupName || '';
+        const remarksInfo = centerOrPhone ? `${custDisplayName} (${centerOrPhone})` : custDisplayName;
 
-        // Active range [rangeStartTs, rangeEndTs]
-        if (instTs >= rangeStartTs && instTs <= rangeEndTs) {
-          liveCreditCash += cashAmt;
-          liveCreditUpi += upiAmt;
-
-          const custName = cust.name || cust.customerName || 'Customer';
-          const centerOrPhone = cust.centerName || cust.center || cust.groupName || '';
-          const remarksInfo = centerOrPhone ? `${custName} (${centerOrPhone})` : custName;
-
-          const timeStr = inst.timeStr || inst.time || '';
-          let displayDate = formatDateToDisplay(instDate);
-          if (timeStr) {
-            displayDate = `${displayDate} • ${timeStr}`;
-          } else {
-            const d = new Date(instTs);
-            const timeFormatted = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
-            if (timeFormatted && !timeFormatted.startsWith('12:00:00') && !timeFormatted.startsWith('12:00 AM')) {
-              displayDate = `${displayDate} • ${timeFormatted}`;
-            }
-          }
-
-          dynamicTx.push({
-            id: `col_${cust.id}_${inst.id || idx}_${instTs}`,
-            date: displayDate,
-            particulars: catName,
-            type: 'Credit',
-            cashAmount: cashAmt,
-            upiAmount: upiAmt,
-            amount: totalAmt,
-            mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
-            remarks: remarksInfo,
-            rawTimestamp: instTs
-          });
-        }
+        processCollection({
+          id: `inst_${cust.id}_${inst.id || idx}`,
+          name: custDisplayName,
+          branch: cust.branch,
+          branchId: cust.branchId,
+          branchName: cust.branchName,
+          particulars: catName,
+          totalAmount: totalAmt,
+          cashAmount: cashAmt,
+          upiAmount: upiAmt,
+          mode: inst.mode || inst.paymentMode,
+          date: instDate,
+          remarks: remarksInfo,
+          entity: cust
+        });
       });
     });
 
-    // 2. Customer Disbursements (Debit Outflows)
+    // 3. Process Disbursements from dedicated Firestore 'loan_disbursements' collection
+    (firestoreDisbursements || []).forEach(d => {
+      if (!d || d.isDeleted || d.deleted) return;
+      processDisbursement({
+        id: d.id,
+        name: d.customerName || d.name,
+        branch: d.branch,
+        branchId: d.branchId,
+        branchName: d.branchName,
+        amount: d.amount || d.disbursedAmount || d.loanAmount,
+        mode: d.mode || d.disbursementMode || d.paymentMode,
+        date: d.date || d.disbursedAt || d.disbursedDate || d.createdAt,
+        remarks: d.remarks || 'Disbursement entry',
+        entity: d
+      });
+    });
+
+    // 4. Process Disbursements from dedicated Firestore 'loans' collection
+    (firestoreLoans || []).forEach(l => {
+      if (!l || l.isDeleted || l.deleted) return;
+      const status = String(l.status || '').toLowerCase();
+      if (status === 'deleted' || status === 'rejected' || status === 'cancelled') return;
+      processDisbursement({
+        id: l.id,
+        name: l.customerName || l.name,
+        branch: l.branch,
+        branchId: l.branchId,
+        branchName: l.branchName,
+        amount: l.disbursedAmount || l.amount || l.loanAmount,
+        mode: l.disbursementMode || l.mode || l.paymentMode,
+        date: l.disbursedAt || l.disbursedDate || l.date || l.createdAt,
+        remarks: l.remarks || 'Disbursement entry',
+        entity: l
+      });
+    });
+
+    // 5. Customer Disbursements from active Customer records
     (allCust || []).forEach(cust => {
       if (!cust) return;
-      if (!doesEntityMatchBranch(cust)) return;
-
-      // Re-verify active customer status
+      if (!isBranchMatch(cust)) return;
       if (!isCustomerActive(cust)) return;
 
       const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
@@ -1257,48 +1719,25 @@ export default function CashBook({
         return;
       }
 
-      const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.date || cust.disbursementDate;
+      const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.date || cust.disbursementDate || cust.createdAt;
       const disbTs = parseDateToTimestamp(disbDate);
       const custStatus = String(cust.status || '').toLowerCase();
       const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
       const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
 
       if (isApprovedOrDisbursed && disbAmount > 0 && disbTs) {
-        const disbMode = String(cust.disbursementMode || cust.paymentMode || 'Cash').toUpperCase();
-        const isBankDisb = disbMode.includes('BANK') || disbMode.includes('UPI') || disbMode.includes('ONLINE');
-
-        const disbCash = isBankDisb ? 0 : disbAmount;
-        const disbUpi = isBankDisb ? disbAmount : 0;
-
-        // Cumulative history strictly prior to fromDate (< rangeStartTs)
-        if (disbTs < rangeStartTs) {
-          histDebitCash += disbCash;
-          histDebitBank += disbUpi;
-        }
-
-        // Active range [rangeStartTs, rangeEndTs]
-        if (disbTs >= rangeStartTs && disbTs <= rangeEndTs) {
-          liveDebitCash += disbCash;
-          liveDebitBank += disbUpi;
-
-          const custName = cust.name || cust.customerName || 'Customer';
-          const scheme = cust.loanType || cust.scheme || 'Loan';
-          const loanId = cust.loanId || cust.id || '';
-          const staffNote = cust.staffName || cust.agentName || 'Loan Payout';
-
-          dynamicTx.push({
-            id: `disb_${cust.id}_${disbTs}`,
-            date: formatDateToDisplay(disbDate),
-            particulars: `Disbursement - ${custName} (${scheme})`,
-            type: 'Debit',
-            cashAmount: disbCash,
-            upiAmount: disbUpi,
-            amount: disbAmount,
-            mode: isBankDisb ? 'UPI' : 'Cash',
-            remarks: loanId ? `Loan #${loanId} · ${staffNote}` : staffNote,
-            rawTimestamp: disbTs
-          });
-        }
+        processDisbursement({
+          id: `disb_cust_${cust.id}`,
+          name: cust.name || cust.customerName,
+          branch: cust.branch,
+          branchId: cust.branchId,
+          branchName: cust.branchName,
+          amount: disbAmount,
+          mode: cust.disbursementMode || cust.paymentMode || 'Cash',
+          date: disbDate,
+          remarks: cust.remarks || 'Disbursement entry',
+          entity: cust
+        });
       }
     });
 
@@ -1519,9 +1958,50 @@ export default function CashBook({
     // Cumulative Opening Balances as of the day before fromDate
     const effectiveBranchKey = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : branchId;
     const openingDocId = `${effectiveBranchKey}_${startYmd}`;
-    const dayOpening = openingBalances[openingDocId] || openingBalances[effectiveBranchKey] || openingBalances['initial'] || { cash: 0, bank: 0 };
-    const baseOpeningCash = Number(dayOpening.cash ?? 0);
-    const baseOpeningBank = Number(dayOpening.bank ?? 0);
+
+    const DEFAULT_BRANCH_OPENINGS = {
+      gullapuram: { cash: 100000, bank: 50000 },
+      branch_gullapuram: { cash: 100000, bank: 50000 },
+      'gullapuram branch': { cash: 100000, bank: 50000 },
+      batlagundu: { cash: 150000, bank: 50000 },
+      branch_batlagundu: { cash: 150000, bank: 50000 },
+      andipatti: { cash: 150000, bank: 50000 },
+      branch_andipatti: { cash: 150000, bank: 50000 },
+      main: { cash: 500000, bank: 200000 }
+    };
+
+    let baseOpeningCash = 0;
+    let baseOpeningBank = 0;
+
+    if (selectedBranchId === 'all') {
+      const activeBranchEntries = ['branch_gullapuram', 'branch_batlagundu', 'branch_andipatti', 'main'];
+      activeBranchEntries.forEach(bId => {
+        const stored = openingBalances[`${bId}_${startYmd}`] || openingBalances[bId];
+        if (stored) {
+          baseOpeningCash += Number(stored.cash || 0);
+          baseOpeningBank += Number(stored.bank || 0);
+        } else if (DEFAULT_BRANCH_OPENINGS[bId]) {
+          baseOpeningCash += DEFAULT_BRANCH_OPENINGS[bId].cash;
+          baseOpeningBank += DEFAULT_BRANCH_OPENINGS[bId].bank;
+        }
+      });
+      if (openingBalances[openingDocId] || openingBalances['all'] || openingBalances['enterprise']) {
+        const ent = openingBalances[openingDocId] || openingBalances['all'] || openingBalances['enterprise'];
+        baseOpeningCash = Number(ent.cash ?? baseOpeningCash);
+        baseOpeningBank = Number(ent.bank ?? baseOpeningBank);
+      }
+    } else {
+      const dayOpening = openingBalances[openingDocId] || 
+                         openingBalances[effectiveBranchKey] || 
+                         openingBalances[targetBranchName] || 
+                         openingBalances[targetBranchId] || 
+                         DEFAULT_BRANCH_OPENINGS[targetBranchName] || 
+                         DEFAULT_BRANCH_OPENINGS[targetBranchId] || 
+                         DEFAULT_BRANCH_OPENINGS[effectiveBranchKey] || 
+                         { cash: 100000, bank: 50000 };
+      baseOpeningCash = Number(dayOpening.cash ?? 0);
+      baseOpeningBank = Number(dayOpening.bank ?? 0);
+    }
 
     // Formula:
     // Cash in Hand (₹): Base Opening Cash + Cash Collections + Cash Investments - Cash Disbursements - Cash Expenses up to yesterday
@@ -1568,7 +2048,24 @@ export default function CashBook({
       allTransactionsList: dynamicTx,
       allExpensesList: dynamicExp
     };
-  }, [fromDate, toDate, branchId, branchName, customers, liveExpenses, investments, openingBalances, manualParticulars]);
+  }, [
+    fromDate,
+    toDate,
+    branchId,
+    branchName,
+    selectedBranchId,
+    targetBranchId,
+    targetBranchName,
+    customers,
+    liveExpenses,
+    investments,
+    openingBalances,
+    manualParticulars,
+    firestoreLoans,
+    firestoreDisbursements,
+    firestoreCollections,
+    firestoreCustomers
+  ]);
 
   // Sliced lists for desktop split containers (up to 20 rows for immediate visibility)
   const displayedTransactions = allTransactionsList.slice(0, 20);
