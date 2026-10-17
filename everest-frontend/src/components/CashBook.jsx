@@ -54,7 +54,7 @@ const getYesterdayYmd = () => {
   return `${yr}-${mo}-${dy}`;
 };
 
-const parseDateToTimestamp = (dateInput) => {
+export const parseDateToTimestamp = (dateInput) => {
   if (!dateInput) return null;
   if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
     return dateInput.getTime();
@@ -293,6 +293,149 @@ export const isCustomerActive = (cust) => {
   return true;
 };
 
+// Comprehensive Earliest Transaction Date Computation:
+// Scans across ALL active transactions: disbursements (debit outflows), collections (credits), expenses, and investments.
+export const computeEarliestTransactionDate = ({
+  customers = [],
+  customLedgerData = null,
+  liveExpenses = [],
+  investments = [],
+  manualParticulars = [],
+  fallbackDate = new Date()
+}) => {
+  const allTimestamps = [];
+
+  const rawCusts = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
+    try {
+      const saved = localStorage.getItem('everest_customers');
+      return saved ? JSON.parse(saved) : [];
+    } catch (_e) { return []; }
+  })());
+
+  (rawCusts || []).forEach(cust => {
+    if (!cust || !isCustomerActive(cust)) return;
+
+    // 1. Check Disbursements (Debits)
+    const custStatus = String(cust.status || '').toLowerCase();
+    const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
+    const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
+
+    if (isApprovedOrDisbursed && disbAmount > 0) {
+      const disbDateCandidates = [
+        cust.disbursedAt,
+        cust.disbursedDate,
+        cust.disbursementDate,
+        cust.disbursed_at,
+        cust.disbursement_date,
+        cust.loanApprovedDate,
+        cust.approvalDate,
+        cust.loanDate,
+        cust.date,
+        cust.createdAt
+      ];
+      for (const cand of disbDateCandidates) {
+        if (cand) {
+          const ts = parseDateToTimestamp(cand);
+          if (ts && !isNaN(ts)) {
+            allTimestamps.push(ts);
+            break;
+          }
+        }
+      }
+    }
+
+    // 2. Check Collections (Credits / Installments)
+    let rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
+    try {
+      const localLedger = localStorage.getItem(`everest_ledger_${cust.id}`);
+      if (localLedger) {
+        const parsed = JSON.parse(localLedger);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (!Array.isArray(rawInstallments) || rawInstallments.length === 0) {
+            rawInstallments = parsed;
+          } else if (parsed.length > rawInstallments.length) {
+            rawInstallments = parsed;
+          }
+        }
+      }
+    } catch (e) {}
+
+    (rawInstallments || []).forEach(inst => {
+      if (!inst || typeof inst !== 'object') return;
+      if (inst.isDeleted === true || inst.deleted === true || inst.is_deleted === true) return;
+      const status = String(inst.status || '').toUpperCase();
+      if (status === 'BOUNCED' || status === 'CANCELLED' || status === 'DELETED') return;
+      if (inst.mode === 'BOUNCED') return;
+
+      const instDateCandidates = [
+        inst.date,
+        inst.paymentDate,
+        inst.collection_date,
+        inst.createdAt
+      ];
+      for (const cand of instDateCandidates) {
+        if (cand) {
+          const ts = parseDateToTimestamp(cand);
+          if (ts && !isNaN(ts)) {
+            allTimestamps.push(ts);
+            break;
+          }
+        }
+      }
+    });
+  });
+
+  // 3. Check Live Expenses
+  (liveExpenses || []).forEach(exp => {
+    if (!exp || exp.isDeleted || exp.deleted) return;
+    const expDateCandidates = [exp.date, exp.createdAt];
+    for (const cand of expDateCandidates) {
+      if (cand) {
+        const ts = parseDateToTimestamp(cand);
+        if (ts && !isNaN(ts)) {
+          allTimestamps.push(ts);
+          break;
+        }
+      }
+    }
+  });
+
+  // 4. Check Live Investments
+  (investments || []).forEach(inv => {
+    if (!inv || inv.isDeleted || inv.deleted) return;
+    const invDateCandidates = [inv.date, inv.createdAt];
+    for (const cand of invDateCandidates) {
+      if (cand) {
+        const ts = parseDateToTimestamp(cand);
+        if (ts && !isNaN(ts)) {
+          allTimestamps.push(ts);
+          break;
+        }
+      }
+    }
+  });
+
+  // 5. Check Manual Particulars
+  (manualParticulars || []).forEach(part => {
+    if (!part || part.isDeleted || part.deleted) return;
+    const partDateCandidates = [part.date, part.createdAt];
+    for (const cand of partDateCandidates) {
+      if (cand) {
+        const ts = parseDateToTimestamp(cand);
+        if (ts && !isNaN(ts)) {
+          allTimestamps.push(ts);
+          break;
+        }
+      }
+    }
+  });
+
+  if (allTimestamps.length > 0) {
+    return new Date(Math.min(...allTimestamps));
+  }
+  return fallbackDate || new Date();
+};
+
 export default function CashBook({ 
   activeBranch = { id: 'main', name: 'Main Branch' }, 
   userProfile = null, 
@@ -307,6 +450,7 @@ export default function CashBook({
   // Active Date Range Filter (default: Today)
   const [fromDate, setFromDate] = useState(() => getTodayYmd());
   const [toDate, setToDate] = useState(() => getTodayYmd());
+  const [activePreset, setActivePreset] = useState('Today');
 
   // Input refs for programmatic showPicker() trigger
   const fromDateInputRef = useRef(null);
@@ -463,6 +607,7 @@ export default function CashBook({
 
   // Date Navigation Helpers (Shift both From & To dates)
   const handleShiftDate = (offsetDays) => {
+    setActivePreset('Custom');
     const shift = (dInput) => {
       const ts = parseDateToTimestamp(dInput);
       if (!ts) return dInput;
@@ -477,8 +622,23 @@ export default function CashBook({
     setToDate(prev => shift(prev));
   };
 
-  const isTodaySelected = isSameDay(fromDate, getTodayYmd()) && isSameDay(toDate, getTodayYmd());
-  const isYesterdaySelected = isSameDay(fromDate, getYesterdayYmd()) && isSameDay(toDate, getYesterdayYmd());
+  const handleSelectAllPeriod = () => {
+    setActivePreset('All');
+    const today = new Date();
+    const earliestDate = computeEarliestTransactionDate({
+      customers,
+      liveExpenses,
+      investments,
+      manualParticulars,
+      fallbackDate: today
+    });
+    setFromDate(formatDateToDisplay(earliestDate));
+    setToDate(formatDateToDisplay(today));
+  };
+
+  const isTodaySelected = activePreset === 'Today' || (activePreset !== 'All' && isSameDay(fromDate, getTodayYmd()) && isSameDay(toDate, getTodayYmd()));
+  const isYesterdaySelected = activePreset === 'Yesterday' || (activePreset !== 'All' && isSameDay(fromDate, getYesterdayYmd()) && isSameDay(toDate, getYesterdayYmd()));
+  const isAllSelected = activePreset === 'All';
 
   // Handle Save Investment
   const handleSaveInvestment = (e) => {
@@ -1348,6 +1508,7 @@ export default function CashBook({
                 value={formatDateToYmd(fromDate)}
                 onChange={(e) => {
                   if (e.target.value) {
+                    setActivePreset('Custom');
                     const newFrom = e.target.value;
                     setFromDate(newFrom);
                     if (newFrom > toDate) setToDate(newFrom);
@@ -1388,6 +1549,7 @@ export default function CashBook({
                 value={formatDateToYmd(toDate)}
                 onChange={(e) => {
                   if (e.target.value) {
+                    setActivePreset('Custom');
                     const newTo = e.target.value;
                     setToDate(newTo);
                     if (newTo < fromDate) setFromDate(newTo);
@@ -1409,11 +1571,12 @@ export default function CashBook({
             </button>
           </div>
 
-          {/* Quick Presets: Yesterday & Today */}
+          {/* Quick Presets: Yesterday, Today, All */}
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
+                setActivePreset('Yesterday');
                 const yest = getYesterdayYmd();
                 setFromDate(yest);
                 setToDate(yest);
@@ -1429,6 +1592,7 @@ export default function CashBook({
             <button
               type="button"
               onClick={() => {
+                setActivePreset('Today');
                 const today = getTodayYmd();
                 setFromDate(today);
                 setToDate(today);
@@ -1440,6 +1604,17 @@ export default function CashBook({
               }`}
             >
               Today
+            </button>
+            <button
+              type="button"
+              onClick={handleSelectAllPeriod}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                isAllSelected
+                  ? 'bg-blue-600 text-white font-extrabold shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
+              }`}
+            >
+              All
             </button>
           </div>
         </div>

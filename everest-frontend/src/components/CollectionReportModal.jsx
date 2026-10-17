@@ -3,7 +3,7 @@ import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, AlertTria
 import CollectionReportDownloadModal from './CollectionReportDownloadModal';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { isCustomerActive } from './CashBook';
+import { isCustomerActive, parseDateToTimestamp, computeEarliestTransactionDate } from './CashBook';
 
 const getTodayStr = () => {
   const today = new Date();
@@ -29,35 +29,6 @@ const formatFromNativeDate = (yyyyMmDd) => {
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
   return yyyyMmDd;
-};
-
-const parseDateToTimestamp = (dStr) => {
-  if (!dStr) return null;
-  if (dStr instanceof Date) return dStr.getTime();
-  if (typeof dStr === 'object' && dStr.seconds !== undefined) return dStr.seconds * 1000;
-
-  if (typeof dStr === 'string') {
-    const cleanStr = dStr.trim();
-    // DD-MM-YYYY or DD.MM.YYYY or DD/MM/YYYY
-    const dmyMatch = cleanStr.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})$/);
-    if (dmyMatch) {
-      const day = parseInt(dmyMatch[1], 10);
-      const month = parseInt(dmyMatch[2], 10);
-      let year = parseInt(dmyMatch[3], 10);
-      if (year < 100) year += 2000;
-      return new Date(year, month - 1, day).getTime();
-    }
-    // YYYY-MM-DD
-    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})$/);
-    if (ymdMatch) {
-      const year = parseInt(ymdMatch[1], 10);
-      const month = parseInt(ymdMatch[2], 10);
-      const day = parseInt(ymdMatch[3], 10);
-      return new Date(year, month - 1, day).getTime();
-    }
-  }
-  const parsed = new Date(dStr);
-  return isNaN(parsed.getTime()) ? null : parsed.getTime();
 };
 
 const resolvePaymentMode = (inst) => {
@@ -383,32 +354,12 @@ export default function CollectionReportModal({
       setFromDate(formatDate(lastMonth));
       setToDate(formatDate(today));
     } else if (option === 'All') {
-      let earliestTs = null;
-      const rawCusts = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
-        try {
-          const saved = localStorage.getItem('everest_customers');
-          return saved ? JSON.parse(saved) : [];
-        } catch (_e) { return []; }
-      })());
-
-      (rawCusts || []).forEach(cust => {
-        const insts = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-        insts.forEach(inst => {
-          const dStr = inst.date || inst.paymentDate || inst.createdAt;
-          const ts = parseDateToTimestamp(dStr);
-          if (ts && (!earliestTs || ts < earliestTs)) {
-            earliestTs = ts;
-          }
-        });
-        const dStr = cust.startDate || cust.firstDueDate || cust.disbursedAt || cust.loanDate || cust.createdAt;
-        const ts = parseDateToTimestamp(dStr);
-        if (ts && (!earliestTs || ts < earliestTs)) {
-          earliestTs = ts;
-        }
+      const earliestDate = computeEarliestTransactionDate({
+        customers,
+        customLedgerData,
+        fallbackDate: today
       });
-
-      const earliestDateStr = earliestTs ? formatDate(new Date(earliestTs)) : '01-01-2020';
-      setFromDate(earliestDateStr);
+      setFromDate(formatDate(earliestDate));
       setToDate(formatDate(today));
     } else {
       const dateStr = formatDate(today);
