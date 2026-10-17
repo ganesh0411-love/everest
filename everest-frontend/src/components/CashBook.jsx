@@ -294,6 +294,60 @@ export const isCustomerActive = (cust) => {
   return true;
 };
 
+// Normalizes customer identity across phone, name, and branch
+export const getCanonicalCustomerKey = (c) => {
+  if (!c || typeof c !== 'object') return '';
+  const cleanName = String(c.name || c.customerName || '')
+    .toLowerCase()
+    .replace(/^(mr|mrs|ms|dr)\.?\s+/i, '')
+    .replace(/\s*\(.*?\)\s*/g, '')
+    .trim();
+  const b = String(c.branch || c.branchName || c.assignedBranch || '').toLowerCase().trim();
+  if (cleanName) return `name_${cleanName}_${b}`;
+  const phone = String(c.phone || c.mobile || c.phoneNumber || '').replace(/\D/g, '');
+  if (phone.length >= 10) return `phone_${phone.slice(-10)}`;
+  return String(c.id || c.customerId || '');
+};
+
+// Merges customer object into targetMap keyed by canonical customer key
+export const mergeCustomerIntoMap = (targetMap, c) => {
+  if (!c || typeof c !== 'object') return;
+  const cKey = getCanonicalCustomerKey(c);
+  if (!cKey) return;
+
+  let existing = targetMap.get(cKey);
+  if (!existing && c.id) {
+    existing = targetMap.get(c.id);
+  }
+  const phone = String(c.phone || c.mobile || c.phoneNumber || '').replace(/\D/g, '');
+  if (!existing && phone.length >= 10) {
+    existing = targetMap.get(`phone_${phone.slice(-10)}`);
+  }
+
+  if (!existing) {
+    targetMap.set(cKey, { ...c, canonicalKey: cKey });
+    return;
+  }
+
+  const existingInst = Array.isArray(existing.installments) ? existing.installments : [];
+  const newInst = Array.isArray(c.installments) ? c.installments : [];
+  const bestInst = newInst.length > existingInst.length ? newInst : (existingInst.length > 0 ? existingInst : newInst);
+
+  const merged = {
+    ...existing,
+    ...c,
+    id: existing.id || c.id,
+    canonicalKey: cKey,
+    name: existing.name || c.name || c.customerName,
+    customerName: existing.customerName || c.customerName || existing.name || c.name,
+    branch: existing.branch || c.branch,
+    branchId: existing.branchId || c.branchId,
+    branchName: existing.branchName || c.branchName,
+    installments: bestInst
+  };
+  targetMap.set(cKey, merged);
+};
+
 // Canonical Gullapuram Master Baseline (Ground Truth: Mr. Sundar Auto disbursed 08-OCT-2026 for ₹ 22,500 Cash)
 export const GULLAPURAM_CANONICAL_CUSTOMERS = [
   {
@@ -476,40 +530,18 @@ export const computeEarliestTransactionDate = ({
   };
 
   const custMap = new Map();
-  GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => custMap.set(c.id, c));
+  GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => mergeCustomerIntoMap(custMap, c));
   try {
     const saved = localStorage.getItem('everest_customers');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed)) {
-        parsed.forEach(c => {
-          if (c?.id) {
-            const existing = custMap.get(c.id);
-            custMap.set(c.id, existing ? {
-              ...existing,
-              ...c,
-              installments: (Array.isArray(c.installments) && c.installments.length > 0)
-                ? c.installments
-                : (existing.installments || [])
-            } : c);
-          }
-        });
+        parsed.forEach(c => mergeCustomerIntoMap(custMap, c));
       }
     }
   } catch (_e) {}
   if (Array.isArray(customers)) {
-    customers.forEach(c => {
-      if (c?.id) {
-        const existing = custMap.get(c.id);
-        custMap.set(c.id, existing ? {
-          ...existing,
-          ...c,
-          installments: (Array.isArray(c.installments) && c.installments.length > 0)
-            ? c.installments
-            : (existing.installments || [])
-        } : c);
-      }
-    });
+    customers.forEach(c => mergeCustomerIntoMap(custMap, c));
   }
   const rawCusts = customLedgerData || Array.from(custMap.values());
 
@@ -1322,57 +1354,24 @@ export default function CashBook({
 
     const customerMap = new Map();
     // 1. First inject GULLAPURAM_CANONICAL_CUSTOMERS
-    GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => customerMap.set(c.id, c));
+    GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => mergeCustomerIntoMap(customerMap, c));
     // 2. Add localStorage customers
     try {
       const saved = localStorage.getItem('everest_customers');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          parsed.forEach(c => {
-            if (c && c.id) {
-              const existing = customerMap.get(c.id);
-              customerMap.set(c.id, existing ? {
-                ...existing,
-                ...c,
-                installments: (Array.isArray(c.installments) && c.installments.length > 0)
-                  ? c.installments
-                  : (existing.installments || [])
-              } : c);
-            }
-          });
+          parsed.forEach(c => mergeCustomerIntoMap(customerMap, c));
         }
       }
     } catch (e) {}
     // 3. Add props customers
     if (Array.isArray(customers)) {
-      customers.forEach(c => {
-        if (c && c.id) {
-          const existing = customerMap.get(c.id);
-          customerMap.set(c.id, existing ? {
-            ...existing,
-            ...c,
-            installments: (Array.isArray(c.installments) && c.installments.length > 0)
-              ? c.installments
-              : (existing.installments || [])
-          } : c);
-        }
-      });
+      customers.forEach(c => mergeCustomerIntoMap(customerMap, c));
     }
     // 4. Add firestoreCustomers
     if (Array.isArray(firestoreCustomers)) {
-      firestoreCustomers.forEach(c => {
-        if (c && c.id) {
-          const existing = customerMap.get(c.id);
-          customerMap.set(c.id, existing ? {
-            ...existing,
-            ...c,
-            installments: (Array.isArray(c.installments) && c.installments.length > 0)
-              ? c.installments
-              : (existing.installments || [])
-          } : c);
-        }
-      });
+      firestoreCustomers.forEach(c => mergeCustomerIntoMap(customerMap, c));
     }
 
     // Ensure Sundar Auto has canonical disbursements and installments if missing
@@ -1463,7 +1462,6 @@ export default function CashBook({
 
     // Deduplication sets to prevent duplicate rows across collections / loans / customers
     const seenDisbursementKeys = new Set();
-    const seenCollectionKeys = new Set();
 
     // Helper to process a disbursement entry (Debit)
     const processDisbursement = ({
@@ -1485,7 +1483,12 @@ export default function CashBook({
       if (!disbTs || disbAmount <= 0) return;
 
       const custName = String(name || 'Customer').trim();
-      const disbKey = `${custName.toLowerCase()}_${disbAmount}_${formatDateToYmd(disbTs)}`;
+      const cleanDisbName = custName
+        .toLowerCase()
+        .replace(/^(mr|mrs|ms|dr)\.?\s+/i, '')
+        .replace(/\s*\(.*?\)\s*/g, '')
+        .trim();
+      const disbKey = `${cleanDisbName}_${disbAmount}_${formatDateToYmd(disbTs)}`;
       if (seenDisbursementKeys.has(disbKey)) return;
       seenDisbursementKeys.add(disbKey);
 
@@ -1520,94 +1523,44 @@ export default function CashBook({
       }
     };
 
-    // Helper to process a collection entry (Credit)
-    const processCollection = ({
-      id,
-      name,
-      branch,
-      branchId: itemBranchId,
-      branchName: itemBranchName,
-      particulars,
-      totalAmount,
-      cashAmount,
-      upiAmount,
-      mode,
-      date,
-      remarks,
-      entity
-    }) => {
-      const matchObj = entity || { branch, branchId: itemBranchId, branchName: itemBranchName };
-      if (!isBranchMatch(matchObj)) return;
-      const instTs = parseDateToTimestamp(date);
-      const totalAmt = Number(totalAmount || (Number(cashAmount || 0) + Number(upiAmount || 0)) || 0);
-      if (!instTs || totalAmt <= 0) return;
+    // 1. Gather all candidate raw collections
+    const rawCollections = [];
 
-      const custName = String(name || 'Customer').trim();
-      const colKey = `${custName.toLowerCase()}_${totalAmt}_${formatDateToYmd(instTs)}_${id || ''}`;
-      if (seenCollectionKeys.has(colKey)) return;
-      seenCollectionKeys.add(colKey);
-
-      let cashAmt = 0;
-      let upiAmt = 0;
-      if (cashAmount !== undefined && upiAmount !== undefined && (Number(cashAmount) > 0 || Number(upiAmount) > 0)) {
-        cashAmt = Number(cashAmount || 0);
-        upiAmt = Number(upiAmount || 0);
-      } else {
-        const modeStr = String(mode || 'Cash').toUpperCase();
-        if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK')) {
-          upiAmt = totalAmt;
-        } else {
-          cashAmt = totalAmt;
-        }
-      }
-
-      // Cumulative history strictly prior to fromDate (< rangeStartTs)
-      if (instTs < rangeStartTs) {
-        histCreditCash += cashAmt;
-        histCreditUpi += upiAmt;
-      }
-
-      // Active range [rangeStartTs, rangeEndTs]
-      if (instTs >= rangeStartTs && instTs <= rangeEndTs) {
-        liveCreditCash += cashAmt;
-        liveCreditUpi += upiAmt;
-
-        dynamicTx.push({
-          id: id || `col_${colKey}`,
-          date: formatDateToDisplay(date),
-          particulars: particulars || 'Daily Collection',
-          type: 'Credit',
-          cashAmount: cashAmt,
-          upiAmount: upiAmt,
-          amount: totalAmt,
-          mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
-          remarks: remarks || custName,
-          rawTimestamp: instTs
-        });
-      }
-    };
-
-    // 1. Process Collections from dedicated Firestore 'collections' table
+    // 1a. Dedicated Firestore 'collections' table
     (firestoreCollections || []).forEach(c => {
-      if (!c || c.isDeleted || c.deleted) return;
-      processCollection({
+      if (!c) return;
+      const isDeleted = c.isDeleted === true || c.deleted === true || c.is_deleted === true || c.deletedAt || c.deleted_at;
+      if (isDeleted) return;
+
+      const colDate = c.date || c.collectionDate || c.paymentDate || c.createdAt;
+      const totalAmt = Number(c.amount || c.paidAmount || (Number(c.cashAmount || 0) + Number(c.upiAmount || 0)) || 0);
+
+      rawCollections.push({
         id: c.id,
+        transaction_id: c.transaction_id || c.transactionId || c.txnId || c.receipt_no || c.receiptNo || c.voucher_no || c.voucherNo,
+        customer_id: c.customerId || c.customer_id || c.userId || c.cust_id,
+        customerName: c.customerName || c.name,
         name: c.customerName || c.name,
         branch: c.branch,
         branchId: c.branchId,
         branchName: c.branchName,
         particulars: c.particulars || c.category || 'Daily Collection',
-        totalAmount: c.amount || c.paidAmount,
+        amount: totalAmt,
+        paidAmount: Number(c.paidAmount || totalAmt),
         cashAmount: c.cashAmount,
         upiAmount: c.upiAmount,
         mode: c.mode || c.paymentMode,
-        date: c.date || c.collectionDate || c.paymentDate || c.createdAt,
+        status: c.status || 'PAID',
+        date: colDate,
+        is_deleted: isDeleted,
+        deleted: isDeleted,
         remarks: c.remarks || c.customerName || 'Collection entry',
+        installment_no: c.installment_no || c.installmentNo || c.number,
         entity: c
       });
     });
 
-    // 2. Process Customer Installments / Collections
+    // 1b. Customer Installments / Collections from active customers
     (allCust || []).forEach(cust => {
       if (!cust || !isCustomerActive(cust)) return;
       if (!isBranchMatch(cust)) return;
@@ -1615,7 +1568,6 @@ export default function CashBook({
       const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
       if (deletedCustomerIds.has(cId)) return;
 
-      // Map dynamic loan product name for this customer
       const rawType = String(cust.loanType || cust.scheme || cust.category || '').toLowerCase();
       let catName = 'Daily Collection';
       if (rawType.includes('agri')) {
@@ -1649,72 +1601,143 @@ export default function CashBook({
 
       (rawInstallments || []).forEach((inst, idx) => {
         if (!inst || typeof inst !== 'object') return;
-        if (
-          inst.isDeleted === true ||
-          inst.deleted === true ||
-          inst.is_deleted === true ||
-          inst.deletedAt ||
-          inst.deleted_at
-        ) {
-          return;
-        }
+        const isDeleted = inst.isDeleted === true || inst.deleted === true || inst.is_deleted === true || inst.deletedAt || inst.deleted_at;
+        if (isDeleted) return;
 
         const instDate = inst.date || inst.paymentDate || inst.collection_date || inst.createdAt;
-        const instTs = parseDateToTimestamp(instDate);
-        if (!instTs) return;
-
-        const status = String(inst.status || '').toUpperCase();
-        if (
-          status === 'BOUNCED' ||
-          status === 'CANCELLED' ||
-          status === 'DELETED' ||
-          status === 'RECYCLED' ||
-          status === 'VOID'
-        ) {
-          return;
-        }
-        if (inst.mode === 'BOUNCED') return;
-
         const totalAmt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
-        if (totalAmt <= 0) return;
-
-        let cashAmt = 0;
-        let upiAmt = 0;
-        if (inst.isSplit) {
-          cashAmt = Number(inst.cashAmount || 0);
-          upiAmt = Number(inst.upiAmount || 0);
-        } else {
-          const modeStr = String(inst.paymentMode || inst.mode || inst.instrument || '').toUpperCase();
-          if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK') || modeStr.includes('GPAY') || modeStr.includes('PHONEPE')) {
-            upiAmt = totalAmt;
-          } else {
-            cashAmt = totalAmt;
-          }
-        }
 
         const custDisplayName = cust.name || cust.customerName || 'Customer';
         const centerOrPhone = cust.centerName || cust.center || cust.groupName || '';
         const remarksInfo = centerOrPhone ? `${custDisplayName} (${centerOrPhone})` : custDisplayName;
 
-        processCollection({
-          id: `inst_${cust.id}_${inst.id || idx}`,
+        rawCollections.push({
+          id: inst.id || `inst_${cust.id}_${idx + 1}`,
+          transaction_id: inst.transaction_id || inst.transactionId || inst.txnId || inst.receipt_no || inst.receiptNo || inst.voucher_no || inst.voucherNo,
+          customer_id: cust.id || cust.customerId || getCanonicalCustomerKey(cust),
+          customerName: custDisplayName,
           name: custDisplayName,
           branch: cust.branch,
           branchId: cust.branchId,
           branchName: cust.branchName,
           particulars: catName,
-          totalAmount: totalAmt,
-          cashAmount: cashAmt,
-          upiAmount: upiAmt,
+          amount: totalAmt,
+          paidAmount: Number(inst.paidAmount || totalAmt),
+          cashAmount: inst.isSplit ? Number(inst.cashAmount || 0) : inst.cashAmount,
+          upiAmount: inst.isSplit ? Number(inst.upiAmount || 0) : inst.upiAmount,
           mode: inst.mode || inst.paymentMode,
+          status: inst.status || 'PAID',
           date: instDate,
+          is_deleted: isDeleted,
+          deleted: isDeleted,
           remarks: remarksInfo,
+          installment_no: inst.number || inst.installment_no || inst.installmentNo || (idx + 1),
           entity: cust
         });
       });
     });
 
-    // 3. Process Disbursements from dedicated Firestore 'loan_disbursements' collection
+    // 2. Strict Collection Deduplication by Unique ID / Normalized Key
+    const uniqueCollectionsMap = new Map();
+    const seenTxnIds = new Set();
+
+    rawCollections.forEach(record => {
+      if (!record) return;
+      const rawStatus = String(record.status || '').toUpperCase();
+      if (
+        rawStatus === 'BOUNCED' ||
+        rawStatus === 'CANCELLED' ||
+        rawStatus === 'DELETED' ||
+        rawStatus === 'RECYCLED' ||
+        rawStatus === 'VOID'
+      ) return;
+      if (record.mode === 'BOUNCED') return;
+
+      const isNotDeleted = !record.is_deleted && !record.deleted && !record.isDeleted;
+      const totalAmt = Number(record.amount || record.paidAmount || 0);
+      const isPaid = (rawStatus === 'PAID' || rawStatus === 'ACTIVE' || (!record.status && totalAmt > 0)) && totalAmt > 0;
+
+      if (!isPaid || !isNotDeleted) return;
+
+      const normCust = String(record.customerName || record.name || record.customer_id || '')
+        .toLowerCase()
+        .replace(/^(mr|mrs|ms|dr)\.?\s+/i, '')
+        .replace(/\s*\(.*?\)\s*/g, '')
+        .trim();
+      const dateKey = formatDateToYmd(record.date);
+      if (!dateKey) return;
+
+      const txnId = record.transaction_id || record.receipt_no || record.voucher_no;
+      if (txnId && seenTxnIds.has(txnId)) return;
+
+      const instKey = record.installment_no || record.amount;
+      const uniqueKey = txnId || `${normCust}_${dateKey}_${instKey}`;
+
+      if (uniqueCollectionsMap.has(uniqueKey)) return;
+
+      if (txnId) seenTxnIds.add(txnId);
+      uniqueCollectionsMap.set(uniqueKey, record);
+    });
+
+    const verifiedCollections = Array.from(uniqueCollectionsMap.values());
+
+    // 3. Process Verified Collections into Historical and Live Summaries
+    verifiedCollections.forEach(record => {
+      const matchObj = record.entity || {
+        branch: record.branch,
+        branchId: record.branchId,
+        branchName: record.branchName
+      };
+      if (!isBranchMatch(matchObj)) return;
+
+      const instTs = parseDateToTimestamp(record.date);
+      const totalAmt = Number(record.amount || record.paidAmount || (Number(record.cashAmount || 0) + Number(record.upiAmount || 0)) || 0);
+      if (!instTs || totalAmt <= 0) return;
+
+      let cashAmt = 0;
+      let upiAmt = 0;
+      if (record.cashAmount !== undefined && record.upiAmount !== undefined && (Number(record.cashAmount) > 0 || Number(record.upiAmount) > 0)) {
+        cashAmt = Number(record.cashAmount || 0);
+        upiAmt = Number(record.upiAmount || 0);
+      } else {
+        const modeStr = String(record.mode || record.paymentMode || 'Cash').toUpperCase();
+        if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK') || modeStr.includes('GPAY') || modeStr.includes('PHONEPE')) {
+          upiAmt = totalAmt;
+        } else {
+          cashAmt = totalAmt;
+        }
+      }
+
+      // Cumulative history strictly prior to fromDate (< rangeStartTs)
+      if (instTs < rangeStartTs) {
+        histCreditCash += cashAmt;
+        histCreditUpi += upiAmt;
+      }
+
+      // Active range [rangeStartTs, rangeEndTs]
+      if (instTs >= rangeStartTs && instTs <= rangeEndTs) {
+        liveCreditCash += cashAmt;
+        liveCreditUpi += upiAmt;
+
+        const custName = String(record.customerName || record.name || 'Customer').trim();
+        const instId = record.id || `col_${record.date}_${custName}`;
+
+        dynamicTx.push({
+          id: instId,
+          date: formatDateToDisplay(record.date),
+          particulars: record.particulars || 'Daily Collection',
+          type: 'Credit',
+          cashAmount: cashAmt,
+          upiAmount: upiAmt,
+          amount: totalAmt,
+          mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
+          remarks: record.remarks || custName,
+          rawTimestamp: instTs
+        });
+      }
+    });
+
+    // 4. Process Disbursements from dedicated Firestore 'loan_disbursements' collection
     (firestoreDisbursements || []).forEach(d => {
       if (!d || d.isDeleted || d.deleted) return;
       processDisbursement({
@@ -1731,7 +1754,7 @@ export default function CashBook({
       });
     });
 
-    // 4. Process Disbursements from dedicated Firestore 'loans' collection
+    // 5. Process Disbursements from dedicated Firestore 'loans' collection
     (firestoreLoans || []).forEach(l => {
       if (!l || l.isDeleted || l.deleted) return;
       const status = String(l.status || '').toLowerCase();
