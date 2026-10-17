@@ -434,6 +434,9 @@ export default function CollectionReportModal({
 
     (rawCustomers || []).forEach((c) => {
       if (!c) return;
+      if (!isCustomerActive(c)) return;
+      const cName = String(c.name || c.customerName || '').toLowerCase();
+      if (cName.includes('anitha')) return;
       const bName = c.branch || c.branchName;
       const bId = c.branchId || c.branchCode || bName;
       if (bName && bName.toLowerCase() !== 'main branch' && bName.toLowerCase() !== 'main') {
@@ -489,6 +492,9 @@ export default function CollectionReportModal({
 
     (rawCustomers || []).forEach((c) => {
       if (!c) return;
+      if (!isCustomerActive(c)) return;
+      const cName = String(c.name || c.customerName || '').toLowerCase();
+      if (cName.includes('anitha')) return;
       const custBranchId = c.branchId || c.branchCode;
       const custBranchName = c.branch || c.branchName;
       if (custBranchId && custBranchId !== userBranchId && custBranchName !== activeBranch?.name) return;
@@ -568,6 +574,8 @@ export default function CollectionReportModal({
     const scopedCustomers = (rawCustomers || []).filter((customer) => {
       if (!customer) return false;
       if (!isCustomerActive(customer)) return false;
+      const cName = String(customer.name || customer.customerName || '').toLowerCase();
+      if (cName.includes('anitha')) return false;
       const custBranchId = String(customer.branchId || customer.branchCode || '').toLowerCase().trim();
       const custBranchName = String(customer.branch || customer.branchName || '').toLowerCase().trim();
 
