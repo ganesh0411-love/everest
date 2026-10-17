@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
+import { canAccessCashBook } from '../utils/branchUtils';
 
 const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
   const handleLogout = async () => {
@@ -52,16 +53,7 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
     if (item.name === 'Expenses' || item.name === 'Expansion') return isAdmin || permissions.expenses === true || permissions.expansion === true || true;
     if (item.name === 'Cash Book') {
-      return (
-        isAdmin || 
-        permissions.cashBook === true || 
-        permissions.cash_book === true || 
-        permissions.allPermissions === true || 
-        permissions.adminOverride === true || 
-        permissions.staffManagementRole === 'Admin' || 
-        permissions.staffManagement === true || 
-        permissions.cashBook !== false
-      );
+      return canAccessCashBook(userProfile);
     }
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 

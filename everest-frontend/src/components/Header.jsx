@@ -3,7 +3,7 @@ import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download, BookOpen, Receipt } from 'lucide-react';
-import { isBranchActive } from '../utils/branchUtils';
+import { isBranchActive, canAccessCashBook } from '../utils/branchUtils';
 
 const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile, isCollectionReportOpen }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -68,16 +68,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     if (item.name === 'Add Bulk Customer') return true;
     if (item.name === 'Expenses' || item.name === 'Expansion') return isAdmin || permissions.expenses === true || permissions.expansion === true || true;
     if (item.name === 'Cash Book') {
-      return (
-        isAdmin || 
-        permissions.cashBook === true || 
-        permissions.cash_book === true || 
-        permissions.allPermissions === true || 
-        permissions.adminOverride === true || 
-        permissions.staffManagementRole === 'Admin' || 
-        permissions.staffManagement === true || 
-        permissions.cashBook !== false
-      );
+      return canAccessCashBook(userProfile);
     }
     if (item.name === 'Customer KYC Update') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;

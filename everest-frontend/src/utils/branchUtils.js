@@ -68,3 +68,42 @@ export const sanitizeLocalStorageBranches = () => {
     });
   } catch (e) {}
 };
+
+/**
+ * Strict RBAC permission check for Cash Book access.
+ * Returns true ONLY if user is:
+ * 1. Super Admin / Main Branch Owner
+ * 2. Staff member explicitly granted Admin / Manager / Customer Management Admin permissions
+ */
+export const canAccessCashBook = (userProfile) => {
+  if (!userProfile) return false;
+  const role = String(userProfile.role || '').toLowerCase();
+  const permissions = userProfile.permissions || {};
+
+  // 1. Super Admin / Main Branch Owner
+  const isSuperAdmin = (
+    role === 'admin' ||
+    role === 'main_admin' ||
+    role === 'super_admin' ||
+    userProfile.isAdmin === true ||
+    userProfile.isSuperAdmin === true
+  );
+  if (isSuperAdmin) return true;
+
+  // 2. Staff member with explicitly granted Admin / Manager / Customer Management Admin permissions
+  const hasAdminPermission = (
+    userProfile.has_admin_permission === true ||
+    userProfile.hasAdminPermission === true ||
+    permissions.allPermissions === true ||
+    permissions.adminOverride === true ||
+    permissions.staffManagementRole === 'Admin' ||
+    permissions.customerManagementMode === 'Admin' ||
+    permissions.applicationStatusRole === 'Admin' ||
+    permissions.collectionReportRole === 'Admin' ||
+    permissions.attendanceRole === 'Admin' ||
+    permissions.cashBook === true ||
+    permissions.cash_book === true
+  );
+
+  return Boolean(hasAdminPermission);
+};

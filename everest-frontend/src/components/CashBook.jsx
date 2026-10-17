@@ -22,7 +22,9 @@ import {
   Plus,
   X,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  Building2,
+  ChevronDown
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -35,6 +37,7 @@ import {
   query, 
   where 
 } from 'firebase/firestore';
+import { isBranchActive, sanitizeLocalStorageBranches } from '../utils/branchUtils';
 
 // Date Helpers
 const getTodayYmd = () => {
@@ -294,6 +297,7 @@ export const isCustomerActive = (cust) => {
 };
 
 // Comprehensive Earliest Transaction Date Computation:
+// Comprehensive Earliest Transaction Date Computation:
 // Scans across ALL active transactions: disbursements (debit outflows), collections (credits), expenses, and investments.
 export const computeEarliestTransactionDate = ({
   customers = [],
@@ -301,9 +305,24 @@ export const computeEarliestTransactionDate = ({
   liveExpenses = [],
   investments = [],
   manualParticulars = [],
-  fallbackDate = new Date()
+  fallbackDate = new Date(),
+  targetBranchId = '',
+  targetBranchName = ''
 }) => {
   const allTimestamps = [];
+
+  const matchesBranch = (entity) => {
+    if (!targetBranchId && !targetBranchName) return true;
+    if (!entity) return false;
+    const bId = String(entity.branchId || '').toLowerCase().trim();
+    const bName = String(entity.branch || entity.branchName || '').toLowerCase().trim();
+    return (
+      (targetBranchId && bId === targetBranchId) ||
+      (targetBranchName && bName === targetBranchName) ||
+      (targetBranchName && bId === targetBranchName) ||
+      (targetBranchId && bName === targetBranchId)
+    );
+  };
 
   const rawCusts = customLedgerData || (customers && customers.length > 0 ? customers : (() => {
     try {
@@ -314,6 +333,7 @@ export const computeEarliestTransactionDate = ({
 
   (rawCusts || []).forEach(cust => {
     if (!cust || !isCustomerActive(cust)) return;
+    if (!matchesBranch(cust)) return;
 
     // 1. Check Disbursements (Debits)
     const custStatus = String(cust.status || '').toLowerCase();
@@ -388,6 +408,7 @@ export const computeEarliestTransactionDate = ({
   // 3. Check Live Expenses
   (liveExpenses || []).forEach(exp => {
     if (!exp || exp.isDeleted || exp.deleted) return;
+    if (!matchesBranch(exp)) return;
     const expDateCandidates = [exp.date, exp.createdAt];
     for (const cand of expDateCandidates) {
       if (cand) {
@@ -403,6 +424,7 @@ export const computeEarliestTransactionDate = ({
   // 4. Check Live Investments
   (investments || []).forEach(inv => {
     if (!inv || inv.isDeleted || inv.deleted) return;
+    if (!matchesBranch(inv)) return;
     const invDateCandidates = [inv.date, inv.createdAt];
     for (const cand of invDateCandidates) {
       if (cand) {
@@ -418,6 +440,7 @@ export const computeEarliestTransactionDate = ({
   // 5. Check Manual Particulars
   (manualParticulars || []).forEach(part => {
     if (!part || part.isDeleted || part.deleted) return;
+    if (!matchesBranch(part)) return;
     const partDateCandidates = [part.date, part.createdAt];
     for (const cand of partDateCandidates) {
       if (cand) {
@@ -447,6 +470,112 @@ export default function CashBook({
   const branchId = activeBranch?.id || 'main';
   const branchName = activeBranch?.name || 'Main Branch';
 
+  const userRole = String(userProfile?.role || '').toLowerCase();
+  const permissions = userProfile?.permissions || {};
+  const isSuperAdmin = userRole === 'admin' || userRole === 'main_admin' || userProfile?.isAdmin === true;
+
+  const currentBranchId = String(activeBranch?.id || userProfile?.branchId || userProfile?.branch || 'main').toLowerCase();
+  const isMainBranch = 
+    currentBranchId === 'main' || 
+    String(activeBranch?.name || '').toLowerCase() === 'main branch' ||
+    String(activeBranch?.name || '').toLowerCase() === 'main';
+
+  // Sub-branch admin or permitted staff (e.g. Gullapuram, Batlagundu, Andipatti): locked strictly to their assigned branch
+  const isSubBranchStaff = !isSuperAdmin || !isMainBranch;
+
+  // Show branch selector filter: ONLY Super Admin in Main Branch
+  const showBranchFilter = isSuperAdmin && isMainBranch;
+
+  // Available Branches for Main Branch / Super Admin
+  const availableBranches = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    (branches || []).forEach(b => {
+      if (!b || !isBranchActive(b)) return;
+      const bId = b.id || b.name;
+      const bName = b.name || b.id;
+      if (!seen.has(bId)) {
+        seen.add(bId);
+        list.push({ id: bId, name: bName });
+      }
+    });
+    try {
+      const saved = localStorage.getItem('everest_branches') || localStorage.getItem('branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(b => {
+            if (!b || !isBranchActive(b)) return;
+            const bId = b.id || b.name;
+            const bName = b.name || b.id;
+            if (!seen.has(bId)) {
+              seen.add(bId);
+              list.push({ id: bId, name: bName });
+            }
+          });
+        }
+      }
+    } catch (e) {}
+    return list;
+  }, [branches]);
+
+  // Purge any stale ghost branch keys from localStorage on mount
+  useEffect(() => {
+    sanitizeLocalStorageBranches();
+  }, []);
+
+  // Selected Branch ID
+  const [selectedBranchId, setSelectedBranchId] = useState(() => {
+    if (isSubBranchStaff) {
+      return userProfile?.branchId || userProfile?.branch || activeBranch?.id || 'main';
+    }
+    return 'all';
+  });
+
+  // Sync if activeBranch changes or userProfile updates
+  useEffect(() => {
+    if (isSubBranchStaff) {
+      setSelectedBranchId(userProfile?.branchId || userProfile?.branch || activeBranch?.id || 'main');
+    }
+  }, [activeBranch?.id, userProfile?.branchId, userProfile?.branch, isSubBranchStaff]);
+
+  const selectedBranchObj = useMemo(() => {
+    if (!selectedBranchId || selectedBranchId === 'all') return null;
+    return availableBranches.find(b => 
+      String(b.id || '').toLowerCase() === String(selectedBranchId).toLowerCase() ||
+      String(b.name || '').toLowerCase() === String(selectedBranchId).toLowerCase()
+    ) || null;
+  }, [selectedBranchId, availableBranches]);
+
+  const targetBranchId = selectedBranchId && selectedBranchId !== 'all' 
+    ? String(selectedBranchId).toLowerCase().trim() 
+    : '';
+  const targetBranchName = selectedBranchObj 
+    ? String(selectedBranchObj.name || '').toLowerCase().trim() 
+    : targetBranchId;
+
+  const displayBranchLabel = useMemo(() => {
+    if (selectedBranchId === 'all') return 'All Branches (Enterprise)';
+    if (selectedBranchObj?.name) return selectedBranchObj.name;
+    if (targetBranchName) return targetBranchName;
+    return activeBranch?.name || 'Assigned Branch';
+  }, [selectedBranchId, selectedBranchObj, targetBranchName, activeBranch?.name]);
+
+  const doesEntityMatchBranch = (entity) => {
+    if (!targetBranchId && !targetBranchName) return true; // 'all' scope matches all
+    if (!entity) return false;
+
+    const bId = String(entity.branchId || '').toLowerCase().trim();
+    const bName = String(entity.branch || entity.branchName || '').toLowerCase().trim();
+
+    return (
+      (targetBranchId && bId === targetBranchId) ||
+      (targetBranchName && bName === targetBranchName) ||
+      (targetBranchName && bId === targetBranchName) ||
+      (targetBranchId && bName === targetBranchId)
+    );
+  };
+
   // Active Date Range Filter (default: Today)
   const [fromDate, setFromDate] = useState(() => getTodayYmd());
   const [toDate, setToDate] = useState(() => getTodayYmd());
@@ -475,11 +604,35 @@ export default function CashBook({
   }, [fromDate]);
 
   // 1. Investments State
-  const investmentsKey = `everest_cashbook_investments_${branchId}`;
+  const investmentsKey = selectedBranchId === 'all'
+    ? 'everest_cashbook_investments_all'
+    : `everest_cashbook_investments_${selectedBranchId || branchId}`;
+
   const [investments, setInvestments] = useState(() => {
     try {
-      const saved = localStorage.getItem(investmentsKey);
-      return saved ? JSON.parse(saved) : [];
+      const allList = [];
+      const seen = new Set();
+      const keys = [
+        `everest_cashbook_investments_${selectedBranchId}`,
+        `everest_cashbook_investments_${branchId}`,
+        'everest_cashbook_investments_all',
+        'everest_cashbook_investments'
+      ];
+      for (const k of keys) {
+        const saved = localStorage.getItem(k);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(item => {
+              if (item?.id && !seen.has(item.id)) {
+                seen.add(item.id);
+                allList.push(item);
+              }
+            });
+          }
+        }
+      }
+      return allList;
     } catch (e) {
       return [];
     }
@@ -488,15 +641,39 @@ export default function CashBook({
   // 2. Expenses State (Listening to expansion_expenses & legacy expenses)
   const [liveExpenses, setLiveExpenses] = useState(() => {
     try {
-      const savedExp = localStorage.getItem(`everest_expansion_expenses_${branchId}`);
-      return savedExp ? JSON.parse(savedExp) : [];
+      const allList = [];
+      const seen = new Set();
+      const keys = [
+        `everest_expansion_expenses_${selectedBranchId}`,
+        `everest_expansion_expenses_${branchId}`,
+        'everest_expansion_expenses_all',
+        'everest_expansion_expenses'
+      ];
+      for (const k of keys) {
+        const saved = localStorage.getItem(k);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(item => {
+              if (item?.id && !seen.has(item.id)) {
+                seen.add(item.id);
+                allList.push(item);
+              }
+            });
+          }
+        }
+      }
+      return allList;
     } catch (e) {
       return [];
     }
   });
 
   // 3. Opening Balances State
-  const openingsKey = `everest_cashbook_openings_${branchId}`;
+  const openingsKey = selectedBranchId === 'all'
+    ? 'everest_cashbook_openings_all'
+    : `everest_cashbook_openings_${selectedBranchId || branchId}`;
+
   const [openingBalances, setOpeningBalances] = useState(() => {
     try {
       const saved = localStorage.getItem(openingsKey);
@@ -513,11 +690,35 @@ export default function CashBook({
   const [isAllExpensesModalOpen, setIsAllExpensesModalOpen] = useState(false);
 
   // Manual Particulars State
-  const particularsKey = `everest_cashbook_particulars_${branchId}`;
+  const particularsKey = selectedBranchId === 'all'
+    ? 'everest_cashbook_particulars_all'
+    : `everest_cashbook_particulars_${selectedBranchId || branchId}`;
+
   const [manualParticulars, setManualParticulars] = useState(() => {
     try {
-      const saved = localStorage.getItem(particularsKey);
-      return saved ? JSON.parse(saved) : [];
+      const allList = [];
+      const seen = new Set();
+      const keys = [
+        `everest_cashbook_particulars_${selectedBranchId}`,
+        `everest_cashbook_particulars_${branchId}`,
+        'everest_cashbook_particulars_all',
+        'everest_cashbook_particulars'
+      ];
+      for (const k of keys) {
+        const saved = localStorage.getItem(k);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(item => {
+              if (item?.id && !seen.has(item.id)) {
+                seen.add(item.id);
+                allList.push(item);
+              }
+            });
+          }
+        }
+      }
+      return allList;
     } catch (e) {
       return [];
     }
@@ -562,8 +763,7 @@ export default function CashBook({
   useEffect(() => {
     let unsub = () => {};
     try {
-      const q = query(collection(db, 'investments'), where('branchId', '==', branchId));
-      unsub = onSnapshot(q, (snapshot) => {
+      unsub = onSnapshot(collection(db, 'investments'), (snapshot) => {
         if (!snapshot.empty) {
           const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setInvestments(list);
@@ -572,14 +772,13 @@ export default function CashBook({
       }, (err) => console.warn('Investments listener notice:', err));
     } catch (e) {}
     return () => unsub();
-  }, [branchId, investmentsKey]);
+  }, [investmentsKey]);
 
   // B. Expansion Expenses Listener
   useEffect(() => {
     let unsub = () => {};
     try {
-      const q = query(collection(db, 'expansion_expenses'), where('branchId', '==', branchId));
-      unsub = onSnapshot(q, (snapshot) => {
+      unsub = onSnapshot(collection(db, 'expansion_expenses'), (snapshot) => {
         if (!snapshot.empty) {
           const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setLiveExpenses(list);
@@ -587,14 +786,13 @@ export default function CashBook({
       }, (err) => console.warn('Expansion expenses listener notice in CashBook:', err));
     } catch (e) {}
     return () => unsub();
-  }, [branchId]);
+  }, []);
 
   // C. CashBook Particulars Listener
   useEffect(() => {
     let unsub = () => {};
     try {
-      const q = query(collection(db, 'cashbook_particulars'), where('branchId', '==', branchId));
-      unsub = onSnapshot(q, (snapshot) => {
+      unsub = onSnapshot(collection(db, 'cashbook_particulars'), (snapshot) => {
         if (!snapshot.empty) {
           const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setManualParticulars(list);
@@ -603,7 +801,7 @@ export default function CashBook({
       }, (err) => console.warn('Particulars listener notice in CashBook:', err));
     } catch (e) {}
     return () => unsub();
-  }, [branchId, particularsKey]);
+  }, [particularsKey]);
 
   // Date Navigation Helpers (Shift both From & To dates)
   const handleShiftDate = (offsetDays) => {
@@ -630,7 +828,9 @@ export default function CashBook({
       liveExpenses,
       investments,
       manualParticulars,
-      fallbackDate: today
+      fallbackDate: today,
+      targetBranchId,
+      targetBranchName
     });
     setFromDate(formatDateToDisplay(earliestDate));
     setToDate(formatDateToDisplay(today));
@@ -652,9 +852,14 @@ export default function CashBook({
       return;
     }
 
+    const activeSaveBranchId = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : (activeBranch?.id || 'main');
+    const activeSaveBranchName = selectedBranchObj?.name || branchName || activeSaveBranchId;
+
     const newInv = {
       id: 'inv_' + Date.now(),
-      branchId,
+      branchId: activeSaveBranchId,
+      branch: activeSaveBranchName,
+      branchName: activeSaveBranchName,
       date: formatDateToDisplay(investmentForm.date || toDate || fromDate),
       particulars: investmentForm.particulars?.trim() || 'Investment Entry',
       amount: numAmt,
@@ -727,9 +932,14 @@ export default function CashBook({
       ? (particularsForm.customParticulars?.trim() || 'Manual Adjustment')
       : particularsForm.particularsCategory;
 
+    const activeSaveBranchId = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : (activeBranch?.id || 'main');
+    const activeSaveBranchName = selectedBranchObj?.name || branchName || activeSaveBranchId;
+
     const newPart = {
       id: 'part_' + Date.now(),
-      branchId,
+      branchId: activeSaveBranchId,
+      branch: activeSaveBranchName,
+      branchName: activeSaveBranchName,
       date: formatDateToDisplay(particularsForm.date || toDate || fromDate),
       particulars: partName,
       type: particularsForm.type || 'Credit',
@@ -900,10 +1110,7 @@ export default function CashBook({
     // 1. Process Customer Collections (Credit Inflows)
     (allCust || []).forEach(cust => {
       if (!cust) return;
-      const cBranch = cust.branchId || cust.branch;
-      if (!isMainBranch && cBranch && cBranch !== branchId && cBranch !== branchName) {
-        return;
-      }
+      if (!doesEntityMatchBranch(cust)) return;
 
       // Re-verify active customer status
       if (!isCustomerActive(cust)) return;
@@ -1035,10 +1242,7 @@ export default function CashBook({
     // 2. Customer Disbursements (Debit Outflows)
     (allCust || []).forEach(cust => {
       if (!cust) return;
-      const cBranch = cust.branchId || cust.branch;
-      if (!isMainBranch && cBranch && cBranch !== branchId && cBranch !== branchName) {
-        return;
-      }
+      if (!doesEntityMatchBranch(cust)) return;
 
       // Re-verify active customer status
       if (!isCustomerActive(cust)) return;
@@ -1101,6 +1305,7 @@ export default function CashBook({
     // 3. Manual Particulars entries
     (manualParticulars || []).forEach((part) => {
       if (!part || typeof part !== 'object') return;
+      if (!doesEntityMatchBranch(part)) return;
       if (
         part.isDeleted === true ||
         part.deleted === true ||
@@ -1184,6 +1389,7 @@ export default function CashBook({
     // 4. Live Expenses
     (liveExpenses || []).forEach(exp => {
       if (!exp || typeof exp !== 'object') return;
+      if (!doesEntityMatchBranch(exp)) return;
       if (
         exp.isDeleted === true ||
         exp.deleted === true ||
@@ -1256,6 +1462,7 @@ export default function CashBook({
     // 5. Live Investments
     (investments || []).forEach(inv => {
       if (!inv || typeof inv !== 'object') return;
+      if (!doesEntityMatchBranch(inv)) return;
       if (
         inv.isDeleted === true ||
         inv.deleted === true ||
@@ -1310,8 +1517,9 @@ export default function CashBook({
     dynamicExp.sort((a, b) => (b.rawTimestamp || 0) - (a.rawTimestamp || 0));
 
     // Cumulative Opening Balances as of the day before fromDate
-    const openingDocId = `${branchId}_${startYmd}`;
-    const dayOpening = openingBalances[openingDocId] || openingBalances[branchId] || openingBalances['initial'] || { cash: 0, bank: 0 };
+    const effectiveBranchKey = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : branchId;
+    const openingDocId = `${effectiveBranchKey}_${startYmd}`;
+    const dayOpening = openingBalances[openingDocId] || openingBalances[effectiveBranchKey] || openingBalances['initial'] || { cash: 0, bank: 0 };
     const baseOpeningCash = Number(dayOpening.cash ?? 0);
     const baseOpeningBank = Number(dayOpening.bank ?? 0);
 
@@ -1321,8 +1529,8 @@ export default function CashBook({
     const calcYesterdayCash = baseOpeningCash + histCreditCash + histInvCash - histDebitCash - histExpCash;
     const calcYesterdayBank = baseOpeningBank + histCreditUpi + histInvBank - histDebitBank - histExpOnline;
 
-    const yCash = Math.max(0, calcYesterdayCash);
-    const yBank = Math.max(0, calcYesterdayBank);
+    const yCash = calcYesterdayCash;
+    const yBank = calcYesterdayBank;
     const yTotal = yCash + yBank;
 
     // Real calculated values for active range (strict real data only, zero mock fallbacks)
@@ -1444,7 +1652,32 @@ export default function CashBook({
         </div>
 
         {/* Top-Right Badges & Prominent Home Button */}
-        <div className="flex items-center gap-3 self-end sm:self-auto">
+        <div className="flex items-center gap-3 self-end sm:self-auto flex-wrap">
+          {/* Branch Scoping Selector / Badge */}
+          {showBranchFilter ? (
+            <div className="relative">
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="appearance-none bg-white border border-slate-200 hover:border-slate-300 text-slate-800 text-xs font-bold py-1.5 pl-8 pr-7 rounded-xl shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition"
+              >
+                <option value="all">All Branches (Enterprise)</option>
+                {availableBranches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <Building2 className="w-3.5 h-3.5 text-blue-600 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold shadow-2xs">
+              <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="truncate max-w-[160px]">{displayBranchLabel}</span>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700">
             <Calendar className="w-3.5 h-3.5 text-blue-600" />
             <span>

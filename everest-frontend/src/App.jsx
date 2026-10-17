@@ -43,7 +43,7 @@ import CustomerDetail from './components/CustomerDetail';
 import DesktopSidebar from './components/DesktopSidebar';
 import AddBranchModal from './components/AddBranchModal';
 import EditBranchModal from './components/EditBranchModal';
-import { isBranchActive, sanitizeLocalStorageBranches } from './utils/branchUtils';
+import { isBranchActive, sanitizeLocalStorageBranches, canAccessCashBook } from './utils/branchUtils';
 
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
@@ -548,6 +548,10 @@ function App() {
 
   const navigateToView = (newView) => {
     setIsCollectionReportOpen(false);
+    if (newView === 'Cash Book' && !canAccessCashBook(userProfile)) {
+      console.warn('Unauthorized navigation to Cash Book blocked by RBAC guard.');
+      newView = 'Home';
+    }
     if (newView === 'Customer') {
       setActiveCategory('Active');
       setSearchQuery('');
@@ -562,6 +566,14 @@ function App() {
     });
     setCurrentView(newView);
   };
+
+  // RBAC safety enforcement: Kick out of Cash Book if permissions change or unpermitted staff opens it
+  useEffect(() => {
+    if (currentView === 'Cash Book' && !canAccessCashBook(userProfile)) {
+      console.warn('Redirecting unauthorized user away from Cash Book to Home.');
+      setCurrentView('Home');
+    }
+  }, [currentView, userProfile]);
   
   const handleDrillDown = (category) => {
     setIsCollectionReportOpen(false);
@@ -1374,6 +1386,24 @@ function App() {
           </div>
         );
       case 'Cash Book': 
+        if (!canAccessCashBook(userProfile)) {
+          return (
+            <div className={`flex-1 ${isCollectionReportOpen ? 'h-full overflow-hidden' : 'overflow-y-auto'}`}>
+              <AdminDashboard 
+                setCurrentView={setCurrentView} 
+                onDrillDown={handleDrillDown} 
+                activeBranch={activeBranch} 
+                userProfile={userProfile} 
+                customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} 
+                branches={branches} 
+                isRoleResolving={isRoleResolving} 
+                isBranchLoading={isBranchLoading} 
+                isCollectionReportOpen={isCollectionReportOpen} 
+                setIsCollectionReportOpen={setIsCollectionReportOpen} 
+              />
+            </div>
+          );
+        }
         return (
           <div className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden">
             <CashBook 
