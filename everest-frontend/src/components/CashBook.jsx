@@ -353,6 +353,27 @@ export const getCanonicalCustomerKey = (c) => {
   return String(c.id || c.customerId || '');
 };
 
+// Filter installments to ONLY include genuine paid receipts
+export const filterPaidInst = (arr) => (arr || []).filter(i => {
+  if (!i || typeof i !== 'object') return false;
+  if (i.isDeleted === true || i.deleted === true || i.is_deleted === true) return false;
+  const st = String(i.status || '').toUpperCase();
+  if (
+    st === 'BOUNCED' ||
+    st === 'CANCELLED' ||
+    st === 'DELETED' ||
+    st === 'RECYCLED' ||
+    st === 'VOID' ||
+    st === 'DUE' ||
+    st === 'PENDING' ||
+    st === 'UNPAID'
+  ) return false;
+  if (i.mode === 'BOUNCED') return false;
+  const totalAmt = Number(i.amount || i.paidAmount || (Number(i.cashAmount || 0) + Number(i.upiAmount || 0)) || 0);
+  const paidAmt = Number(i.paidAmount ?? i.paid_amount ?? (st === 'PAID' ? totalAmt : 0));
+  return (st === 'PAID' || paidAmt > 0) && totalAmt > 0;
+});
+
 // Merges customer object into targetMap keyed by canonical customer key
 export const mergeCustomerIntoMap = (targetMap, c) => {
   if (!c || typeof c !== 'object') return;
@@ -370,27 +391,6 @@ export const mergeCustomerIntoMap = (targetMap, c) => {
   if (!existing && phone.length >= 10) {
     existing = targetMap.get(`phone_${phone.slice(-10)}`);
   }
-
-  // Filter installments to ONLY include genuine paid receipts
-  const filterPaidInst = (arr) => (arr || []).filter(i => {
-    if (!i || typeof i !== 'object') return false;
-    if (i.isDeleted === true || i.deleted === true || i.is_deleted === true) return false;
-    const st = String(i.status || '').toUpperCase();
-    if (
-      st === 'BOUNCED' ||
-      st === 'CANCELLED' ||
-      st === 'DELETED' ||
-      st === 'RECYCLED' ||
-      st === 'VOID' ||
-      st === 'DUE' ||
-      st === 'PENDING' ||
-      st === 'UNPAID'
-    ) return false;
-    if (i.mode === 'BOUNCED') return false;
-    const totalAmt = Number(i.amount || i.paidAmount || (Number(i.cashAmount || 0) + Number(i.upiAmount || 0)) || 0);
-    const paidAmt = Number(i.paidAmount ?? i.paid_amount ?? (st === 'PAID' ? totalAmt : 0));
-    return (st === 'PAID' || paidAmt > 0) && totalAmt > 0;
-  });
 
   const newValidInst = filterPaidInst(c.installments);
 
