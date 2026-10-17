@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Settings as SettingsIcon, Building2, MapPin, Eye, EyeOff, Calculator, ShieldAlert } from 'lucide-react';
+import { isBranchActive } from '../utils/branchUtils';
 
 const Settings = ({ branches = [], userProfile = null, activeBranch = { id: 'main', name: 'Main Branch' } }) => {
-  // We only list sub-branches (exclude Main Branch from configuration).
-  const subBranches = branches.filter(b => b.id !== 'main' && b.name?.toLowerCase() !== 'main branch');
+  // We only list active sub-branches (exclude Main Branch from configuration).
+  const subBranches = branches.filter(b => isBranchActive(b) && b.id !== 'main' && b.name?.toLowerCase() !== 'main branch');
   const [toastMsg, setToastMsg] = useState(null);
 
   // Enforce strict access control:

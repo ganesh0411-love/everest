@@ -43,6 +43,7 @@ import CustomerDetail from './components/CustomerDetail';
 import DesktopSidebar from './components/DesktopSidebar';
 import AddBranchModal from './components/AddBranchModal';
 import EditBranchModal from './components/EditBranchModal';
+import { isBranchActive, sanitizeLocalStorageBranches } from './utils/branchUtils';
 
 
 const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWUyOTNiIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImF2YXRhciIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2JnKSIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzgiIHI9IjE2IiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48cGF0aCBkPSJNNTAgNjJDMzAgNjIgMTYgNzggMTYgOTVDMjYgOTggMzcgMTAwIDUwIDEwMEM2MyAxMDAgNzQgOTggODQgOTVDODQgNzggNzAgNjIgNTAgNjJaIiBmaWxsPSJ1cmwoI2F2YXRhcikiLz48L3N2Zz4=";
@@ -156,10 +157,27 @@ function App() {
 
   // Fetch Branches Globally
   useEffect(() => {
+    sanitizeLocalStorageBranches();
     if (user && userProfile) {
       const unsub = onSnapshot(collection(db, 'branches'), (snapshot) => {
-        const fetchedBranches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const fetchedBranches = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(isBranchActive);
         setBranches([{ id: 'main', name: 'Main Branch' }, ...fetchedBranches]);
+
+        // Background self-healing: purge obsolete Madurai/Trichy docs if found in Firestore
+        snapshot.docs.forEach(docSnap => {
+          const d = docSnap.data();
+          const docId = docSnap.id.toLowerCase();
+          const dName = String(d.name || d.branchName || docSnap.id).toLowerCase();
+          if (
+            dName.includes('madurai') || dName.includes('trichy') ||
+            docId.includes('madurai') || docId.includes('trichy')
+          ) {
+            console.log(`Self-healing purge of ghost branch doc [${docSnap.id}]`);
+            deleteDoc(docSnap.ref).catch(err => console.warn("Purge ghost branch err:", err));
+          }
+        });
       }, (error) => {
         console.error("Error fetching branches:", error);
       });
@@ -2056,7 +2074,7 @@ function App() {
                             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\\\'http://www.w3.org/2000/svg\\\' fill=\\\'none\\\' viewBox=\\\'0 0 24 24\\\' stroke=\\\'%2364748b\\\'%3E%3Cpath stroke-linecap=\\\'round\\\' stroke-linejoin=\\\'round\\\' stroke-width=\\\'2\\\' d=\\\'M19 9l-7 7-7-7\\\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' }}
                           >
                             <option value="All">All Branches</option>
-                            {branches.filter(b => b.id !== 'main').map(b => (
+                            {branches.filter(b => isBranchActive(b) && b.id !== 'main').map(b => (
                               <option key={b.id} value={b.name}>{b.name}</option>
                             ))}
                           </select>

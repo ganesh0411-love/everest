@@ -36,6 +36,7 @@ import {
   query, 
   where 
 } from 'firebase/firestore';
+import { isBranchActive, sanitizeLocalStorageBranches } from '../utils/branchUtils';
 
 const formatCurrency = (amt) => {
   return '₹ ' + Number(amt || 0).toLocaleString('en-IN');
@@ -242,15 +243,19 @@ export default function ExpansionView({
     }
   }, [activeBranch?.id, userProfile?.branchId, userProfile?.branch, isBranchManager]);
 
+  // Purge any stale ghost branch keys from localStorage on mount
+  useEffect(() => {
+    sanitizeLocalStorageBranches();
+  }, []);
+
   // Available Branches for Main Branch / Super Admin
   const availableBranches = useMemo(() => {
     const list = [];
     const seen = new Set();
     (branches || []).forEach(b => {
-      if (!b) return;
+      if (!b || !isBranchActive(b)) return;
       const bId = b.id || b.name;
       const bName = b.name || b.id;
-      if (b.disabled === true || b.status === 'Disabled') return;
       if (!seen.has(bId)) {
         seen.add(bId);
         list.push({ id: bId, name: bName });
@@ -262,10 +267,10 @@ export default function ExpansionView({
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
           parsed.forEach(b => {
-            if (!b) return;
+            if (!b || !isBranchActive(b)) return;
             const bId = b.id || b.name;
             const bName = b.name || b.id;
-            if (!seen.has(bId) && b.disabled !== true && b.status !== 'Disabled') {
+            if (!seen.has(bId)) {
               seen.add(bId);
               list.push({ id: bId, name: bName });
             }
@@ -348,67 +353,122 @@ export default function ExpansionView({
     }
   });
 
-  // Available Staff List for filter dropdown
+  // Target Branch for Staff Matching
+  const selectedBranchObj = useMemo(() => {
+    if (!selectedBranchId || selectedBranchId === 'all') return null;
+    return availableBranches.find(b => 
+      String(b.id || '').toLowerCase() === String(selectedBranchId).toLowerCase() ||
+      String(b.name || '').toLowerCase() === String(selectedBranchId).toLowerCase()
+    ) || null;
+  }, [selectedBranchId, availableBranches]);
+
+  const targetBranchId = selectedBranchId && selectedBranchId !== 'all' 
+    ? String(selectedBranchId).toLowerCase().trim() 
+    : '';
+  const targetBranchName = selectedBranchObj 
+    ? String(selectedBranchObj.name || '').toLowerCase().trim() 
+    : targetBranchId;
+
+  // Available Staff List strictly from active Staff Master Directory
   const availableStaffList = useMemo(() => {
     const staffSet = new Set();
-    const currentBranchStr = String(
-      selectedBranchId !== 'all' ? selectedBranchId : (activeBranch?.name || activeBranch?.id || '')
-    ).toLowerCase().trim();
+    const allCandidates = [];
 
-    // 1. From Firestore staff collection
-    firestoreStaff.forEach(s => {
-      if (!s) return;
-      if (s.status === 'Recycled' || s.status === 'Deleted' || s.status === 'Inactive' || s.disabled === true) return;
-      const sBranch = String(s.branch || s.branchId || s.branchName || '').toLowerCase().trim();
-      if (
-        selectedBranchId === 'all' || 
-        !currentBranchStr ||
-        sBranch === currentBranchStr || 
-        sBranch.includes(currentBranchStr) || 
-        currentBranchStr.includes(sBranch)
-      ) {
-        const name = (s.name || s.staffName || s.displayName || '').trim();
-        if (name) staffSet.add(name);
-      }
+    // 1. Genuine Active Staff from Firestore Staff Master
+    (firestoreStaff || []).forEach(s => {
+      if (s) allCandidates.push(s);
     });
 
-    // 2. From localStorage staff
+    // 2. Genuine Active Staff from localStorage backup if Firestore is loading
     try {
       const savedStaff = localStorage.getItem('everest_staff') || localStorage.getItem('staff');
       if (savedStaff) {
         const parsed = JSON.parse(savedStaff);
         if (Array.isArray(parsed)) {
           parsed.forEach(s => {
-            if (!s) return;
-            const sBranch = String(s.branch || s.branchId || s.branchName || '').toLowerCase().trim();
-            if (
-              selectedBranchId === 'all' || 
-              !currentBranchStr ||
-              sBranch === currentBranchStr || 
-              sBranch.includes(currentBranchStr) || 
-              currentBranchStr.includes(sBranch)
-            ) {
-              const name = (s.name || s.staffName || s.displayName || '').trim();
-              if (name) staffSet.add(name);
-            }
+            if (s) allCandidates.push(s);
           });
         }
       }
     } catch (e) {}
 
-    // 3. Inspect loaded expenses
-    expenses.forEach(e => {
-      const p = (e.paidBy || e.paid_by || e.staff || e.staffName || '').trim();
-      if (p) staffSet.add(p);
+    const seenNames = new Set();
+    allCandidates.forEach(s => {
+      if (!s) return;
+
+      // Strict active status check
+      if (s.isDeleted === true || s.is_deleted === true || s.deleted === true) return;
+      const status = String(s.status || '').trim().toLowerCase();
+      if (status === 'recycled' || status === 'deleted' || status === 'inactive') return;
+      if (s.disabled === true) return;
+
+      const rawName = (s.name || s.staffName || s.displayName || '').trim();
+      if (!rawName) return;
+      const lowerName = rawName.toLowerCase();
+
+      // Top-level Admin check:
+      // A top-level Super Admin entry must NEVER be listed in field staff dropdowns for Branch Managers / Staff Admins.
+      const isTopLevelAdmin = (
+        lowerName === 'admin' ||
+        lowerName === 'super admin' ||
+        lowerName === 'main admin' ||
+        String(s.role || '').toLowerCase() === 'admin' ||
+        String(s.role || '').toLowerCase() === 'main_admin' ||
+        s.isAdmin === true ||
+        s.isSuperAdmin === true
+      );
+
+      // If viewing user is NOT Super Admin (e.g. Branch Manager Muthumani), strictly EXCLUDE Admin
+      if (!isSuperAdmin && isTopLevelAdmin) {
+        return;
+      }
+
+      // If branch filter is NOT 'all', check branch assignment:
+      if (selectedBranchId !== 'all') {
+        const sBranchId = String(s.branchId || '').toLowerCase().trim();
+        const sBranch = String(s.branch || '').toLowerCase().trim();
+        const sBranchName = String(s.branchName || '').toLowerCase().trim();
+
+        const branchMatches = (
+          (targetBranchId && sBranchId === targetBranchId) ||
+          (targetBranchName && sBranchName === targetBranchName) ||
+          (targetBranchName && sBranch === targetBranchName) ||
+          (targetBranchId && sBranch === targetBranchId) ||
+          (targetBranchId && sBranchName === targetBranchId) ||
+          (targetBranchName && sBranchId === targetBranchName)
+        );
+
+        if (!branchMatches) {
+          return;
+        }
+
+        // Even for Super Admin, when inspecting a branch like Batlagundu,
+        // do not inject Head Office Admin if Admin doesn't belong to Batlagundu
+        if (isTopLevelAdmin && !branchMatches) {
+          return;
+        }
+      }
+
+      if (!seenNames.has(lowerName)) {
+        seenNames.add(lowerName);
+        staffSet.add(rawName);
+      }
     });
 
-    // 4. Always include userProfile name if logged in
-    if (userProfile?.name) {
-      staffSet.add(userProfile.name.trim());
-    }
-
     return Array.from(staffSet).sort((a, b) => a.localeCompare(b));
-  }, [firestoreStaff, selectedBranchId, activeBranch, expenses, userProfile?.name]);
+  }, [firestoreStaff, selectedBranchId, targetBranchId, targetBranchName, isSuperAdmin]);
+
+  // Reset staff filter whenever branch selection changes
+  useEffect(() => {
+    setSelectedStaff('All Staff');
+  }, [selectedBranchId]);
+
+  // Keep selectedStaff sane if staff list updates
+  useEffect(() => {
+    if (selectedStaff !== 'All Staff' && !availableStaffList.includes(selectedStaff)) {
+      setSelectedStaff('All Staff');
+    }
+  }, [availableStaffList, selectedStaff]);
 
   // Modal State
   const [isExpModalOpen, setIsExpModalOpen] = useState(false);
@@ -449,45 +509,46 @@ export default function ExpansionView({
     let unsubExp = () => {};
 
     try {
-      let qExp;
-      if (selectedBranchId && selectedBranchId !== 'all') {
-        qExp = query(collection(db, 'expansion_expenses'), where('branchId', '==', selectedBranchId));
-      } else {
-        qExp = collection(db, 'expansion_expenses');
-      }
+      const qExp = collection(db, 'expansion_expenses');
 
       unsubExp = onSnapshot(qExp, (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs
-            .map(d => {
-              const data = d.data();
-              return {
-                id: d.id,
-                ...data,
-                category: data.category || 'Others',
-                mode: String(data.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
-                cashDenominations: data.cashDenominations || null,
-                receiptImage: data.receiptImage || data.receiptUrl || null
-              };
-            })
-            .filter(item => !MOCK_EXPENSE_IDS.has(item.id) && !item.isMock);
-          const deduped = deduplicateExpenses(list);
-          setExpenses(deduped);
-          try { localStorage.setItem(expStorageKey, JSON.stringify(deduped)); } catch (e) {}
-        } else {
-          setExpenses(prev => {
-            const clean = deduplicateExpenses(prev.filter(p => !MOCK_EXPENSE_IDS.has(p.id) && !p.isMock));
-            try { localStorage.setItem(expStorageKey, JSON.stringify(clean)); } catch (e) {}
-            return clean;
+        const list = snap.docs
+          .map(d => {
+            const data = d.data();
+            return {
+              id: d.id,
+              ...data,
+              category: data.category || 'Others',
+              mode: String(data.mode || '').toUpperCase().includes('CASH') ? 'Cash' : 'UPI',
+              cashDenominations: data.cashDenominations || null,
+              receiptImage: data.receiptImage || data.receiptUrl || null
+            };
+          })
+          .filter(item => !MOCK_EXPENSE_IDS.has(item.id) && !item.isMock);
+
+        let branchExpenses = list;
+        if (selectedBranchId && selectedBranchId !== 'all') {
+          branchExpenses = list.filter(item => {
+            const itemBranch = String(item.branchId || item.branch || item.branchName || '').toLowerCase().trim();
+            return (
+              itemBranch === targetBranchId ||
+              itemBranch === targetBranchName ||
+              (targetBranchName && itemBranch.includes(targetBranchName)) ||
+              (targetBranchId && itemBranch.includes(targetBranchId))
+            );
           });
         }
+
+        const deduped = deduplicateExpenses(branchExpenses);
+        setExpenses(deduped);
+        try { localStorage.setItem(expStorageKey, JSON.stringify(deduped)); } catch (e) {}
       }, (err) => console.warn('Firestore expansion_expenses listener notice:', err));
     } catch (e) {}
 
     return () => {
       unsubExp();
     };
-  }, [selectedBranchId, expStorageKey]);
+  }, [selectedBranchId, targetBranchId, targetBranchName, expStorageKey]);
 
   // Category matching helper
   const matchCategory = (expense, cat) => {

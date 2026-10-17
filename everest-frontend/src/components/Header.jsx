@@ -3,6 +3,7 @@ import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download, BookOpen, Receipt } from 'lucide-react';
+import { isBranchActive } from '../utils/branchUtils';
 
 const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile, isCollectionReportOpen }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -120,7 +121,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
                             Select Branch
                           </div>
                           
-                          {branches.filter(b => b.isVisibleInDropdown !== false).map((b) => {
+                          {branches.filter(b => isBranchActive(b) && b.isVisibleInDropdown !== false).map((b) => {
                             const branchName = typeof b === 'string' ? b : b.name;
                             const isMain = branchName.toLowerCase() === 'main branch' || branchName.toLowerCase() === 'main';
 
