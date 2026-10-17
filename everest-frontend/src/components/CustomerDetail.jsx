@@ -74,8 +74,23 @@ const CustomerDetail = ({ customer, onBack }) => {
   }, [customer?.installments]);
 
   useEffect(() => {
-    if (customer && customer.id) {
+    if (customer && customer.id && installments) {
       localStorage.setItem(`everest_ledger_${customer.id}`, JSON.stringify(installments));
+      try {
+        const saved = localStorage.getItem('everest_customers');
+        if (saved) {
+          const list = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            const idx = list.findIndex(c => c.id === customer.id);
+            if (idx !== -1) {
+              list[idx] = { ...list[idx], installments: installments };
+              localStorage.setItem('everest_customers', JSON.stringify(list));
+            }
+          }
+        }
+      } catch (e) {}
+      window.dispatchEvent(new Event('collection-updated'));
+      window.dispatchEvent(new Event('customers-updated'));
     }
   }, [installments, customer]);
 
@@ -674,11 +689,23 @@ const CustomerDetail = ({ customer, onBack }) => {
   const handleSaveTransaction = async () => {
     if (!selectedTransaction) return;
     try {
-      let updatedInstallments = installments.map(inst => 
-        inst.id === selectedTransaction.id 
-          ? { ...inst, date: transactionEditData.date, number: transactionEditData.number, amount: parseFloat(transactionEditData.amount) || 0 } 
-          : inst
-      );
+      let updatedInstallments = installments.map(inst => {
+        if (inst.id === selectedTransaction.id) {
+          const newAmt = parseFloat(transactionEditData.amount) || 0;
+          const isUpi = String(inst.mode || inst.paymentMode || '').toUpperCase().includes('UPI');
+          return {
+            ...inst,
+            date: transactionEditData.date || inst.date,
+            number: transactionEditData.number || inst.number,
+            amount: newAmt,
+            paidAmount: newAmt,
+            cashAmount: isUpi ? 0 : newAmt,
+            upiAmount: isUpi ? newAmt : 0,
+            status: newAmt > 0 ? 'PAID' : 'BOUNCED'
+          };
+        }
+        return inst;
+      });
       updatedInstallments = recalculateInstallments(updatedInstallments);
       setInstallments(updatedInstallments);
       const customerRef = doc(db, 'customers', customer.id);

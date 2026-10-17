@@ -116,18 +116,40 @@ export const parseDateToTimestamp = (dateInput) => {
   const parsed = new Date(clean);
   return isNaN(parsed.getTime()) ? null : parsed.getTime();
 };
+// Normalize any date representation (String DD-MM-YYYY, YYYY-MM-DD, ISO 8601, Date, or Timestamp) to 'YYYY-MM-DD'
+export const normalizeDate = (dateInput) => {
+  if (!dateInput) return '';
+  if (typeof dateInput === 'string') {
+    const s = dateInput.trim();
+    // DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY with optional time
+    const dmy = s.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})(?:[T\s]|$)/);
+    if (dmy) {
+      const d = String(dmy[1]).padStart(2, '0');
+      const m = String(dmy[2]).padStart(2, '0');
+      let y = String(dmy[3]);
+      if (y.length === 2) y = '20' + y;
+      return `${y}-${m}-${d}`;
+    }
+    // If it contains ISO timestamp 'T', parse via Date to accurately reflect local calendar day
+    if (s.includes('T')) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        const yr = d.getFullYear();
+        const mo = String(d.getMonth() + 1).padStart(2, '0');
+        const dy = String(d.getDate()).padStart(2, '0');
+        return `${yr}-${mo}-${dy}`;
+      }
+    }
+    // YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+    const ymd = s.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})/);
+    if (ymd) {
+      const y = ymd[1];
+      const m = String(ymd[2]).padStart(2, '0');
+      const d = String(ymd[3]).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
 
-const formatDateToDisplay = (dateInput) => {
-  const ts = parseDateToTimestamp(dateInput);
-  if (!ts) return '';
-  const d = new Date(ts);
-  const dy = String(d.getDate()).padStart(2, '0');
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const yr = d.getFullYear();
-  return `${dy}-${mo}-${yr}`;
-};
-
-const formatDateToYmd = (dateInput) => {
   const ts = parseDateToTimestamp(dateInput);
   if (!ts) return '';
   const d = new Date(ts);
@@ -137,7 +159,42 @@ const formatDateToYmd = (dateInput) => {
   return `${yr}-${mo}-${dy}`;
 };
 
-const formatCurrency = (amt) => {
+export const isInRange = (dateInput, fromDateInput, toDateInput) => {
+  const target = normalizeDate(dateInput);
+  if (!target) return false;
+  const f = normalizeDate(fromDateInput);
+  const t = normalizeDate(toDateInput);
+  if (!f || !t) return false;
+  const start = f <= t ? f : t;
+  const end = f <= t ? t : f;
+  return target >= start && target <= end;
+};
+
+export const isPriorToRange = (dateInput, fromDateInput, toDateInput) => {
+  const target = normalizeDate(dateInput);
+  if (!target) return false;
+  const f = normalizeDate(fromDateInput);
+  const t = normalizeDate(toDateInput);
+  if (!f || !t) return false;
+  const start = f <= t ? f : t;
+  return target < start;
+};
+
+export const formatDateToDisplay = (dateInput) => {
+  const ymd = normalizeDate(dateInput);
+  if (!ymd) return '';
+  const parts = ymd.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return ymd;
+};
+
+export const formatDateToYmd = (dateInput) => {
+  return normalizeDate(dateInput);
+};
+
+export const formatCurrency = (amt) => {
   const val = Number(amt || 0);
   if (val < 0) {
     return '-₹ ' + Math.abs(val).toLocaleString('en-IN');
@@ -145,23 +202,15 @@ const formatCurrency = (amt) => {
   return '₹ ' + val.toLocaleString('en-IN');
 };
 
-const isSameDay = (dateA, dateB) => {
-  const tsA = parseDateToTimestamp(dateA);
-  const tsB = parseDateToTimestamp(dateB);
-  if (!tsA || !tsB) return false;
-  const dA = new Date(tsA).setHours(0, 0, 0, 0);
-  const dB = new Date(tsB).setHours(0, 0, 0, 0);
-  return dA === dB;
+export const isSameDay = (dateA, dateB) => {
+  const ymdA = normalizeDate(dateA);
+  const ymdB = normalizeDate(dateB);
+  if (!ymdA || !ymdB) return false;
+  return ymdA === ymdB;
 };
 
-const isDateInRange = (dateStr, fromDateInput, toDateInput) => {
-  const ts = parseDateToTimestamp(dateStr);
-  const startTs = parseDateToTimestamp(fromDateInput);
-  const endTs = parseDateToTimestamp(toDateInput);
-  if (!ts || !startTs || !endTs) return false;
-  const s = Math.min(new Date(startTs).setHours(0, 0, 0, 0), new Date(endTs).setHours(0, 0, 0, 0));
-  const e = Math.max(new Date(startTs).setHours(23, 59, 59, 999), new Date(endTs).setHours(23, 59, 59, 999));
-  return ts >= s && ts <= e;
+export const isDateInRange = (dateStr, fromDateInput, toDateInput) => {
+  return isInRange(dateStr, fromDateInput, toDateInput);
 };
 
 // Resolves formal category name from expense item
@@ -392,7 +441,21 @@ export const mergeCustomerIntoMap = (targetMap, c) => {
     existing = targetMap.get(`phone_${phone.slice(-10)}`);
   }
 
-  const newValidInst = filterPaidInst(c.installments);
+  let candidateInstallments = c.installments;
+  const cId = c.id || c.customerId;
+  if (cId) {
+    try {
+      const savedLedger = localStorage.getItem(`everest_ledger_${cId}`);
+      if (savedLedger) {
+        const parsed = JSON.parse(savedLedger);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          candidateInstallments = parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
+  const newValidInst = filterPaidInst(candidateInstallments);
 
   if (!existing) {
     targetMap.set(cKey, { 
@@ -637,9 +700,7 @@ export const computeEarliestTransactionDate = ({
       if (localLedger) {
         const parsed = JSON.parse(localLedger);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          if (!Array.isArray(rawInstallments) || rawInstallments.length === 0) {
-            rawInstallments = parsed;
-          }
+          rawInstallments = parsed;
         }
       }
     } catch (e) {}
@@ -1216,6 +1277,25 @@ export default function CashBook({
     return () => unsub();
   }, []);
 
+  // H. Real-time Re-Sync Listener for Focus, Custom Collection Updates, and Storage Mutations
+  const [syncTick, setSyncTick] = useState(0);
+  useEffect(() => {
+    const handleReSync = () => {
+      setSyncTick(prev => prev + 1);
+    };
+    window.addEventListener('focus', handleReSync);
+    window.addEventListener('collection-updated', handleReSync);
+    window.addEventListener('customers-updated', handleReSync);
+    window.addEventListener('storage', handleReSync);
+
+    return () => {
+      window.removeEventListener('focus', handleReSync);
+      window.removeEventListener('collection-updated', handleReSync);
+      window.removeEventListener('customers-updated', handleReSync);
+      window.removeEventListener('storage', handleReSync);
+    };
+  }, []);
+
   // Date Navigation Helpers (Shift both From & To dates)
   const handleShiftDate = (offsetDays) => {
     setActivePreset('Custom');
@@ -1420,15 +1500,16 @@ export default function CashBook({
     allTransactionsList,
     allExpensesList
   } = useMemo(() => {
-    const fromTs = parseDateToTimestamp(fromDate);
-    const toTs = parseDateToTimestamp(toDate);
-    const startDayTs = fromTs ? new Date(fromTs).setHours(0, 0, 0, 0) : 0;
-    const endDayTs = toTs ? new Date(toTs).setHours(23, 59, 59, 999) : 0;
-    const rangeStartTs = Math.min(startDayTs, endDayTs);
-    const rangeEndTs = Math.max(startDayTs, endDayTs);
+    const startYmd = normalizeDate(fromDate) <= normalizeDate(toDate) ? normalizeDate(fromDate) : normalizeDate(toDate);
+    const endYmd = normalizeDate(fromDate) <= normalizeDate(toDate) ? normalizeDate(toDate) : normalizeDate(fromDate);
 
-    const startYmd = formatDateToYmd(new Date(rangeStartTs));
-    const endYmd = formatDateToYmd(new Date(rangeEndTs));
+    const fromTs = parseDateToTimestamp(startYmd);
+    const toTs = parseDateToTimestamp(endYmd);
+    const rangeStartTs = fromTs ? new Date(fromTs).setHours(0, 0, 0, 0) : 0;
+    const rangeEndTs = toTs ? new Date(toTs).setHours(23, 59, 59, 999) : 0;
+
+    const isRecordInActiveRange = (dateInput) => isInRange(dateInput, startYmd, endYmd);
+    const isRecordPriorToActiveRange = (dateInput) => isPriorToRange(dateInput, startYmd, endYmd);
 
     // Strict Active Customer Filter Pipeline:
     // Build active customer directory and identify soft-deleted, recycled, or purged records.
@@ -1459,17 +1540,36 @@ export default function CashBook({
       firestoreCustomers.forEach(c => mergeCustomerIntoMap(customerMap, c));
     }
 
-    // Ensure Sundar Auto has canonical disbursements and strictly verified ground truth receipts
+    // Ensure Sundar Auto has canonical disbursements and verified ground truth receipts
     Array.from(customerMap.values()).forEach(c => {
       const cName = String(c.name || c.customerName || '').toLowerCase();
       if (cName.includes('sundar') && cName.includes('auto')) {
-        c.disbursedAt = '08-10-2026';
-        c.disbursedDate = '08-10-2026';
-        c.loanApprovedDate = '08-10-2026';
-        c.disbursedAmount = 22500;
-        c.loanAmount = 22500;
-        // Strictly lock to canonical verified ground truth receipts matching Collection Report 1:1
-        c.installments = GULLAPURAM_CANONICAL_CUSTOMERS[0].installments;
+        c.disbursedAt = c.disbursedAt || '08-10-2026';
+        c.disbursedDate = c.disbursedDate || '08-10-2026';
+        c.loanApprovedDate = c.loanApprovedDate || '08-10-2026';
+        c.disbursedAmount = c.disbursedAmount || 22500;
+        c.loanAmount = c.loanAmount || 22500;
+
+        let liveInst = c.installments;
+        const cId = String(c.id || c.customerId || '').trim();
+        if (cId) {
+          try {
+            const savedLedger = localStorage.getItem(`everest_ledger_${cId}`);
+            if (savedLedger) {
+              const parsed = JSON.parse(savedLedger);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                liveInst = parsed;
+              }
+            }
+          } catch (e) {}
+        }
+        const paidInst = filterPaidInst(liveInst || []);
+        if (paidInst.length > 0) {
+          c.installments = liveInst;
+        } else {
+          // Strictly lock to canonical verified ground truth receipts matching Collection Report 1:1 if no live edits exist
+          c.installments = GULLAPURAM_CANONICAL_CUSTOMERS[0].installments;
+        }
       }
     });
 
@@ -1618,13 +1718,13 @@ export default function CashBook({
       const disbUpi = isBankDisb ? disbAmount : 0;
 
       // Cumulative history strictly prior to fromDate (< rangeStartTs)
-      if (disbTs < rangeStartTs) {
+      if (isRecordPriorToActiveRange(date)) {
         histDebitCash += disbCash;
         histDebitBank += disbUpi;
       }
 
       // Active range [rangeStartTs, rangeEndTs]
-      if (disbTs >= rangeStartTs && disbTs <= rangeEndTs) {
+      if (isRecordInActiveRange(date)) {
         liveDebitCash += disbCash;
         liveDebitBank += disbUpi;
 
@@ -1646,7 +1746,111 @@ export default function CashBook({
     // 1. Gather all candidate raw collections
     const rawCollections = [];
 
-    // 1a. Dedicated Firestore 'collections' table (strictly real paid receipts)
+    // 1a. Customer Installments / Collections from active customers (strictly real paid receipts)
+    (allCust || []).forEach(cust => {
+      if (!cust || !isCustomerActive(cust)) return;
+      if (!isBranchMatch(cust)) return;
+
+      const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
+      const custNameLower = String(cust.name || cust.customerName || '').toLowerCase().trim();
+      const cleanCustName = custNameLower.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
+
+      if (custNameLower.includes('anitha') || cleanCustName.includes('anitha')) return;
+      if (cId && deletedCustomerIds.has(cId)) return;
+      if (deletedCustomerNames.has(cleanCustName)) return;
+
+      const rawType = String(cust.loanType || cust.scheme || cust.category || '').toLowerCase();
+      let catName = 'Daily Collection';
+      if (rawType.includes('agri')) {
+        catName = 'Agri Loan Collection';
+      } else if (rawType.includes('personal')) {
+        catName = 'Personal Loan Collection';
+      } else if (rawType.includes('monthly')) {
+        catName = 'Monthly Collection';
+      } else if (rawType.includes('weekly') || rawType.includes('micro')) {
+        catName = 'Weekly Collection';
+      } else if (rawType.includes('daily')) {
+        catName = 'Daily Collection';
+      } else if (cust.loanType || cust.scheme) {
+        catName = cust.loanType || cust.scheme;
+      }
+
+      // Query strictly actual paid receipts (never generated due schedules!)
+      let candInst = cust.installments || cust.ledger || cust.transactions || cust.history || [];
+      if (cId) {
+        try {
+          const savedLedger = localStorage.getItem(`everest_ledger_${cId}`);
+          if (savedLedger) {
+            const parsed = JSON.parse(savedLedger);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              candInst = parsed;
+            }
+          }
+        } catch (e) {}
+      }
+
+      let rawInstallments = filterPaidInst(candInst);
+      if (rawInstallments.length === 0 && cleanCustName.includes('sundar') && cleanCustName.includes('auto')) {
+        rawInstallments = GULLAPURAM_CANONICAL_CUSTOMERS[0].installments;
+      }
+
+      (rawInstallments || []).forEach((inst, idx) => {
+        if (!inst || typeof inst !== 'object') return;
+        const isDeleted = inst.isDeleted === true || inst.deleted === true || inst.is_deleted === true || inst.deletedAt || inst.deleted_at;
+        if (isDeleted) return;
+
+        const rawStatus = String(inst.status || '').toUpperCase();
+        if (
+          rawStatus === 'BOUNCED' ||
+          rawStatus === 'CANCELLED' ||
+          rawStatus === 'DELETED' ||
+          rawStatus === 'RECYCLED' ||
+          rawStatus === 'VOID' ||
+          rawStatus === 'DUE' ||
+          rawStatus === 'PENDING' ||
+          rawStatus === 'UNPAID'
+        ) return;
+        if (inst.mode === 'BOUNCED') return;
+
+        const totalAmt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
+        const paidAmt = Number(inst.paidAmount ?? inst.paid_amount ?? (rawStatus === 'PAID' ? totalAmt : 0));
+        if (rawStatus !== 'PAID' && paidAmt <= 0) return;
+        if (totalAmt <= 0) return;
+
+        const instDate = inst.date || inst.paymentDate || inst.collection_date || inst.createdAt;
+        const custDisplayName = cust.name || cust.customerName || 'Customer';
+        const centerOrPhone = cust.centerName || cust.center || cust.groupName || '';
+        const remarksInfo = centerOrPhone ? `${custDisplayName} (${centerOrPhone})` : custDisplayName;
+
+        const actualPaid = paidAmt > 0 ? paidAmt : totalAmt;
+
+        rawCollections.push({
+          id: inst.id || `inst_${cust.id}_${idx + 1}`,
+          transaction_id: inst.transaction_id || inst.transactionId || inst.txnId || inst.receipt_no || inst.receiptNo || inst.voucher_no || inst.voucherNo,
+          customer_id: cust.id || cust.customerId || getCanonicalCustomerKey(cust),
+          customerName: custDisplayName,
+          name: custDisplayName,
+          branch: cust.branch,
+          branchId: cust.branchId,
+          branchName: cust.branchName,
+          particulars: catName,
+          amount: actualPaid,
+          paidAmount: actualPaid,
+          cashAmount: inst.isSplit ? Number(inst.cashAmount || 0) : (inst.cashAmount !== undefined ? Number(inst.cashAmount) : (String(inst.mode || inst.paymentMode || '').toUpperCase().includes('UPI') ? 0 : actualPaid)),
+          upiAmount: inst.isSplit ? Number(inst.upiAmount || 0) : (inst.upiAmount !== undefined ? Number(inst.upiAmount) : (String(inst.mode || inst.paymentMode || '').toUpperCase().includes('UPI') ? actualPaid : 0)),
+          mode: inst.mode || inst.paymentMode || (inst.isSplit ? 'Split' : 'Cash'),
+          status: 'PAID',
+          date: instDate,
+          is_deleted: false,
+          deleted: false,
+          remarks: remarksInfo,
+          installment_no: inst.number || inst.installment_no || inst.installmentNo || (idx + 1),
+          entity: cust
+        });
+      });
+    });
+
+    // 1b. Dedicated Firestore 'collections' table (strictly real paid receipts)
     (firestoreCollections || []).forEach(c => {
       if (!c) return;
       const isDeleted = c.isDeleted === true || c.deleted === true || c.is_deleted === true || c.deletedAt || c.deleted_at;
@@ -1706,100 +1910,6 @@ export default function CashBook({
       });
     });
 
-    // 1b. Customer Installments / Collections from active customers (strictly real paid receipts)
-    (allCust || []).forEach(cust => {
-      if (!cust || !isCustomerActive(cust)) return;
-      if (!isBranchMatch(cust)) return;
-
-      const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
-      const custNameLower = String(cust.name || cust.customerName || '').toLowerCase().trim();
-      const cleanCustName = custNameLower.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
-
-      if (custNameLower.includes('anitha') || cleanCustName.includes('anitha')) return;
-      if (cId && deletedCustomerIds.has(cId)) return;
-      if (deletedCustomerNames.has(cleanCustName)) return;
-
-      const rawType = String(cust.loanType || cust.scheme || cust.category || '').toLowerCase();
-      let catName = 'Daily Collection';
-      if (rawType.includes('agri')) {
-        catName = 'Agri Loan Collection';
-      } else if (rawType.includes('personal')) {
-        catName = 'Personal Loan Collection';
-      } else if (rawType.includes('monthly')) {
-        catName = 'Monthly Collection';
-      } else if (rawType.includes('weekly') || rawType.includes('micro')) {
-        catName = 'Weekly Collection';
-      } else if (rawType.includes('daily')) {
-        catName = 'Daily Collection';
-      } else if (cust.loanType || cust.scheme) {
-        catName = cust.loanType || cust.scheme;
-      }
-
-      // Query strictly actual paid receipts (never generated due schedules!)
-      let rawInstallments = [];
-      if (cleanCustName.includes('sundar') && cleanCustName.includes('auto')) {
-        rawInstallments = GULLAPURAM_CANONICAL_CUSTOMERS[0].installments;
-      } else {
-        const candInst = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-        rawInstallments = filterPaidInst(candInst);
-      }
-
-      (rawInstallments || []).forEach((inst, idx) => {
-        if (!inst || typeof inst !== 'object') return;
-        const isDeleted = inst.isDeleted === true || inst.deleted === true || inst.is_deleted === true || inst.deletedAt || inst.deleted_at;
-        if (isDeleted) return;
-
-        const rawStatus = String(inst.status || '').toUpperCase();
-        if (
-          rawStatus === 'BOUNCED' ||
-          rawStatus === 'CANCELLED' ||
-          rawStatus === 'DELETED' ||
-          rawStatus === 'RECYCLED' ||
-          rawStatus === 'VOID' ||
-          rawStatus === 'DUE' ||
-          rawStatus === 'PENDING' ||
-          rawStatus === 'UNPAID'
-        ) return;
-        if (inst.mode === 'BOUNCED') return;
-
-        const totalAmt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
-        const paidAmt = Number(inst.paidAmount ?? inst.paid_amount ?? (rawStatus === 'PAID' ? totalAmt : 0));
-        if (rawStatus !== 'PAID' && paidAmt <= 0) return;
-        if (totalAmt <= 0) return;
-
-        const instDate = inst.date || inst.paymentDate || inst.collection_date || inst.createdAt;
-        const custDisplayName = cust.name || cust.customerName || 'Customer';
-        const centerOrPhone = cust.centerName || cust.center || cust.groupName || '';
-        const remarksInfo = centerOrPhone ? `${custDisplayName} (${centerOrPhone})` : custDisplayName;
-
-        const actualPaid = paidAmt > 0 ? paidAmt : totalAmt;
-
-        rawCollections.push({
-          id: inst.id || `inst_${cust.id}_${idx + 1}`,
-          transaction_id: inst.transaction_id || inst.transactionId || inst.txnId || inst.receipt_no || inst.receiptNo || inst.voucher_no || inst.voucherNo,
-          customer_id: cust.id || cust.customerId || getCanonicalCustomerKey(cust),
-          customerName: custDisplayName,
-          name: custDisplayName,
-          branch: cust.branch,
-          branchId: cust.branchId,
-          branchName: cust.branchName,
-          particulars: catName,
-          amount: actualPaid,
-          paidAmount: actualPaid,
-          cashAmount: inst.isSplit ? Number(inst.cashAmount || 0) : (inst.cashAmount !== undefined ? Number(inst.cashAmount) : (String(inst.mode || inst.paymentMode || '').toUpperCase().includes('UPI') ? 0 : actualPaid)),
-          upiAmount: inst.isSplit ? Number(inst.upiAmount || 0) : (inst.upiAmount !== undefined ? Number(inst.upiAmount) : (String(inst.mode || inst.paymentMode || '').toUpperCase().includes('UPI') ? actualPaid : 0)),
-          mode: inst.mode || inst.paymentMode || (inst.isSplit ? 'Split' : 'Cash'),
-          status: 'PAID',
-          date: instDate,
-          is_deleted: false,
-          deleted: false,
-          remarks: remarksInfo,
-          installment_no: inst.number || inst.installment_no || inst.installmentNo || (idx + 1),
-          entity: cust
-        });
-      });
-    });
-
     // 2. Strict Collection Deduplication by Unique ID / Normalized Key
     const uniqueCollectionsMap = new Map();
     const seenTxnIds = new Set();
@@ -1835,7 +1945,7 @@ export default function CashBook({
       const dateKey = formatDateToYmd(record.date);
       if (!dateKey) return;
 
-      const txnId = record.transaction_id || record.receipt_no || record.voucher_no;
+      const txnId = record.transaction_id || record.receipt_no || record.voucher_no || record.id;
       if (txnId && seenTxnIds.has(txnId)) return;
 
       const instKey = record.installment_no || record.amount;
@@ -1877,13 +1987,13 @@ export default function CashBook({
       }
 
       // Cumulative history strictly prior to fromDate (< rangeStartTs)
-      if (instTs < rangeStartTs) {
+      if (isRecordPriorToActiveRange(record.date)) {
         histCreditCash += cashAmt;
         histCreditUpi += upiAmt;
       }
 
       // Active range [rangeStartTs, rangeEndTs]
-      if (instTs >= rangeStartTs && instTs <= rangeEndTs) {
+      if (isRecordInActiveRange(record.date)) {
         liveCreditCash += cashAmt;
         liveCreditUpi += upiAmt;
 
@@ -2024,7 +2134,7 @@ export default function CashBook({
       const uAmt = Number(part.upiAmount || 0);
 
       // Cumulative up to yesterday (< rangeStartTs)
-      if (pTs < rangeStartTs) {
+      if (isRecordPriorToActiveRange(pDate)) {
         if (part.type === 'Debit') {
           histDebitCash += cAmt;
           histDebitBank += uAmt;
@@ -2035,7 +2145,7 @@ export default function CashBook({
       }
 
       // Active range [rangeStartTs, rangeEndTs]
-      if (pTs >= rangeStartTs && pTs <= rangeEndTs) {
+      if (isRecordInActiveRange(pDate)) {
         if (part.type === 'Debit') {
           liveDebitCash += cAmt;
           liveDebitBank += uAmt;
@@ -2087,13 +2197,13 @@ export default function CashBook({
       const eOnline = isCash ? 0 : amt;
 
       // Cumulative up to yesterday (< rangeStartTs)
-      if (expTs < rangeStartTs) {
+      if (isRecordPriorToActiveRange(expDate)) {
         histExpCash += eCash;
         histExpOnline += eOnline;
       }
 
       // Active range [rangeStartTs, rangeEndTs]
-      if (expTs >= rangeStartTs && expTs <= rangeEndTs) {
+      if (isRecordInActiveRange(expDate)) {
         liveExpCash += eCash;
         liveExpOnline += eOnline;
 
@@ -2119,7 +2229,7 @@ export default function CashBook({
     const totalPeriodExpenses = liveExpCash + liveExpOnline;
     if (totalPeriodExpenses > 0) {
       dynamicTx.push({
-        id: `exp_consolidated_${rangeStartTs}_${rangeEndTs}`,
+        id: `exp_consolidated_${startYmd}_${endYmd}`,
         date: rangeDateLabel,
         particulars: 'Official Expense',
         type: 'Expense',
@@ -2160,13 +2270,13 @@ export default function CashBook({
       const iBank = isCash ? 0 : amt;
 
       // Cumulative up to yesterday (< rangeStartTs)
-      if (invTs < rangeStartTs) {
+      if (isRecordPriorToActiveRange(invDate)) {
         histInvCash += iCash;
         histInvBank += iBank;
       }
 
       // Active range [rangeStartTs, rangeEndTs]
-      if (invTs >= rangeStartTs && invTs <= rangeEndTs) {
+      if (isRecordInActiveRange(invDate)) {
         liveInvCash += iCash;
         liveInvBank += iBank;
 
@@ -2267,6 +2377,7 @@ export default function CashBook({
       allExpensesList: dynamicExp
     };
   }, [
+    syncTick,
     fromDate,
     toDate,
     branchId,
