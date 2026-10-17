@@ -402,25 +402,58 @@ export const getCanonicalCustomerKey = (c) => {
   return String(c.id || c.customerId || '');
 };
 
-// Filter installments to ONLY include genuine paid receipts
+// Resolve Payment Mode (1:1 with CollectionReportModal)
+export const resolvePaymentMode = (inst) => {
+  if (!inst) return 'Cash';
+  const rawMode = (
+    inst.mode || 
+    inst.paymentMode || 
+    inst.instrument || 
+    inst.paymentType || 
+    inst.type || 
+    inst.payMode || 
+    inst.method ||
+    ''
+  ).toString().trim();
+
+  if (rawMode) {
+    const lower = rawMode.toLowerCase();
+    if (lower.includes('upi') || lower.includes('online') || lower.includes('gpay') || lower.includes('phonepe') || lower.includes('paytm') || lower.includes('qr') || lower.includes('bank')) {
+      return 'UPI';
+    }
+    if (lower.includes('cash')) {
+      return 'Cash';
+    }
+    return rawMode.toUpperCase();
+  }
+
+  if (inst.upiPhoto || (Number(inst.upiAmount || 0) > 0 && Number(inst.cashAmount || 0) === 0)) {
+    return 'UPI';
+  }
+  if (Number(inst.cashAmount || 0) > 0 && Number(inst.upiAmount || 0) === 0) {
+    return 'Cash';
+  }
+
+  return 'Cash';
+};
+
+// Filter installments to ONLY include genuine paid receipts (1:1 with CollectionReportModal)
 export const filterPaidInst = (arr) => (arr || []).filter(i => {
   if (!i || typeof i !== 'object') return false;
-  if (i.isDeleted === true || i.deleted === true || i.is_deleted === true) return false;
-  const st = String(i.status || '').toUpperCase();
+  if (i.isDeleted === true || i.deleted === true || i.is_deleted === true || i.deletedAt || i.deleted_at) return false;
+  const st = String(i.status || '').toUpperCase().trim();
   if (
     st === 'BOUNCED' ||
     st === 'CANCELLED' ||
     st === 'DELETED' ||
     st === 'RECYCLED' ||
-    st === 'VOID' ||
-    st === 'DUE' ||
-    st === 'PENDING' ||
-    st === 'UNPAID'
+    st === 'VOID'
   ) return false;
-  if (i.mode === 'BOUNCED') return false;
+  if (String(i.mode || '').toUpperCase().trim() === 'BOUNCED') return false;
   const totalAmt = Number(i.amount || i.paidAmount || (Number(i.cashAmount || 0) + Number(i.upiAmount || 0)) || 0);
   const paidAmt = Number(i.paidAmount ?? i.paid_amount ?? (st === 'PAID' ? totalAmt : 0));
-  return (st === 'PAID' || paidAmt > 0) && totalAmt > 0;
+  if ((st === 'DUE' || st === 'PENDING' || st === 'UNPAID') && paidAmt <= 0) return false;
+  return totalAmt > 0;
 });
 
 // Merges customer object into targetMap keyed by canonical customer key
@@ -614,6 +647,7 @@ export const GULLAPURAM_CANONICAL_CUSTOMERS = [
 // Scans across ALL active transactions: disbursements (debit outflows), collections (credits), expenses, and investments.
 export const computeEarliestTransactionDate = ({
   customers = [],
+  firestoreCustomers = [],
   loans = [],
   loan_disbursements = [],
   collections = [],
@@ -635,10 +669,21 @@ export const computeEarliestTransactionDate = ({
     const tName = String(targetBranchName || '').toLowerCase().trim();
     const tId = String(targetBranchId || '').toLowerCase().trim();
     if (tName === 'all' || tName === 'all branches' || tName === 'enterprise' || tId === 'all') return true;
+    if (tName === 'main' || tName === 'main branch' || tId === 'main') return true;
     if (tId && (bId === tId || bName === tId)) return true;
     if (tName && (bName === tName || bId === tName)) return true;
     if (tName && bName.length > 2 && (bName.includes(tName) || tName.includes(bName))) return true;
     if (tId && bId.length > 2 && (bId.includes(tId) || tId.includes(bId))) return true;
+    // Synonyms for Batlagundu / Vathalagundu
+    if ((tName.includes('batlagundu') || tId.includes('batlagundu') || tName.includes('vathalagundu') || tId.includes('vathalagundu')) &&
+        (bName.includes('batlagundu') || bId.includes('batlagundu') || bName.includes('vathalagundu') || bId.includes('vathalagundu'))) {
+      return true;
+    }
+    // Synonyms for Andipatti / Aundipatti
+    if ((tName.includes('andipatti') || tId.includes('andipatti') || tName.includes('aundipatti') || tId.includes('aundipatti')) &&
+        (bName.includes('andipatti') || bId.includes('andipatti') || bName.includes('aundipatti') || bId.includes('aundipatti'))) {
+      return true;
+    }
     return false;
   };
 
@@ -655,6 +700,9 @@ export const computeEarliestTransactionDate = ({
   } catch (_e) {}
   if (Array.isArray(customers)) {
     customers.forEach(c => mergeCustomerIntoMap(custMap, c));
+  }
+  if (Array.isArray(firestoreCustomers)) {
+    firestoreCustomers.forEach(c => mergeCustomerIntoMap(custMap, c));
   }
   const rawCusts = customLedgerData || Array.from(custMap.values());
 
@@ -707,23 +755,20 @@ export const computeEarliestTransactionDate = ({
 
     (rawInstallments || []).forEach(inst => {
       if (!inst || typeof inst !== 'object') return;
-      if (inst.isDeleted === true || inst.deleted === true || inst.is_deleted === true) return;
-      const status = String(inst.status || '').toUpperCase();
+      if (inst.isDeleted === true || inst.deleted === true || inst.is_deleted === true || inst.deletedAt || inst.deleted_at) return;
+      const status = String(inst.status || '').toUpperCase().trim();
       if (
         status === 'BOUNCED' || 
         status === 'CANCELLED' || 
         status === 'DELETED' ||
         status === 'RECYCLED' ||
-        status === 'VOID' ||
-        status === 'DUE' ||
-        status === 'PENDING' ||
-        status === 'UNPAID'
+        status === 'VOID'
       ) return;
-      if (inst.mode === 'BOUNCED') return;
+      if (String(inst.mode || '').toUpperCase().trim() === 'BOUNCED') return;
 
       const amt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
       const paidAmt = Number(inst.paidAmount ?? inst.paid_amount ?? (status === 'PAID' ? amt : 0));
-      if (status !== 'PAID' && paidAmt <= 0) return;
+      if ((status === 'DUE' || status === 'PENDING' || status === 'UNPAID') && paidAmt <= 0) return;
       if (amt <= 0) return;
 
       const instDateCandidates = [
@@ -769,21 +814,19 @@ export const computeEarliestTransactionDate = ({
     if (!col || col.isDeleted || col.deleted) return;
     const cName = String(col.customerName || col.name || '').toLowerCase();
     if (cName.includes('anitha')) return;
-    const status = String(col.status || '').toUpperCase();
+    const status = String(col.status || '').toUpperCase().trim();
     if (
       status === 'BOUNCED' ||
       status === 'CANCELLED' ||
       status === 'DELETED' ||
       status === 'RECYCLED' ||
-      status === 'VOID' ||
-      status === 'DUE' ||
-      status === 'PENDING' ||
-      status === 'UNPAID'
+      status === 'VOID'
     ) return;
-    if (col.mode === 'BOUNCED') return;
+    if (String(col.mode || '').toUpperCase().trim() === 'BOUNCED') return;
     const amt = Number(col.amount || col.paidAmount || (Number(col.cashAmount || 0) + Number(col.upiAmount || 0)) || 0);
     const paidAmt = Number(col.paidAmount ?? col.paid_amount ?? (status === 'PAID' ? amt : 0));
-    if (status !== 'PAID' && paidAmt <= 0) return;
+    if ((status === 'DUE' || status === 'PENDING' || status === 'UNPAID') && paidAmt <= 0) return;
+    if (amt <= 0) return;
     if (!matchesBranch(col)) return;
     const colDateCandidates = [col.date, col.collectionDate, col.paymentDate, col.createdAt];
     for (const cand of colDateCandidates) {
@@ -796,6 +839,7 @@ export const computeEarliestTransactionDate = ({
       }
     }
   });
+
 
   // 3. Check Live Expenses
   (liveExpenses || []).forEach(exp => {
@@ -959,33 +1003,63 @@ export default function CashBook({
     if (!item) return false;
     const sel = (selectedBranchId || '').toLowerCase().trim();
     const selName = (targetBranchName || '').toLowerCase().trim();
-    if (!sel || sel === 'all' || sel === 'all branches' || sel === 'enterprise' || selName === 'all branches' || selName === 'all') {
+    if (!sel || sel === 'all' || sel === 'all branches' || sel === 'enterprise' || 
+        selName === 'all branches' || selName === 'all' || 
+        sel === 'main' || sel === 'main branch' || 
+        selName === 'main' || selName === 'main branch') {
       return true;
     }
 
     if (typeof item === 'string') {
       const s = item.toLowerCase().trim();
       if (!s) return false;
-      if (s === 'all' || s === 'all branches' || s === 'enterprise') return true;
-      return (
-        s === sel || s === selName ||
+      if (s === 'all' || s === 'all branches' || s === 'enterprise' || s === 'main' || s === 'main branch') return true;
+      if (s === sel || s === selName ||
         (sel && (s.includes(sel) || sel.includes(s))) ||
-        (selName && (s.includes(selName) || selName.includes(s)))
-      );
+        (selName && (s.includes(selName) || selName.includes(s)))) {
+        return true;
+      }
+      if ((sel.includes('batlagundu') || selName.includes('batlagundu') || sel.includes('vathalagundu') || selName.includes('vathalagundu')) &&
+          (s.includes('batlagundu') || s.includes('vathalagundu'))) {
+        return true;
+      }
+      if ((sel.includes('andipatti') || selName.includes('andipatti') || sel.includes('aundipatti') || selName.includes('aundipatti')) &&
+          (s.includes('andipatti') || s.includes('aundipatti'))) {
+        return true;
+      }
+      return false;
     }
 
     const b = String(item.branch || '').toLowerCase().trim();
     const bName = String(item.branchName || item.assignedBranch || '').toLowerCase().trim();
     const bId = String(item.branchId || item.branchCode || '').toLowerCase().trim();
 
-    return (
+    if (
       (sel && (b === sel || bName === sel || bId === sel)) ||
       (selName && (b === selName || bName === selName || bId === selName)) ||
       (sel && b && (b.includes(sel) || sel.includes(b))) ||
       (sel && bId && (bId.includes(sel) || sel.includes(bId))) ||
       (selName && b && (b.includes(selName) || selName.includes(b))) ||
       (selName && bName && (bName.includes(selName) || selName.includes(bName)))
-    );
+    ) {
+      return true;
+    }
+
+    // Synonyms for Batlagundu / Vathalagundu
+    if ((sel.includes('batlagundu') || selName.includes('batlagundu') || sel.includes('vathalagundu') || selName.includes('vathalagundu')) &&
+        (b.includes('batlagundu') || bName.includes('batlagundu') || bId.includes('batlagundu') ||
+         b.includes('vathalagundu') || bName.includes('vathalagundu') || bId.includes('vathalagundu'))) {
+      return true;
+    }
+
+    // Synonyms for Andipatti / Aundipatti
+    if ((sel.includes('andipatti') || selName.includes('andipatti') || sel.includes('aundipatti') || selName.includes('aundipatti')) &&
+        (b.includes('andipatti') || bName.includes('andipatti') || bId.includes('andipatti') ||
+         b.includes('aundipatti') || bName.includes('aundipatti') || bId.includes('aundipatti'))) {
+      return true;
+    }
+
+    return false;
   };
 
   const doesEntityMatchBranch = isBranchMatch;
@@ -1317,7 +1391,8 @@ export default function CashBook({
     setActivePreset('All');
     const today = new Date();
     const earliestDate = computeEarliestTransactionDate({
-      customers: Array.isArray(customers) && customers.length > 0 ? customers : firestoreCustomers,
+      customers: Array.isArray(customers) ? customers : [],
+      firestoreCustomers: Array.isArray(firestoreCustomers) ? firestoreCustomers : [],
       loans: firestoreLoans,
       loan_disbursements: firestoreDisbursements,
       collections: firestoreCollections,
@@ -1331,6 +1406,13 @@ export default function CashBook({
     setFromDate(formatDateToDisplay(earliestDate));
     setToDate(formatDateToDisplay(today));
   };
+
+  // Re-calculate date boundaries on All when branch changes
+  useEffect(() => {
+    if (activePreset === 'All') {
+      handleSelectAllPeriod();
+    }
+  }, [selectedBranchId, targetBranchName]);
 
   const isTodaySelected = activePreset === 'Today' || (activePreset !== 'All' && isSameDay(fromDate, getTodayYmd()) && isSameDay(toDate, getTodayYmd()));
   const isYesterdaySelected = activePreset === 'Yesterday' || (activePreset !== 'All' && isSameDay(fromDate, getYesterdayYmd()) && isSameDay(toDate, getYesterdayYmd()));
@@ -1799,22 +1881,19 @@ export default function CashBook({
         const isDeleted = inst.isDeleted === true || inst.deleted === true || inst.is_deleted === true || inst.deletedAt || inst.deleted_at;
         if (isDeleted) return;
 
-        const rawStatus = String(inst.status || '').toUpperCase();
+        const rawStatus = String(inst.status || '').toUpperCase().trim();
         if (
           rawStatus === 'BOUNCED' ||
           rawStatus === 'CANCELLED' ||
           rawStatus === 'DELETED' ||
           rawStatus === 'RECYCLED' ||
-          rawStatus === 'VOID' ||
-          rawStatus === 'DUE' ||
-          rawStatus === 'PENDING' ||
-          rawStatus === 'UNPAID'
+          rawStatus === 'VOID'
         ) return;
-        if (inst.mode === 'BOUNCED') return;
+        if (String(inst.mode || '').toUpperCase().trim() === 'BOUNCED') return;
 
         const totalAmt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
         const paidAmt = Number(inst.paidAmount ?? inst.paid_amount ?? (rawStatus === 'PAID' ? totalAmt : 0));
-        if (rawStatus !== 'PAID' && paidAmt <= 0) return;
+        if ((rawStatus === 'DUE' || rawStatus === 'PENDING' || rawStatus === 'UNPAID') && paidAmt <= 0) return;
         if (totalAmt <= 0) return;
 
         const instDate = inst.date || inst.paymentDate || inst.collection_date || inst.createdAt;
@@ -1824,9 +1903,47 @@ export default function CashBook({
 
         const actualPaid = paidAmt > 0 ? paidAmt : totalAmt;
 
+        const upiAmt = Number(inst.upiAmount || 0);
+        const cashAmt = Number(inst.cashAmount || 0);
+        const rawMode = (inst.mode || inst.paymentMode || inst.instrument || '').toString().trim().toUpperCase();
+
+        let isSplit = false;
+        let finalUpi = 0;
+        let finalCash = 0;
+        let resolvedMode = 'Cash';
+
+        if (upiAmt > 0 && cashAmt > 0) {
+          isSplit = true;
+          finalUpi = upiAmt;
+          finalCash = cashAmt;
+          resolvedMode = 'Split';
+        } else if (rawMode === 'SPLIT' || rawMode === 'UPI/CASH' || rawMode === 'BOTH') {
+          isSplit = true;
+          if (upiAmt > 0 || cashAmt > 0) {
+            finalUpi = upiAmt;
+            finalCash = cashAmt;
+          } else {
+            finalUpi = Math.round(actualPaid / 2);
+            finalCash = actualPaid - finalUpi;
+          }
+          resolvedMode = 'Split';
+        } else {
+          resolvedMode = resolvePaymentMode(inst);
+          if (resolvedMode === 'UPI') {
+            finalUpi = actualPaid;
+            finalCash = 0;
+          } else {
+            finalCash = actualPaid;
+            finalUpi = 0;
+          }
+        }
+
+        const scopedInstId = `inst_${cust.id || cust.customerId || 'c'}_${inst.id || idx + 1}`;
+        const realTxnId = inst.transaction_id || inst.transactionId || inst.txnId || inst.receipt_no || inst.receiptNo || inst.voucher_no || inst.voucherNo || null;
+
         rawCollections.push({
-          id: inst.id || `inst_${cust.id}_${idx + 1}`,
-          transaction_id: inst.transaction_id || inst.transactionId || inst.txnId || inst.receipt_no || inst.receiptNo || inst.voucher_no || inst.voucherNo,
+          id: scopedInstId,
+          transaction_id: realTxnId,
           customer_id: cust.id || cust.customerId || getCanonicalCustomerKey(cust),
           customerName: custDisplayName,
           name: custDisplayName,
@@ -1836,9 +1953,9 @@ export default function CashBook({
           particulars: catName,
           amount: actualPaid,
           paidAmount: actualPaid,
-          cashAmount: inst.isSplit ? Number(inst.cashAmount || 0) : (inst.cashAmount !== undefined ? Number(inst.cashAmount) : (String(inst.mode || inst.paymentMode || '').toUpperCase().includes('UPI') ? 0 : actualPaid)),
-          upiAmount: inst.isSplit ? Number(inst.upiAmount || 0) : (inst.upiAmount !== undefined ? Number(inst.upiAmount) : (String(inst.mode || inst.paymentMode || '').toUpperCase().includes('UPI') ? actualPaid : 0)),
-          mode: inst.mode || inst.paymentMode || (inst.isSplit ? 'Split' : 'Cash'),
+          cashAmount: finalCash,
+          upiAmount: finalUpi,
+          mode: resolvedMode,
           status: 'PAID',
           date: instDate,
           is_deleted: false,
@@ -1864,30 +1981,62 @@ export default function CashBook({
       if (cId && deletedCustomerIds.has(cId)) return;
       if (deletedCustomerNames.has(cleanCName)) return;
 
-      const rawStatus = String(c.status || '').toUpperCase();
+      const rawStatus = String(c.status || '').toUpperCase().trim();
       if (
         rawStatus === 'BOUNCED' ||
         rawStatus === 'CANCELLED' ||
         rawStatus === 'DELETED' ||
         rawStatus === 'RECYCLED' ||
-        rawStatus === 'VOID' ||
-        rawStatus === 'DUE' ||
-        rawStatus === 'PENDING' ||
-        rawStatus === 'UNPAID'
+        rawStatus === 'VOID'
       ) return;
-      if (c.mode === 'BOUNCED') return;
+      if (String(c.mode || '').toUpperCase().trim() === 'BOUNCED') return;
 
       const totalAmt = Number(c.amount || c.paidAmount || (Number(c.cashAmount || 0) + Number(c.upiAmount || 0)) || 0);
       const paidAmt = Number(c.paidAmount ?? c.paid_amount ?? (rawStatus === 'PAID' ? totalAmt : 0));
-      if (rawStatus !== 'PAID' && paidAmt <= 0) return;
+      if ((rawStatus === 'DUE' || rawStatus === 'PENDING' || rawStatus === 'UNPAID') && paidAmt <= 0) return;
       if (totalAmt <= 0) return;
 
       const actualPaid = paidAmt > 0 ? paidAmt : totalAmt;
       const colDate = c.date || c.collectionDate || c.paymentDate || c.createdAt;
 
+      const upiAmt = Number(c.upiAmount || 0);
+      const cashAmt = Number(c.cashAmount || 0);
+      const rawMode = (c.mode || c.paymentMode || c.instrument || '').toString().trim().toUpperCase();
+
+      let isSplit = false;
+      let finalUpi = 0;
+      let finalCash = 0;
+      let resolvedMode = 'Cash';
+
+      if (upiAmt > 0 && cashAmt > 0) {
+        isSplit = true;
+        finalUpi = upiAmt;
+        finalCash = cashAmt;
+        resolvedMode = 'Split';
+      } else if (rawMode === 'SPLIT' || rawMode === 'UPI/CASH' || rawMode === 'BOTH') {
+        isSplit = true;
+        if (upiAmt > 0 || cashAmt > 0) {
+          finalUpi = upiAmt;
+          finalCash = cashAmt;
+        } else {
+          finalUpi = Math.round(actualPaid / 2);
+          finalCash = actualPaid - finalUpi;
+        }
+        resolvedMode = 'Split';
+      } else {
+        resolvedMode = resolvePaymentMode(c);
+        if (resolvedMode === 'UPI') {
+          finalUpi = actualPaid;
+          finalCash = 0;
+        } else {
+          finalCash = actualPaid;
+          finalUpi = 0;
+        }
+      }
+
       rawCollections.push({
         id: c.id,
-        transaction_id: c.transaction_id || c.transactionId || c.txnId || c.receipt_no || c.receiptNo || c.voucher_no || c.voucherNo,
+        transaction_id: c.transaction_id || c.transactionId || c.txnId || c.receipt_no || c.receiptNo || c.voucher_no || c.voucherNo || null,
         customer_id: cId,
         customerName: c.customerName || c.name,
         name: c.customerName || c.name,
@@ -1897,9 +2046,9 @@ export default function CashBook({
         particulars: c.particulars || c.category || 'Daily Collection',
         amount: actualPaid,
         paidAmount: actualPaid,
-        cashAmount: c.cashAmount,
-        upiAmount: c.upiAmount,
-        mode: c.mode || c.paymentMode,
+        cashAmount: finalCash,
+        upiAmount: finalUpi,
+        mode: resolvedMode,
         status: 'PAID',
         date: colDate,
         is_deleted: false,
@@ -1910,30 +2059,27 @@ export default function CashBook({
       });
     });
 
-    // 2. Strict Collection Deduplication by Unique ID / Normalized Key
+    // 2. Strict Collection Deduplication by Customer-Scoped Key
     const uniqueCollectionsMap = new Map();
     const seenTxnIds = new Set();
 
     rawCollections.forEach(record => {
       if (!record) return;
-      const rawStatus = String(record.status || '').toUpperCase();
+      const rawStatus = String(record.status || '').toUpperCase().trim();
       if (
         rawStatus === 'BOUNCED' ||
         rawStatus === 'CANCELLED' ||
         rawStatus === 'DELETED' ||
         rawStatus === 'RECYCLED' ||
-        rawStatus === 'VOID' ||
-        rawStatus === 'DUE' ||
-        rawStatus === 'PENDING' ||
-        rawStatus === 'UNPAID'
+        rawStatus === 'VOID'
       ) return;
-      if (record.mode === 'BOUNCED') return;
+      if (String(record.mode || '').toUpperCase().trim() === 'BOUNCED') return;
 
       const isNotDeleted = !record.is_deleted && !record.deleted && !record.isDeleted;
-      const totalAmt = Number(record.amount || record.paidAmount || 0);
-      const isPaid = (rawStatus === 'PAID' || rawStatus === 'ACTIVE' || (!record.status && totalAmt > 0)) && totalAmt > 0;
-
-      if (!isPaid || !isNotDeleted) return;
+      const totalAmt = Number(record.amount || record.paidAmount || (Number(record.cashAmount || 0) + Number(record.upiAmount || 0)) || 0);
+      const paidAmt = Number(record.paidAmount ?? record.paid_amount ?? (rawStatus === 'PAID' ? totalAmt : 0));
+      if ((rawStatus === 'DUE' || rawStatus === 'PENDING' || rawStatus === 'UNPAID') && paidAmt <= 0) return;
+      if (totalAmt <= 0 || !isNotDeleted) return;
 
       const normCust = String(record.customerName || record.name || record.customer_id || '')
         .toLowerCase()
@@ -1945,17 +2091,23 @@ export default function CashBook({
       const dateKey = formatDateToYmd(record.date);
       if (!dateKey) return;
 
-      const txnId = record.transaction_id || record.receipt_no || record.voucher_no || record.id;
-      if (txnId && seenTxnIds.has(txnId)) return;
+      // Only check genuine global transaction identifiers against seenTxnIds (never generic numeric IDs!)
+      const realTxnId = record.transaction_id || record.receipt_no || record.voucher_no || null;
+      if (realTxnId && seenTxnIds.has(realTxnId)) return;
 
-      const instKey = record.installment_no || record.amount;
-      const uniqueKey = txnId || `${normCust}_${dateKey}_${instKey}_${record.amount}`;
+      // Customer-scoped deduplication key: prevents collision between different customers
+      const custKey = record.customer_id || normCust;
+      const instKey = record.installment_no !== undefined ? record.installment_no : (record.id || totalAmt);
+      const uniqueKey = realTxnId 
+        ? `txn_${realTxnId}` 
+        : `${custKey}_${normCust}_${dateKey}_${instKey}_${totalAmt}`;
 
       if (uniqueCollectionsMap.has(uniqueKey)) return;
 
-      if (txnId) seenTxnIds.add(txnId);
+      if (realTxnId) seenTxnIds.add(realTxnId);
       uniqueCollectionsMap.set(uniqueKey, record);
     });
+
 
     const verifiedCollections = Array.from(uniqueCollectionsMap.values());
 
@@ -1978,11 +2130,13 @@ export default function CashBook({
         cashAmt = Number(record.cashAmount || 0);
         upiAmt = Number(record.upiAmount || 0);
       } else {
-        const modeStr = String(record.mode || record.paymentMode || 'Cash').toUpperCase();
-        if (modeStr.includes('UPI') || modeStr.includes('ONLINE') || modeStr.includes('BANK') || modeStr.includes('GPAY') || modeStr.includes('PHONEPE')) {
+        const mode = resolvePaymentMode(record);
+        if (mode === 'UPI') {
           upiAmt = totalAmt;
+          cashAmt = 0;
         } else {
           cashAmt = totalAmt;
+          upiAmt = 0;
         }
       }
 
