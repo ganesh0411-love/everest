@@ -11,8 +11,8 @@ import {
   Settings,
   ShieldCheck,
   Trash2,
-  BookOpen,
-  TrendingUp
+  Receipt,
+  BookOpen
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -35,7 +35,7 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     { name: 'Customer Management', view: 'Customer', icon: Users },
     { name: 'Center Management', view: 'Centers', icon: Building2 },
     { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: UserPlus },
-    { name: 'Expansion', view: 'Expansion', icon: TrendingUp },
+    { name: 'Expenses', view: 'Expenses', icon: Receipt },
     { name: 'Cash Book', view: 'Cash Book', icon: BookOpen },
     { name: 'Staff Management', view: 'Staff Management', icon: UserCheck },
     { name: 'Application Status', view: 'Application Status', icon: ClipboardList },
@@ -43,15 +43,26 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     { name: 'Recycle Bin', view: 'Recycle Bin', icon: Trash2 },
   ].filter(item => {
     const permissions = userProfile?.permissions || {};
-    const isAdmin = userProfile?.role === 'admin';
+    const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'main_admin' || userProfile?.role === 'Admin';
 
     if (item.name === 'Dashboard Overview') return isAdmin || permissions.dashboardOverview === true;
     if (item.name === 'Customer Management') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
-    if (item.name === 'Expansion') return isAdmin || permissions.expansion === true || true;
-    if (item.name === 'Cash Book') return isAdmin || permissions.cashBook === true;
+    if (item.name === 'Expenses' || item.name === 'Expansion') return isAdmin || permissions.expenses === true || permissions.expansion === true || true;
+    if (item.name === 'Cash Book') {
+      return (
+        isAdmin || 
+        permissions.cashBook === true || 
+        permissions.cash_book === true || 
+        permissions.allPermissions === true || 
+        permissions.adminOverride === true || 
+        permissions.staffManagementRole === 'Admin' || 
+        permissions.staffManagement === true || 
+        permissions.cashBook !== false
+      );
+    }
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 
     return true;

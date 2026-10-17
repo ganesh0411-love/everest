@@ -9,6 +9,8 @@ import {
   Trash2, 
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown,
+  Building2,
   ArrowLeft, 
   Receipt, 
   Home, 
@@ -168,6 +170,19 @@ const MOCK_EXPENSE_IDS = new Set([
   'exp_7', 'exp_8', 'exp_9', 'exp_10', 'exp_11', 'exp_12', 'exp_13'
 ]);
 
+const deduplicateExpenses = (items) => {
+  if (!Array.isArray(items)) return [];
+  const map = new Map();
+  items.forEach(item => {
+    if (!item) return;
+    const id = item.id || `exp_${item.date}_${item.amount}_${item.description}_${item.paidBy || item.paid_by || ''}`;
+    if (!map.has(id)) {
+      map.set(id, { ...item, id });
+    }
+  });
+  return Array.from(map.values());
+};
+
 const INITIAL_EXPENSES = [];
 
 export default function ExpansionView({ 
@@ -179,6 +194,101 @@ export default function ExpansionView({
   onHome
 }) {
   const branchId = activeBranch?.id || 'main';
+
+  // Role & Permissions Scoping:
+  const userRole = String(userProfile?.role || '').toLowerCase();
+  const permissions = userProfile?.permissions || {};
+  const isSuperAdmin = userRole === 'admin' || userRole === 'main_admin' || userProfile?.isAdmin === true;
+
+  const currentBranchId = String(activeBranch?.id || userProfile?.branchId || userProfile?.branch || 'main').toLowerCase();
+  const isMainBranch = 
+    currentBranchId === 'main' || 
+    String(activeBranch?.name || '').toLowerCase() === 'main branch' ||
+    String(activeBranch?.name || '').toLowerCase() === 'main';
+
+  // Can manage / filter staff (Super Admin, Branch Manager with Admin Power, e.g. Muthumani with Admin Power):
+  const canManageStaff = Boolean(
+    isSuperAdmin ||
+    permissions.staffManagementRole === 'Admin' ||
+    permissions.allPermissions === true ||
+    permissions.adminOverride === true ||
+    permissions.staffManagement === true
+  );
+
+  // Branch Manager: Has admin power, locked to their assigned branch
+  const isBranchManager = canManageStaff && !isSuperAdmin;
+
+  // Show Branch Filter: only Super Admin in Main Branch
+  const showBranchFilter = isSuperAdmin && isMainBranch;
+
+  // Show Staff Filter: Super Admin OR Branch Manager / Staff with Admin permissions
+  const showStaffFilter = isSuperAdmin || canManageStaff;
+
+  // Active Branch filter state
+  const [selectedBranchId, setSelectedBranchId] = useState(() => {
+    if (isBranchManager) {
+      return activeBranch?.id || userProfile?.branchId || userProfile?.branch || 'main';
+    }
+    return activeBranch?.id || 'main';
+  });
+
+  // Active Staff filter state
+  const [selectedStaff, setSelectedStaff] = useState('All Staff');
+
+  // Sync selectedBranchId if activeBranch changes
+  useEffect(() => {
+    if (isBranchManager) {
+      setSelectedBranchId(activeBranch?.id || userProfile?.branchId || userProfile?.branch || 'main');
+    }
+  }, [activeBranch?.id, userProfile?.branchId, userProfile?.branch, isBranchManager]);
+
+  // Available Branches for Main Branch / Super Admin
+  const availableBranches = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    (branches || []).forEach(b => {
+      if (!b) return;
+      const bId = b.id || b.name;
+      const bName = b.name || b.id;
+      if (b.disabled === true || b.status === 'Disabled') return;
+      if (!seen.has(bId)) {
+        seen.add(bId);
+        list.push({ id: bId, name: bName });
+      }
+    });
+    try {
+      const saved = localStorage.getItem('everest_branches') || localStorage.getItem('branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(b => {
+            if (!b) return;
+            const bId = b.id || b.name;
+            const bName = b.name || b.id;
+            if (!seen.has(bId) && b.disabled !== true && b.status !== 'Disabled') {
+              seen.add(bId);
+              list.push({ id: bId, name: bName });
+            }
+          });
+        }
+      }
+    } catch (e) {}
+    return list;
+  }, [branches]);
+
+  // Real-time Firestore Staff subscription
+  const [firestoreStaff, setFirestoreStaff] = useState([]);
+  useEffect(() => {
+    try {
+      const unsub = onSnapshot(collection(db, 'staff'), (snapshot) => {
+        const list = snapshot.docs.map(d => ({ docId: d.id, id: d.id, ...d.data() }));
+        setFirestoreStaff(list);
+      }, (err) => {
+        console.warn("Firestore staff snapshot in ExpansionView:", err);
+      });
+      return () => unsub();
+    } catch (e) {}
+  }, []);
 
   // Preset Filters: 'Today' | 'Yesterday' | 'Last Week' | 'Last Month' | 'Custom'
   const [activePreset, setActivePreset] = useState('Today');
@@ -208,7 +318,9 @@ export default function ExpansionView({
   });
 
   // Storage Key
-  const expStorageKey = `everest_expansion_expenses_${branchId}`;
+  const expStorageKey = selectedBranchId === 'all' 
+    ? 'everest_expansion_expenses_all' 
+    : `everest_expansion_expenses_${selectedBranchId || branchId}`;
 
   // Expenses State (Purged of all mock/dummy records, live persistence only)
   const [expenses, setExpenses] = useState(() => {
@@ -218,8 +330,9 @@ export default function ExpansionView({
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const liveOnly = parsed.filter(p => !MOCK_EXPENSE_IDS.has(p.id) && !p.isMock);
-          localStorage.setItem(expStorageKey, JSON.stringify(liveOnly));
-          return liveOnly.map(p => ({
+          const deduped = deduplicateExpenses(liveOnly);
+          try { localStorage.setItem(expStorageKey, JSON.stringify(deduped)); } catch (e) {}
+          return deduped.map(p => ({
             ...p,
             time: p.time || (p.createdAt ? formatTime(p.createdAt) : '10:30 AM'),
             category: p.category || 'Others',
@@ -234,6 +347,68 @@ export default function ExpansionView({
       return [];
     }
   });
+
+  // Available Staff List for filter dropdown
+  const availableStaffList = useMemo(() => {
+    const staffSet = new Set();
+    const currentBranchStr = String(
+      selectedBranchId !== 'all' ? selectedBranchId : (activeBranch?.name || activeBranch?.id || '')
+    ).toLowerCase().trim();
+
+    // 1. From Firestore staff collection
+    firestoreStaff.forEach(s => {
+      if (!s) return;
+      if (s.status === 'Recycled' || s.status === 'Deleted' || s.status === 'Inactive' || s.disabled === true) return;
+      const sBranch = String(s.branch || s.branchId || s.branchName || '').toLowerCase().trim();
+      if (
+        selectedBranchId === 'all' || 
+        !currentBranchStr ||
+        sBranch === currentBranchStr || 
+        sBranch.includes(currentBranchStr) || 
+        currentBranchStr.includes(sBranch)
+      ) {
+        const name = (s.name || s.staffName || s.displayName || '').trim();
+        if (name) staffSet.add(name);
+      }
+    });
+
+    // 2. From localStorage staff
+    try {
+      const savedStaff = localStorage.getItem('everest_staff') || localStorage.getItem('staff');
+      if (savedStaff) {
+        const parsed = JSON.parse(savedStaff);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(s => {
+            if (!s) return;
+            const sBranch = String(s.branch || s.branchId || s.branchName || '').toLowerCase().trim();
+            if (
+              selectedBranchId === 'all' || 
+              !currentBranchStr ||
+              sBranch === currentBranchStr || 
+              sBranch.includes(currentBranchStr) || 
+              currentBranchStr.includes(sBranch)
+            ) {
+              const name = (s.name || s.staffName || s.displayName || '').trim();
+              if (name) staffSet.add(name);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    // 3. Inspect loaded expenses
+    expenses.forEach(e => {
+      const p = (e.paidBy || e.paid_by || e.staff || e.staffName || '').trim();
+      if (p) staffSet.add(p);
+    });
+
+    // 4. Always include userProfile name if logged in
+    if (userProfile?.name) {
+      staffSet.add(userProfile.name.trim());
+    }
+
+    return Array.from(staffSet).sort((a, b) => a.localeCompare(b));
+  }, [firestoreStaff, selectedBranchId, activeBranch, expenses, userProfile?.name]);
 
   // Modal State
   const [isExpModalOpen, setIsExpModalOpen] = useState(false);
@@ -274,7 +449,13 @@ export default function ExpansionView({
     let unsubExp = () => {};
 
     try {
-      const qExp = query(collection(db, 'expansion_expenses'), where('branchId', '==', branchId));
+      let qExp;
+      if (selectedBranchId && selectedBranchId !== 'all') {
+        qExp = query(collection(db, 'expansion_expenses'), where('branchId', '==', selectedBranchId));
+      } else {
+        qExp = collection(db, 'expansion_expenses');
+      }
+
       unsubExp = onSnapshot(qExp, (snap) => {
         if (!snap.empty) {
           const list = snap.docs
@@ -290,12 +471,13 @@ export default function ExpansionView({
               };
             })
             .filter(item => !MOCK_EXPENSE_IDS.has(item.id) && !item.isMock);
-          setExpenses(list);
-          localStorage.setItem(expStorageKey, JSON.stringify(list));
+          const deduped = deduplicateExpenses(list);
+          setExpenses(deduped);
+          try { localStorage.setItem(expStorageKey, JSON.stringify(deduped)); } catch (e) {}
         } else {
           setExpenses(prev => {
-            const clean = prev.filter(p => !MOCK_EXPENSE_IDS.has(p.id) && !p.isMock);
-            localStorage.setItem(expStorageKey, JSON.stringify(clean));
+            const clean = deduplicateExpenses(prev.filter(p => !MOCK_EXPENSE_IDS.has(p.id) && !p.isMock));
+            try { localStorage.setItem(expStorageKey, JSON.stringify(clean)); } catch (e) {}
             return clean;
           });
         }
@@ -305,7 +487,7 @@ export default function ExpansionView({
     return () => {
       unsubExp();
     };
-  }, [branchId, expStorageKey]);
+  }, [selectedBranchId, expStorageKey]);
 
   // Category matching helper
   const matchCategory = (expense, cat) => {
@@ -342,14 +524,44 @@ export default function ExpansionView({
     return true;
   };
 
-  // --- Filtered Expenses based on active Date Range, Category, & Mode ---
+  // Staff matching helper (Role-based)
+  const matchStaff = (expense) => {
+    // Standard Staff (No Admin Permission):
+    // Defaults strictly to showing expenses relevant to their own operations.
+    if (!canManageStaff) {
+      const myName = (userProfile?.name || userProfile?.displayName || '').toLowerCase().trim();
+      if (!myName) return true;
+      const pBy = (expense.paidBy || expense.paid_by || expense.staff || expense.staffName || '').toLowerCase().trim();
+      return pBy === myName || pBy.includes(myName) || myName.includes(pBy);
+    }
+
+    // Admin / Branch Manager with Admin Permissions:
+    if (!selectedStaff || selectedStaff === 'All Staff') return true;
+
+    // Filter strictly by paid_by === selectedStaff
+    const targetStaff = selectedStaff.toLowerCase().trim();
+    const pBy = (expense.paidBy || expense.paid_by || expense.staff || expense.staffName || '').toLowerCase().trim();
+    return pBy === targetStaff || pBy.includes(targetStaff) || targetStaff.includes(pBy);
+  };
+
+  // --- Filtered Expenses based on active Date Range, Category, Mode & Staff ---
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => {
-      return isDateInRange(e.date, fromDate, toDate) &&
-             matchCategory(e, selectedCategory) &&
-             matchMode(e, selectedMode);
+    const map = new Map();
+    expenses.forEach(e => {
+      if (!e || !e.id) return;
+      if (
+        isDateInRange(e.date, fromDate, toDate) &&
+        matchCategory(e, selectedCategory) &&
+        matchMode(e, selectedMode) &&
+        matchStaff(e)
+      ) {
+        if (!map.has(e.id)) {
+          map.set(e.id, e);
+        }
+      }
     });
-  }, [expenses, fromDate, toDate, selectedCategory, selectedMode]);
+    return Array.from(map.values());
+  }, [expenses, fromDate, toDate, selectedCategory, selectedMode, selectedStaff, canManageStaff, userProfile?.name]);
 
   // Sorted Filtered Expenses based on sortOrder
   const sortedFilteredExpenses = useMemo(() => {
@@ -445,9 +657,9 @@ export default function ExpansionView({
 
   // --- Right Sidebar: Unique-Date Aggregated Expenses Ledger (No Duplicate Dates) ---
   const dailyAggregatedExpenses = useMemo(() => {
-    // 1. Filter by category & mode first
+    // 1. Filter by category, mode & staff first
     const list = expenses.filter(e => {
-      return matchCategory(e, selectedCategory) && matchMode(e, selectedMode);
+      return matchCategory(e, selectedCategory) && matchMode(e, selectedMode) && matchStaff(e);
     });
 
     // 2. Group by date YMD
@@ -501,7 +713,7 @@ export default function ExpansionView({
     }
 
     return aggregatedList;
-  }, [expenses, selectedCategory, selectedMode, activePreset]);
+  }, [expenses, selectedCategory, selectedMode, activePreset, selectedStaff, canManageStaff, userProfile?.name]);
 
   // Mini Ledger Row Click: Focus strictly on that unique date
   const handleDrillDownDate = (dateStr) => {
@@ -667,6 +879,8 @@ export default function ExpansionView({
     const isCash = expForm.mode === 'Cash';
     const currentTimeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+    const activeBranchToSave = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : branchId;
+
     const payload = {
       date: expForm.date || formatDateToDisplay(getTodayYmd()),
       time: editingExp?.time || currentTimeStr,
@@ -680,7 +894,7 @@ export default function ExpansionView({
       paidBy: expForm.paidBy.trim() || userProfile?.name || 'Admin',
       cashDenominations: isCash && expForm.cashDenominations ? expForm.cashDenominations : null,
       receiptImage: expForm.receiptImage || null,
-      branchId,
+      branchId: activeBranchToSave,
       updatedAt: new Date().toISOString()
     };
 
@@ -690,21 +904,25 @@ export default function ExpansionView({
       } catch (e) {}
 
       setExpenses(prev => {
-        const updated = prev.map(i => i.id === editingExp.id ? { ...i, ...payload } : i);
-        localStorage.setItem(expStorageKey, JSON.stringify(updated));
+        const updated = deduplicateExpenses(prev.map(i => i.id === editingExp.id ? { ...i, ...payload } : i));
+        try { localStorage.setItem(expStorageKey, JSON.stringify(updated)); } catch (e) {}
         return updated;
       });
     } else {
       payload.createdAt = new Date().toISOString();
-      let newId = `exp_${Date.now()}`;
+      let docRef = null;
       try {
-        const docRef = await addDoc(collection(db, 'expansion_expenses'), payload);
-        newId = docRef.id;
-      } catch (e) {}
+        docRef = await addDoc(collection(db, 'expansion_expenses'), payload);
+      } catch (e) {
+        console.warn('Firestore addDoc fallback:', e);
+      }
 
+      const newId = docRef?.id || `exp_${Date.now()}`;
       setExpenses(prev => {
-        const updated = [{ id: newId, ...payload }, ...prev];
-        localStorage.setItem(expStorageKey, JSON.stringify(updated));
+        // If onSnapshot already inserted this record, do NOT append again!
+        if (prev.some(i => i.id === newId)) return prev;
+        const updated = deduplicateExpenses([{ id: newId, ...payload }, ...prev]);
+        try { localStorage.setItem(expStorageKey, JSON.stringify(updated)); } catch (e) {}
         return updated;
       });
     }
@@ -719,8 +937,8 @@ export default function ExpansionView({
     } catch (e) {}
 
     setExpenses(prev => {
-      const updated = prev.filter(i => i.id !== id);
-      localStorage.setItem(expStorageKey, JSON.stringify(updated));
+      const updated = deduplicateExpenses(prev.filter(i => i.id !== id));
+      try { localStorage.setItem(expStorageKey, JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
   };
@@ -853,7 +1071,7 @@ export default function ExpansionView({
     <div className="w-full min-h-screen bg-[#f0f4f9] text-slate-800 p-4 sm:p-6 lg:p-8 space-y-5 overflow-x-hidden">
       {/* 1. Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {onBack && (
             <button
               type="button"
@@ -864,14 +1082,55 @@ export default function ExpansionView({
               <ArrowLeft className="w-4 h-4" />
             </button>
           )}
-          <div className="flex items-baseline gap-2.5">
+          <div className="flex flex-wrap items-baseline gap-2.5">
             <h1 className="text-2xl lg:text-3xl font-black text-[#1e293b] tracking-tight">
-              Expansion
+              Expenses
             </h1>
             <span className="text-xs sm:text-sm text-slate-500 font-medium">
-              Manage Expenses & Cash Outflow
+              Manage Operational Expenses & Outflows
             </span>
           </div>
+
+          {/* Contextual Role-Based Branch & Staff Filters */}
+          {(showBranchFilter || showStaffFilter) && (
+            <div className="flex items-center gap-2 ml-1">
+              {showBranchFilter && (
+                <div className="relative">
+                  <select
+                    value={selectedBranchId}
+                    onChange={(e) => setSelectedBranchId(e.target.value)}
+                    className="appearance-none bg-white border border-slate-200 hover:border-slate-300 rounded-xl px-3 py-1.5 pr-7 text-xs font-bold text-slate-700 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
+                    title="Filter Expenses by Branch"
+                  >
+                    <option value="all">All Branches</option>
+                    {availableBranches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              )}
+
+              {showStaffFilter && (
+                <div className="relative">
+                  <select
+                    value={selectedStaff}
+                    onChange={(e) => setSelectedStaff(e.target.value)}
+                    className="appearance-none bg-white border border-slate-200 hover:border-slate-300 rounded-xl px-3 py-1.5 pr-7 text-xs font-bold text-slate-700 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
+                    title="Filter Expenses by Staff"
+                  >
+                    <option value="All Staff">
+                      {isBranchManager ? "Filter Staff: All Staff" : "All Staff"}
+                    </option>
+                    {availableStaffList.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Top-Right Badges & Prominent Home Button */}

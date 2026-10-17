@@ -575,9 +575,6 @@ function App() {
     if (currentView !== 'Home') {
       setIsCollectionReportOpen(false);
     }
-    if (currentView === 'Expenses') {
-      setCurrentView('Expansion');
-    }
   }, [currentView]);
 
   useEffect(() => {
@@ -1334,6 +1331,7 @@ function App() {
       case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} branches={branches} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
       case 'Add Bulk Customer': return <div className="flex-1 overflow-y-auto"><AddBulkCustomer activeBranch={activeBranch} /></div>;
+      case 'Expenses':
       case 'Expansion': 
         return (
           <div className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden">
@@ -1958,7 +1956,7 @@ function App() {
           <CustomerDashboard userProfile={userProfile} customers={customers} />
         ) : (
           <div className="w-full h-full flex flex-col relative overflow-hidden">
-            {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Expansion' && currentView !== 'Cash Book' && (
+            {currentView !== 'EMI Calculator' && currentView !== 'Customer Detail' && currentView !== 'Expenses' && currentView !== 'Expansion' && currentView !== 'Cash Book' && (
             <Header 
               currentView={currentView} 
               setCurrentView={switchTab}
@@ -1975,7 +1973,7 @@ function App() {
             />
           )}
           <div className="flex-1 flex flex-col md:flex-row w-full overflow-hidden relative">
-            {currentView !== 'Expansion' && currentView !== 'Cash Book' && (
+            {currentView !== 'Expenses' && currentView !== 'Expansion' && currentView !== 'Cash Book' && (
               <DesktopSidebar 
                 currentView={currentView} 
                 setCurrentView={switchTab}
@@ -1990,7 +1988,7 @@ function App() {
                 userProfile={userProfile}
               />
             )}
-            <div className={`flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] ${(currentView === 'Expansion' || currentView === 'Cash Book') ? 'max-w-none mx-0' : 'max-w-4xl mx-auto md:max-w-none md:mx-0'} overflow-hidden`}>
+            <div className={`flex-1 w-full h-full flex flex-col relative bg-[#f8fafc] ${(currentView === 'Expenses' || currentView === 'Expansion' || currentView === 'Cash Book') ? 'max-w-none mx-0' : 'max-w-4xl mx-auto md:max-w-none md:mx-0'} overflow-hidden`}>
               {renderView()}
 
               {/* Filter Modal Overlay */}

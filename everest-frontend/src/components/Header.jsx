@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download, BookOpen, TrendingUp } from 'lucide-react';
+import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download, BookOpen, Receipt } from 'lucide-react';
 
 const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile, isCollectionReportOpen }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -49,7 +49,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     { name: 'Customer Management', view: 'Customer', icon: <Users className="w-5 h-5" /> },
     { name: 'Center Management', view: 'Centers', icon: <Building2 className="w-5 h-5" /> },
     { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: <UserPlus className="w-5 h-5" /> },
-    { name: 'Expansion', view: 'Expansion', icon: <TrendingUp className="w-5 h-5" /> },
+    { name: 'Expenses', view: 'Expenses', icon: <Receipt className="w-5 h-5" /> },
     { name: 'Cash Book', view: 'Cash Book', icon: <BookOpen className="w-5 h-5" /> },
     { name: 'Staff Management', view: 'Staff Management', icon: <UserCheck className="w-5 h-5" /> },
     { name: 'Customer KYC Update', view: 'Customer KYC Update', icon: <ShieldCheck className="w-5 h-5" /> },
@@ -57,7 +57,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     { name: 'Recycle Bin', view: 'Recycle Bin', icon: <Trash2 className="w-5 h-5" /> }
   ].filter(item => {
     const permissions = userProfile?.permissions || {};
-    const isAdmin = userProfile?.role === 'admin';
+    const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'main_admin' || userProfile?.role === 'Admin';
 
     if (item.name === 'Dashboard Overview') return isAdmin || permissions.dashboardOverview === true;
     if (item.name === 'Customer Management') return isAdmin || permissions.customerManagement === true;
@@ -65,8 +65,19 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
     if (item.name === 'Add Bulk Customer') return true;
-    if (item.name === 'Expansion') return isAdmin || permissions.expansion === true || true;
-    if (item.name === 'Cash Book') return isAdmin || permissions.cashBook === true;
+    if (item.name === 'Expenses' || item.name === 'Expansion') return isAdmin || permissions.expenses === true || permissions.expansion === true || true;
+    if (item.name === 'Cash Book') {
+      return (
+        isAdmin || 
+        permissions.cashBook === true || 
+        permissions.cash_book === true || 
+        permissions.allPermissions === true || 
+        permissions.adminOverride === true || 
+        permissions.staffManagementRole === 'Admin' || 
+        permissions.staffManagement === true || 
+        permissions.cashBook !== false
+      );
+    }
     if (item.name === 'Customer KYC Update') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 

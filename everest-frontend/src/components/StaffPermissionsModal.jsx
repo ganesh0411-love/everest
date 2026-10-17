@@ -345,7 +345,7 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                     setPermissions(prev => ({ ...prev, expansion: nextVal, expenses: nextVal }));
                   }}
                 />
-                <span className="text-sm font-bold text-slate-700">Expansion</span>
+                <span className="text-sm font-bold text-slate-700">Expenses</span>
               </label>
             </div>
 
