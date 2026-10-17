@@ -919,40 +919,44 @@ export default function CashBook({
   // Sub-branch admin or permitted staff (e.g. Gullapuram, Batlagundu, Andipatti): locked strictly to their assigned branch
   const isSubBranchStaff = !isSuperAdmin;
 
-  // Show branch selector filter: Super Admin can always switch between branches or enterprise rollup
-  const showBranchFilter = isSuperAdmin;
+  // Show branch selector filter: Only Super Admin when viewing the top-level Main Branch enterprise container.
+  // When navigating directly into a scoped Sub-branch (or for sub-branch staff), selector is hidden and fixed badge is shown.
+  const showBranchFilter = isSuperAdmin && isMainBranch;
 
-  // Available Branches for Main Branch / Super Admin
+  // Available Branches for Main Branch / Super Admin:
+  // Root option is Main Branch (Consolidated Enterprise Root), followed dynamically by all active sub-branches
   const availableBranches = useMemo(() => {
-    const list = [];
-    const seen = new Set();
-    (branches || []).forEach(b => {
+    const subBranches = [];
+    const seen = new Set(['main', 'main branch', 'all', 'all branches', 'enterprise']);
+
+    const addBranch = (b) => {
       if (!b || !isBranchActive(b)) return;
-      const bId = b.id || b.name;
-      const bName = b.name || b.id;
-      if (!seen.has(bId)) {
-        seen.add(bId);
-        list.push({ id: bId, name: bName });
+      const bId = String(b.id || b.branchId || b.name || '').trim();
+      const bName = String(b.name || b.branchName || b.id || '').trim();
+      const bIdLower = bId.toLowerCase();
+      const bNameLower = bName.toLowerCase();
+      if (bNameLower === 'main branch' || bNameLower === 'main' || bIdLower === 'main' || bNameLower === 'all' || bNameLower.includes('all branches')) return;
+      
+      if (!seen.has(bIdLower) && !seen.has(bNameLower)) {
+        seen.add(bIdLower);
+        seen.add(bNameLower);
+        subBranches.push({ id: bId, name: bName, isEnterprise: false });
       }
-    });
+    };
+
+    (branches || []).forEach(addBranch);
     try {
       const saved = localStorage.getItem('everest_branches') || localStorage.getItem('branches');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(b => {
-            if (!b || !isBranchActive(b)) return;
-            const bId = b.id || b.name;
-            const bName = b.name || b.id;
-            if (!seen.has(bId)) {
-              seen.add(bId);
-              list.push({ id: bId, name: bName });
-            }
-          });
-        }
+        if (Array.isArray(parsed)) parsed.forEach(addBranch);
       }
     } catch (e) {}
-    return list;
+
+    return [
+      { id: 'main', name: 'Main Branch', isEnterprise: true, description: 'Consolidated Inflows/Outflows across all sub-branches' },
+      ...subBranches
+    ];
   }, [branches]);
 
   // Purge any stale ghost branch keys from localStorage on mount
@@ -960,44 +964,44 @@ export default function CashBook({
     sanitizeLocalStorageBranches();
   }, []);
 
-  // Selected Branch ID
+  // Selected Branch ID (default: 'main' representing the consolidated root)
   const [selectedBranchId, setSelectedBranchId] = useState(() => {
     if (isSubBranchStaff) {
       return userProfile?.branchId || userProfile?.branch || activeBranch?.id || 'main';
     }
-    return (activeBranch?.id && activeBranch.id !== 'main') ? activeBranch.id : 'all';
+    return (activeBranch?.id && activeBranch.id !== 'all') ? activeBranch.id : 'main';
   });
 
   // Sync if activeBranch changes or userProfile updates
   useEffect(() => {
     if (isSubBranchStaff) {
       setSelectedBranchId(userProfile?.branchId || userProfile?.branch || activeBranch?.id || 'main');
-    } else if (activeBranch?.id && activeBranch.id !== 'main') {
-      setSelectedBranchId(activeBranch.id);
+    } else if (activeBranch?.id) {
+      setSelectedBranchId(activeBranch.id === 'all' ? 'main' : activeBranch.id);
     }
   }, [activeBranch?.id, userProfile?.branchId, userProfile?.branch, isSubBranchStaff]);
 
+  const isEnterpriseSelected = !selectedBranchId || selectedBranchId === 'main' || selectedBranchId === 'all';
+
   const selectedBranchObj = useMemo(() => {
-    if (!selectedBranchId || selectedBranchId === 'all') return null;
+    if (isEnterpriseSelected) return availableBranches[0] || { id: 'main', name: 'Main Branch', isEnterprise: true };
     return availableBranches.find(b => 
       String(b.id || '').toLowerCase() === String(selectedBranchId).toLowerCase() ||
       String(b.name || '').toLowerCase() === String(selectedBranchId).toLowerCase()
     ) || (String(activeBranch?.id || '').toLowerCase() === String(selectedBranchId).toLowerCase() ? activeBranch : null);
-  }, [selectedBranchId, availableBranches, activeBranch]);
+  }, [selectedBranchId, isEnterpriseSelected, availableBranches, activeBranch]);
 
-  const targetBranchId = selectedBranchId && selectedBranchId !== 'all' 
-    ? String(selectedBranchId).toLowerCase().trim() 
-    : '';
-  const targetBranchName = selectedBranchObj 
-    ? String(selectedBranchObj.name || '').toLowerCase().trim() 
-    : (activeBranch?.name ? String(activeBranch.name).toLowerCase().trim() : targetBranchId);
+  const targetBranchId = isEnterpriseSelected ? 'main' : String(selectedBranchId).toLowerCase().trim();
+  const targetBranchName = isEnterpriseSelected 
+    ? 'main branch' 
+    : (selectedBranchObj?.name ? String(selectedBranchObj.name).toLowerCase().trim() : targetBranchId);
 
   const displayBranchLabel = useMemo(() => {
-    if (selectedBranchId === 'all') return 'All Branches (Enterprise)';
+    if (isEnterpriseSelected) return 'Main Branch';
     if (selectedBranchObj?.name) return selectedBranchObj.name;
-    if (targetBranchName) return targetBranchName;
-    return activeBranch?.name || 'Assigned Branch';
-  }, [selectedBranchId, selectedBranchObj, targetBranchName, activeBranch?.name]);
+    if (targetBranchName && targetBranchName !== 'main' && targetBranchName !== 'main branch') return targetBranchName;
+    return activeBranch?.name || 'Main Branch';
+  }, [isEnterpriseSelected, selectedBranchObj, targetBranchName, activeBranch?.name]);
 
   const isBranchMatch = (item) => {
     if (!item) return false;
@@ -1062,6 +1066,14 @@ export default function CashBook({
     return false;
   };
 
+  // Scalable Branch-Aware Query Pipeline (1:1 with architecture mandate)
+  const isBranchScoped = (recordBranch, activeSelection = (isEnterpriseSelected ? 'main' : selectedBranchId)) => {
+    // If "Main Branch" is selected, aggregate ALL active sub-branches
+    if (activeSelection === 'Main Branch' || activeSelection === 'main' || activeSelection === 'all') return true;
+    if (!recordBranch) return false;
+    return isBranchMatch(recordBranch);
+  };
+
   const doesEntityMatchBranch = isBranchMatch;
 
   // Active Date Range Filter (default: Today)
@@ -1092,8 +1104,8 @@ export default function CashBook({
   }, [fromDate]);
 
   // 1. Investments State
-  const investmentsKey = selectedBranchId === 'all'
-    ? 'everest_cashbook_investments_all'
+  const investmentsKey = isEnterpriseSelected
+    ? 'everest_cashbook_investments_main'
     : `everest_cashbook_investments_${selectedBranchId || branchId}`;
 
   const [investments, setInvestments] = useState(() => {
@@ -1103,6 +1115,7 @@ export default function CashBook({
       const keys = [
         `everest_cashbook_investments_${selectedBranchId}`,
         `everest_cashbook_investments_${branchId}`,
+        'everest_cashbook_investments_main',
         'everest_cashbook_investments_all',
         'everest_cashbook_investments'
       ];
@@ -1134,6 +1147,7 @@ export default function CashBook({
       const keys = [
         `everest_expansion_expenses_${selectedBranchId}`,
         `everest_expansion_expenses_${branchId}`,
+        'everest_expansion_expenses_main',
         'everest_expansion_expenses_all',
         'everest_expansion_expenses'
       ];
@@ -1158,13 +1172,13 @@ export default function CashBook({
   });
 
   // 3. Opening Balances State
-  const openingsKey = selectedBranchId === 'all'
-    ? 'everest_cashbook_openings_all'
+  const openingsKey = isEnterpriseSelected
+    ? 'everest_cashbook_openings_main'
     : `everest_cashbook_openings_${selectedBranchId || branchId}`;
 
   const [openingBalances, setOpeningBalances] = useState(() => {
     try {
-      const saved = localStorage.getItem(openingsKey);
+      const saved = localStorage.getItem(openingsKey) || localStorage.getItem('everest_cashbook_openings_all');
       return saved ? JSON.parse(saved) : {};
     } catch (e) {
       return {};
@@ -1178,8 +1192,8 @@ export default function CashBook({
   const [isAllExpensesModalOpen, setIsAllExpensesModalOpen] = useState(false);
 
   // Manual Particulars State
-  const particularsKey = selectedBranchId === 'all'
-    ? 'everest_cashbook_particulars_all'
+  const particularsKey = isEnterpriseSelected
+    ? 'everest_cashbook_particulars_main'
     : `everest_cashbook_particulars_${selectedBranchId || branchId}`;
 
   const [manualParticulars, setManualParticulars] = useState(() => {
@@ -1430,8 +1444,8 @@ export default function CashBook({
       return;
     }
 
-    const activeSaveBranchId = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : (activeBranch?.id || 'main');
-    const activeSaveBranchName = selectedBranchObj?.name || branchName || activeSaveBranchId;
+    const activeSaveBranchId = isEnterpriseSelected ? 'main' : (selectedBranchId || activeBranch?.id || 'main');
+    const activeSaveBranchName = isEnterpriseSelected ? 'Main Branch' : (selectedBranchObj?.name || branchName || activeSaveBranchId);
 
     const newInv = {
       id: 'inv_' + Date.now(),
@@ -1510,8 +1524,8 @@ export default function CashBook({
       ? (particularsForm.customParticulars?.trim() || 'Manual Adjustment')
       : particularsForm.particularsCategory;
 
-    const activeSaveBranchId = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : (activeBranch?.id || 'main');
-    const activeSaveBranchName = selectedBranchObj?.name || branchName || activeSaveBranchId;
+    const activeSaveBranchId = isEnterpriseSelected ? 'main' : (selectedBranchId || activeBranch?.id || 'main');
+    const activeSaveBranchName = isEnterpriseSelected ? 'Main Branch' : (selectedBranchObj?.name || branchName || activeSaveBranchId);
 
     const newPart = {
       id: 'part_' + Date.now(),
@@ -2454,25 +2468,33 @@ export default function CashBook({
     dynamicExp.sort((a, b) => (b.rawTimestamp || 0) - (a.rawTimestamp || 0));
 
     // Cumulative Opening Balances as of the day before fromDate
-    const effectiveBranchKey = selectedBranchId && selectedBranchId !== 'all' ? selectedBranchId : branchId;
+    const effectiveBranchKey = isEnterpriseSelected ? 'main' : (selectedBranchId || branchId);
     const openingDocId = `${effectiveBranchKey}_${startYmd}`;
 
     let baseOpeningCash = 0;
     let baseOpeningBank = 0;
 
-    if (selectedBranchId === 'all') {
-      const activeBranchEntries = (availableBranches || []).map(b => b.id);
-      activeBranchEntries.forEach(bId => {
+    if (isEnterpriseSelected) {
+      // In Main Branch (Consolidated Enterprise Root), aggregate opening balances across all active sub-branches
+      const subBranchIds = (availableBranches || [])
+        .filter(b => !b.isEnterprise)
+        .map(b => b.id);
+
+      subBranchIds.forEach(bId => {
         const stored = openingBalances[`${bId}_${startYmd}`] || openingBalances[bId];
         if (stored) {
           baseOpeningCash += Number(stored.cash || 0);
           baseOpeningBank += Number(stored.bank || 0);
         }
       });
-      if (openingBalances[openingDocId] || openingBalances['all'] || openingBalances['enterprise']) {
-        const ent = openingBalances[openingDocId] || openingBalances['all'] || openingBalances['enterprise'];
-        baseOpeningCash = Number(ent.cash ?? baseOpeningCash);
-        baseOpeningBank = Number(ent.bank ?? baseOpeningBank);
+      const rootDoc = openingBalances[`main_${startYmd}`] || 
+                      openingBalances[openingDocId] || 
+                      openingBalances['main'] || 
+                      openingBalances['all'] || 
+                      openingBalances['enterprise'];
+      if (rootDoc) {
+        baseOpeningCash = Number(rootDoc.cash ?? baseOpeningCash);
+        baseOpeningBank = Number(rootDoc.bank ?? baseOpeningBank);
       }
     } else {
       const dayOpening = openingBalances[openingDocId] || 
@@ -2641,10 +2663,9 @@ export default function CashBook({
                 onChange={(e) => setSelectedBranchId(e.target.value)}
                 className="appearance-none bg-white border border-slate-200 hover:border-slate-300 text-slate-800 text-xs font-bold py-1.5 pl-8 pr-7 rounded-xl shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition"
               >
-                <option value="all">All Branches (Enterprise)</option>
                 {availableBranches.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.name}
+                    {b.isEnterprise ? 'Main Branch (Consolidated Inflows/Outflows across all sub-branches)' : b.name}
                   </option>
                 ))}
               </select>
