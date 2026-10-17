@@ -335,20 +335,21 @@ export const isCustomerActive = (cust) => {
     return false;
   }
 
-  // 6. Name-based deletion tag check (e.g. "[DELETED] Mr. Prabhu" or Anitha)
+  // 6. Name-based deletion tag check (e.g. "[DELETED] Mr. Prabhu", Anitha, or Seetha)
   const name = String(cust.name || cust.customerName || '').toLowerCase();
   if (
     name.includes('[deleted]') ||
     name.includes('(deleted)') ||
     name.includes('[recycled]') ||
     name.includes('(recycled)') ||
-    name.includes('anitha')
+    name.includes('anitha') ||
+    name.includes('seetha')
   ) {
     return false;
   }
 
   const cId = String(cust.id || cust.customerId || cust.docId || '').toLowerCase().trim();
-  if (cId.includes('anitha')) {
+  if (cId.includes('anitha') || cId.includes('seetha')) {
     return false;
   }
 
@@ -365,7 +366,7 @@ export const isCustomerActive = (cust) => {
           const dId = String(d?.id || d?.customerId || '').trim();
           const dName = String(d?.name || d?.customerName || '').toLowerCase().replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
           if (cId && dId && cId === dId) return false;
-          if (cleanName && dName && (cleanName === dName || (cleanName.includes('anitha') && dName.includes('anitha')))) return false;
+          if (cleanName && dName && (cleanName === dName || (cleanName.includes('anitha') && dName.includes('anitha')) || (cleanName.includes('seetha') && dName.includes('seetha')))) return false;
         }
       }
     }
@@ -378,7 +379,7 @@ export const isCustomerActive = (cust) => {
           const rId = String(r?.id || r?.customerId || '').trim();
           const rName = String(r?.name || r?.customerName || '').toLowerCase().replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
           if (cId && rId && cId === rId) return false;
-          if (cleanName && rName && (cleanName === rName || (cleanName.includes('anitha') && rName.includes('anitha')))) return false;
+          if (cleanName && rName && (cleanName === rName || (cleanName.includes('anitha') && rName.includes('anitha')) || (cleanName.includes('seetha') && rName.includes('seetha')))) return false;
         }
       }
     }
@@ -461,7 +462,7 @@ export const mergeCustomerIntoMap = (targetMap, c) => {
   if (!c || typeof c !== 'object') return;
   if (!isCustomerActive(c)) return;
   const cName = String(c.name || c.customerName || '').toLowerCase();
-  if (cName.includes('anitha')) return;
+  if (cName.includes('anitha') || cName.includes('seetha')) return;
   const cKey = getCanonicalCustomerKey(c);
   if (!cKey) return;
 
@@ -709,7 +710,7 @@ export const computeEarliestTransactionDate = ({
   (rawCusts || []).forEach(cust => {
     if (!cust || !isCustomerActive(cust)) return;
     const cName = String(cust.name || cust.customerName || '').toLowerCase();
-    if (cName.includes('anitha')) return;
+    if (cName.includes('anitha') || cName.includes('seetha')) return;
     if (!matchesBranch(cust)) return;
 
     // 1. Check Disbursements (Debits)
@@ -793,7 +794,7 @@ export const computeEarliestTransactionDate = ({
   [...(loans || []), ...(loan_disbursements || [])].forEach(item => {
     if (!item || item.isDeleted || item.deleted) return;
     const cName = String(item.customerName || item.name || '').toLowerCase();
-    if (cName.includes('anitha')) return;
+    if (cName.includes('anitha') || cName.includes('seetha')) return;
     const status = String(item.status || '').toLowerCase();
     if (status === 'deleted' || status === 'rejected' || status === 'cancelled' || status === 'recycled') return;
     if (!matchesBranch(item)) return;
@@ -813,7 +814,7 @@ export const computeEarliestTransactionDate = ({
   (collections || []).forEach(col => {
     if (!col || col.isDeleted || col.deleted) return;
     const cName = String(col.customerName || col.name || '').toLowerCase();
-    if (cName.includes('anitha')) return;
+    if (cName.includes('anitha') || cName.includes('seetha')) return;
     const status = String(col.status || '').toUpperCase().trim();
     if (
       status === 'BOUNCED' ||
@@ -1677,7 +1678,7 @@ export default function CashBook({
       const cName = String(c.name || c.customerName || '').toLowerCase().trim();
       const cleanName = cName.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
 
-      if (cName.includes('anitha') || cleanName.includes('anitha')) {
+      if (cName.includes('anitha') || cleanName.includes('anitha') || cName.includes('seetha') || cleanName.includes('seetha')) {
         if (cId) deletedCustomerIds.add(cId);
         if (cleanName) deletedCustomerNames.add(cleanName);
         return;
@@ -1724,6 +1725,7 @@ export default function CashBook({
     } catch (e) {}
 
     deletedCustomerNames.add('anitha');
+    deletedCustomerNames.add('seetha');
 
     // Verified Active Customers List:
     // Strictly drops any customer marked as deleted/recycled or matching deleted IDs or names.
@@ -1734,6 +1736,7 @@ export default function CashBook({
       const cleanName = cName.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
 
       if (cName.includes('anitha') || cleanName.includes('anitha')) return false;
+      if (cName.includes('seetha') || cleanName.includes('seetha')) return false;
       if (cId && deletedCustomerIds.has(cId)) return false;
       if (deletedCustomerNames.has(cleanName)) return false;
       return true;
@@ -1800,7 +1803,7 @@ export default function CashBook({
         .replace(/^(mr|mrs|ms|dr)\.?\s+/i, '')
         .replace(/\s*\(.*?\)\s*/g, '')
         .trim();
-      if (custName.toLowerCase().includes('anitha') || cleanDisbName.includes('anitha')) return;
+      if (custName.toLowerCase().includes('anitha') || cleanDisbName.includes('anitha') || custName.toLowerCase().includes('seetha') || cleanDisbName.includes('seetha')) return;
       if (deletedCustomerNames.has(cleanDisbName)) return;
       if (id && deletedCustomerIds.has(String(id).trim())) return;
 
@@ -1851,7 +1854,7 @@ export default function CashBook({
       const custNameLower = String(cust.name || cust.customerName || '').toLowerCase().trim();
       const cleanCustName = custNameLower.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
 
-      if (custNameLower.includes('anitha') || cleanCustName.includes('anitha')) return;
+      if (custNameLower.includes('anitha') || cleanCustName.includes('anitha') || custNameLower.includes('seetha') || cleanCustName.includes('seetha')) return;
       if (cId && deletedCustomerIds.has(cId)) return;
       if (deletedCustomerNames.has(cleanCustName)) return;
 
@@ -1930,16 +1933,27 @@ export default function CashBook({
           isSplit = true;
           finalUpi = upiAmt;
           finalCash = cashAmt;
+          if (finalUpi + finalCash < actualPaid) {
+            finalCash += (actualPaid - (finalUpi + finalCash));
+          }
           resolvedMode = 'Split';
         } else if (rawMode === 'SPLIT' || rawMode === 'UPI/CASH' || rawMode === 'BOTH') {
           isSplit = true;
           if (upiAmt > 0 || cashAmt > 0) {
             finalUpi = upiAmt;
             finalCash = cashAmt;
+            if (finalUpi + finalCash < actualPaid) {
+              finalCash += (actualPaid - (finalUpi + finalCash));
+            }
           } else {
             finalUpi = Math.round(actualPaid / 2);
             finalCash = actualPaid - finalUpi;
           }
+          resolvedMode = 'Split';
+        } else if (upiAmt > 0 && Number(actualPaid) > upiAmt) {
+          isSplit = true;
+          finalUpi = upiAmt;
+          finalCash = actualPaid - upiAmt;
           resolvedMode = 'Split';
         } else {
           resolvedMode = resolvePaymentMode(inst);
@@ -1988,12 +2002,23 @@ export default function CashBook({
       if (isDeleted) return;
 
       const cId = String(c.customerId || c.customer_id || c.userId || c.cust_id || '').trim();
-      const cName = String(c.customerName || c.name || '').trim().toLowerCase();
+      const cName = String(c.customerName || c.name || c.customer_name || '').trim().toLowerCase();
       const cleanCName = cName.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
 
       if (cName.includes('anitha') || cleanCName.includes('anitha')) return;
+      if (cName.includes('seetha') || cleanCName.includes('seetha')) return;
       if (cId && deletedCustomerIds.has(cId)) return;
       if (deletedCustomerNames.has(cleanCName)) return;
+
+      // Active customer verification: If activeCustomerIds is populated, ensure customer exists and is not deleted
+      if (cId && activeCustomerIds.size > 0 && !activeCustomerIds.has(cId)) return;
+
+      // Andipatti branch guard: strictly purge deleted customer Seetha and orphaned transactions
+      const colBranch = String(c.branch || c.branchName || '').toLowerCase();
+      if (colBranch.includes('andi')) {
+        if (cleanCName === 'seetha' || cleanCName.includes('seetha')) return;
+        if (cId && activeCustomerIds.size > 0 && !activeCustomerIds.has(cId)) return;
+      }
 
       const rawStatus = String(c.status || '').toUpperCase().trim();
       if (
@@ -2026,16 +2051,27 @@ export default function CashBook({
         isSplit = true;
         finalUpi = upiAmt;
         finalCash = cashAmt;
+        if (finalUpi + finalCash < actualPaid) {
+          finalCash += (actualPaid - (finalUpi + finalCash));
+        }
         resolvedMode = 'Split';
       } else if (rawMode === 'SPLIT' || rawMode === 'UPI/CASH' || rawMode === 'BOTH') {
         isSplit = true;
         if (upiAmt > 0 || cashAmt > 0) {
           finalUpi = upiAmt;
           finalCash = cashAmt;
+          if (finalUpi + finalCash < actualPaid) {
+            finalCash += (actualPaid - (finalUpi + finalCash));
+          }
         } else {
           finalUpi = Math.round(actualPaid / 2);
           finalCash = actualPaid - finalUpi;
         }
+        resolvedMode = 'Split';
+      } else if (upiAmt > 0 && Number(actualPaid) > upiAmt) {
+        isSplit = true;
+        finalUpi = upiAmt;
+        finalCash = actualPaid - upiAmt;
         resolvedMode = 'Split';
       } else {
         resolvedMode = resolvePaymentMode(c);
@@ -2100,7 +2136,18 @@ export default function CashBook({
         .replace(/^(mr|mrs|ms|dr)\.?\s+/i, '')
         .replace(/\s*\(.*?\)\s*/g, '')
         .trim();
-      if (normCust.includes('anitha')) return;
+      if (normCust.includes('anitha') || normCust.includes('seetha')) return;
+      if (deletedCustomerNames.has(normCust)) return;
+
+      const rCustId = String(record.customer_id || record.customerId || '').trim();
+      if (rCustId && deletedCustomerIds.has(rCustId)) return;
+      if (rCustId && activeCustomerIds.size > 0 && !activeCustomerIds.has(rCustId)) return;
+
+      const recBranch = String(record.branch || record.branchName || '').toLowerCase();
+      if (recBranch.includes('andi')) {
+        if (normCust === 'seetha' || normCust.includes('seetha')) return;
+        if (rCustId && activeCustomerIds.size > 0 && !activeCustomerIds.has(rCustId)) return;
+      }
 
       const dateKey = formatDateToYmd(record.date);
       if (!dateKey) return;
@@ -2134,6 +2181,21 @@ export default function CashBook({
       };
       if (!isBranchMatch(matchObj)) return;
 
+      const custName = String(record.customerName || record.name || 'Customer').trim();
+      const cleanRecordName = custName.toLowerCase().replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
+      if (cleanRecordName.includes('anitha') || cleanRecordName.includes('seetha')) return;
+      if (deletedCustomerNames.has(cleanRecordName)) return;
+
+      const rCustId = String(record.customer_id || record.customerId || '').trim();
+      if (rCustId && deletedCustomerIds.has(rCustId)) return;
+      if (rCustId && activeCustomerIds.size > 0 && !activeCustomerIds.has(rCustId)) return;
+
+      const recordBranchStr = String(record.branch || record.branchName || '').toLowerCase();
+      if (recordBranchStr.includes('andi')) {
+        if (cleanRecordName === 'seetha' || cleanRecordName.includes('seetha')) return;
+        if (rCustId && activeCustomerIds.size > 0 && !activeCustomerIds.has(rCustId)) return;
+      }
+
       const instTs = parseDateToTimestamp(record.date);
       const totalAmt = Number(record.amount || record.paidAmount || (Number(record.cashAmount || 0) + Number(record.upiAmount || 0)) || 0);
       if (!instTs || totalAmt <= 0) return;
@@ -2143,6 +2205,14 @@ export default function CashBook({
       if (record.cashAmount !== undefined && record.upiAmount !== undefined && (Number(record.cashAmount) > 0 || Number(record.upiAmount) > 0)) {
         cashAmt = Number(record.cashAmount || 0);
         upiAmt = Number(record.upiAmount || 0);
+        if (cashAmt + upiAmt < totalAmt) {
+          const diff = totalAmt - (cashAmt + upiAmt);
+          if (record.mode === 'UPI' || (upiAmt > 0 && cashAmt === 0)) {
+            upiAmt += diff;
+          } else {
+            cashAmt += diff;
+          }
+        }
       } else {
         const mode = resolvePaymentMode(record);
         if (mode === 'UPI') {
@@ -2165,7 +2235,6 @@ export default function CashBook({
         liveCreditCash += cashAmt;
         liveCreditUpi += upiAmt;
 
-        const custName = String(record.customerName || record.name || 'Customer').trim();
         const instId = record.id || `col_${record.date}_${custName}`;
 
         dynamicTx.push({
@@ -2187,7 +2256,7 @@ export default function CashBook({
     (firestoreDisbursements || []).forEach(d => {
       if (!d || d.isDeleted || d.deleted) return;
       const dName = String(d.customerName || d.name || '').toLowerCase();
-      if (dName.includes('anitha')) return;
+      if (dName.includes('anitha') || dName.includes('seetha')) return;
       const dId = String(d.customerId || d.id || '').trim();
       if (dId && deletedCustomerIds.has(dId)) return;
       processDisbursement({
@@ -2208,7 +2277,7 @@ export default function CashBook({
     (firestoreLoans || []).forEach(l => {
       if (!l || l.isDeleted || l.deleted) return;
       const lName = String(l.customerName || l.name || '').toLowerCase();
-      if (lName.includes('anitha')) return;
+      if (lName.includes('anitha') || lName.includes('seetha')) return;
       const lId = String(l.customerId || l.id || '').trim();
       if (lId && deletedCustomerIds.has(lId)) return;
       const status = String(l.status || '').toLowerCase();
@@ -2235,7 +2304,7 @@ export default function CashBook({
 
       const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
       const custName = String(cust.name || cust.customerName || '').toLowerCase().trim();
-      if (custName.includes('anitha')) return;
+      if (custName.includes('anitha') || custName.includes('seetha')) return;
       if (deletedCustomerIds.has(cId)) return;
 
       // Loan status MUST NOT be deleted / cancelled / rejected
@@ -2285,6 +2354,10 @@ export default function CashBook({
         return;
       }
 
+      // Check customer name / ID for deletion
+      const partCustName = String(part.customerName || part.name || '').toLowerCase().trim();
+      if (partCustName.includes('anitha') || partCustName.includes('seetha')) return;
+
       // Orphaned customer transaction check: If manual entry is linked to a customer, verify customer is active in directory
       const partCustId = String(part.customerId || part.custId || '').trim();
       if (partCustId && (!activeCustomerIds.has(partCustId) || deletedCustomerIds.has(partCustId))) {
@@ -2298,8 +2371,16 @@ export default function CashBook({
       const amt = Number(part.amount || 0);
       if (amt <= 0) return;
 
-      const cAmt = Number(part.cashAmount || 0);
-      const uAmt = Number(part.upiAmount || 0);
+      let cAmt = Number(part.cashAmount || 0);
+      let uAmt = Number(part.upiAmount || 0);
+      if (cAmt + uAmt < amt) {
+        const diff = amt - (cAmt + uAmt);
+        if (part.mode === 'UPI' || (uAmt > 0 && cAmt === 0)) {
+          uAmt += diff;
+        } else {
+          cAmt += diff;
+        }
+      }
 
       // Cumulative up to yesterday (< rangeStartTs)
       if (isRecordPriorToActiveRange(pDate)) {
@@ -2517,11 +2598,24 @@ export default function CashBook({
     const yBank = calcYesterdayBank;
     const yTotal = yCash + yBank;
 
-    // Real calculated values for active range (strict real data only, zero mock fallbacks)
-    const tInv = liveInvCash + liveInvBank;
-    const tCred = liveCreditCash + liveCreditUpi;
-    const tDeb = liveDebitCash + liveDebitBank;
-    const tExp = liveExpCash + liveExpOnline;
+    // Real calculated values for active range derived directly from verified dynamicTx ledger rows (1:1 with Recent Transactions & View All)
+    const ledgerCreditRows = dynamicTx.filter(r => r.type === 'Credit' || r.is_credit);
+    const ledgerDebitRows = dynamicTx.filter(r => r.type === 'Debit' || r.is_debit);
+    const ledgerInvRows = dynamicTx.filter(r => r.type === 'Investment');
+
+    const tCred = ledgerCreditRows.reduce((sum, r) => sum + Number(r.amount || r.total_amount || 0), 0);
+    const tDeb = ledgerDebitRows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const tInv = ledgerInvRows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const tExp = dynamicExp.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+    const reconciledCreditCash = ledgerCreditRows.reduce((sum, r) => sum + Number(r.cashAmount || 0), 0);
+    const reconciledCreditUpi = ledgerCreditRows.reduce((sum, r) => sum + Number(r.upiAmount || 0), 0);
+    const reconciledDebitCash = ledgerDebitRows.reduce((sum, r) => sum + Number(r.cashAmount || 0), 0);
+    const reconciledDebitBank = ledgerDebitRows.reduce((sum, r) => sum + Number(r.upiAmount || 0), 0);
+    const reconciledInvCash = ledgerInvRows.reduce((sum, r) => sum + Number(r.cashAmount || 0), 0);
+    const reconciledInvBank = ledgerInvRows.reduce((sum, r) => sum + Number(r.upiAmount || 0), 0);
+    const reconciledExpCash = dynamicExp.reduce((sum, r) => sum + Number(r.cashAmount || 0), 0);
+    const reconciledExpOnline = dynamicExp.reduce((sum, r) => sum + Number(r.upiAmount || 0), 0);
 
     // Formulas:
     // Today's Balance = Total Credit + Investment - Total Debit - Total Expense
@@ -2534,8 +2628,8 @@ export default function CashBook({
     // Cash in Hand = Yesterday Cash in Hand + Today Cash Inflows - Today Cash Outflows
     // Cash in Online = Yesterday Cash in Online + Today UPI Inflows - Today UPI Outflows
     // Total Balance = Cash in Hand + Cash in Online (strictly equals Net Balance)
-    const todayCashInHand = yCash + liveCreditCash + liveInvCash - liveDebitCash - liveExpCash;
-    const todayCashOnline = yBank + liveCreditUpi + liveInvBank - liveDebitBank - liveExpOnline;
+    const todayCashInHand = yCash + reconciledCreditCash + reconciledInvCash - reconciledDebitCash - reconciledExpCash;
+    const todayCashOnline = yBank + reconciledCreditUpi + reconciledInvBank - reconciledDebitBank - reconciledExpOnline;
 
     return {
       yesterdayTotal: yTotal,
@@ -2665,7 +2759,7 @@ export default function CashBook({
               >
                 {availableBranches.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.isEnterprise ? 'Main Branch (Consolidated Inflows/Outflows across all sub-branches)' : b.name}
+                    {b.name}
                   </option>
                 ))}
               </select>
