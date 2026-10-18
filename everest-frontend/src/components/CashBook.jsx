@@ -24,7 +24,9 @@ import {
   Search,
   CheckCircle2,
   Building2,
-  ChevronDown
+  ChevronDown,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -1191,6 +1193,20 @@ export default function CashBook({
   const [isAddParticularsModalOpen, setIsAddParticularsModalOpen] = useState(false);
   const [isAllTransactionsModalOpen, setIsAllTransactionsModalOpen] = useState(false);
   const [isAllExpensesModalOpen, setIsAllExpensesModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTargetItem, setEditTargetItem] = useState(null);
+  const [deleteModalItem, setDeleteModalItem] = useState(null);
+  const [editForm, setEditForm] = useState({
+    date: '',
+    particulars: '',
+    type: 'Credit',
+    mode: 'Cash',
+    amount: '',
+    cashAmount: '',
+    upiAmount: '',
+    remarks: '',
+    source: ''
+  });
 
   // Manual Particulars State
   const particularsKey = isEnterpriseSelected
@@ -1268,7 +1284,7 @@ export default function CashBook({
     try {
       unsub = onSnapshot(collection(db, 'investments'), (snapshot) => {
         if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          const list = snapshot.docs.map(d => ({ ...d.data(), id: d.data()?.id || d.id, firestoreId: d.id }));
           setInvestments(list);
           try { localStorage.setItem(investmentsKey, JSON.stringify(list)); } catch (e) {}
         }
@@ -1297,7 +1313,7 @@ export default function CashBook({
     try {
       unsub = onSnapshot(collection(db, 'cashbook_particulars'), (snapshot) => {
         if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          const list = snapshot.docs.map(d => ({ ...d.data(), id: d.data()?.id || d.id, firestoreId: d.id }));
           setManualParticulars(list);
           try { localStorage.setItem(particularsKey, JSON.stringify(list)); } catch (e) {}
         }
@@ -1458,6 +1474,8 @@ export default function CashBook({
       amount: numAmt,
       mode: investmentForm.mode || 'Bank',
       remarks: investmentForm.remarks?.trim() || 'Capital addition',
+      source: 'investment',
+      is_manual_entry: true,
       createdAt: new Date().toISOString()
     };
 
@@ -1541,6 +1559,8 @@ export default function CashBook({
       amount: total,
       mode: (cAmt > 0 && uAmt > 0) ? 'Split' : (uAmt > 0 ? 'UPI' : 'Cash'),
       remarks: particularsForm.remarks?.trim() || 'Manual Particulars Entry',
+      source: 'particulars',
+      is_manual_entry: true,
       createdAt: new Date().toISOString()
     };
 
@@ -1579,6 +1599,252 @@ export default function CashBook({
     } catch (err) {
       console.warn('Saved manual particulars locally:', err);
     }
+  };
+
+  // --- Helpers for updating and deleting manual items across localStorage and Firestore ---
+  const updateStorageLists = (category, targetId, updatedRecord) => {
+    const keys = category === 'investments'
+      ? [
+          investmentsKey,
+          `everest_cashbook_investments_${selectedBranchId}`,
+          `everest_cashbook_investments_${branchId}`,
+          'everest_cashbook_investments_main',
+          'everest_cashbook_investments_all',
+          'everest_cashbook_investments'
+        ]
+      : [
+          particularsKey,
+          `everest_cashbook_particulars_${selectedBranchId}`,
+          `everest_cashbook_particulars_${branchId}`,
+          'everest_cashbook_particulars_main',
+          'everest_cashbook_particulars_all',
+          'everest_cashbook_particulars'
+        ];
+
+    keys.forEach(k => {
+      try {
+        const saved = localStorage.getItem(k);
+        if (saved) {
+          const list = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            let found = false;
+            const updated = list.map(item => {
+              if (item && (item.id === targetId || item.firestoreId === targetId)) {
+                found = true;
+                return { ...item, ...updatedRecord };
+              }
+              return item;
+            });
+            if (found) {
+              localStorage.setItem(k, JSON.stringify(updated));
+            }
+          }
+        }
+      } catch (e) {}
+    });
+  };
+
+  const deleteFromStorageLists = (category, targetId) => {
+    const keys = category === 'investments'
+      ? [
+          investmentsKey,
+          `everest_cashbook_investments_${selectedBranchId}`,
+          `everest_cashbook_investments_${branchId}`,
+          'everest_cashbook_investments_main',
+          'everest_cashbook_investments_all',
+          'everest_cashbook_investments'
+        ]
+      : [
+          particularsKey,
+          `everest_cashbook_particulars_${selectedBranchId}`,
+          `everest_cashbook_particulars_${branchId}`,
+          'everest_cashbook_particulars_main',
+          'everest_cashbook_particulars_all',
+          'everest_cashbook_particulars'
+        ];
+
+    keys.forEach(k => {
+      try {
+        const saved = localStorage.getItem(k);
+        if (saved) {
+          const list = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            const updated = list.filter(item => item && item.id !== targetId && item.firestoreId !== targetId);
+            localStorage.setItem(k, JSON.stringify(updated));
+          }
+        }
+      } catch (e) {}
+    });
+  };
+
+  // --- Handlers for Inline Edit and Delete of Manual Cash Book Entries ---
+  const handleOpenEditModal = (tx) => {
+    if (!tx) return;
+    const isInv = tx.source === 'investment' || tx.type === 'Investment';
+    const orig = tx.originalRecord || {};
+
+    let mode = tx.mode || orig.mode || (isInv ? 'Bank' : 'Cash');
+    let cashAmt = tx.cashAmount ?? orig.cashAmount ?? 0;
+    let upiAmt = tx.upiAmount ?? orig.upiAmount ?? 0;
+    let totalAmt = tx.amount ?? orig.amount ?? 0;
+
+    let paymentType = mode;
+    if (!isInv) {
+      if (cashAmt > 0 && upiAmt > 0) {
+        paymentType = 'Split';
+      } else if (upiAmt > 0) {
+        paymentType = 'UPI';
+      } else {
+        paymentType = 'Cash';
+      }
+    }
+
+    setEditTargetItem(tx);
+    setEditForm({
+      date: tx.date || orig.date || formatDateToDisplay(toDate || fromDate),
+      particulars: tx.particulars || orig.particulars || '',
+      type: tx.type || orig.type || (isInv ? 'Investment' : 'Credit'),
+      mode: isInv ? (mode || 'Bank') : paymentType,
+      amount: totalAmt > 0 ? String(totalAmt) : '',
+      cashAmount: cashAmt > 0 ? String(cashAmt) : '',
+      upiAmount: upiAmt > 0 ? String(upiAmt) : '',
+      remarks: tx.remarks || orig.remarks || '',
+      source: isInv ? 'investment' : 'particulars'
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!editTargetItem) return;
+
+    const isInv = editForm.source === 'investment' || editTargetItem.type === 'Investment';
+    const targetId = editTargetItem.id;
+    const orig = editTargetItem.originalRecord || {};
+    const targetFirestoreId = editTargetItem.firestoreId || orig.firestoreId || targetId;
+
+    if (isInv) {
+      const numAmt = parseFloat(editForm.amount);
+      if (isNaN(numAmt) || numAmt <= 0) {
+        alert('Please enter a valid investment amount.');
+        return;
+      }
+      const updatedInv = {
+        ...orig,
+        id: targetId,
+        date: formatDateToDisplay(editForm.date || orig.date),
+        particulars: editForm.particulars?.trim() || 'Investment Entry',
+        amount: numAmt,
+        mode: editForm.mode || 'Bank',
+        remarks: editForm.remarks?.trim() || '',
+        source: 'investment',
+        is_manual_entry: true,
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Immediately update React state (triggers dynamic ledger recalculation)
+      setInvestments(prev => prev.map(item => (item.id === targetId || item.firestoreId === targetId) ? updatedInv : item));
+
+      // 2. Persist to localStorage
+      updateStorageLists('investments', targetId, updatedInv);
+
+      // 3. Sync to Firestore
+      try {
+        setDoc(doc(db, 'investments', targetFirestoreId), updatedInv, { merge: true }).catch(err => {
+          console.warn('Firestore investment update sync notice:', err);
+        });
+      } catch (err) {}
+
+    } else {
+      let cAmt = 0;
+      let uAmt = 0;
+      let total = 0;
+
+      if (editForm.mode === 'Split') {
+        cAmt = parseFloat(editForm.cashAmount) || 0;
+        uAmt = parseFloat(editForm.upiAmount) || 0;
+        total = cAmt + uAmt;
+      } else if (editForm.mode === 'UPI' || editForm.mode === 'Bank') {
+        uAmt = parseFloat(editForm.amount) || 0;
+        total = uAmt;
+      } else {
+        cAmt = parseFloat(editForm.amount) || 0;
+        total = cAmt;
+      }
+
+      if (total <= 0) {
+        alert('Please enter a valid amount.');
+        return;
+      }
+
+      const updatedPart = {
+        ...orig,
+        id: targetId,
+        date: formatDateToDisplay(editForm.date || orig.date),
+        particulars: editForm.particulars?.trim() || 'Manual Adjustment',
+        type: editForm.type || 'Credit',
+        cashAmount: cAmt,
+        upiAmount: uAmt,
+        amount: total,
+        mode: (cAmt > 0 && uAmt > 0) ? 'Split' : (uAmt > 0 ? 'UPI' : 'Cash'),
+        remarks: editForm.remarks?.trim() || '',
+        source: 'particulars',
+        is_manual_entry: true,
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Immediately update React state (triggers dynamic ledger recalculation)
+      setManualParticulars(prev => prev.map(item => (item.id === targetId || item.firestoreId === targetId) ? updatedPart : item));
+
+      // 2. Persist to localStorage
+      updateStorageLists('particulars', targetId, updatedPart);
+
+      // 3. Sync to Firestore
+      try {
+        setDoc(doc(db, 'cashbook_particulars', targetFirestoreId), updatedPart, { merge: true }).catch(err => {
+          console.warn('Firestore particulars update sync notice:', err);
+        });
+      } catch (err) {}
+    }
+
+    setIsEditModalOpen(false);
+    setEditTargetItem(null);
+  };
+
+  const handleConfirmDeleteEntry = (tx) => {
+    if (!tx) return;
+    setDeleteModalItem(tx);
+  };
+
+  const handleExecuteDelete = () => {
+    if (!deleteModalItem) return;
+    const tx = deleteModalItem;
+    const isInv = tx.source === 'investment' || tx.type === 'Investment';
+    const targetId = tx.id;
+    const targetFirestoreId = tx.firestoreId || tx.originalRecord?.firestoreId || targetId;
+
+    if (isInv) {
+      setInvestments(prev => prev.filter(item => item.id !== targetId && item.firestoreId !== targetId));
+      deleteFromStorageLists('investments', targetId);
+      try {
+        deleteDoc(doc(db, 'investments', targetFirestoreId)).catch(() => {
+          setDoc(doc(db, 'investments', targetFirestoreId), { is_deleted: true, deleted: true }, { merge: true }).catch(() => {});
+        });
+      } catch (err) {}
+    } else {
+      setManualParticulars(prev => prev.filter(item => item.id !== targetId && item.firestoreId !== targetId));
+      deleteFromStorageLists('particulars', targetId);
+      try {
+        deleteDoc(doc(db, 'cashbook_particulars', targetFirestoreId)).catch(() => {
+          setDoc(doc(db, 'cashbook_particulars', targetFirestoreId), { is_deleted: true, deleted: true }, { merge: true }).catch(() => {});
+        });
+      } catch (err) {}
+    }
+
+    setDeleteModalItem(null);
   };
 
   // --- Dynamic Ledger Computation for Selected Date Range ---
@@ -2405,6 +2671,7 @@ export default function CashBook({
 
         dynamicTx.push({
           id: part.id,
+          firestoreId: part.firestoreId || part.id,
           date: formatDateToDisplay(pDate),
           particulars: part.particulars || 'Manual Adjustment',
           type: part.type || 'Credit',
@@ -2413,7 +2680,10 @@ export default function CashBook({
           amount: amt,
           mode: part.mode || ((cAmt > 0 && uAmt > 0) ? 'Split' : (uAmt > 0 ? 'UPI' : 'Cash')),
           remarks: part.remarks || 'Manual Adjustment',
-          rawTimestamp: pTs
+          rawTimestamp: pTs,
+          source: 'particulars',
+          is_manual_entry: true,
+          originalRecord: part
         });
       }
     });
@@ -2531,6 +2801,7 @@ export default function CashBook({
 
         dynamicTx.push({
           id: inv.id,
+          firestoreId: inv.firestoreId || inv.id,
           date: formatDateToDisplay(invDate),
           particulars: inv.particulars || 'Investment Entry',
           type: 'Investment',
@@ -2539,7 +2810,10 @@ export default function CashBook({
           amount: amt,
           mode: isCash ? 'Cash' : 'UPI',
           remarks: inv.remarks || 'Capital Inflow',
-          rawTimestamp: invTs
+          rawTimestamp: invTs,
+          source: 'investment',
+          is_manual_entry: true,
+          originalRecord: inv
         });
       }
     });
@@ -3269,7 +3543,33 @@ export default function CashBook({
                       {tx.upiAmount > 0 ? formatCurrency(tx.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
                     </td>
                     <td className="py-2.5 px-2.5 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
-                    <td className="py-2.5 px-2.5 text-slate-400 text-[11px] truncate max-w-[120px]" title={tx.remarks || '-'}>{tx.remarks || '-'}</td>
+                    <td className="py-2.5 px-2.5 text-slate-600 text-[11px] max-w-[180px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate" title={tx.remarks || '-'}>{tx.remarks || '-'}</span>
+                        
+                        {/* Expose Edit/Delete strictly for direct manual Cash Book entries */}
+                        {(tx.source === 'investment' || tx.source === 'particulars' || tx.type === 'Investment' || tx.is_manual_entry) && (
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button 
+                              type="button"
+                              title="Edit Entry"
+                              onClick={() => handleOpenEditModal(tx)}
+                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5"/>
+                            </button>
+                            <button 
+                              type="button"
+                              title="Delete Entry"
+                              onClick={() => handleConfirmDeleteEntry(tx)}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5"/>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {displayedTransactions.length === 0 && (
@@ -3670,6 +3970,331 @@ export default function CashBook({
         </div>
       )}
 
+      {/* ================= MODAL: EDIT MANUAL ENTRY ================= */}
+      {isEditModalOpen && editTargetItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className={`px-6 py-4 border-b flex items-center justify-between ${
+              editForm.source === 'investment' 
+                ? 'bg-purple-50/80 border-purple-100' 
+                : 'bg-emerald-50/80 border-emerald-100'
+            }`}>
+              <div className="flex items-center gap-2">
+                {editForm.source === 'investment' ? (
+                  <Landmark className="w-5 h-5 text-purple-700" />
+                ) : (
+                  <Receipt className="w-5 h-5 text-emerald-700" />
+                )}
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    {editForm.source === 'investment' ? 'Edit Investment Entry' : 'Edit Particulars Entry'}
+                  </h3>
+                  <p className="text-[10px] font-semibold text-slate-500">
+                    Update manual Cash Book record
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsEditModalOpen(false); setEditTargetItem(null); }}
+                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Date</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="DD-MM-YYYY"
+                    value={editForm.date}
+                    onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                  />
+                </div>
+
+                {editForm.source === 'particulars' ? (
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type</label>
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+                      <button
+                        type="button"
+                        onClick={() => setEditForm({ ...editForm, type: 'Credit' })}
+                        className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                          editForm.type === 'Credit'
+                            ? 'bg-emerald-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Credit (+)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditForm({ ...editForm, type: 'Debit' })}
+                        className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                          editForm.type === 'Debit'
+                            ? 'bg-rose-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Debit (-)
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type</label>
+                    <div className="px-3 py-2 bg-purple-50 border border-purple-100 rounded-xl text-xs font-extrabold text-purple-700">
+                      Investment (Inflow)
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Particulars / Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Entry particulars"
+                  value={editForm.particulars}
+                  onChange={(e) => setEditForm({ ...editForm, particulars: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                />
+              </div>
+
+              {editForm.source === 'investment' ? (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
+                  <select
+                    value={editForm.mode}
+                    onChange={(e) => setEditForm({ ...editForm, mode: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-purple-500 cursor-pointer"
+                  >
+                    <option value="Bank">Bank Transfer / NEFT</option>
+                    <option value="UPI">UPI / Online</option>
+                    <option value="Cash">Cash Deposit</option>
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
+                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, mode: 'Cash' })}
+                      className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                        editForm.mode === 'Cash'
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      💵 Cash
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, mode: 'UPI' })}
+                      className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                        editForm.mode === 'UPI'
+                          ? 'bg-purple-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      📱 UPI
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, mode: 'Split' })}
+                      className={`py-1 text-xs font-extrabold rounded-lg transition cursor-pointer ${
+                        editForm.mode === 'Split'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      ⚡ Split
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {editForm.source === 'particulars' && editForm.mode === 'Split' ? (
+                <div className="grid grid-cols-2 gap-3 p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">💵 Cash Amount (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={editForm.cashAmount}
+                      onChange={(e) => {
+                        const cVal = e.target.value;
+                        const cNum = parseFloat(cVal) || 0;
+                        const uNum = parseFloat(editForm.upiAmount) || 0;
+                        setEditForm({
+                          ...editForm,
+                          cashAmount: cVal,
+                          amount: String(cNum + uNum)
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">📱 UPI Amount (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={editForm.upiAmount}
+                      onChange={(e) => {
+                        const uVal = e.target.value;
+                        const uNum = parseFloat(uVal) || 0;
+                        const cNum = parseFloat(editForm.cashAmount) || 0;
+                        setEditForm({
+                          ...editForm,
+                          upiAmount: uVal,
+                          amount: String(cNum + uNum)
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Total Amount (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    placeholder="e.g. 5000"
+                    value={editForm.amount}
+                    onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Remarks (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="Reference note or detail"
+                  value={editForm.remarks}
+                  onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => { setIsEditModalOpen(false); setEditTargetItem(null); }}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md cursor-pointer active:scale-95 transition"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: DELETE CONFIRMATION ================= */}
+      {deleteModalItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-red-50/80 border-b border-red-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                  <Trash2 className="w-4 h-4 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    Delete Manual Entry
+                  </h3>
+                  <p className="text-[10px] font-semibold text-red-700">
+                    {deleteModalItem.source === 'investment' || deleteModalItem.type === 'Investment' ? 'Investment Record' : 'Manual Particulars Record'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteModalItem(null)}
+                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <p className="text-xs font-bold text-slate-800">
+                Are you sure you want to delete this manual entry?
+              </p>
+
+              {/* Entry Detail Preview Card */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">Particulars</span>
+                  <span className="font-extrabold text-slate-900 truncate max-w-[180px]">{deleteModalItem.particulars}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">Amount</span>
+                  <span className="font-black text-slate-900">₹{formatCurrency(deleteModalItem.amount)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">Type / Mode</span>
+                  <div className="flex items-center gap-1.5">
+                    {renderTypeBadge(deleteModalItem.type)}
+                    <span className="px-2 py-0.5 rounded-md bg-slate-200/70 text-slate-700 font-bold text-[10px]">{deleteModalItem.mode}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">Remarks</span>
+                  <span className="text-slate-600 truncate max-w-[180px] font-medium">{deleteModalItem.remarks || '-'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">Date</span>
+                  <span className="text-slate-600 font-semibold">{deleteModalItem.date}</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                This manual record will be removed immediately. Opening, Net, and Closing balances will automatically recompute.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalItem(null)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteDelete}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black shadow-md cursor-pointer active:scale-95 transition flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Entry
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL: VIEW ALL RECENT TRANSACTIONS ================= */}
       {isAllTransactionsModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
@@ -3721,7 +4346,33 @@ export default function CashBook({
                         {tx.upiAmount > 0 ? formatCurrency(tx.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
                       </td>
                       <td className="py-2.5 px-2 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
-                      <td className="py-2.5 px-2 text-slate-400 text-[11px]">{tx.remarks || '-'}</td>
+                      <td className="py-2.5 px-2 text-slate-600 text-[11px] max-w-[180px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate" title={tx.remarks || '-'}>{tx.remarks || '-'}</span>
+                          
+                          {/* Expose Edit/Delete strictly for direct manual Cash Book entries */}
+                          {(tx.source === 'investment' || tx.source === 'particulars' || tx.type === 'Investment' || tx.is_manual_entry) && (
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <button 
+                                type="button"
+                                title="Edit Entry"
+                                onClick={() => handleOpenEditModal(tx)}
+                                className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition cursor-pointer"
+                              >
+                                <Pencil className="w-3.5 h-3.5"/>
+                              </button>
+                              <button 
+                                type="button"
+                                title="Delete Entry"
+                                onClick={() => handleConfirmDeleteEntry(tx)}
+                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5"/>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {allTransactionsList.length === 0 && (
