@@ -3970,9 +3970,189 @@ export default function CashBook({
         </div>
       )}
 
-      {/* ================= MODAL: EDIT MANUAL ENTRY ================= */}
-      {isEditModalOpen && editTargetItem && (
+      {/* ================= MODAL: VIEW ALL RECENT TRANSACTIONS ================= */}
+      {isAllTransactionsModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 bg-blue-50/80 border-b border-blue-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-blue-700" />
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  All Transactions ({allTransactionsList.length})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAllTransactionsModalOpen(false)}
+                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
+                    <th rowSpan={2} className="py-2.5 px-2 text-center w-8 align-middle">S.No</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Date</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Particulars</th>
+                    <th rowSpan={2} className="py-2.5 px-2 text-center align-middle">Type</th>
+                    <th colSpan={2} className="py-1 px-2 text-center border-l border-r border-b border-slate-200 tracking-widest text-[9.5px]">MODE</th>
+                    <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">Total Amount (₹)</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Remarks</th>
+                  </tr>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
+                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-slate-200">Cash (₹)</th>
+                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-r border-slate-200">UPI (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                  {allTransactionsList.map((tx, idx) => (
+                    <tr key={tx.id || idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
+                      <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
+                      <td className="py-2.5 px-2 font-bold text-slate-800">{tx.particulars}</td>
+                      <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-slate-200 bg-slate-50/20">
+                        {tx.cashAmount > 0 ? formatCurrency(tx.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-r border-slate-200 bg-slate-50/20">
+                        {tx.upiAmount > 0 ? formatCurrency(tx.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
+                      <td className="py-2.5 px-2 text-slate-600 text-[11px] max-w-[180px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate" title={tx.remarks || '-'}>{tx.remarks || '-'}</span>
+                          
+                          {/* Expose Edit/Delete strictly for direct manual Cash Book entries */}
+                          {(tx.source === 'investment' || tx.source === 'particulars' || tx.type === 'Investment' || tx.is_manual_entry) && (
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <button 
+                                type="button"
+                                title="Edit Entry"
+                                onClick={() => handleOpenEditModal(tx)}
+                                className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition cursor-pointer"
+                              >
+                                <Pencil className="w-3.5 h-3.5"/>
+                              </button>
+                              <button 
+                                type="button"
+                                title="Delete Entry"
+                                onClick={() => handleConfirmDeleteEntry(tx)}
+                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5"/>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {allTransactionsList.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">No transactions found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsAllTransactionsModalOpen(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-extrabold cursor-pointer hover:bg-blue-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: VIEW ALL EXPENSES ================= */}
+      {isAllExpensesModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-purple-700" />
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  All Expenses ({allExpensesList.length})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAllExpensesModalOpen(false)}
+                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
+                    <th rowSpan={2} className="py-2.5 px-2 text-center w-8 align-middle">S.No</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Date</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Expense Category</th>
+                    <th colSpan={2} className="py-1 px-2 text-center border-l border-r border-b border-slate-200 tracking-widest text-[9.5px]">MODE</th>
+                    <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">Total (₹)</th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Remarks</th>
+                  </tr>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
+                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-slate-200">Cash (₹)</th>
+                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-r border-slate-200">UPI (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                  {allExpensesList.map((exp, idx) => (
+                    <tr key={exp.id || idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
+                      <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{exp.date}</td>
+                      <td className="py-2.5 px-2 font-bold text-slate-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/80 text-[11px] font-extrabold shadow-2xs">
+                          {exp.category || exp.details || 'Office Expense'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-slate-200 bg-slate-50/20">
+                        {exp.cashAmount > 0 ? formatCurrency(exp.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-r border-slate-200 bg-slate-50/20">
+                        {exp.upiAmount > 0 ? formatCurrency(exp.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
+                      <td className="py-2.5 px-2 text-slate-500 font-medium text-[11px]">{exp.remarks || '-'}</td>
+                    </tr>
+                  ))}
+                  {allExpensesList.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">No expenses found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsAllExpensesModalOpen(false)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-extrabold cursor-pointer hover:bg-purple-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT MANUAL ENTRY (ELEVATED Z-[100]) ================= */}
+      {isEditModalOpen && editTargetItem && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
             <div className={`px-6 py-4 border-b flex items-center justify-between ${
               editForm.source === 'investment' 
@@ -4210,9 +4390,9 @@ export default function CashBook({
         </div>
       )}
 
-      {/* ================= MODAL: DELETE CONFIRMATION ================= */}
+      {/* ================= MODAL: DELETE CONFIRMATION (ELEVATED Z-[100]) ================= */}
       {deleteModalItem && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
             <div className="px-5 py-4 bg-red-50/80 border-b border-red-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -4290,186 +4470,6 @@ export default function CashBook({
                   Delete Entry
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= MODAL: VIEW ALL RECENT TRANSACTIONS ================= */}
-      {isAllTransactionsModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 bg-blue-50/80 border-b border-blue-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-blue-700" />
-                <h3 className="text-sm font-extrabold text-slate-900">
-                  All Transactions ({allTransactionsList.length})
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAllTransactionsModalOpen(false)}
-                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
-                    <th rowSpan={2} className="py-2.5 px-2 text-center w-8 align-middle">S.No</th>
-                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Date</th>
-                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Particulars</th>
-                    <th rowSpan={2} className="py-2.5 px-2 text-center align-middle">Type</th>
-                    <th colSpan={2} className="py-1 px-2 text-center border-l border-r border-b border-slate-200 tracking-widest text-[9.5px]">MODE</th>
-                    <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">Total Amount (₹)</th>
-                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Remarks</th>
-                  </tr>
-                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
-                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-slate-200">Cash (₹)</th>
-                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-r border-slate-200">UPI (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
-                  {allTransactionsList.map((tx, idx) => (
-                    <tr key={tx.id || idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
-                      <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
-                      <td className="py-2.5 px-2 font-bold text-slate-800">{tx.particulars}</td>
-                      <td className="py-2.5 px-2 text-center whitespace-nowrap">{renderTypeBadge(tx.type)}</td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-slate-200 bg-slate-50/20">
-                        {tx.cashAmount > 0 ? formatCurrency(tx.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
-                      </td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-r border-slate-200 bg-slate-50/20">
-                        {tx.upiAmount > 0 ? formatCurrency(tx.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(tx.amount)}</td>
-                      <td className="py-2.5 px-2 text-slate-600 text-[11px] max-w-[180px]">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate" title={tx.remarks || '-'}>{tx.remarks || '-'}</span>
-                          
-                          {/* Expose Edit/Delete strictly for direct manual Cash Book entries */}
-                          {(tx.source === 'investment' || tx.source === 'particulars' || tx.type === 'Investment' || tx.is_manual_entry) && (
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              <button 
-                                type="button"
-                                title="Edit Entry"
-                                onClick={() => handleOpenEditModal(tx)}
-                                className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition cursor-pointer"
-                              >
-                                <Pencil className="w-3.5 h-3.5"/>
-                              </button>
-                              <button 
-                                type="button"
-                                title="Delete Entry"
-                                onClick={() => handleConfirmDeleteEntry(tx)}
-                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5"/>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {allTransactionsList.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">No transactions found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsAllTransactionsModalOpen(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-extrabold cursor-pointer hover:bg-blue-700 transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= MODAL: VIEW ALL EXPENSES ================= */}
-      {isAllExpensesModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-purple-700" />
-                <h3 className="text-sm font-extrabold text-slate-900">
-                  All Expenses ({allExpensesList.length})
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAllExpensesModalOpen(false)}
-                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
-                    <th rowSpan={2} className="py-2.5 px-2 text-center w-8 align-middle">S.No</th>
-                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Date</th>
-                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Expense Category</th>
-                    <th colSpan={2} className="py-1 px-2 text-center border-l border-r border-b border-slate-200 tracking-widest text-[9.5px]">MODE</th>
-                    <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">Total (₹)</th>
-                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Remarks</th>
-                  </tr>
-                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
-                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-slate-200">Cash (₹)</th>
-                    <th className="py-1 px-2 text-right whitespace-nowrap border-l border-r border-slate-200">UPI (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
-                  {allExpensesList.map((exp, idx) => (
-                    <tr key={exp.id || idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
-                      <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{exp.date}</td>
-                      <td className="py-2.5 px-2 font-bold text-slate-800">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/80 text-[11px] font-extrabold shadow-2xs">
-                          {exp.category || exp.details || 'Office Expense'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-slate-200 bg-slate-50/20">
-                        {exp.cashAmount > 0 ? formatCurrency(exp.cashAmount) : <span className="text-slate-300 font-normal">-</span>}
-                      </td>
-                      <td className="py-2.5 px-2 text-right font-black text-slate-700 whitespace-nowrap border-l border-r border-slate-200 bg-slate-50/20">
-                        {exp.upiAmount > 0 ? formatCurrency(exp.upiAmount) : <span className="text-slate-300 font-normal">-</span>}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-black text-slate-900 whitespace-nowrap">{formatCurrency(exp.amount)}</td>
-                      <td className="py-2.5 px-2 text-slate-500 font-medium text-[11px]">{exp.remarks || '-'}</td>
-                    </tr>
-                  ))}
-                  {allExpensesList.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">No expenses found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsAllExpensesModalOpen(false)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-extrabold cursor-pointer hover:bg-purple-700 transition"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
