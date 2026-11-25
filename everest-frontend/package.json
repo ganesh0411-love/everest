@@ -20,6 +20,7 @@
     "@capacitor/geolocation": "^8.2.0",
     "@capacitor/local-notifications": "8.1.0",
     "@capacitor/share": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.4",
     "@capawesome-team/capacitor-android-foreground-service": "^8.1.0",
     "@capgo/capacitor-printer": "^8.0.14",
     "@imgly/background-removal": "^1.7.0",

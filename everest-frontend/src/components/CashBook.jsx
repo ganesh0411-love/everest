@@ -3223,14 +3223,17 @@ export default function CashBook({
 
         {/* Right: Add Investment & Export CSV */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsInvestmentModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100/70 text-blue-700 text-xs font-extrabold shadow-2xs cursor-pointer active:scale-95 transition"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Add Investment</span>
-          </button>
+          {/* Render Add Investment strictly for operational sub-branches (hidden in Main Branch) */}
+          {!isEnterpriseSelected && (
+            <button
+              type="button"
+              onClick={() => setIsInvestmentModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100/70 text-blue-700 text-xs font-extrabold shadow-2xs cursor-pointer active:scale-95 transition"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Add Investment</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -3494,14 +3497,17 @@ export default function CashBook({
               </h3>
             </div>
             <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setIsAddParticularsModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-xl border border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-800 text-xs font-black shadow-2xs cursor-pointer active:scale-95 transition"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Add Particulars</span>
-              </button>
+              {/* Render Add Particulars strictly for operational sub-branches (hidden in Main Branch) */}
+              {!isEnterpriseSelected && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddParticularsModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl border border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-800 text-xs font-black shadow-2xs cursor-pointer active:scale-95 transition"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Add Particulars</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsAllTransactionsModalOpen(true)}

@@ -86,18 +86,18 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
   };
 
   return (
-    <header className={`w-full px-4 shadow-sm relative z-50 flex-col max-w-4xl mx-auto md:max-w-none md:mx-0 bg-[#eaf5f4] md:py-4 ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'} ${currentView === 'Staff Management' ? 'hidden md:flex' : 'flex'}`}>
+    <header className={`app-top-header w-full px-4 shadow-sm relative z-50 flex-col max-w-4xl mx-auto md:max-w-none md:mx-0 bg-[#eaf5f4] md:py-4 ${(currentView === 'Application Status' || currentView === 'Customer') ? 'py-2' : 'pt-2 pb-1'} ${currentView === 'Staff Management' ? 'hidden md:flex' : 'flex'}`}>
       <div className={`flex justify-between relative ${(currentView === 'Customer') ? 'items-center pb-1' : 'items-start'}`}>
           {/* Always show Logo & Branch on Left */}
-          <div className="flex items-center gap-2 md:gap-4">
-            <img src={logo} alt="Everest Logo" className="w-10 h-10 md:w-12 md:h-12 object-contain magic-crop mix-blend-multiply" />
-            <div className="flex flex-col justify-center items-start gap-0.5 md:gap-2 mt-1 md:mt-0">
-              <div className="flex items-center gap-2">
-                <div className="relative inline-flex items-center" ref={branchDropdownRef}>
-                  <span className="font-bold text-[14px] text-slate-900">{getDisplayBranch()}</span>
+          <div className="flex items-center gap-2 md:gap-4 min-w-0">
+            <img src={logo} alt="Everest Logo" className="w-10 h-10 md:w-12 md:h-12 object-contain magic-crop mix-blend-multiply flex-shrink-0 shrink-0" />
+            <div className="flex flex-col justify-center items-start gap-0.5 md:gap-2 mt-1 md:mt-0 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="relative inline-flex items-center min-w-0" ref={branchDropdownRef}>
+                  <span className="font-bold text-[14px] text-slate-900 truncate max-w-[110px] sm:max-w-[160px]">{getDisplayBranch()}</span>
                   {userProfile?.role !== 'staff' && (
                     <>
-                      <span className="ml-1 text-[10px] text-slate-400">▼</span>
+                      <span className="ml-1 text-[10px] text-slate-400 flex-shrink-0 shrink-0">▼</span>
                       
                       {/* Invisible overlay button to toggle custom dropdown */}
                       <div 
@@ -195,9 +195,9 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
             </div>
           )}
 
-        <div className="flex items-center gap-2 relative" ref={menuRef}>
+        <div className="flex items-center gap-2 relative flex-shrink-0 shrink-0" ref={menuRef}>
             {userProfile?.role === 'staff' ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
                 {(() => {
                   const staffPhoto = userProfile.photoBase64 || userProfile.photoUrl || userProfile.profileImage || userProfile.photo;
                   return (
@@ -223,10 +223,10 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
 
                       {/* Staff Name & ID */}
                       <div className="flex flex-col text-left leading-tight">
-                        <span className="text-xs font-bold text-gray-800 truncate max-w-[85px]">
+                        <span className="text-xs font-bold text-gray-800 truncate max-w-[85px] sm:max-w-[130px]">
                           {userProfile?.name || 'Staff'}
                         </span>
-                        <span className="text-[10px] text-gray-400 font-mono">
+                        <span className="text-[10px] text-gray-400 font-mono truncate max-w-[85px] sm:max-w-[130px]">
                           {userProfile?.staffId || userProfile?.id || ''}
                         </span>
                       </div>
@@ -235,10 +235,10 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
                 })()}
               </div>
             ) : (
-            <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm">ADMIN</span>
+            <span className="text-[#1ca3a6] font-black tracking-widest text-xs mb-0 drop-shadow-sm flex-shrink-0 shrink-0">ADMIN</span>
           )}
           <button 
-            className="md:hidden p-1 text-slate-500 hover:text-slate-700 transition-colors shrink-0"
+            className="md:hidden p-1 text-slate-500 hover:text-slate-700 transition-colors shrink-0 flex-shrink-0"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
