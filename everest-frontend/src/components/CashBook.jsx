@@ -906,6 +906,105 @@ export const computeEarliestTransactionDate = ({
   return fallbackDate || new Date();
 };
 
+// ================= VISUAL RICH GRAPHICS (REFERENCE 1001025240) =================
+const GrowthChartGraphic = () => (
+  <svg viewBox="0 0 100 68" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-24 h-16 sm:w-28 sm:h-18 opacity-95 select-none pointer-events-none drop-shadow-sm">
+    <defs>
+      <linearGradient id="growthBarGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.85" />
+        <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.4" />
+      </linearGradient>
+      <linearGradient id="growthArrowGrad" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0%" stopColor="#A5F3FC" />
+        <stop offset="100%" stopColor="#FFFFFF" />
+      </linearGradient>
+      <filter id="growthGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#0284C7" floodOpacity="0.5" />
+      </filter>
+    </defs>
+    {/* 5 Ascending Bars */}
+    <rect x="10" y="46" width="9" height="18" rx="2.5" fill="url(#growthBarGrad)" />
+    <rect x="24" y="36" width="9" height="28" rx="2.5" fill="url(#growthBarGrad)" />
+    <rect x="38" y="27" width="9" height="37" rx="2.5" fill="url(#growthBarGrad)" />
+    <rect x="52" y="17" width="9" height="47" rx="2.5" fill="url(#growthBarGrad)" />
+    <rect x="66" y="8" width="9" height="56" rx="2.5" fill="url(#growthBarGrad)" />
+    {/* Upward Curved Trend Arrow */}
+    <path
+      d="M 6 52 C 28 42, 46 26, 76 6"
+      stroke="url(#growthArrowGrad)"
+      strokeWidth="3.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      filter="url(#growthGlow)"
+    />
+    <polygon points="76,3 78,13 68,9" fill="#FFFFFF" filter="url(#growthGlow)" />
+  </svg>
+);
+
+const GoldCoinStack = () => {
+  const renderCoin = (cx, cy, rx = 12, ry = 4.6, h = 3.8) => (
+    <g key={`${cx}-${cy}`}>
+      {/* 3D Side Rim */}
+      <path
+        d={`M ${cx - rx} ${cy} v ${h} a ${rx} ${ry} 0 0 0 ${rx * 2} 0 v -${h} Z`}
+        fill="url(#coinRimGrad)"
+        stroke="#92400E"
+        strokeWidth="0.4"
+      />
+      {/* Top Face */}
+      <ellipse
+        cx={cx}
+        cy={cy}
+        rx={rx}
+        ry={ry}
+        fill="url(#coinFaceGrad)"
+        stroke="#FEF08A"
+        strokeWidth="0.6"
+      />
+      {/* Embossed Inner Rim */}
+      <ellipse
+        cx={cx}
+        cy={cy}
+        rx={rx * 0.72}
+        ry={ry * 0.72}
+        fill="none"
+        stroke="#D97706"
+        strokeWidth="0.5"
+        strokeDasharray="2 1"
+        opacity="0.8"
+      />
+    </g>
+  );
+
+  return (
+    <svg viewBox="0 0 90 68" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-22 h-16 sm:w-26 sm:h-18 select-none pointer-events-none drop-shadow-md">
+      <defs>
+        <linearGradient id="coinRimGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#78350F" />
+          <stop offset="25%" stopColor="#D97706" />
+          <stop offset="50%" stopColor="#FEF08A" />
+          <stop offset="75%" stopColor="#D97706" />
+          <stop offset="100%" stopColor="#78350F" />
+        </linearGradient>
+        <radialGradient id="coinFaceGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#FFFBEB" />
+          <stop offset="30%" stopColor="#FDE047" />
+          <stop offset="70%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#B45309" />
+        </radialGradient>
+      </defs>
+      {/* Ground Cast Shadow */}
+      <ellipse cx="45" cy="58" rx="38" ry="7" fill="#1E1B4B" opacity="0.4" />
+      {/* Rear Left Stack (cx=23) */}
+      {[46, 42, 38, 34, 30].map(cy => renderCoin(23, cy))}
+      {/* Rear Right Stack (cx=67) */}
+      {[46, 42, 38, 34, 30, 26].map(cy => renderCoin(67, cy))}
+      {/* Front Center Stack (cx=45) */}
+      {[54, 50, 46, 42].map(cy => renderCoin(45, cy))}
+    </svg>
+  );
+};
+
 // ================= MULTI-SELECT COLUMN FILTER POPOVER =================
 const TableColumnFilterDropdown = ({
   title,
@@ -3324,6 +3423,23 @@ export default function CashBook({
         <div className="absolute -right-16 -top-24 w-72 h-72 rounded-full bg-white/10 blur-2xl pointer-events-none" />
         <div className="absolute right-1/4 -bottom-20 w-80 h-32 rounded-full bg-cyan-400/15 blur-xl pointer-events-none" />
 
+        {/* Sweeping organic wave ribbon highlight */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="absolute right-0 top-0 w-3/4 h-full opacity-30">
+            <path
+              d="M 0,200 C 300,140 450,20 750,60 C 860,75 930,35 1000,10 L 1000,200 Z"
+              fill="url(#heroCyanWaveGrad)"
+            />
+            <defs>
+              <linearGradient id="heroCyanWaveGrad" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0%" stopColor="#06B6D4" stopOpacity="0" />
+                <stop offset="40%" stopColor="#38BDF8" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="#93C5FD" stopOpacity="0.75" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Left: Logo, Title & Subtitle */}
           <div className="flex items-center gap-3">
@@ -3337,7 +3453,7 @@ export default function CashBook({
                 <ArrowLeft className="w-5 h-5" />
               </button>
             )}
-            <div className="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center text-blue-700 shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-400 to-blue-500 shadow-md flex items-center justify-center text-white shrink-0 ring-2 ring-white/30">
               <TrendingUp className="w-7 h-7 stroke-[2.5]" />
             </div>
             <div>
@@ -3580,34 +3696,45 @@ export default function CashBook({
 
       {/* ================= 3. TOP METRIC CARDS (HIGH-CONTRAST VIBRANT 3-COLUMN GRID) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-        {/* Card 1: Opening Balance (Today) - Vibrant Blue Gradient */}
-        <div className="bg-white rounded-3xl border border-blue-200 shadow-md overflow-hidden flex flex-col justify-between">
-          <div className="bg-gradient-to-r from-[#0F52BA] via-[#1D63DC] to-[#2589F5] p-4 text-white relative overflow-hidden">
-            {/* Background chart/bars watermark decoration */}
-            <div className="absolute right-3 bottom-0 opacity-20 pointer-events-none flex items-end gap-1 h-14">
-              <div className="w-2 h-5 bg-white rounded-t-sm" />
-              <div className="w-2 h-8 bg-white rounded-t-sm" />
-              <div className="w-2 h-12 bg-white rounded-t-sm" />
-              <div className="w-2 h-7 bg-white rounded-t-sm" />
-              <div className="w-2 h-14 bg-white rounded-t-sm" />
+        {/* Card 1: Opening Balance (Today) - Vibrant Blue S-Curve Wave Header */}
+        <div className="bg-white rounded-3xl border border-blue-200/80 shadow-md overflow-hidden flex flex-col justify-between">
+          <div className="relative text-white overflow-hidden">
+            {/* Vibrant Blue Gradient Background */}
+            <div className="bg-gradient-to-r from-[#0759D6] via-[#106DF6] to-[#2593FE] pt-4 px-4 pb-8 relative">
+              <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
+
+              <div className="relative z-10 flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                      <Wallet className="w-4 h-4 stroke-[2.2]" />
+                    </div>
+                    <span className="text-xs font-bold text-blue-100 tracking-wide">
+                      Opening Balance (Today)
+                    </span>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    {formatCurrency(yesterdayTotal)}
+                  </div>
+                </div>
+
+                <div className="shrink-0 -mt-1 -mr-1">
+                  <GrowthChartGraphic />
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 mb-1.5 relative z-10">
-              <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
-                <Wallet className="w-4 h-4 stroke-[2.2]" />
-              </div>
-              <span className="text-xs font-bold text-blue-100 tracking-wide">
-                Opening Balance (Today)
-              </span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-white tracking-tight relative z-10">
-              {formatCurrency(yesterdayTotal)}
+            {/* S-Curve SVG Wave Divider */}
+            <div className="relative -mt-5 w-full overflow-hidden leading-none z-10">
+              <svg viewBox="0 0 500 40" preserveAspectRatio="none" className="w-full h-5 sm:h-6 fill-white block">
+                <path d="M 0,15 C 120,38 220,0 360,24 C 420,34 465,22 500,10 L 500,40 L 0,40 Z" />
+              </svg>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 p-3 bg-white">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl p-2 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2.5 bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Banknote className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -3616,8 +3743,8 @@ export default function CashBook({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl p-2 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2.5 bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -3628,14 +3755,26 @@ export default function CashBook({
           </div>
         </div>
 
-        {/* Card 2: Today's Summary - Vibrant Emerald Green Gradient */}
-        <div className="bg-white rounded-3xl border border-emerald-200 shadow-md overflow-hidden flex flex-col justify-between">
-          <div className="bg-gradient-to-r from-[#0A7E3E] via-[#16A34A] to-[#22C55E] p-3 sm:px-4 text-white flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
-                <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+        {/* Card 2: Today's Summary - Vibrant Emerald Green Wave Header */}
+        <div className="bg-white rounded-3xl border border-emerald-200/80 shadow-md overflow-hidden flex flex-col justify-between">
+          <div className="relative text-white overflow-hidden">
+            {/* Emerald Green Gradient Background */}
+            <div className="bg-gradient-to-r from-[#0B7A3B] via-[#159648] to-[#22C55E] pt-3 px-4 pb-6 relative">
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                    <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <span className="text-sm font-black text-white tracking-tight">Today's Summary</span>
+                </div>
               </div>
-              <span className="text-sm font-black text-white tracking-tight">Today's Summary</span>
+            </div>
+
+            {/* Gentle Wave Divider */}
+            <div className="relative -mt-4 w-full overflow-hidden leading-none z-10">
+              <svg viewBox="0 0 500 30" preserveAspectRatio="none" className="w-full h-4 sm:h-5 fill-white block">
+                <path d="M 0,8 C 140,24 320,0 500,14 L 500,30 L 0,30 Z" />
+              </svg>
             </div>
           </div>
 
@@ -3650,10 +3789,10 @@ export default function CashBook({
               className={`rounded-2xl p-2.5 text-center flex flex-col items-center justify-center cursor-pointer transition-all duration-200 select-none ${
                 isInvestmentFilterActive
                   ? 'bg-emerald-200/90 border-2 border-emerald-600 shadow-md ring-2 ring-emerald-500/40 scale-[1.02]'
-                  : 'bg-emerald-50/80 border border-emerald-200 hover:bg-emerald-100/80 hover:shadow-2xs active:scale-95'
+                  : 'bg-emerald-50/80 border border-emerald-200/90 hover:bg-emerald-100/80 hover:shadow-2xs active:scale-95'
               }`}
             >
-              <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-1 relative shadow-2xs">
+              <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center mb-1 relative shadow-xs">
                 <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                 {isInvestmentFilterActive && (
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-600 border-2 border-white rounded-full animate-pulse" />
@@ -3669,8 +3808,8 @@ export default function CashBook({
             </div>
 
             {/* 2. Total Credit */}
-            <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
-              <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center mb-1 shadow-2xs">
+            <div className="bg-blue-50/80 border border-blue-200/90 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
+              <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center mb-1 shadow-xs">
                 <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
               </div>
               <span className="text-[10px] font-bold text-blue-800/90 block">Total Credit</span>
@@ -3678,8 +3817,8 @@ export default function CashBook({
             </div>
 
             {/* 3. Total Debit */}
-            <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
-              <div className="w-7 h-7 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mb-1 shadow-2xs">
+            <div className="bg-rose-50/80 border border-rose-200/90 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
+              <div className="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center mb-1 shadow-xs">
                 <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
               </div>
               <span className="text-[10px] font-bold text-rose-800/90 block">Total Debit</span>
@@ -3687,8 +3826,8 @@ export default function CashBook({
             </div>
 
             {/* 4. Total Expense */}
-            <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
-              <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mb-1 shadow-2xs">
+            <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
+              <div className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center mb-1 shadow-xs">
                 <Receipt className="w-3.5 h-3.5" />
               </div>
               <span className="text-[10px] font-bold text-amber-800/90 block">Total Expense</span>
@@ -3708,30 +3847,45 @@ export default function CashBook({
           </div>
         </div>
 
-        {/* Card 3: Today's Cash Account - Vibrant Royal Purple Gradient */}
-        <div className="bg-white rounded-3xl border border-purple-200 shadow-md overflow-hidden flex flex-col justify-between">
-          <div className="bg-gradient-to-r from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] p-4 text-white relative overflow-hidden">
-            {/* Coins graphic watermark decoration */}
-            <div className="absolute right-3 bottom-0 opacity-20 pointer-events-none flex items-end gap-1">
-              <Coins className="w-14 h-14 stroke-[1.5]" />
+        {/* Card 3: Today's Cash Account - Vibrant Royal Purple S-Curve Wave Header */}
+        <div className="bg-white rounded-3xl border border-purple-200/80 shadow-md overflow-hidden flex flex-col justify-between">
+          <div className="relative text-white overflow-hidden">
+            {/* Royal Purple Gradient Background */}
+            <div className="bg-gradient-to-r from-[#4A148C] via-[#6B21A8] to-[#8B5CF6] pt-4 px-4 pb-8 relative">
+              <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
+
+              <div className="relative z-10 flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                      <Coins className="w-4 h-4 stroke-[2.2]" />
+                    </div>
+                    <span className="text-xs font-bold text-purple-100 tracking-wide">
+                      Today's Cash Account
+                    </span>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    {formatCurrency(todayNetClosingBalance)}
+                  </div>
+                </div>
+
+                <div className="shrink-0 -mt-1 -mr-1">
+                  <GoldCoinStack />
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 mb-1.5 relative z-10">
-              <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
-                <Coins className="w-4 h-4 stroke-[2.2]" />
-              </div>
-              <span className="text-xs font-bold text-purple-100 tracking-wide">
-                Today's Cash Account
-              </span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-white tracking-tight relative z-10">
-              {formatCurrency(todayNetClosingBalance)}
+            {/* S-Curve SVG Wave Divider */}
+            <div className="relative -mt-5 w-full overflow-hidden leading-none z-10">
+              <svg viewBox="0 0 500 40" preserveAspectRatio="none" className="w-full h-5 sm:h-6 fill-white block">
+                <path d="M 0,15 C 120,38 220,0 360,24 C 420,34 465,22 500,10 L 500,40 L 0,40 Z" />
+              </svg>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 p-3 bg-white">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl p-2 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2.5 bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Banknote className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -3740,8 +3894,8 @@ export default function CashBook({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl p-2 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2.5 bg-slate-50/80 border border-slate-100 rounded-2xl p-2.5 shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -3762,8 +3916,8 @@ export default function CashBook({
 
         <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 overflow-x-auto py-1">
           {/* 1. Yesterday Balance */}
-          <div className="bg-blue-50/90 border border-blue-200 rounded-2xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+          <div className="bg-blue-50/90 border border-blue-200/90 rounded-2xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
               <Coins className="w-4 h-4" />
             </div>
             <div className="min-w-0">
@@ -3775,8 +3929,8 @@ export default function CashBook({
           <span className="text-base font-black text-slate-400 px-1">+</span>
 
           {/* 2. Collection / Credit */}
-          <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+          <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
               <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
@@ -3796,11 +3950,11 @@ export default function CashBook({
             className={`rounded-2xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs cursor-pointer transition-all duration-200 select-none ${
               isInvestmentFilterActive
                 ? 'bg-purple-100 border-2 border-purple-600 shadow-md ring-2 ring-purple-500/40 scale-[1.02]'
-                : 'bg-purple-50/90 border border-purple-200 hover:bg-purple-100/70 hover:border-purple-300 active:scale-95'
+                : 'bg-purple-50/90 border border-purple-200/90 hover:bg-purple-100/70 hover:border-purple-300 active:scale-95'
             }`}
           >
-            <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 relative">
-              <Landmark className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-xl bg-purple-500 text-white flex items-center justify-center shrink-0 relative shadow-xs">
+              <TrendingUp className="w-4 h-4" />
               {isInvestmentFilterActive && (
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-600 border-2 border-white rounded-full animate-pulse" />
               )}
@@ -3819,8 +3973,8 @@ export default function CashBook({
           <span className="text-base font-black text-slate-400 px-1">-</span>
 
           {/* 4. Debit */}
-          <div className="bg-rose-50/90 border border-rose-200 rounded-2xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+          <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
@@ -3832,8 +3986,8 @@ export default function CashBook({
           <span className="text-base font-black text-slate-400 px-1">-</span>
 
           {/* 5. Expense */}
-          <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+          <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
               <Receipt className="w-4 h-4" />
             </div>
             <div className="min-w-0">
@@ -4109,12 +4263,12 @@ export default function CashBook({
                           </button>
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-6">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center mb-2 shadow-2xs">
-                          <Search className="w-6 h-6 stroke-[2]" />
+                        <div className="relative py-8 flex flex-col items-center justify-center">
+                          <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mb-2.5 shadow-2xs">
+                            <Search className="w-7 h-7 stroke-[2]" />
+                          </div>
+                          <span className="text-slate-600 font-bold text-xs">No transactions recorded for this period.</span>
                         </div>
-                        <span className="text-slate-500 font-semibold text-xs">No transactions recorded for this period.</span>
-                      </div>
                       )}
                     </td>
                   </tr>
@@ -4184,11 +4338,11 @@ export default function CashBook({
                 {displayedExpenses.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
-                    <div className="flex flex-col items-center justify-center py-6">
-                      <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-500 flex items-center justify-center mb-2 shadow-2xs">
-                        <Wallet className="w-6 h-6 stroke-[2]" />
+                    <div className="relative py-8 flex flex-col items-center justify-center">
+                      <div className="w-14 h-14 rounded-2xl bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center mb-2.5 shadow-2xs">
+                        <Wallet className="w-7 h-7 stroke-[2]" />
                       </div>
-                      <span className="text-slate-500 font-semibold text-xs">No expenses recorded for this period.</span>
+                      <span className="text-slate-600 font-bold text-xs">No expenses recorded for this period.</span>
                     </div>
                   </td>
                   </tr>
