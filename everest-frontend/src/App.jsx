@@ -749,7 +749,9 @@ function App() {
       });
     };
 
-    setupListener();
+    if (Capacitor.isNativePlatform()) {
+      setupListener();
+    }
 
     return () => {
       if (backListenerHandle) {
