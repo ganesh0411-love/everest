@@ -413,6 +413,26 @@ export const getCanonicalCustomerKey = (c) => {
   return String(c.id || c.customerId || '');
 };
 
+// Resolve Transaction Business Date (1:1 with CollectionReportModal)
+export const getTransactionBusinessDate = (rec) => {
+  if (!rec) return '';
+  return (
+    rec.collection_date ||
+    rec.collectionDate ||
+    rec.payment_date ||
+    rec.paymentDate ||
+    rec.disbursement_date ||
+    rec.disbursedDate ||
+    rec.disbursedAt ||
+    rec.date ||
+    rec.dueDate ||
+    rec.scheduledDate ||
+    rec.created_at ||
+    rec.createdAt ||
+    ''
+  );
+};
+
 // Resolve Payment Mode (1:1 with CollectionReportModal)
 export const resolvePaymentMode = (inst) => {
   if (!inst) return 'Cash';
@@ -485,19 +505,8 @@ export const mergeCustomerIntoMap = (targetMap, c) => {
     existing = targetMap.get(`phone_${phone.slice(-10)}`);
   }
 
-  let candidateInstallments = c.installments;
-  const cId = c.id || c.customerId;
-  if (cId) {
-    try {
-      const savedLedger = localStorage.getItem(`everest_ledger_${cId}`);
-      if (savedLedger) {
-        const parsed = JSON.parse(savedLedger);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          candidateInstallments = parsed;
-        }
-      }
-    } catch (e) {}
-  }
+  // Strictly use live customer installments from authoritative Firestore database
+  const candidateInstallments = c.installments;
 
   const newValidInst = filterPaidInst(candidateInstallments);
 
@@ -695,20 +704,16 @@ export const computeEarliestTransactionDate = ({
         (bName.includes('andipatti') || bId.includes('andipatti') || bName.includes('aundipatti') || bId.includes('aundipatti'))) {
       return true;
     }
+    // Synonyms for Gullapuram / Kullapuram
+    if ((tName.includes('kullapuram') || tId.includes('kullapuram') || tName.includes('gullapuram') || tId.includes('gullapuram')) &&
+        (bName.includes('kullapuram') || bId.includes('kullapuram') || bName.includes('gullapuram') || bId.includes('gullapuram'))) {
+      return true;
+    }
     return false;
   };
 
   const custMap = new Map();
   GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => mergeCustomerIntoMap(custMap, c));
-  try {
-    const saved = localStorage.getItem('everest_customers');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        parsed.forEach(c => mergeCustomerIntoMap(custMap, c));
-      }
-    }
-  } catch (_e) {}
   if (Array.isArray(customers)) {
     customers.forEach(c => mergeCustomerIntoMap(custMap, c));
   }
@@ -753,16 +758,7 @@ export const computeEarliestTransactionDate = ({
     }
 
     // 2. Check Collections (Credits / Installments - strictly real paid receipts)
-    let rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-    try {
-      const localLedger = localStorage.getItem(`everest_ledger_${cust.id}`);
-      if (localLedger) {
-        const parsed = JSON.parse(localLedger);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          rawInstallments = parsed;
-        }
-      }
-    } catch (e) {}
+    const rawInstallments = cust.installments || cust.ledger || cust.transactions || cust.history || [];
 
     (rawInstallments || []).forEach(inst => {
       if (!inst || typeof inst !== 'object') return;
@@ -1316,6 +1312,10 @@ export default function CashBook({
           (s.includes('andipatti') || s.includes('aundipatti'))) {
         return true;
       }
+      if ((sel.includes('kullapuram') || selName.includes('kullapuram') || sel.includes('gullapuram') || selName.includes('gullapuram')) &&
+          (s.includes('kullapuram') || s.includes('gullapuram'))) {
+        return true;
+      }
       return false;
     }
 
@@ -1345,6 +1345,13 @@ export default function CashBook({
     if ((sel.includes('andipatti') || selName.includes('andipatti') || sel.includes('aundipatti') || selName.includes('aundipatti')) &&
         (b.includes('andipatti') || bName.includes('andipatti') || bId.includes('andipatti') ||
          b.includes('aundipatti') || bName.includes('aundipatti') || bId.includes('aundipatti'))) {
+      return true;
+    }
+
+    // Synonyms for Gullapuram / Kullapuram
+    if ((sel.includes('kullapuram') || selName.includes('kullapuram') || sel.includes('gullapuram') || selName.includes('gullapuram')) &&
+        (b.includes('kullapuram') || bName.includes('kullapuram') || bId.includes('kullapuram') ||
+         b.includes('gullapuram') || bName.includes('gullapuram') || bId.includes('gullapuram'))) {
       return true;
     }
 
@@ -1388,87 +1395,54 @@ export default function CashBook({
     return formatDateToDisplay(getYesterdayYmd());
   }, [fromDate]);
 
-  // 1. Investments State
+  // 1. Investments State (Initial state empty; populated strictly via real-time Firestore stream)
   const investmentsKey = isEnterpriseSelected
     ? 'everest_cashbook_investments_main'
     : `everest_cashbook_investments_${selectedBranchId || branchId}`;
 
-  const [investments, setInvestments] = useState(() => {
-    try {
-      const allList = [];
-      const seen = new Set();
-      const keys = [
-        `everest_cashbook_investments_${selectedBranchId}`,
-        `everest_cashbook_investments_${branchId}`,
-        'everest_cashbook_investments_main',
-        'everest_cashbook_investments_all',
-        'everest_cashbook_investments'
-      ];
-      for (const k of keys) {
-        const saved = localStorage.getItem(k);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            parsed.forEach(item => {
-              if (item?.id && !seen.has(item.id)) {
-                seen.add(item.id);
-                allList.push(item);
-              }
-            });
-          }
-        }
-      }
-      return allList;
-    } catch (e) {
-      return [];
-    }
-  });
+  const [investments, setInvestments] = useState([]);
 
   // 2. Expenses State (Listening to expansion_expenses & legacy expenses)
-  const [liveExpenses, setLiveExpenses] = useState(() => {
-    try {
-      const allList = [];
-      const seen = new Set();
-      const keys = [
-        `everest_expansion_expenses_${selectedBranchId}`,
-        `everest_expansion_expenses_${branchId}`,
-        'everest_expansion_expenses_main',
-        'everest_expansion_expenses_all',
-        'everest_expansion_expenses'
-      ];
-      for (const k of keys) {
-        const saved = localStorage.getItem(k);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            parsed.forEach(item => {
-              if (item?.id && !seen.has(item.id)) {
-                seen.add(item.id);
-                allList.push(item);
-              }
-            });
-          }
-        }
-      }
-      return allList;
-    } catch (e) {
-      return [];
-    }
-  });
+  const [liveExpenses, setLiveExpenses] = useState([]);
 
-  // 3. Opening Balances State
+  // 3. Opening Balances State (Live database opening record cache)
   const openingsKey = isEnterpriseSelected
     ? 'everest_cashbook_openings_main'
     : `everest_cashbook_openings_${selectedBranchId || branchId}`;
 
-  const [openingBalances, setOpeningBalances] = useState(() => {
-    try {
-      const saved = localStorage.getItem(openingsKey) || localStorage.getItem('everest_cashbook_openings_all');
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-      return {};
-    }
+  const [openingBalances, setOpeningBalances] = useState({});
+
+  // Real-time Data Stream Tracking for Unified Cross-Device Consistency
+  const [streamLoaded, setStreamLoaded] = useState({
+    investments: false,
+    expenses: false,
+    particulars: false,
+    loans: false,
+    disbursements: false,
+    collections: false,
+    customers: false
   });
+  const [liveDataReady, setLiveDataReady] = useState(false);
+
+  useEffect(() => {
+    if (Array.isArray(customers) && customers.length > 0) {
+      setStreamLoaded(prev => ({ ...prev, customers: true }));
+    }
+  }, [customers]);
+
+  useEffect(() => {
+    if (Object.values(streamLoaded).every(Boolean)) {
+      setLiveDataReady(true);
+    }
+  }, [streamLoaded]);
+
+  // Fallback network safety timer so UI never blocks indefinitely
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLiveDataReady(true);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Transaction Table Column Filters
   const [selectedTypeFilters, setSelectedTypeFilters] = useState([]);
@@ -1518,40 +1492,12 @@ export default function CashBook({
     source: ''
   });
 
-  // Manual Particulars State
+  // Manual Particulars State (Initial state empty; populated strictly via real-time Firestore stream)
   const particularsKey = isEnterpriseSelected
     ? 'everest_cashbook_particulars_main'
     : `everest_cashbook_particulars_${selectedBranchId || branchId}`;
 
-  const [manualParticulars, setManualParticulars] = useState(() => {
-    try {
-      const allList = [];
-      const seen = new Set();
-      const keys = [
-        `everest_cashbook_particulars_${selectedBranchId}`,
-        `everest_cashbook_particulars_${branchId}`,
-        'everest_cashbook_particulars_all',
-        'everest_cashbook_particulars'
-      ];
-      for (const k of keys) {
-        const saved = localStorage.getItem(k);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            parsed.forEach(item => {
-              if (item?.id && !seen.has(item.id)) {
-                seen.add(item.id);
-                allList.push(item);
-              }
-            });
-          }
-        }
-      }
-      return allList;
-    } catch (e) {
-      return [];
-    }
-  });
+  const [manualParticulars, setManualParticulars] = useState([]);
 
   // Particulars Form
   const [particularsForm, setParticularsForm] = useState({
@@ -1587,19 +1533,22 @@ export default function CashBook({
     }));
   }, [fromDate, toDate]);
 
-  // --- Real-time Listeners ---
+  // --- Real-time Listeners (Authoritative Firestore Streams) ---
   // A. Investments Listener
   useEffect(() => {
     let unsub = () => {};
     try {
       unsub = onSnapshot(collection(db, 'investments'), (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ ...d.data(), id: d.data()?.id || d.id, firestoreId: d.id }));
-          setInvestments(list);
-          try { localStorage.setItem(investmentsKey, JSON.stringify(list)); } catch (e) {}
-        }
-      }, (err) => console.warn('Investments listener notice:', err));
-    } catch (e) {}
+        const list = snapshot.docs.map(d => ({ ...d.data(), id: d.data()?.id || d.id, firestoreId: d.id }));
+        setInvestments(list);
+        setStreamLoaded(prev => ({ ...prev, investments: true }));
+      }, (err) => {
+        console.warn('Investments listener notice:', err);
+        setStreamLoaded(prev => ({ ...prev, investments: true }));
+      });
+    } catch (e) {
+      setStreamLoaded(prev => ({ ...prev, investments: true }));
+    }
     return () => unsub();
   }, [investmentsKey]);
 
@@ -1608,12 +1557,16 @@ export default function CashBook({
     let unsub = () => {};
     try {
       unsub = onSnapshot(collection(db, 'expansion_expenses'), (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setLiveExpenses(list);
-        }
-      }, (err) => console.warn('Expansion expenses listener notice in CashBook:', err));
-    } catch (e) {}
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setLiveExpenses(list);
+        setStreamLoaded(prev => ({ ...prev, expenses: true }));
+      }, (err) => {
+        console.warn('Expansion expenses listener notice in CashBook:', err);
+        setStreamLoaded(prev => ({ ...prev, expenses: true }));
+      });
+    } catch (e) {
+      setStreamLoaded(prev => ({ ...prev, expenses: true }));
+    }
     return () => unsub();
   }, []);
 
@@ -1622,13 +1575,16 @@ export default function CashBook({
     let unsub = () => {};
     try {
       unsub = onSnapshot(collection(db, 'cashbook_particulars'), (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ ...d.data(), id: d.data()?.id || d.id, firestoreId: d.id }));
-          setManualParticulars(list);
-          try { localStorage.setItem(particularsKey, JSON.stringify(list)); } catch (e) {}
-        }
-      }, (err) => console.warn('Particulars listener notice in CashBook:', err));
-    } catch (e) {}
+        const list = snapshot.docs.map(d => ({ ...d.data(), id: d.data()?.id || d.id, firestoreId: d.id }));
+        setManualParticulars(list);
+        setStreamLoaded(prev => ({ ...prev, particulars: true }));
+      }, (err) => {
+        console.warn('Particulars listener notice in CashBook:', err);
+        setStreamLoaded(prev => ({ ...prev, particulars: true }));
+      });
+    } catch (e) {
+      setStreamLoaded(prev => ({ ...prev, particulars: true }));
+    }
     return () => unsub();
   }, [particularsKey]);
 
@@ -1638,12 +1594,16 @@ export default function CashBook({
     let unsub = () => {};
     try {
       unsub = onSnapshot(collection(db, 'loans'), (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setFirestoreLoans(list);
-        }
-      }, (err) => console.warn('Loans listener notice in CashBook:', err));
-    } catch (e) {}
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setFirestoreLoans(list);
+        setStreamLoaded(prev => ({ ...prev, loans: true }));
+      }, (err) => {
+        console.warn('Loans listener notice in CashBook:', err);
+        setStreamLoaded(prev => ({ ...prev, loans: true }));
+      });
+    } catch (e) {
+      setStreamLoaded(prev => ({ ...prev, loans: true }));
+    }
     return () => unsub();
   }, []);
 
@@ -1653,12 +1613,16 @@ export default function CashBook({
     let unsub = () => {};
     try {
       unsub = onSnapshot(collection(db, 'loan_disbursements'), (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setFirestoreDisbursements(list);
-        }
-      }, (err) => console.warn('Disbursements listener notice in CashBook:', err));
-    } catch (e) {}
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setFirestoreDisbursements(list);
+        setStreamLoaded(prev => ({ ...prev, disbursements: true }));
+      }, (err) => {
+        console.warn('Disbursements listener notice in CashBook:', err);
+        setStreamLoaded(prev => ({ ...prev, disbursements: true }));
+      });
+    } catch (e) {
+      setStreamLoaded(prev => ({ ...prev, disbursements: true }));
+    }
     return () => unsub();
   }, []);
 
@@ -1668,12 +1632,16 @@ export default function CashBook({
     let unsub = () => {};
     try {
       unsub = onSnapshot(collection(db, 'collections'), (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setFirestoreCollections(list);
-        }
-      }, (err) => console.warn('Collections listener notice in CashBook:', err));
-    } catch (e) {}
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setFirestoreCollections(list);
+        setStreamLoaded(prev => ({ ...prev, collections: true }));
+      }, (err) => {
+        console.warn('Collections listener notice in CashBook:', err);
+        setStreamLoaded(prev => ({ ...prev, collections: true }));
+      });
+    } catch (e) {
+      setStreamLoaded(prev => ({ ...prev, collections: true }));
+    }
     return () => unsub();
   }, []);
 
@@ -1683,12 +1651,16 @@ export default function CashBook({
     let unsub = () => {};
     try {
       unsub = onSnapshot(collection(db, 'customers'), (snapshot) => {
-        if (!snapshot.empty) {
-          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setFirestoreCustomers(list);
-        }
-      }, (err) => console.warn('Customers listener notice in CashBook:', err));
-    } catch (e) {}
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setFirestoreCustomers(list);
+        setStreamLoaded(prev => ({ ...prev, customers: true }));
+      }, (err) => {
+        console.warn('Customers listener notice in CashBook:', err);
+        setStreamLoaded(prev => ({ ...prev, customers: true }));
+      });
+    } catch (e) {
+      setStreamLoaded(prev => ({ ...prev, customers: true }));
+    }
     return () => unsub();
   }, []);
 
@@ -2194,21 +2166,11 @@ export default function CashBook({
     const customerMap = new Map();
     // 1. First inject GULLAPURAM_CANONICAL_CUSTOMERS
     GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => mergeCustomerIntoMap(customerMap, c));
-    // 2. Add localStorage customers
-    try {
-      const saved = localStorage.getItem('everest_customers');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(c => mergeCustomerIntoMap(customerMap, c));
-        }
-      }
-    } catch (e) {}
-    // 3. Add props customers
+    // 2. Add props customers (live from Firestore)
     if (Array.isArray(customers)) {
       customers.forEach(c => mergeCustomerIntoMap(customerMap, c));
     }
-    // 4. Add firestoreCustomers
+    // 3. Add direct firestoreCustomers stream
     if (Array.isArray(firestoreCustomers)) {
       firestoreCustomers.forEach(c => mergeCustomerIntoMap(customerMap, c));
     }
@@ -2223,19 +2185,7 @@ export default function CashBook({
         c.disbursedAmount = c.disbursedAmount || 22500;
         c.loanAmount = c.loanAmount || 22500;
 
-        let liveInst = c.installments;
-        const cId = String(c.id || c.customerId || '').trim();
-        if (cId) {
-          try {
-            const savedLedger = localStorage.getItem(`everest_ledger_${cId}`);
-            if (savedLedger) {
-              const parsed = JSON.parse(savedLedger);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                liveInst = parsed;
-              }
-            }
-          } catch (e) {}
-        }
+        const liveInst = c.installments;
         const paidInst = filterPaidInst(liveInst || []);
         if (paidInst.length > 0) {
           c.installments = liveInst;
@@ -2452,18 +2402,7 @@ export default function CashBook({
       }
 
       // Query strictly actual paid receipts (never generated due schedules!)
-      let candInst = cust.installments || cust.ledger || cust.transactions || cust.history || [];
-      if (cId) {
-        try {
-          const savedLedger = localStorage.getItem(`everest_ledger_${cId}`);
-          if (savedLedger) {
-            const parsed = JSON.parse(savedLedger);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              candInst = parsed;
-            }
-          }
-        } catch (e) {}
-      }
+      const candInst = cust.installments || cust.ledger || cust.transactions || cust.history || [];
 
       let rawInstallments = filterPaidInst(candInst);
       if (rawInstallments.length === 0 && cleanCustName.includes('sundar') && cleanCustName.includes('auto')) {
@@ -2490,7 +2429,7 @@ export default function CashBook({
         if ((rawStatus === 'DUE' || rawStatus === 'PENDING' || rawStatus === 'UNPAID') && paidAmt <= 0) return;
         if (totalAmt <= 0) return;
 
-        const instDate = inst.date || inst.paymentDate || inst.collection_date || inst.createdAt;
+        const instDate = getTransactionBusinessDate(inst);
         const custDisplayName = cust.name || cust.customerName || 'Customer';
         const centerOrPhone = cust.centerName || cust.center || cust.groupName || '';
         const remarksInfo = centerOrPhone ? `${custDisplayName} (${centerOrPhone})` : custDisplayName;
@@ -2613,7 +2552,7 @@ export default function CashBook({
       if (totalAmt <= 0) return;
 
       const actualPaid = paidAmt > 0 ? paidAmt : totalAmt;
-      const colDate = c.date || c.collectionDate || c.paymentDate || c.createdAt;
+      const colDate = getTransactionBusinessDate(c);
 
       const upiAmt = Number(c.upiAmount || 0);
       const cashAmt = Number(c.cashAmount || 0);
@@ -3694,6 +3633,20 @@ export default function CashBook({
         </div>
       </div>
 
+      {/* ================= LOADING STATE WHILE LIVE STREAMS INITIALIZE ================= */}
+      {!liveDataReady ? (
+        <div className="bg-white rounded-3xl border border-blue-100 shadow-md p-10 flex flex-col items-center justify-center text-center my-2">
+          <div className="relative w-14 h-14 mb-4">
+            <div className="absolute inset-0 rounded-full border-4 border-blue-200 animate-ping opacity-25"></div>
+            <div className="w-14 h-14 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <h3 className="text-lg font-black text-slate-800 tracking-tight">Fetching live branch ledger...</h3>
+          <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-1 max-w-md">
+            Synchronizing real-time collections, disbursements, and account balances across all devices...
+          </p>
+        </div>
+      ) : (
+        <>
       {/* ================= 3. TOP METRIC CARDS (HIGH-CONTRAST VIBRANT 3-COLUMN GRID) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
         {/* Card 1: Opening Balance (Today) - Vibrant Blue S-Curve Wave Header */}
@@ -4360,6 +4313,9 @@ export default function CashBook({
           </div>
         </div>
       </div>
+
+        </>
+      )}
 
       {/* ================= MODAL: ADD INVESTMENT ================= */}
       {isInvestmentModalOpen && (

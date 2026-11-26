@@ -44,13 +44,8 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   const [installments, setInstallments] = useState(() => {
     if (!customer || !customer.id) return [];
-    if (customer.installments && Array.isArray(customer.installments) && customer.installments.length > 0) return customer.installments;
-    try {
-      const saved = localStorage.getItem(`everest_ledger_${customer.id}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
+    if (customer.installments && Array.isArray(customer.installments)) return customer.installments;
+    return [];
   });
 
   useEffect(() => {
@@ -75,20 +70,6 @@ const CustomerDetail = ({ customer, onBack }) => {
 
   useEffect(() => {
     if (customer && customer.id && installments) {
-      localStorage.setItem(`everest_ledger_${customer.id}`, JSON.stringify(installments));
-      try {
-        const saved = localStorage.getItem('everest_customers');
-        if (saved) {
-          const list = JSON.parse(saved);
-          if (Array.isArray(list)) {
-            const idx = list.findIndex(c => c.id === customer.id);
-            if (idx !== -1) {
-              list[idx] = { ...list[idx], installments: installments };
-              localStorage.setItem('everest_customers', JSON.stringify(list));
-            }
-          }
-        }
-      } catch (e) {}
       window.dispatchEvent(new Event('collection-updated'));
       window.dispatchEvent(new Event('customers-updated'));
     }
