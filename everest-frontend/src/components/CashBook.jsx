@@ -904,6 +904,181 @@ export const computeEarliestTransactionDate = ({
   return fallbackDate || new Date();
 };
 
+// ================= MULTI-SELECT COLUMN FILTER POPOVER =================
+const TableColumnFilterDropdown = ({
+  title,
+  isOpen,
+  onClose,
+  options = [], // [{ value, label, count }]
+  selectedValues = [],
+  onToggleValue,
+  onSelectAll,
+  onClear,
+  hasSearch = false,
+  searchPlaceholder = 'Search...',
+  align = 'left'
+}) => {
+  const [internalSearch, setInternalSearch] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setInternalSearch('');
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const filteredOptions = hasSearch && internalSearch.trim()
+    ? options.filter(opt => String(opt.label || opt.value || '').toLowerCase().includes(internalSearch.toLowerCase()))
+    : options;
+
+  const isAllSelected = options.length > 0 && selectedValues.length === options.length;
+
+  const handleToggleSelectAll = () => {
+    if (hasSearch && internalSearch.trim()) {
+      const visibleValues = filteredOptions.map(o => o.value);
+      const allVisibleSelected = visibleValues.length > 0 && visibleValues.every(v => selectedValues.includes(v));
+      if (allVisibleSelected) {
+        onSelectAll(selectedValues.filter(v => !visibleValues.includes(v)));
+      } else {
+        onSelectAll(Array.from(new Set([...selectedValues, ...visibleValues])));
+      }
+    } else {
+      if (isAllSelected) {
+        onClear();
+      } else {
+        onSelectAll(options.map(o => o.value));
+      }
+    }
+  };
+
+  const alignClass = align === 'right' 
+    ? 'right-0' 
+    : align === 'center' 
+      ? 'left-1/2 -translate-x-1/2' 
+      : 'left-0';
+
+  return (
+    <div 
+      className={`filter-popover-container absolute ${alignClass} top-full mt-2 w-64 max-w-[90vw] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[80] overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-left normal-case tracking-normal`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Popover Header */}
+      <div className="px-3 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-black text-slate-800">{title}</span>
+          {selectedValues.length > 0 && (
+            <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded-full">
+              {selectedValues.length}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleToggleSelectAll}
+            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          >
+            {hasSearch && internalSearch.trim() 
+              ? 'Select Visible' 
+              : isAllSelected ? 'Deselect All' : 'Select All'}
+          </button>
+          {selectedValues.length > 0 && (
+            <>
+              <span className="text-slate-300 text-[10px]">•</span>
+              <button
+                type="button"
+                onClick={onClear}
+                className="text-[10px] font-bold text-slate-500 hover:text-slate-700 hover:underline cursor-pointer"
+              >
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Search */}
+      {hasSearch && (
+        <div className="p-2 border-b border-slate-100 bg-white">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={internalSearch}
+              onChange={(e) => setInternalSearch(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+              autoFocus
+            />
+            {internalSearch && (
+              <button
+                type="button"
+                onClick={() => setInternalSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Option Items */}
+      <div className="max-h-56 overflow-y-auto divide-y divide-slate-50 p-1">
+        {filteredOptions.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400 font-medium">
+            No options found
+          </div>
+        ) : (
+          filteredOptions.map((opt) => {
+            const isChecked = selectedValues.includes(opt.value);
+            return (
+              <label
+                key={String(opt.value)}
+                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-xs select-none transition-colors ${
+                  isChecked ? 'bg-blue-50/70 font-bold text-blue-900' : 'text-slate-700 font-medium'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0 pr-1">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => onToggleValue(opt.value)}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="truncate">{opt.label || opt.value}</span>
+                </div>
+                {opt.count !== undefined && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md shrink-0 font-bold ${
+                    isChecked ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {opt.count}
+                  </span>
+                )}
+              </label>
+            );
+          })
+        )}
+      </div>
+
+      {/* Popover Footer */}
+      <div className="p-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px]">
+        <span className="text-slate-500 text-[10px]">
+          {selectedValues.length} of {options.length} selected
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-extrabold cursor-pointer transition active:scale-95"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function CashBook({ 
   activeBranch = { id: 'main', name: 'Main Branch' }, 
   userProfile = null, 
@@ -1193,6 +1368,34 @@ export default function CashBook({
       return {};
     }
   });
+
+  // Transaction Table Column Filters
+  const [selectedTypeFilters, setSelectedTypeFilters] = useState([]);
+  const [selectedAmountFilters, setSelectedAmountFilters] = useState([]);
+  const [selectedRemarkFilters, setSelectedRemarkFilters] = useState([]);
+  const [activeFilterDropdown, setActiveFilterDropdown] = useState(null); // 'type_recent' | 'amount_recent' | 'remarks_recent' | 'type_modal' | 'amount_modal' | 'remarks_modal' | null
+
+  // Outside click & Escape key listener for filter popovers
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (activeFilterDropdown && !e.target.closest('.filter-popover-container')) {
+        setActiveFilterDropdown(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && activeFilterDropdown) {
+        setActiveFilterDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeFilterDropdown]);
 
   // Modals
   const [isInvestmentModalOpen, setIsInvestmentModalOpen] = useState(false);
@@ -2946,10 +3149,109 @@ export default function CashBook({
     firestoreCustomers
   ]);
 
+  // Dynamic Available Options & Counts for Column Filters
+  const availableTypes = useMemo(() => {
+    const set = new Set();
+    allTransactionsList.forEach(tx => {
+      if (tx.type) set.add(tx.type);
+    });
+    return Array.from(set).sort();
+  }, [allTransactionsList]);
+
+  const availableAmounts = useMemo(() => {
+    const set = new Set();
+    allTransactionsList.forEach(tx => {
+      set.add(Number(tx.amount) || 0);
+    });
+    return Array.from(set).sort((a, b) => a - b);
+  }, [allTransactionsList]);
+
+  const availableRemarks = useMemo(() => {
+    const set = new Set();
+    allTransactionsList.forEach(tx => {
+      const r = (tx.remarks || '').trim() || '-';
+      set.add(r);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allTransactionsList]);
+
+  const typeCounts = useMemo(() => {
+    const map = {};
+    allTransactionsList.forEach(tx => {
+      const t = tx.type || 'Other';
+      map[t] = (map[t] || 0) + 1;
+    });
+    return map;
+  }, [allTransactionsList]);
+
+  const amountCounts = useMemo(() => {
+    const map = {};
+    allTransactionsList.forEach(tx => {
+      const a = Number(tx.amount) || 0;
+      map[a] = (map[a] || 0) + 1;
+    });
+    return map;
+  }, [allTransactionsList]);
+
+  const remarkCounts = useMemo(() => {
+    const map = {};
+    allTransactionsList.forEach(tx => {
+      const r = (tx.remarks || '').trim() || '-';
+      map[r] = (map[r] || 0) + 1;
+    });
+    return map;
+  }, [allTransactionsList]);
+
+  // Combined Multi-Select Filtered Transactions (AND across columns, OR within columns)
+  const filteredAllTransactions = useMemo(() => {
+    return allTransactionsList.filter(tx => {
+      if (selectedTypeFilters.length > 0 && !selectedTypeFilters.includes(tx.type)) {
+        return false;
+      }
+      if (selectedAmountFilters.length > 0) {
+        const numAmt = Number(tx.amount) || 0;
+        if (!selectedAmountFilters.includes(numAmt)) {
+          return false;
+        }
+      }
+      if (selectedRemarkFilters.length > 0) {
+        const remarkStr = (tx.remarks || '').trim() || '-';
+        if (!selectedRemarkFilters.includes(remarkStr)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allTransactionsList, selectedTypeFilters, selectedAmountFilters, selectedRemarkFilters]);
+
   // Sliced lists for desktop split containers (up to 20 rows for immediate visibility)
-  const displayedTransactions = allTransactionsList.slice(0, 20);
+  const displayedTransactions = useMemo(() => {
+    return filteredAllTransactions.slice(0, 20);
+  }, [filteredAllTransactions]);
+
   const displayedExpenses = allExpensesList.slice(0, 20);
   const totalExpensesCalculated = allExpensesList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+  const hasActiveFilters = selectedTypeFilters.length > 0 || selectedAmountFilters.length > 0 || selectedRemarkFilters.length > 0;
+  const totalActiveFilterCount = selectedTypeFilters.length + selectedAmountFilters.length + selectedRemarkFilters.length;
+  const isInvestmentFilterActive = selectedTypeFilters.length === 1 && selectedTypeFilters[0] === 'Investment' && selectedAmountFilters.length === 0 && selectedRemarkFilters.length === 0;
+
+  const toggleInvestmentFilter = () => {
+    if (isInvestmentFilterActive) {
+      setSelectedTypeFilters([]);
+    } else {
+      setSelectedTypeFilters(['Investment']);
+      setSelectedAmountFilters([]);
+      setSelectedRemarkFilters([]);
+    }
+  };
+
+  const clearAllFilters = () => {
+    setSelectedTypeFilters([]);
+    setSelectedAmountFilters([]);
+    setSelectedRemarkFilters([]);
+    setActiveFilterDropdown(null);
+  };
 
   // Render Type Badge
   const renderTypeBadge = (type) => {
@@ -3309,11 +3611,31 @@ export default function CashBook({
 
           {/* 4 Distinct Pastel Mini-Pills */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="bg-emerald-100/80 border border-emerald-200 rounded-xl p-2 text-center flex flex-col items-center justify-center">
-              <div className="w-6 h-6 rounded-lg bg-emerald-200/80 text-emerald-800 flex items-center justify-center mb-1">
+            <div 
+              onClick={toggleInvestmentFilter}
+              role="button"
+              tabIndex={0}
+              title={isInvestmentFilterActive ? "Active: Filtering by Investment (Click to show all)" : "Click to filter transactions by Investment"}
+              className={`rounded-xl p-2 text-center flex flex-col items-center justify-center cursor-pointer transition-all duration-200 select-none ${
+                isInvestmentFilterActive
+                  ? 'bg-emerald-200/90 border-2 border-emerald-600 shadow-md ring-2 ring-emerald-500/40 scale-[1.02]'
+                  : 'bg-emerald-100/80 border border-emerald-200 hover:bg-emerald-100/90 hover:border-emerald-300 hover:shadow-2xs active:scale-95'
+              }`}
+            >
+              <div className="w-6 h-6 rounded-lg bg-emerald-200/80 text-emerald-800 flex items-center justify-center mb-1 relative">
                 <Landmark className="w-3.5 h-3.5" />
+                {isInvestmentFilterActive && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-600 border-2 border-white rounded-full animate-pulse" />
+                )}
               </div>
-              <span className="text-[10px] font-bold text-emerald-800/80 block">Investment</span>
+              <span className="text-[10px] font-bold text-emerald-800/80 block flex items-center justify-center gap-1">
+                <span>Investment</span>
+                {isInvestmentFilterActive && (
+                  <span className="text-[8px] bg-emerald-600 text-white rounded px-1 font-black">
+                    Filter ON
+                  </span>
+                )}
+              </span>
               <span className="text-xs sm:text-sm font-black text-emerald-950">{formatCurrency(todayInvestment)}</span>
             </div>
 
@@ -3438,12 +3760,32 @@ export default function CashBook({
           <span className="text-sm font-black text-slate-500 px-1">+</span>
 
           {/* 3. Investment */}
-          <div className="bg-purple-50/90 border border-purple-200 rounded-xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+          <div 
+            onClick={toggleInvestmentFilter}
+            role="button"
+            tabIndex={0}
+            title={isInvestmentFilterActive ? "Active: Filtering by Investment (Click to show all)" : "Click to filter transactions by Investment"}
+            className={`rounded-xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs cursor-pointer transition-all duration-200 select-none ${
+              isInvestmentFilterActive
+                ? 'bg-purple-100 border-2 border-purple-600 shadow-md ring-2 ring-purple-500/40 scale-[1.02]'
+                : 'bg-purple-50/90 border border-purple-200 hover:bg-purple-100/70 hover:border-purple-300 active:scale-95'
+            }`}
+          >
+            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 relative">
               <Landmark className="w-4 h-4" />
+              {isInvestmentFilterActive && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-600 border-2 border-white rounded-full animate-pulse" />
+              )}
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-bold text-purple-800/80 block truncate">Investment</span>
+              <span className="text-[10px] font-bold text-purple-800/80 block truncate flex items-center gap-1">
+                <span>Investment</span>
+                {isInvestmentFilterActive && (
+                  <span className="text-[8px] bg-purple-600 text-white rounded px-1 font-black">
+                    Filter ON
+                  </span>
+                )}
+              </span>
               <span className="text-xs sm:text-sm font-black text-purple-950 block truncate">{formatCurrency(todayInvestment)}</span>
             </div>
           </div>
@@ -3494,13 +3836,24 @@ export default function CashBook({
         {/* Left Container (~58% / 7 cols): Recent Transactions */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3 lg:col-span-7 flex flex-col justify-between overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                 <ClipboardList className="w-3.5 h-3.5 stroke-[2.2]" />
               </div>
               <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
                 Recent Transactions
               </h3>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-[10px] font-bold cursor-pointer transition active:scale-95 shadow-2xs"
+                  title="Clear all active column filters"
+                >
+                  <X className="w-3 h-3 stroke-[2.5]" />
+                  <span>Clear Filters ({totalActiveFilterCount})</span>
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2.5">
               {/* Render Add Particulars strictly for operational sub-branches (hidden in Main Branch) */}
@@ -3524,17 +3877,147 @@ export default function CashBook({
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-100">
+          <div className="overflow-x-auto rounded-xl border border-slate-100 min-h-[320px]">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
                   <th rowSpan={2} className="py-2.5 px-2.5 text-center w-8 align-middle">S.No</th>
                   <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Date</th>
                   <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Particulars</th>
-                  <th rowSpan={2} className="py-2.5 px-2.5 text-center align-middle">Type</th>
+                  <th rowSpan={2} className="py-2.5 px-2 text-center align-middle">
+                    <div className="relative filter-popover-container inline-flex items-center justify-center gap-1">
+                      <span>Type</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveFilterDropdown(activeFilterDropdown === 'type_recent' ? null : 'type_recent');
+                        }}
+                        className={`p-1 rounded-md transition cursor-pointer flex items-center gap-0.5 ${
+                          selectedTypeFilters.length > 0
+                            ? 'bg-blue-100 text-blue-700 font-black ring-1 ring-blue-300'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                        }`}
+                        title="Filter by Type"
+                      >
+                        {selectedTypeFilters.length > 0 && (
+                          <span className="text-[9px] bg-blue-600 text-white rounded-full px-1 py-0.2 font-black leading-none">
+                            {selectedTypeFilters.length}
+                          </span>
+                        )}
+                        <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+                      </button>
+
+                      <TableColumnFilterDropdown
+                        title="Filter by Type"
+                        isOpen={activeFilterDropdown === 'type_recent'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={availableTypes.map(t => ({ value: t, label: t, count: typeCounts[t] || 0 }))}
+                        selectedValues={selectedTypeFilters}
+                        onToggleValue={(val) => {
+                          setSelectedTypeFilters(prev => 
+                            prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
+                          );
+                        }}
+                        onSelectAll={(vals) => setSelectedTypeFilters(vals)}
+                        onClear={() => setSelectedTypeFilters([])}
+                        align="center"
+                      />
+                    </div>
+                  </th>
                   <th colSpan={2} className="py-1.5 px-2 text-center border-l border-r border-b border-slate-200/90 tracking-widest text-[9.5px]">MODE</th>
-                  <th rowSpan={2} className="py-2.5 px-2.5 text-center whitespace-nowrap align-middle">Total Amount (₹)</th>
-                  <th rowSpan={2} className="py-2.5 px-2.5 align-middle">Remarks</th>
+                  <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">
+                    <div className="relative filter-popover-container inline-flex items-center justify-center gap-1">
+                      <span>Total Amount (₹)</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveFilterDropdown(activeFilterDropdown === 'amount_recent' ? null : 'amount_recent');
+                        }}
+                        className={`p-1 rounded-md transition cursor-pointer flex items-center gap-0.5 ${
+                          selectedAmountFilters.length > 0
+                            ? 'bg-blue-100 text-blue-700 font-black ring-1 ring-blue-300'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                        }`}
+                        title="Filter by Total Amount"
+                      >
+                        {selectedAmountFilters.length > 0 && (
+                          <span className="text-[9px] bg-blue-600 text-white rounded-full px-1 py-0.2 font-black leading-none">
+                            {selectedAmountFilters.length}
+                          </span>
+                        )}
+                        <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+                      </button>
+
+                      <TableColumnFilterDropdown
+                        title="Filter by Amount"
+                        isOpen={activeFilterDropdown === 'amount_recent'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={availableAmounts.map(amt => ({ 
+                          value: amt, 
+                          label: formatCurrency(amt), 
+                          count: amountCounts[amt] || 0 
+                        }))}
+                        selectedValues={selectedAmountFilters}
+                        onToggleValue={(val) => {
+                          setSelectedAmountFilters(prev => 
+                            prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
+                          );
+                        }}
+                        onSelectAll={(vals) => setSelectedAmountFilters(vals)}
+                        onClear={() => setSelectedAmountFilters([])}
+                        align="right"
+                      />
+                    </div>
+                  </th>
+                  <th rowSpan={2} className="py-2.5 px-2 align-middle">
+                    <div className="relative filter-popover-container flex items-center justify-between gap-1">
+                      <span>Remarks</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveFilterDropdown(activeFilterDropdown === 'remarks_recent' ? null : 'remarks_recent');
+                        }}
+                        className={`p-1 rounded-md transition cursor-pointer flex items-center gap-0.5 ${
+                          selectedRemarkFilters.length > 0
+                            ? 'bg-blue-100 text-blue-700 font-black ring-1 ring-blue-300'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                        }`}
+                        title="Filter by Remarks"
+                      >
+                        {selectedRemarkFilters.length > 0 && (
+                          <span className="text-[9px] bg-blue-600 text-white rounded-full px-1 py-0.2 font-black leading-none">
+                            {selectedRemarkFilters.length}
+                          </span>
+                        )}
+                        <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+                      </button>
+
+                      <TableColumnFilterDropdown
+                        title="Filter by Remarks"
+                        isOpen={activeFilterDropdown === 'remarks_recent'}
+                        onClose={() => setActiveFilterDropdown(null)}
+                        options={availableRemarks.map(rem => ({ 
+                          value: rem, 
+                          label: rem, 
+                          count: remarkCounts[rem] || 0 
+                        }))}
+                        selectedValues={selectedRemarkFilters}
+                        onToggleValue={(val) => {
+                          setSelectedRemarkFilters(prev => 
+                            prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
+                          );
+                        }}
+                        onSelectAll={(vals) => setSelectedRemarkFilters(vals)}
+                        onClear={() => setSelectedRemarkFilters([])}
+                        hasSearch={true}
+                        searchPlaceholder="Search remarks / customer..."
+                        align="right"
+                      />
+                    </div>
+                  </th>
                 </tr>
                 <tr className="bg-slate-100/80 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200/80">
                   <th className="py-1 px-2.5 text-right whitespace-nowrap border-l border-slate-200/80">Cash (₹)</th>
@@ -3586,7 +4069,23 @@ export default function CashBook({
                 ))}
                 {displayedTransactions.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">No transactions recorded for this period.</td>
+                    <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
+                      {hasActiveFilters ? (
+                        <div className="flex flex-col items-center justify-center gap-2 py-4">
+                          <span className="font-semibold text-slate-600">No transactions match the selected filters.</span>
+                          <button
+                            type="button"
+                            onClick={clearAllFilters}
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Clear All Filters</span>
+                          </button>
+                        </div>
+                      ) : (
+                        'No transactions recorded for this period.'
+                      )}
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -3985,13 +4484,24 @@ export default function CashBook({
       {/* ================= MODAL: VIEW ALL RECENT TRANSACTIONS ================= */}
       {isAllTransactionsModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-blue-50/80 border-b border-blue-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <ClipboardList className="w-5 h-5 text-blue-700" />
                 <h3 className="text-sm font-extrabold text-slate-900">
-                  All Transactions ({allTransactionsList.length})
+                  All Transactions ({filteredAllTransactions.length}{hasActiveFilters ? ` of ${allTransactionsList.length}` : ''})
                 </h3>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-[10px] font-bold cursor-pointer transition active:scale-95 shadow-2xs"
+                    title="Clear all active column filters"
+                  >
+                    <X className="w-3 h-3 stroke-[2.5]" />
+                    <span>Clear Filters ({totalActiveFilterCount})</span>
+                  </button>
+                )}
               </div>
               <button
                 type="button"
@@ -4002,17 +4512,148 @@ export default function CashBook({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="flex-1 overflow-y-auto p-4 min-h-[350px]">
+              <div className="overflow-x-auto min-h-[320px]">
+                <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
                     <th rowSpan={2} className="py-2.5 px-2 text-center w-8 align-middle">S.No</th>
                     <th rowSpan={2} className="py-2.5 px-2 align-middle">Date</th>
                     <th rowSpan={2} className="py-2.5 px-2 align-middle">Particulars</th>
-                    <th rowSpan={2} className="py-2.5 px-2 text-center align-middle">Type</th>
+                    <th rowSpan={2} className="py-2.5 px-2 text-center align-middle">
+                        <div className="relative filter-popover-container inline-flex items-center justify-center gap-1">
+                          <span>Type</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveFilterDropdown(activeFilterDropdown === 'type_modal' ? null : 'type_modal');
+                            }}
+                            className={`p-1 rounded-md transition cursor-pointer flex items-center gap-0.5 ${
+                              selectedTypeFilters.length > 0
+                                ? 'bg-blue-100 text-blue-700 font-black ring-1 ring-blue-300'
+                                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                            }`}
+                            title="Filter by Type"
+                          >
+                            {selectedTypeFilters.length > 0 && (
+                              <span className="text-[9px] bg-blue-600 text-white rounded-full px-1 py-0.2 font-black leading-none">
+                                {selectedTypeFilters.length}
+                              </span>
+                            )}
+                            <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+                          </button>
+
+                          <TableColumnFilterDropdown
+                            title="Filter by Type"
+                            isOpen={activeFilterDropdown === 'type_modal'}
+                            onClose={() => setActiveFilterDropdown(null)}
+                            options={availableTypes.map(t => ({ value: t, label: t, count: typeCounts[t] || 0 }))}
+                            selectedValues={selectedTypeFilters}
+                            onToggleValue={(val) => {
+                              setSelectedTypeFilters(prev => 
+                                prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
+                              );
+                            }}
+                            onSelectAll={(vals) => setSelectedTypeFilters(vals)}
+                            onClear={() => setSelectedTypeFilters([])}
+                            align="center"
+                          />
+                        </div>
+                      </th>
                     <th colSpan={2} className="py-1 px-2 text-center border-l border-r border-b border-slate-200 tracking-widest text-[9.5px]">MODE</th>
-                    <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">Total Amount (₹)</th>
-                    <th rowSpan={2} className="py-2.5 px-2 align-middle">Remarks</th>
+                    <th rowSpan={2} className="py-2.5 px-2 text-center whitespace-nowrap align-middle">
+                        <div className="relative filter-popover-container inline-flex items-center justify-center gap-1">
+                          <span>Total Amount (₹)</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveFilterDropdown(activeFilterDropdown === 'amount_modal' ? null : 'amount_modal');
+                            }}
+                            className={`p-1 rounded-md transition cursor-pointer flex items-center gap-0.5 ${
+                              selectedAmountFilters.length > 0
+                                ? 'bg-blue-100 text-blue-700 font-black ring-1 ring-blue-300'
+                                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                            }`}
+                            title="Filter by Total Amount"
+                          >
+                            {selectedAmountFilters.length > 0 && (
+                              <span className="text-[9px] bg-blue-600 text-white rounded-full px-1 py-0.2 font-black leading-none">
+                                {selectedAmountFilters.length}
+                              </span>
+                            )}
+                            <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+                          </button>
+
+                          <TableColumnFilterDropdown
+                            title="Filter by Amount"
+                            isOpen={activeFilterDropdown === 'amount_modal'}
+                            onClose={() => setActiveFilterDropdown(null)}
+                            options={availableAmounts.map(amt => ({ 
+                              value: amt, 
+                              label: formatCurrency(amt), 
+                              count: amountCounts[amt] || 0 
+                            }))}
+                            selectedValues={selectedAmountFilters}
+                            onToggleValue={(val) => {
+                              setSelectedAmountFilters(prev => 
+                                prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
+                              );
+                            }}
+                            onSelectAll={(vals) => setSelectedAmountFilters(vals)}
+                            onClear={() => setSelectedAmountFilters([])}
+                            align="right"
+                          />
+                        </div>
+                      </th>
+                    <th rowSpan={2} className="py-2.5 px-2 align-middle">
+                        <div className="relative filter-popover-container flex items-center justify-between gap-1">
+                          <span>Remarks</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveFilterDropdown(activeFilterDropdown === 'remarks_modal' ? null : 'remarks_modal');
+                            }}
+                            className={`p-1 rounded-md transition cursor-pointer flex items-center gap-0.5 ${
+                              selectedRemarkFilters.length > 0
+                                ? 'bg-blue-100 text-blue-700 font-black ring-1 ring-blue-300'
+                                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                            }`}
+                            title="Filter by Remarks"
+                          >
+                            {selectedRemarkFilters.length > 0 && (
+                              <span className="text-[9px] bg-blue-600 text-white rounded-full px-1 py-0.2 font-black leading-none">
+                                {selectedRemarkFilters.length}
+                              </span>
+                            )}
+                            <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+                          </button>
+
+                          <TableColumnFilterDropdown
+                            title="Filter by Remarks"
+                            isOpen={activeFilterDropdown === 'remarks_modal'}
+                            onClose={() => setActiveFilterDropdown(null)}
+                            options={availableRemarks.map(rem => ({ 
+                              value: rem, 
+                              label: rem, 
+                              count: remarkCounts[rem] || 0 
+                            }))}
+                            selectedValues={selectedRemarkFilters}
+                            onToggleValue={(val) => {
+                              setSelectedRemarkFilters(prev => 
+                                prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
+                              );
+                            }}
+                            onSelectAll={(vals) => setSelectedRemarkFilters(vals)}
+                            onClear={() => setSelectedRemarkFilters([])}
+                            hasSearch={true}
+                            searchPlaceholder="Search remarks / customer..."
+                            align="right"
+                          />
+                        </div>
+                      </th>
                   </tr>
                   <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 bg-slate-100/70">
                     <th className="py-1 px-2 text-right whitespace-nowrap border-l border-slate-200">Cash (₹)</th>
@@ -4020,7 +4661,7 @@ export default function CashBook({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
-                  {allTransactionsList.map((tx, idx) => (
+                  {filteredAllTransactions.map((tx, idx) => (
                     <tr key={tx.id || idx} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 px-2 text-center text-slate-400 font-bold">{idx + 1}</td>
                       <td className="py-2.5 px-2 whitespace-nowrap text-slate-600 font-bold text-[11px]">{tx.date}</td>
@@ -4062,13 +4703,30 @@ export default function CashBook({
                       </td>
                     </tr>
                   ))}
-                  {allTransactionsList.length === 0 && (
+                  {filteredAllTransactions.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">No transactions found.</td>
+                      <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
+                        {hasActiveFilters ? (
+                          <div className="flex flex-col items-center justify-center gap-2 py-4">
+                            <span className="font-semibold text-slate-600">No transactions match the selected filters.</span>
+                            <button
+                              type="button"
+                              onClick={clearAllFilters}
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Clear All Filters</span>
+                            </button>
+                          </div>
+                        ) : (
+                          'No transactions found.'
+                        )}
+                      </td>
                     </tr>
                   )}
                 </tbody>
               </table>
+            </div>
             </div>
 
             <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex justify-end">
