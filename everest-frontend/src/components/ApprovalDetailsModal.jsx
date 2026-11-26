@@ -12,7 +12,9 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
   const [toastMsg, setToastMsg] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [isNomineeOk, setIsNomineeOk] = useState(false);
-  const [resolvedStaffProfile, setResolvedStaffProfile] = useState(null);
+  const [resolvedPrimaryProfile, setResolvedPrimaryProfile] = useState(null);
+  const [resolvedAssignedProfile, setResolvedAssignedProfile] = useState(null);
+  const resolvedStaffProfile = resolvedAssignedProfile || resolvedPrimaryProfile;
 
   // Admin Staff Assignment State
   const [showStaffDropdown, setShowStaffDropdown] = useState(false);
@@ -25,12 +27,24 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
   const isStaffEmpty = !localApp.staffId || localApp.staffId === 'N/A';
   const canAssignStaff = isAdmin || isStaffEmpty;
 
+  // Ensure centers are available even when opened from CustomerDetail
+  const [internalCenters, setInternalCenters] = useState(centers || []);
+  useEffect(() => {
+    if (centers && centers.length > 0) {
+      setInternalCenters(centers);
+    } else {
+      getDocs(collection(db, 'centers')).then(snap => {
+        setInternalCenters(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }).catch(err => console.error("Error fetching centers in modal:", err));
+    }
+  }, [centers]);
+
   // Sync prop changes
   useEffect(() => {
     setLocalApp(application);
   }, [application]);
 
-  const parentCenter = localApp.centerName ? centers?.find(
+  const parentCenter = localApp.centerName ? internalCenters?.find(
     c => c.centerName?.trim().toLowerCase() === localApp.centerName?.trim().toLowerCase() &&
          (!localApp.branchName || !c.branchName || c.branchName?.trim().toLowerCase() === localApp.branchName?.trim().toLowerCase())
   ) : null;
@@ -42,7 +56,7 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
 
   const resolvedLeaderName = React.useMemo(() => {
     if (localApp.centerId || localApp.centerName) {
-      const parent = centers?.find(c => 
+      const parent = internalCenters?.find(c => 
         (localApp.centerId && c.id === localApp.centerId) ||
         (c.centerName && localApp.centerName && c.centerName.trim().toLowerCase() === localApp.centerName.trim().toLowerCase())
       );
@@ -51,11 +65,11 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
       }
     }
     return localApp.centerLeaderName || localApp.leaderName || '--';
-  }, [localApp, centers]);
+  }, [localApp, internalCenters]);
 
   const resolvedLeaderCustomerId = React.useMemo(() => {
     if (localApp.centerId || localApp.centerName) {
-      const parent = centers?.find(c => 
+      const parent = internalCenters?.find(c => 
         (localApp.centerId && c.id === localApp.centerId) ||
         (c.centerName && localApp.centerName && c.centerName.trim().toLowerCase() === localApp.centerName.trim().toLowerCase())
       );
@@ -64,111 +78,246 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
       }
     }
     return localApp.leaderCustomerId || '--';
-  }, [localApp, centers]);
+  }, [localApp, internalCenters]);
 
   useEffect(() => {
-    const staffName = parentCenter?.staffName || 
-      (typeof localApp.staffName === 'string' && localApp.staffName !== 'Staff Unassigned' && localApp.staffName !== 'Unassigned' && localApp.staffName.trim() ? localApp.staffName : null) ||
-      (typeof localApp.assignedStaff === 'string' && localApp.assignedStaff.trim() ? localApp.assignedStaff : null) ||
-      localApp.staff?.name ||
-      localApp.assignedStaff?.name ||
+    // 1. Identify Primary Staff identifiers
+    const primaryName = (
+      localApp.primary_staff ||
+      localApp.primaryStaff ||
+      localApp.primaryStaffName ||
+      parentCenter?.staffName ||
       localApp.createdByStaffName ||
-      localApp.centerStaffName ||
-      '';
+      localApp.staffName ||
+      ''
+    ).trim();
 
-    const staffId = parentCenter?.staffId || localApp.staffId || localApp.staff?.id || '';
+    const primaryId = (
+      localApp.primary_staff_id ||
+      localApp.primaryStaffId ||
+      parentCenter?.staffId ||
+      (localApp.primary_staff || localApp.primaryStaff ? '' : (localApp.createdByStaffId || localApp.staffId)) ||
+      ''
+    ).trim();
 
-    if (!staffName && !staffId) {
-      setResolvedStaffProfile(null);
-      return;
-    }
+    // 2. Identify Assigned / Temporary Staff identifiers
+    const assignedName = (
+      localApp.assigned_staff ||
+      localApp.assignedStaff ||
+      localApp.assignedStaffName ||
+      ''
+    ).trim();
 
-    const fetchStaffProfile = async () => {
+    const assignedId = (
+      localApp.assigned_staff_id ||
+      localApp.assignedStaffId ||
+      ''
+    ).trim();
+
+    const rawAssignedDate = localApp.assigned_date || localApp.assignedDate || localApp.assignedAt || '';
+
+    const fetchProfiles = async () => {
       try {
         const staffRef = collection(db, 'staff');
-        
-        let foundProfile = null;
-        if (staffId) {
-          const qId = query(staffRef, where('staffId', '==', staffId));
-          const snap = await getDocs(qId);
-          if (!snap.empty) {
-             foundProfile = snap.docs[0].data();
-          } else {
-             const qId2 = query(staffRef, where('employeeId', '==', staffId));
-             const snap2 = await getDocs(qId2);
-             if (!snap2.empty) foundProfile = snap2.docs[0].data();
-          }
-        }
-        
-        if (!foundProfile && staffName) {
-          const qName = query(staffRef, where('name', '==', staffName));
-          const snap = await getDocs(qName);
-          if (!snap.empty) {
-             foundProfile = snap.docs[0].data();
-          } else {
-             const qDisplayName = query(staffRef, where('displayName', '==', staffName));
-             const snap2 = await getDocs(qDisplayName);
-             if (!snap2.empty) foundProfile = snap2.docs[0].data();
-          }
-        }
+        const snap = await getDocs(staffRef);
+        const allStaff = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
 
-        if (foundProfile) {
-          setResolvedStaffProfile(foundProfile);
+        // Populate active staffList
+        const activeStaff = allStaff.filter(s => s.status !== 'Inactive' && s.status !== 'Recycled');
+        const branchStaff = localApp.branchName 
+          ? activeStaff.filter(s => !s.branch || s.branch === 'All' || s.branch.toLowerCase() === localApp.branchName.toLowerCase())
+          : activeStaff;
+        setStaffList(branchStaff.length > 0 ? branchStaff : activeStaff);
+
+        const findStaff = (id, name) => {
+          if (id) {
+            const foundById = allStaff.find(s => 
+              String(s.staffId || s.employeeId || s.customId || s.id || '').trim().toLowerCase() === String(id).trim().toLowerCase()
+            );
+            if (foundById) return foundById;
+          }
+          if (name) {
+            const foundByName = allStaff.find(s =>
+              String(s.name || s.displayName || '').trim().toLowerCase() === String(name).trim().toLowerCase()
+            );
+            if (foundByName) return foundByName;
+          }
+          return null;
+        };
+
+        // Resolve Primary Profile
+        const primaryMatch = findStaff(primaryId, primaryName);
+        if (primaryMatch) {
+          setResolvedPrimaryProfile({
+            name: primaryMatch.name || primaryMatch.displayName || primaryName || 'Unassigned',
+            staffId: primaryMatch.staffId || primaryMatch.employeeId || primaryMatch.customId || primaryId || 'N/A',
+            designation: primaryMatch.designation || primaryMatch.jobRole || primaryMatch.role || localApp.primaryStaffDesignation || parentCenter?.staffDesignation || localApp.staffDesignation || 'Collection Agent',
+            phone: primaryMatch.phone || primaryMatch.contactNumber || primaryMatch.contactNo || localApp.primaryStaffContact || parentCenter?.staffContact || localApp.staffContact || 'N/A'
+          });
         } else {
-          setResolvedStaffProfile({
-             name: staffName || 'Unassigned',
-             staffId: staffId || 'N/A',
-             designation: localApp.staffDesignation || 'Collection Agent',
-             phone: localApp.staffContact || 'N/A'
+          setResolvedPrimaryProfile({
+            name: primaryName || 'Unassigned',
+            staffId: primaryId || 'N/A',
+            designation: localApp.primaryStaffDesignation || parentCenter?.staffDesignation || localApp.staffDesignation || 'Collection Agent',
+            phone: localApp.primaryStaffContact || parentCenter?.staffContact || localApp.staffContact || 'N/A'
           });
         }
-      } catch(err) {
-        console.error("Error fetching staff profile", err);
-        setResolvedStaffProfile({
-           name: staffName || 'Unassigned',
-           staffId: staffId || 'N/A',
-           designation: localApp.staffDesignation || 'Collection Agent',
-           phone: localApp.staffContact || 'N/A'
-        });
-      }
-    };
-    fetchStaffProfile();
-  }, [localApp, parentCenter?.staffName]);
 
-  useEffect(() => {
-    if (canAssignStaff && showStaffDropdown && staffList.length === 0) {
-      const fetchStaff = async () => {
-        try {
-          const staffRef = collection(db, 'staff');
-          const q = localApp.branchName ? query(staffRef, where('branch', '==', localApp.branchName)) : staffRef;
-          const snap = await getDocs(q);
-          const list = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
-          // filter active only
-          setStaffList(list.filter(s => s.status !== 'Inactive'));
-        } catch(err) {
-          console.error("Error fetching staff", err);
+        // Resolve Assigned Profile
+        if (assignedName || assignedId) {
+          const assignedMatch = findStaff(assignedId, assignedName);
+          const formattedAssignedDate = rawAssignedDate 
+            ? formatDate(rawAssignedDate) 
+            : (localApp.lastUpdated ? formatDate(localApp.lastUpdated) : (localApp.updatedAt ? formatDate(localApp.updatedAt) : '25-11-2026'));
+
+          if (assignedMatch) {
+            setResolvedAssignedProfile({
+              name: assignedMatch.name || assignedMatch.displayName || assignedName,
+              staffId: assignedMatch.staffId || assignedMatch.employeeId || assignedMatch.customId || assignedId || 'N/A',
+              designation: assignedMatch.designation || assignedMatch.jobRole || assignedMatch.role || localApp.assignedStaffDesignation || 'Collection Agent',
+              phone: assignedMatch.phone || assignedMatch.contactNumber || assignedMatch.contactNo || localApp.assignedStaffContact || 'N/A',
+              assignedDate: formattedAssignedDate
+            });
+          } else {
+            setResolvedAssignedProfile({
+              name: assignedName,
+              staffId: assignedId || 'N/A',
+              designation: localApp.assignedStaffDesignation || localApp.staffDesignation || 'Collection Agent',
+              phone: localApp.assignedStaffContact || localApp.staffContact || 'N/A',
+              assignedDate: formattedAssignedDate
+            });
+          }
+        } else {
+          setResolvedAssignedProfile(null);
+        }
+      } catch (err) {
+        console.error("Error fetching staff profiles:", err);
+        setResolvedPrimaryProfile({
+          name: primaryName || 'Unassigned',
+          staffId: primaryId || 'N/A',
+          designation: localApp.primaryStaffDesignation || parentCenter?.staffDesignation || localApp.staffDesignation || 'Collection Agent',
+          phone: localApp.primaryStaffContact || parentCenter?.staffContact || localApp.staffContact || 'N/A'
+        });
+
+        if (assignedName || assignedId) {
+          setResolvedAssignedProfile({
+            name: assignedName,
+            staffId: assignedId || 'N/A',
+            designation: localApp.assignedStaffDesignation || localApp.staffDesignation || 'Collection Agent',
+            phone: localApp.assignedStaffContact || localApp.staffContact || 'N/A',
+            assignedDate: rawAssignedDate ? formatDate(rawAssignedDate) : '25-11-2026'
+          });
+        } else {
+          setResolvedAssignedProfile(null);
         }
       }
-      fetchStaff();
-    }
-  }, [canAssignStaff, showStaffDropdown, localApp.branchName]);
+    };
+
+    fetchProfiles();
+  }, [localApp, parentCenter?.staffName, parentCenter?.staffId]);
 
   const handleAssignStaff = async (staffMember) => {
     try {
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      const formattedDate = `${dd}-${mm}-${yyyy}`;
+
+      // Resolve primary staff first to preserve it untouched
+      const primaryName = (
+        localApp.primary_staff ||
+        localApp.primaryStaff ||
+        localApp.primaryStaffName ||
+        resolvedPrimaryProfile?.name ||
+        parentCenter?.staffName ||
+        localApp.createdByStaffName ||
+        localApp.staffName ||
+        'N/A'
+      ).trim();
+
+      const primaryId = (
+        localApp.primary_staff_id ||
+        localApp.primaryStaffId ||
+        resolvedPrimaryProfile?.staffId ||
+        parentCenter?.staffId ||
+        (localApp.primary_staff || localApp.primaryStaff ? '' : (localApp.createdByStaffId || localApp.staffId)) ||
+        'N/A'
+      ).trim();
+
+      const primaryDesignation = (
+        localApp.primary_staff_designation ||
+        localApp.primaryStaffDesignation ||
+        resolvedPrimaryProfile?.designation ||
+        parentCenter?.staffDesignation ||
+        localApp.staffDesignation ||
+        'Collection Agent'
+      ).trim();
+
+      const primaryContact = (
+        localApp.primary_staff_contact ||
+        localApp.primaryStaffContact ||
+        resolvedPrimaryProfile?.phone ||
+        parentCenter?.staffContact ||
+        localApp.staffContact ||
+        'N/A'
+      ).trim();
+
+      // New assigned staff info from selected staffMember
+      const newAssignedName = (staffMember.name || staffMember.displayName || '').trim();
+      const newAssignedId = (staffMember.staffId || staffMember.employeeId || staffMember.customId || staffMember.id || '').trim();
+      const newAssignedDesignation = staffMember.designation || staffMember.jobRole || staffMember.subRole || staffMember.role || 'Collection Agent';
+      const newAssignedContact = staffMember.phone || staffMember.contactNumber || staffMember.contactNo || '';
+
       const payload = {
-        staffId: staffMember.staffId || staffMember.employeeId || staffMember.customId || staffMember.id || '',
-        assignedStaff: staffMember.name || staffMember.displayName || '',
-        staffDesignation: staffMember.designation || staffMember.jobRole || staffMember.subRole || staffMember.role || 'Collection Agent',
-        staffContact: staffMember.phone || staffMember.contactNumber || ''
+        // Preserved Primary Staff
+        primary_staff: primaryName,
+        primaryStaff: primaryName,
+        primaryStaffName: primaryName,
+        primary_staff_id: primaryId,
+        primaryStaffId: primaryId,
+        primary_staff_designation: primaryDesignation,
+        primaryStaffDesignation: primaryDesignation,
+        primary_staff_contact: primaryContact,
+        primaryStaffContact: primaryContact,
+
+        // Newly Assigned Staff + Date
+        assigned_staff: newAssignedName,
+        assignedStaff: newAssignedName,
+        assignedStaffName: newAssignedName,
+        assigned_staff_id: newAssignedId,
+        assignedStaffId: newAssignedId,
+        assigned_staff_designation: newAssignedDesignation,
+        assignedStaffDesignation: newAssignedDesignation,
+        assigned_staff_contact: newAssignedContact,
+        assignedStaffContact: newAssignedContact,
+        assigned_date: formattedDate,
+        assignedDate: formattedDate,
+        assignedAt: today.toISOString()
       };
-      
+
       const appRef = doc(db, 'customers', localApp.id);
       await updateDoc(appRef, payload);
-      
+
+      // Instant state update for immediate UI feedback
       setLocalApp(prev => ({ ...prev, ...payload }));
+      setResolvedPrimaryProfile(prev => prev || {
+        name: primaryName,
+        staffId: primaryId,
+        designation: primaryDesignation,
+        phone: primaryContact
+      });
+      setResolvedAssignedProfile({
+        name: newAssignedName,
+        staffId: newAssignedId || 'N/A',
+        designation: newAssignedDesignation,
+        phone: newAssignedContact || 'N/A',
+        assignedDate: formattedDate
+      });
       setShowStaffDropdown(false);
       setToastMsg('Staff assigned successfully!');
       setTimeout(() => setToastMsg(''), 3000);
+      window.dispatchEvent(new Event('customers-updated'));
     } catch(err) {
       console.error("Assign staff error:", err);
       setToastMsg('Failed to assign staff.');
@@ -372,6 +521,17 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
   const aadhar = application.aadhaar || '000000001234';
   const maskedAadhar = `****${aadhar.slice(-4)}`;
 
+  const hasAssignedStaff = Boolean(
+    resolvedAssignedProfile?.name &&
+    (
+      !resolvedPrimaryProfile?.name ||
+      resolvedAssignedProfile.name.trim().toLowerCase() !== resolvedPrimaryProfile.name.trim().toLowerCase() ||
+      (resolvedAssignedProfile.staffId && resolvedPrimaryProfile?.staffId && 
+       resolvedAssignedProfile.staffId !== 'N/A' && resolvedPrimaryProfile.staffId !== 'N/A' &&
+       resolvedAssignedProfile.staffId.trim().toLowerCase() !== resolvedPrimaryProfile.staffId.trim().toLowerCase())
+    )
+  );
+
   const infoRows = [
     {
       id: 'loanDetails',
@@ -390,7 +550,9 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
     {
       id: 'staff',
       title: 'Staff',
-      subtitle: `Staff Name : ${resolvedStaffProfile?.name || resolvedStaffProfile?.displayName || 'N/A'}`,
+      subtitle: hasAssignedStaff
+        ? `Assigned : ${resolvedAssignedProfile?.name || 'N/A'}`
+        : `Staff Name : ${resolvedPrimaryProfile?.name || 'N/A'}`,
       icon: <User size={20} className="text-rose-500" />,
       bg: 'bg-rose-100',
     },
@@ -683,14 +845,14 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
                   {showStaffDropdown && (
                     <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
                       <div className="max-h-60 overflow-y-auto p-1">
-                        {staffList.length > 0 ? staffList.map(staff => (
+                        {staffList.length > 0 ? staffList.map((staff, idx) => (
                           <button
-                            key={staff.id}
+                            key={staff.docId || staff.id || staff.staffId || idx}
                             onClick={() => handleAssignStaff(staff)}
                             className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg flex flex-col transition-colors border-b border-slate-50 last:border-0"
                           >
                             <span className="font-bold text-slate-800 text-[14px]">{staff.name || staff.displayName}</span>
-                            <span className="text-slate-500 text-[12px] font-medium">{staff.staffId || staff.employeeId || staff.customId || staff.id} &bull; {staff.designation || staff.role}</span>
+                            <span className="text-slate-500 text-[12px] font-medium">{staff.staffId || staff.employeeId || staff.customId || staff.id || '--'} &bull; {staff.designation || staff.jobRole || staff.role || 'Collection Agent'}</span>
                           </button>
                         )) : (
                           <div className="p-3 text-center text-slate-500 text-sm font-medium">Loading staff...</div>
@@ -702,32 +864,79 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
               )}
             </div>
 
-            <div className="space-y-3.5 text-[14px] text-slate-800 font-medium tracking-tight relative">
+            <div className="space-y-4 text-[14px] text-slate-800 font-medium tracking-tight relative pb-4">
               {showStaffDropdown && (
                  <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowStaffDropdown(false)} />
               )}
-              <div className="space-y-3 py-2 text-sm">
-                <div className="grid grid-cols-[140px_10px_1fr] items-center">
-                  <span className="font-semibold text-gray-700">Staff ID</span>
-                  <span>:</span>
-                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.staffId || resolvedStaffProfile?.customId || resolvedStaffProfile?.employeeId || parentCenter?.staffId || localApp.staffId || 'N/A'}</span>
+
+              {/* 1. TOP BLOCK: PRIMARY / ORIGINAL STAFF (OG STAFF) */}
+              <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-3 border-b border-slate-200/70 pb-2">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700 uppercase tracking-wider">
+                    PRIMARY STAFF
+                  </span>
                 </div>
-                <div className="grid grid-cols-[140px_10px_1fr] items-center">
-                  <span className="font-semibold text-gray-700">Staff Name</span>
-                  <span>:</span>
-                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.name || resolvedStaffProfile?.displayName || localApp.staffName || localApp.assignedStaff || 'N/A'}</span>
-                </div>
-                <div className="grid grid-cols-[140px_10px_1fr] items-center">
-                  <span className="font-semibold text-gray-700">Designation</span>
-                  <span>:</span>
-                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.designation || localApp.staffDesignation || 'Collection Agent'}</span>
-                </div>
-                <div className="grid grid-cols-[140px_10px_1fr] items-center">
-                  <span className="font-semibold text-gray-700">Contact No</span>
-                  <span>:</span>
-                  <span className="font-medium text-gray-900">{resolvedStaffProfile?.phone || resolvedStaffProfile?.contactNo || localApp.staffContact || 'N/A'}</span>
+                <div className="space-y-2.5 text-sm">
+                  <div className="grid grid-cols-[130px_10px_1fr] items-center">
+                    <span className="font-semibold text-slate-600">Staff ID</span>
+                    <span className="text-slate-400">:</span>
+                    <span className="font-bold text-slate-900">{resolvedPrimaryProfile?.staffId || 'N/A'}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_10px_1fr] items-center">
+                    <span className="font-semibold text-slate-600">Staff Name</span>
+                    <span className="text-slate-400">:</span>
+                    <span className="font-bold text-slate-900">{resolvedPrimaryProfile?.name || 'N/A'}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_10px_1fr] items-center">
+                    <span className="font-semibold text-slate-600">Designation</span>
+                    <span className="text-slate-400">:</span>
+                    <span className="font-medium text-slate-800">{resolvedPrimaryProfile?.designation || 'Collection Agent'}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_10px_1fr] items-center">
+                    <span className="font-semibold text-slate-600">Contact No</span>
+                    <span className="text-slate-400">:</span>
+                    <span className="font-medium text-slate-800">{resolvedPrimaryProfile?.phone || 'N/A'}</span>
+                  </div>
                 </div>
               </div>
+
+              {/* 2. BOTTOM BLOCK: TEMPORARY / ASSIGNED STAFF (HIGHLIGHTED ACTIVE CARD) */}
+              {hasAssignedStaff && (
+                <div className="bg-teal-50/70 border border-teal-500 rounded-2xl p-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="flex items-center justify-between mb-3 border-b border-teal-200/80 pb-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-600 text-white uppercase tracking-wider shadow-xs">
+                      TEMPORARY / ASSIGNED
+                    </span>
+                    {resolvedAssignedProfile?.assignedDate && (
+                      <span className="text-[12px] font-bold text-teal-800 bg-teal-100/90 px-2.5 py-0.5 rounded-md border border-teal-200">
+                        Assigned Date: {resolvedAssignedProfile.assignedDate}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2.5 text-sm">
+                    <div className="grid grid-cols-[130px_10px_1fr] items-center">
+                      <span className="font-semibold text-teal-900/80">Staff ID</span>
+                      <span className="text-teal-600">:</span>
+                      <span className="font-bold text-slate-900">{resolvedAssignedProfile?.staffId || 'N/A'}</span>
+                    </div>
+                    <div className="grid grid-cols-[130px_10px_1fr] items-center">
+                      <span className="font-semibold text-teal-900/80">Staff Name</span>
+                      <span className="text-teal-600">:</span>
+                      <span className="font-bold text-teal-950 text-[15px]">{resolvedAssignedProfile?.name || 'N/A'}</span>
+                    </div>
+                    <div className="grid grid-cols-[130px_10px_1fr] items-center">
+                      <span className="font-semibold text-teal-900/80">Designation</span>
+                      <span className="text-teal-600">:</span>
+                      <span className="font-medium text-slate-800">{resolvedAssignedProfile?.designation || 'Collection Agent'}</span>
+                    </div>
+                    <div className="grid grid-cols-[130px_10px_1fr] items-center">
+                      <span className="font-semibold text-teal-900/80">Contact No</span>
+                      <span className="text-teal-600">:</span>
+                      <span className="font-medium text-slate-800">{resolvedAssignedProfile?.phone || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
