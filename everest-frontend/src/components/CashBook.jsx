@@ -281,6 +281,10 @@ const resolveExpenseRemarks = (exp) => {
 export const isCustomerActive = (cust) => {
   if (!cust || typeof cust !== 'object') return false;
 
+  // 0. Defunct branch guard: strictly exclude deleted Gullapuram branch
+  const custBranch = String(cust.branch || cust.branchName || cust.branchId || '').toLowerCase().trim();
+  if (custBranch.includes('gullapuram')) return false;
+
   // 1. Explicit deletion boolean flags
   if (
     cust.isDeleted === true ||
@@ -362,38 +366,6 @@ export const isCustomerActive = (cust) => {
   if (cId.includes('anitha') || cId.includes('seetha')) {
     return false;
   }
-
-  // 7. Check localStorage deleted registry and recycle bin
-  try {
-    const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
-    const cleanName = name.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
-
-    const savedDel = localStorage.getItem('everest_deleted_customers');
-    if (savedDel) {
-      const parsed = JSON.parse(savedDel);
-      if (Array.isArray(parsed)) {
-        for (const d of parsed) {
-          const dId = String(d?.id || d?.customerId || '').trim();
-          const dName = String(d?.name || d?.customerName || '').toLowerCase().replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
-          if (cId && dId && cId === dId) return false;
-          if (cleanName && dName && (cleanName === dName || (cleanName.includes('anitha') && dName.includes('anitha')) || (cleanName.includes('seetha') && dName.includes('seetha')))) return false;
-        }
-      }
-    }
-
-    const savedRec = localStorage.getItem('everest_recycle_bin');
-    if (savedRec) {
-      const parsed = JSON.parse(savedRec);
-      if (Array.isArray(parsed)) {
-        for (const r of parsed) {
-          const rId = String(r?.id || r?.customerId || '').trim();
-          const rName = String(r?.name || r?.customerName || '').toLowerCase().replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
-          if (cId && rId && cId === rId) return false;
-          if (cleanName && rName && (cleanName === rName || (cleanName.includes('anitha') && rName.includes('anitha')) || (cleanName.includes('seetha') && rName.includes('seetha')))) return false;
-        }
-      }
-    }
-  } catch (_e) {}
 
   return true;
 };
@@ -482,8 +454,6 @@ export const filterPaidInst = (arr) => (arr || []).filter(i => {
   ) return false;
   if (String(i.mode || '').toUpperCase().trim() === 'BOUNCED') return false;
   const totalAmt = Number(i.amount || i.paidAmount || (Number(i.cashAmount || 0) + Number(i.upiAmount || 0)) || 0);
-  const paidAmt = Number(i.paidAmount ?? i.paid_amount ?? (st === 'PAID' ? totalAmt : 0));
-  if ((st === 'DUE' || st === 'PENDING' || st === 'UNPAID') && paidAmt <= 0) return false;
   return totalAmt > 0;
 });
 
@@ -538,130 +508,8 @@ export const mergeCustomerIntoMap = (targetMap, c) => {
   targetMap.set(cKey, merged);
 };
 
-// Canonical Gullapuram Master Baseline (Ground Truth: Mr. Sundar Auto disbursed 08-OCT-2026 for ₹ 22,500 Cash)
-// Matches Collection Report 1:1 strictly with actual paid receipts
-export const GULLAPURAM_CANONICAL_CUSTOMERS = [
-  {
-    id: 'cust_gullapuram_sundar_auto',
-    customerId: 'CUST-GUL-001',
-    name: 'Mr. Sundar Auto',
-    customerName: 'Mr. Sundar Auto',
-    phone: '9842100001',
-    branch: 'Gullapuram',
-    branchName: 'Gullapuram',
-    branchId: 'branch_gullapuram',
-    loanType: 'Daily Loan',
-    loanAmount: 22500,
-    disbursedAmount: 22500,
-    disbursementMode: 'Cash',
-    paymentMode: 'Cash',
-    status: 'Approved',
-    loanStatus: 'Active',
-    disbursedAt: '08-10-2026',
-    disbursedDate: '08-10-2026',
-    disbursementDate: '08-10-2026',
-    loanApprovedDate: '08-10-2026',
-    date: '08-10-2026',
-    createdAt: '08-10-2026',
-    remarks: 'Disbursement entry',
-    repayAmount: 25000,
-    perDayAmount: 250,
-    installments: [
-      {
-        id: 'inst_gul_sundar_09_10',
-        number: 1,
-        date: '09-10-2026',
-        paymentDate: '09-10-2026',
-        amount: 250,
-        paidAmount: 250,
-        cashAmount: 250,
-        upiAmount: 0,
-        mode: 'Cash',
-        paymentMode: 'Cash',
-        status: 'PAID'
-      },
-      {
-        id: 'inst_gul_sundar_11_10_1',
-        number: 2,
-        date: '11-10-2026',
-        paymentDate: '11-10-2026',
-        amount: 150,
-        paidAmount: 150,
-        cashAmount: 150,
-        upiAmount: 0,
-        mode: 'Cash',
-        paymentMode: 'Cash',
-        status: 'PAID'
-      },
-      {
-        id: 'inst_gul_sundar_11_10_2',
-        number: 3,
-        date: '11-10-2026',
-        paymentDate: '11-10-2026',
-        amount: 100,
-        paidAmount: 100,
-        cashAmount: 100,
-        upiAmount: 0,
-        mode: 'Cash',
-        paymentMode: 'Cash',
-        status: 'PAID'
-      },
-      {
-        id: 'inst_gul_sundar_13_10',
-        number: 4,
-        date: '13-10-2026',
-        paymentDate: '13-10-2026',
-        amount: 500,
-        paidAmount: 500,
-        cashAmount: 500,
-        upiAmount: 0,
-        mode: 'Cash',
-        paymentMode: 'Cash',
-        status: 'PAID'
-      },
-      {
-        id: 'inst_gul_sundar_14_10',
-        number: 5,
-        date: '14-10-2026',
-        paymentDate: '14-10-2026',
-        amount: 250,
-        paidAmount: 250,
-        cashAmount: 250,
-        upiAmount: 0,
-        mode: 'Cash',
-        paymentMode: 'Cash',
-        status: 'PAID'
-      },
-      {
-        id: 'inst_gul_sundar_15_10',
-        number: 6,
-        date: '15-10-2026',
-        paymentDate: '15-10-2026',
-        amount: 250,
-        paidAmount: 250,
-        cashAmount: 250,
-        upiAmount: 0,
-        mode: 'Cash',
-        paymentMode: 'Cash',
-        status: 'PAID'
-      },
-      {
-        id: 'inst_gul_sundar_16_10',
-        number: 7,
-        date: '16-10-2026',
-        paymentDate: '16-10-2026',
-        amount: 250,
-        paidAmount: 250,
-        cashAmount: 100,
-        upiAmount: 150,
-        mode: 'Split',
-        paymentMode: 'Split',
-        isSplit: true,
-        status: 'PAID'
-      }
-    ]
-  }
-];
+// Canonical Gullapuram Master Baseline: Purged permanently (Gullapuram is deleted)
+export const GULLAPURAM_CANONICAL_CUSTOMERS = [];
 
 // Comprehensive Earliest Transaction Date Computation:
 // Scans across ALL active transactions: disbursements (debit outflows), collections (credits), expenses, and investments.
@@ -682,10 +530,12 @@ export const computeEarliestTransactionDate = ({
   const allTimestamps = [];
 
   const matchesBranch = (entity) => {
-    if (!targetBranchId && !targetBranchName) return true;
     if (!entity) return false;
     const bId = String(entity.branchId || entity.branchCode || '').toLowerCase().trim();
     const bName = String(entity.branch || entity.branchName || entity.assignedBranch || '').toLowerCase().trim();
+    // Strictly exclude deleted Gullapuram branch
+    if (bName.includes('gullapuram') || bId.includes('gullapuram')) return false;
+    if (!targetBranchId && !targetBranchName) return true;
     const tName = String(targetBranchName || '').toLowerCase().trim();
     const tId = String(targetBranchId || '').toLowerCase().trim();
     if (tName === 'all' || tName === 'all branches' || tName === 'enterprise' || tId === 'all') return true;
@@ -702,11 +552,6 @@ export const computeEarliestTransactionDate = ({
     // Synonyms for Andipatti / Aundipatti
     if ((tName.includes('andipatti') || tId.includes('andipatti') || tName.includes('aundipatti') || tId.includes('aundipatti')) &&
         (bName.includes('andipatti') || bId.includes('andipatti') || bName.includes('aundipatti') || bId.includes('aundipatti'))) {
-      return true;
-    }
-    // Synonyms for Gullapuram / Kullapuram
-    if ((tName.includes('kullapuram') || tId.includes('kullapuram') || tName.includes('gullapuram') || tId.includes('gullapuram')) &&
-        (bName.includes('kullapuram') || bId.includes('kullapuram') || bName.includes('gullapuram') || bId.includes('gullapuram'))) {
       return true;
     }
     return false;
@@ -1197,7 +1042,7 @@ export default function CashBook({
     String(activeBranch?.name || '').toLowerCase() === 'main branch' ||
     String(activeBranch?.name || '').toLowerCase() === 'main';
 
-  // Sub-branch admin or permitted staff (e.g. Gullapuram, Batlagundu, Andipatti): locked strictly to their assigned branch
+  // Sub-branch admin or permitted staff (e.g. Batlagundu, Andipatti, Kullapuram): locked strictly to their assigned branch
   const isSubBranchStaff = !isSuperAdmin;
 
   // Show branch selector filter: Only Super Admin when viewing the top-level Main Branch enterprise container.
@@ -1216,6 +1061,7 @@ export default function CashBook({
       const bName = String(b.name || b.branchName || b.id || '').trim();
       const bIdLower = bId.toLowerCase();
       const bNameLower = bName.toLowerCase();
+      if (bNameLower.includes('gullapuram') || bIdLower.includes('gullapuram')) return;
       if (bNameLower === 'main branch' || bNameLower === 'main' || bIdLower === 'main' || bNameLower === 'all' || bNameLower.includes('all branches')) return;
       
       if (!seen.has(bIdLower) && !seen.has(bNameLower)) {
@@ -1226,13 +1072,6 @@ export default function CashBook({
     };
 
     (branches || []).forEach(addBranch);
-    try {
-      const saved = localStorage.getItem('everest_branches') || localStorage.getItem('branches');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) parsed.forEach(addBranch);
-      }
-    } catch (e) {}
 
     return [
       { id: 'main', name: 'Main Branch', isEnterprise: true, description: 'Consolidated Inflows/Outflows across all sub-branches' },
@@ -1298,6 +1137,8 @@ export default function CashBook({
     if (typeof item === 'string') {
       const s = item.toLowerCase().trim();
       if (!s) return false;
+      // Defunct branch guard: strictly exclude deleted Gullapuram branch
+      if (s.includes('gullapuram')) return false;
       if (s === 'all' || s === 'all branches' || s === 'enterprise' || s === 'main' || s === 'main branch') return true;
       if (s === sel || s === selName ||
         (sel && (s.includes(sel) || sel.includes(s))) ||
@@ -1312,10 +1153,6 @@ export default function CashBook({
           (s.includes('andipatti') || s.includes('aundipatti'))) {
         return true;
       }
-      if ((sel.includes('kullapuram') || selName.includes('kullapuram') || sel.includes('gullapuram') || selName.includes('gullapuram')) &&
-          (s.includes('kullapuram') || s.includes('gullapuram'))) {
-        return true;
-      }
       return false;
     }
 
@@ -1323,13 +1160,18 @@ export default function CashBook({
     const bName = String(item.branchName || item.assignedBranch || '').toLowerCase().trim();
     const bId = String(item.branchId || item.branchCode || '').toLowerCase().trim();
 
+    // Defunct branch guard: strictly exclude deleted Gullapuram branch
+    if (b.includes('gullapuram') || bName.includes('gullapuram') || bId.includes('gullapuram')) {
+      return false;
+    }
+
     if (
       (sel && (b === sel || bName === sel || bId === sel)) ||
       (selName && (b === selName || bName === selName || bId === selName)) ||
       (sel && b && (b.includes(sel) || sel.includes(b))) ||
       (sel && bId && (bId.includes(sel) || sel.includes(bId))) ||
       (selName && b && (b.includes(selName) || selName.includes(b))) ||
-      (selName && bName && (bName.includes(selName) || selName.includes(bName)))
+      (selName && bName && (bName.includes(selName) || selName.includes(b)))
     ) {
       return true;
     }
@@ -1345,13 +1187,6 @@ export default function CashBook({
     if ((sel.includes('andipatti') || selName.includes('andipatti') || sel.includes('aundipatti') || selName.includes('aundipatti')) &&
         (b.includes('andipatti') || bName.includes('andipatti') || bId.includes('andipatti') ||
          b.includes('aundipatti') || bName.includes('aundipatti') || bId.includes('aundipatti'))) {
-      return true;
-    }
-
-    // Synonyms for Gullapuram / Kullapuram
-    if ((sel.includes('kullapuram') || selName.includes('kullapuram') || sel.includes('gullapuram') || selName.includes('gullapuram')) &&
-        (b.includes('kullapuram') || bName.includes('kullapuram') || bId.includes('kullapuram') ||
-         b.includes('gullapuram') || bName.includes('gullapuram') || bId.includes('gullapuram'))) {
       return true;
     }
 
@@ -1412,37 +1247,7 @@ export default function CashBook({
 
   const [openingBalances, setOpeningBalances] = useState({});
 
-  // Real-time Data Stream Tracking for Unified Cross-Device Consistency
-  const [streamLoaded, setStreamLoaded] = useState({
-    investments: false,
-    expenses: false,
-    particulars: false,
-    loans: false,
-    disbursements: false,
-    collections: false,
-    customers: false
-  });
-  const [liveDataReady, setLiveDataReady] = useState(false);
-
-  useEffect(() => {
-    if (Array.isArray(customers) && customers.length > 0) {
-      setStreamLoaded(prev => ({ ...prev, customers: true }));
-    }
-  }, [customers]);
-
-  useEffect(() => {
-    if (Object.values(streamLoaded).every(Boolean)) {
-      setLiveDataReady(true);
-    }
-  }, [streamLoaded]);
-
-  // Fallback network safety timer so UI never blocks indefinitely
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLiveDataReady(true);
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, []);
+  // Immediate Reactive Rendering - No Blocking Buffer
 
   // Transaction Table Column Filters
   const [selectedTypeFilters, setSelectedTypeFilters] = useState([]);
@@ -1541,13 +1346,10 @@ export default function CashBook({
       unsub = onSnapshot(collection(db, 'investments'), (snapshot) => {
         const list = snapshot.docs.map(d => ({ ...d.data(), id: d.data()?.id || d.id, firestoreId: d.id }));
         setInvestments(list);
-        setStreamLoaded(prev => ({ ...prev, investments: true }));
       }, (err) => {
         console.warn('Investments listener notice:', err);
-        setStreamLoaded(prev => ({ ...prev, investments: true }));
       });
     } catch (e) {
-      setStreamLoaded(prev => ({ ...prev, investments: true }));
     }
     return () => unsub();
   }, [investmentsKey]);
@@ -1559,13 +1361,10 @@ export default function CashBook({
       unsub = onSnapshot(collection(db, 'expansion_expenses'), (snapshot) => {
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         setLiveExpenses(list);
-        setStreamLoaded(prev => ({ ...prev, expenses: true }));
       }, (err) => {
         console.warn('Expansion expenses listener notice in CashBook:', err);
-        setStreamLoaded(prev => ({ ...prev, expenses: true }));
       });
     } catch (e) {
-      setStreamLoaded(prev => ({ ...prev, expenses: true }));
     }
     return () => unsub();
   }, []);
@@ -1577,13 +1376,10 @@ export default function CashBook({
       unsub = onSnapshot(collection(db, 'cashbook_particulars'), (snapshot) => {
         const list = snapshot.docs.map(d => ({ ...d.data(), id: d.data()?.id || d.id, firestoreId: d.id }));
         setManualParticulars(list);
-        setStreamLoaded(prev => ({ ...prev, particulars: true }));
       }, (err) => {
         console.warn('Particulars listener notice in CashBook:', err);
-        setStreamLoaded(prev => ({ ...prev, particulars: true }));
       });
     } catch (e) {
-      setStreamLoaded(prev => ({ ...prev, particulars: true }));
     }
     return () => unsub();
   }, [particularsKey]);
@@ -1596,13 +1392,10 @@ export default function CashBook({
       unsub = onSnapshot(collection(db, 'loans'), (snapshot) => {
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         setFirestoreLoans(list);
-        setStreamLoaded(prev => ({ ...prev, loans: true }));
       }, (err) => {
         console.warn('Loans listener notice in CashBook:', err);
-        setStreamLoaded(prev => ({ ...prev, loans: true }));
       });
     } catch (e) {
-      setStreamLoaded(prev => ({ ...prev, loans: true }));
     }
     return () => unsub();
   }, []);
@@ -1615,13 +1408,10 @@ export default function CashBook({
       unsub = onSnapshot(collection(db, 'loan_disbursements'), (snapshot) => {
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         setFirestoreDisbursements(list);
-        setStreamLoaded(prev => ({ ...prev, disbursements: true }));
       }, (err) => {
         console.warn('Disbursements listener notice in CashBook:', err);
-        setStreamLoaded(prev => ({ ...prev, disbursements: true }));
       });
     } catch (e) {
-      setStreamLoaded(prev => ({ ...prev, disbursements: true }));
     }
     return () => unsub();
   }, []);
@@ -1634,13 +1424,10 @@ export default function CashBook({
       unsub = onSnapshot(collection(db, 'collections'), (snapshot) => {
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         setFirestoreCollections(list);
-        setStreamLoaded(prev => ({ ...prev, collections: true }));
       }, (err) => {
         console.warn('Collections listener notice in CashBook:', err);
-        setStreamLoaded(prev => ({ ...prev, collections: true }));
       });
     } catch (e) {
-      setStreamLoaded(prev => ({ ...prev, collections: true }));
     }
     return () => unsub();
   }, []);
@@ -1653,13 +1440,10 @@ export default function CashBook({
       unsub = onSnapshot(collection(db, 'customers'), (snapshot) => {
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         setFirestoreCustomers(list);
-        setStreamLoaded(prev => ({ ...prev, customers: true }));
       }, (err) => {
         console.warn('Customers listener notice in CashBook:', err);
-        setStreamLoaded(prev => ({ ...prev, customers: true }));
       });
     } catch (e) {
-      setStreamLoaded(prev => ({ ...prev, customers: true }));
     }
     return () => unsub();
   }, []);
@@ -2164,37 +1948,14 @@ export default function CashBook({
     const deletedCustomerNames = new Set();
 
     const customerMap = new Map();
-    // 1. First inject GULLAPURAM_CANONICAL_CUSTOMERS
-    GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => mergeCustomerIntoMap(customerMap, c));
-    // 2. Add props customers (live from Firestore)
+    // 1. Add props customers (live from Firestore)
     if (Array.isArray(customers)) {
       customers.forEach(c => mergeCustomerIntoMap(customerMap, c));
     }
-    // 3. Add direct firestoreCustomers stream
+    // 2. Add direct firestoreCustomers stream
     if (Array.isArray(firestoreCustomers)) {
       firestoreCustomers.forEach(c => mergeCustomerIntoMap(customerMap, c));
     }
-
-    // Ensure Sundar Auto has canonical disbursements and verified ground truth receipts
-    Array.from(customerMap.values()).forEach(c => {
-      const cName = String(c.name || c.customerName || '').toLowerCase();
-      if (cName.includes('sundar') && cName.includes('auto')) {
-        c.disbursedAt = c.disbursedAt || '08-10-2026';
-        c.disbursedDate = c.disbursedDate || '08-10-2026';
-        c.loanApprovedDate = c.loanApprovedDate || '08-10-2026';
-        c.disbursedAmount = c.disbursedAmount || 22500;
-        c.loanAmount = c.loanAmount || 22500;
-
-        const liveInst = c.installments;
-        const paidInst = filterPaidInst(liveInst || []);
-        if (paidInst.length > 0) {
-          c.installments = liveInst;
-        } else {
-          // Strictly lock to canonical verified ground truth receipts matching Collection Report 1:1 if no live edits exist
-          c.installments = GULLAPURAM_CANONICAL_CUSTOMERS[0].installments;
-        }
-      }
-    });
 
     const rawCustomerSource = Array.from(customerMap.values());
 
@@ -2218,37 +1979,6 @@ export default function CashBook({
         if (cleanName) deletedCustomerNames.add(cleanName);
       }
     });
-
-    // Also inspect known deleted records from local storage if any
-    try {
-      const savedDeleted = localStorage.getItem('everest_deleted_customers');
-      if (savedDeleted) {
-        const parsedDel = JSON.parse(savedDeleted);
-        if (Array.isArray(parsedDel)) {
-          parsedDel.forEach(dc => {
-            const dcId = String(dc.id || dc.customerId || '').trim();
-            const dcName = String(dc.name || dc.customerName || '').toLowerCase().trim().replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
-            if (dcId) deletedCustomerIds.add(dcId);
-            if (dcName) deletedCustomerNames.add(dcName);
-          });
-        }
-      }
-    } catch (e) {}
-
-    try {
-      const savedRecycled = localStorage.getItem('everest_recycle_bin');
-      if (savedRecycled) {
-        const parsedRec = JSON.parse(savedRecycled);
-        if (Array.isArray(parsedRec)) {
-          parsedRec.forEach(rc => {
-            const rcId = String(rc.id || rc.customerId || '').trim();
-            const rcName = String(rc.name || rc.customerName || '').toLowerCase().trim().replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
-            if (rcId) deletedCustomerIds.add(rcId);
-            if (rcName) deletedCustomerNames.add(rcName);
-          });
-        }
-      }
-    } catch (e) {}
 
     deletedCustomerNames.add('anitha');
     deletedCustomerNames.add('seetha');
@@ -2405,9 +2135,6 @@ export default function CashBook({
       const candInst = cust.installments || cust.ledger || cust.transactions || cust.history || [];
 
       let rawInstallments = filterPaidInst(candInst);
-      if (rawInstallments.length === 0 && cleanCustName.includes('sundar') && cleanCustName.includes('auto')) {
-        rawInstallments = GULLAPURAM_CANONICAL_CUSTOMERS[0].installments;
-      }
 
       (rawInstallments || []).forEach((inst, idx) => {
         if (!inst || typeof inst !== 'object') return;
@@ -2425,8 +2152,6 @@ export default function CashBook({
         if (String(inst.mode || '').toUpperCase().trim() === 'BOUNCED') return;
 
         const totalAmt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
-        const paidAmt = Number(inst.paidAmount ?? inst.paid_amount ?? (rawStatus === 'PAID' ? totalAmt : 0));
-        if ((rawStatus === 'DUE' || rawStatus === 'PENDING' || rawStatus === 'UNPAID') && paidAmt <= 0) return;
         if (totalAmt <= 0) return;
 
         const instDate = getTransactionBusinessDate(inst);
@@ -2434,7 +2159,7 @@ export default function CashBook({
         const centerOrPhone = cust.centerName || cust.center || cust.groupName || '';
         const remarksInfo = centerOrPhone ? `${custDisplayName} (${centerOrPhone})` : custDisplayName;
 
-        const actualPaid = paidAmt > 0 ? paidAmt : totalAmt;
+        const actualPaid = totalAmt;
 
         const upiAmt = Number(inst.upiAmount || 0);
         const cashAmt = Number(inst.cashAmount || 0);
@@ -2517,6 +2242,9 @@ export default function CashBook({
       const isDeleted = c.isDeleted === true || c.deleted === true || c.is_deleted === true || c.deletedAt || c.deleted_at;
       if (isDeleted) return;
 
+      const colBranch = String(c.branch || c.branchName || c.branchId || '').toLowerCase();
+      if (colBranch.includes('gullapuram')) return; // Strictly exclude deleted Gullapuram branch
+
       const cId = String(c.customerId || c.customer_id || c.userId || c.cust_id || '').trim();
       const cName = String(c.customerName || c.name || c.customer_name || '').trim().toLowerCase();
       const cleanCName = cName.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
@@ -2530,7 +2258,6 @@ export default function CashBook({
       if (cId && activeCustomerIds.size > 0 && !activeCustomerIds.has(cId)) return;
 
       // Andipatti branch guard: strictly purge deleted customer Seetha and orphaned transactions
-      const colBranch = String(c.branch || c.branchName || '').toLowerCase();
       if (colBranch.includes('andi')) {
         if (cleanCName === 'seetha' || cleanCName.includes('seetha')) return;
         if (cId && activeCustomerIds.size > 0 && !activeCustomerIds.has(cId)) return;
@@ -2547,11 +2274,9 @@ export default function CashBook({
       if (String(c.mode || '').toUpperCase().trim() === 'BOUNCED') return;
 
       const totalAmt = Number(c.amount || c.paidAmount || (Number(c.cashAmount || 0) + Number(c.upiAmount || 0)) || 0);
-      const paidAmt = Number(c.paidAmount ?? c.paid_amount ?? (rawStatus === 'PAID' ? totalAmt : 0));
-      if ((rawStatus === 'DUE' || rawStatus === 'PENDING' || rawStatus === 'UNPAID') && paidAmt <= 0) return;
       if (totalAmt <= 0) return;
 
-      const actualPaid = paidAmt > 0 ? paidAmt : totalAmt;
+      const actualPaid = totalAmt;
       const colDate = getTransactionBusinessDate(c);
 
       const upiAmt = Number(c.upiAmount || 0);
@@ -2643,8 +2368,6 @@ export default function CashBook({
 
       const isNotDeleted = !record.is_deleted && !record.deleted && !record.isDeleted;
       const totalAmt = Number(record.amount || record.paidAmount || (Number(record.cashAmount || 0) + Number(record.upiAmount || 0)) || 0);
-      const paidAmt = Number(record.paidAmount ?? record.paid_amount ?? (rawStatus === 'PAID' ? totalAmt : 0));
-      if ((rawStatus === 'DUE' || rawStatus === 'PENDING' || rawStatus === 'UNPAID') && paidAmt <= 0) return;
       if (totalAmt <= 0 || !isNotDeleted) return;
 
       const normCust = String(record.customerName || record.name || record.customer_id || '')
@@ -3633,20 +3356,6 @@ export default function CashBook({
         </div>
       </div>
 
-      {/* ================= LOADING STATE WHILE LIVE STREAMS INITIALIZE ================= */}
-      {!liveDataReady ? (
-        <div className="bg-white rounded-3xl border border-blue-100 shadow-md p-10 flex flex-col items-center justify-center text-center my-2">
-          <div className="relative w-14 h-14 mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-blue-200 animate-ping opacity-25"></div>
-            <div className="w-14 h-14 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <h3 className="text-lg font-black text-slate-800 tracking-tight">Fetching live branch ledger...</h3>
-          <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-1 max-w-md">
-            Synchronizing real-time collections, disbursements, and account balances across all devices...
-          </p>
-        </div>
-      ) : (
-        <>
       {/* ================= 3. TOP METRIC CARDS (HIGH-CONTRAST VIBRANT 3-COLUMN GRID) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
         {/* Card 1: Opening Balance (Today) - Vibrant Blue S-Curve Wave Header */}
@@ -4314,10 +4023,7 @@ export default function CashBook({
         </div>
       </div>
 
-        </>
-      )}
-
-      {/* ================= MODAL: ADD INVESTMENT ================= */}
+{/* ================= MODAL: ADD INVESTMENT ================= */}
       {isInvestmentModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">

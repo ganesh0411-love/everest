@@ -613,6 +613,7 @@ export default function CollectionReportModal({
       if (cName.includes('anitha') || cName.includes('seetha')) return false;
       const custBranchId = String(customer.branchId || customer.branchCode || '').toLowerCase().trim();
       const custBranchName = String(customer.branch || customer.branchName || '').toLowerCase().trim();
+      if (custBranchName.includes('gullapuram') || custBranchId.includes('gullapuram')) return false;
 
       if (isBranchFilterMode) {
         // Main Branch mode: user is filtering by sub-branches via multi-select checkboxes
