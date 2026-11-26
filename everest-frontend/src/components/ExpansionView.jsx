@@ -23,7 +23,12 @@ import {
   Image as ImageIcon,
   Eye,
   X,
-  CheckCircle2
+  CheckCircle2,
+  BarChart3,
+  TrendingUp,
+  LayoutGrid,
+  FileText,
+  Search
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -185,6 +190,38 @@ const deduplicateExpenses = (items) => {
 };
 
 const INITIAL_EXPENSES = [];
+
+// ================= 3D EXPENSE WALLET EMBLEM (MATCHING REFERENCE 1001025700) =================
+const ExpenseWallet3D = () => (
+  <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 select-none pointer-events-none drop-shadow-sm">
+    <defs>
+      <linearGradient id="expWalletBody" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#2563EB" />
+        <stop offset="100%" stopColor="#1D4ED8" />
+      </linearGradient>
+      <linearGradient id="expCoinFace" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#FEF08A" />
+        <stop offset="50%" stopColor="#F59E0B" />
+        <stop offset="100%" stopColor="#D97706" />
+      </linearGradient>
+      <linearGradient id="expWalletFlap" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#3B82F6" />
+        <stop offset="100%" stopColor="#60A5FA" />
+      </linearGradient>
+    </defs>
+    {/* Golden Coin emerging from wallet */}
+    <circle cx="24" cy="15" r="9" fill="url(#expCoinFace)" stroke="#FBBF24" strokeWidth="1" />
+    <circle cx="24" cy="15" r="6.5" fill="none" stroke="#D97706" strokeWidth="0.8" strokeDasharray="2 1" />
+    <text x="24" y="19" fontSize="9" fontWeight="900" fill="#78350F" textAnchor="middle">₹</text>
+    {/* Wallet Main Body */}
+    <rect x="6" y="17" width="36" height="25" rx="6" fill="url(#expWalletBody)" stroke="#1E40AF" strokeWidth="1" />
+    {/* Wallet Card Flap */}
+    <path d="M 6 22 C 16 26, 32 26, 42 22 L 42 26 C 32 30, 16 30, 6 26 Z" fill="url(#expWalletFlap)" opacity="0.6" />
+    {/* Leather Clasp */}
+    <rect x="28" y="25" width="14" height="9" rx="4.5" fill="#1E3A8A" stroke="#60A5FA" strokeWidth="0.8" />
+    <circle cx="38" cy="29.5" r="2" fill="#FBBF24" />
+  </svg>
+);
 
 export default function ExpansionView({ 
   activeBranch = { id: 'main', name: 'Main Branch' }, 
@@ -1129,332 +1166,393 @@ export default function ExpansionView({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f0f4f9] text-slate-800 p-4 sm:p-6 lg:p-8 space-y-5 overflow-x-hidden">
-      {/* 1. Header Row */}
-      <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
-        <div className="flex flex-wrap items-center gap-3">
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              title="Back to Dashboard"
-              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-2xs cursor-pointer active:scale-95 transition"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-          <div className="flex flex-wrap items-baseline gap-2.5">
-            <h1 className="text-2xl lg:text-3xl font-black text-[#1e293b] tracking-tight">
-              Expenses
-            </h1>
-            <span className="text-xs sm:text-sm text-slate-500 font-medium">
-              Manage Operational Expenses & Outflows
-            </span>
-          </div>
+    <div className="w-full min-h-screen bg-[#f1f5f9] text-slate-800 p-4 sm:p-6 lg:p-7 space-y-4 overflow-x-hidden">
+      {/* ================= 1. VIBRANT ROYAL BLUE HERO BANNER (MATCHING REFERENCE 1001025700) ================= */}
+      <div className="page-header relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0B3B8C] via-[#124CBC] to-[#1D63DC] p-4 sm:p-5 text-white shadow-xl">
+        {/* Subtle decorative background wave highlights */}
+        <div className="absolute -right-16 -top-24 w-72 h-72 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        <div className="absolute right-1/4 -bottom-20 w-80 h-32 rounded-full bg-cyan-400/15 blur-xl pointer-events-none" />
 
-          {/* Contextual Role-Based Branch & Staff Filters */}
-          {(showBranchFilter || showStaffFilter) && (
-            <div className="flex items-center gap-2 ml-1">
-              {showBranchFilter && (
-                <div className="relative">
-                  <select
-                    value={selectedBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
-                    className="appearance-none bg-white border border-slate-200 hover:border-slate-300 rounded-xl px-3 py-1.5 pr-7 text-xs font-bold text-slate-700 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
-                    title="Filter Expenses by Branch"
-                  >
-                    <option value="all">All Branches</option>
-                    {availableBranches.map(b => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              )}
-
-              {showStaffFilter && (
-                <div className="relative">
-                  <select
-                    value={selectedStaff}
-                    onChange={(e) => setSelectedStaff(e.target.value)}
-                    className="appearance-none bg-white border border-slate-200 hover:border-slate-300 rounded-xl px-3 py-1.5 pr-7 text-xs font-bold text-slate-700 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
-                    title="Filter Expenses by Staff"
-                  >
-                    <option value="All Staff">
-                      {isBranchManager ? "Filter Staff: All Staff" : "All Staff"}
-                    </option>
-                    {availableStaffList.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              )}
-            </div>
-          )}
+        {/* Sweeping organic wave ribbon highlight */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="absolute right-0 top-0 w-3/4 h-full opacity-30">
+            <path
+              d="M 0,200 C 300,140 450,20 750,60 C 860,75 930,35 1000,10 L 1000,200 Z"
+              fill="url(#expHeroCyanWaveGrad)"
+            />
+            <defs>
+              <linearGradient id="expHeroCyanWaveGrad" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0%" stopColor="#06B6D4" stopOpacity="0" />
+                <stop offset="40%" stopColor="#38BDF8" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="#93C5FD" stopOpacity="0.75" />
+              </linearGradient>
+            </defs>
+          </svg>
         </div>
 
-        {/* Top-Right Badges & Prominent Home Button */}
-        <div className="flex items-center gap-3 self-end sm:self-auto">
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700">
-            <Calendar className="w-3.5 h-3.5 text-blue-600" />
-            <span>{headerDateBadgeText} <span className="text-slate-400 font-normal">(Generated)</span></span>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Left: Back Button, 3D Wallet Emblem, Title & Subtitle */}
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                title="Back to Dashboard"
+                className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white shadow-xs cursor-pointer active:scale-95 transition shrink-0"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center shrink-0 ring-2 ring-white/30">
+              <ExpenseWallet3D />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">
+                Expenses
+              </h1>
+              <span className="hidden sm:inline text-white/40 font-light text-lg">|</span>
+              <p className="text-xs sm:text-sm font-semibold text-blue-100/90 tracking-wide">
+                Manage Operational Expenses & Outflows
+              </p>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onHome || onBack}
-            title="Go to Home"
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-2xs cursor-pointer active:scale-95 transition text-xs font-extrabold"
-          >
-            <Home className="w-4 h-4 stroke-[2.5]" />
-            <span>Home</span>
-          </button>
+          {/* Right: Staff Dropdown, Date Pill & Home Button */}
+          <div className="flex items-center gap-2.5 flex-wrap self-end md:self-auto">
+            {/* Contextual Role-Based Branch & Staff Filters */}
+            {(showBranchFilter || showStaffFilter) && (
+              <div className="flex items-center gap-2">
+                {showBranchFilter && (
+                  <div className="relative">
+                    <select
+                      value={selectedBranchId}
+                      onChange={(e) => setSelectedBranchId(e.target.value)}
+                      className="appearance-none bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold py-2 pl-8 pr-7 rounded-2xl shadow-xs backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer transition"
+                    >
+                      <option value="all" className="text-slate-900 bg-white">All Branches</option>
+                      {availableBranches.map(b => (
+                        <option key={b.id} value={b.id} className="text-slate-900 bg-white">{b.name}</option>
+                      ))}
+                    </select>
+                    <Building2 className="w-3.5 h-3.5 text-blue-200 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <ChevronDown className="w-3.5 h-3.5 text-blue-200 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                )}
+
+                {showStaffFilter && (
+                  <div className="relative">
+                    <select
+                      value={selectedStaff}
+                      onChange={(e) => setSelectedStaff(e.target.value)}
+                      className="appearance-none bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold py-2 pl-8 pr-7 rounded-2xl shadow-xs backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer transition"
+                    >
+                      <option value="All Staff" className="text-slate-900 bg-white">
+                        {isBranchManager ? "Filter Staff: All Staff" : "All Staff"}
+                      </option>
+                      {availableStaffList.map(s => (
+                        <option key={s} value={s} className="text-slate-900 bg-white">{s}</option>
+                      ))}
+                    </select>
+                    <User className="w-3.5 h-3.5 text-blue-200 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <ChevronDown className="w-3.5 h-3.5 text-blue-200 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Generated Date Pill */}
+            <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white/15 border border-white/25 shadow-xs backdrop-blur-md text-xs font-bold text-white">
+              <Calendar className="w-3.5 h-3.5 text-blue-200 shrink-0" />
+              <span>
+                {headerDateBadgeText}
+                <span className="text-blue-200/90 font-medium ml-1">(Generated)</span>
+              </span>
+            </div>
+
+            {/* Prominent White Home Button */}
+            <button
+              type="button"
+              onClick={onHome || onBack}
+              title="Go to Home"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-white hover:bg-blue-50 text-blue-700 shadow-md cursor-pointer active:scale-95 transition text-xs font-black"
+            >
+              <Home className="w-4 h-4 stroke-[2.5]" />
+              <span>Home</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 2. Main Content Split: Left (~76%) Operations & Table | Right (~24%) Calendar & History */}
+      {/* ================= 2. MAIN CONTENT SPLIT: LEFT (~76%) & RIGHT (~24%) ================= */}
       <div className="flex flex-col lg:flex-row gap-3.5 items-start w-full">
         {/* ================= LEFT ~76%: SUMMARY, CONTROLS & PRIMARY EXPENSE TABLE ================= */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3.5">
-          {/* Top Sub-Row: Filter Period (5 cols) & Summary (7 cols) */}
+        <div className="flex-1 min-w-0 flex flex-col gap-3.5 w-full">
+          {/* Top Sub-Row: Filter Period (md:col-span-5) & Summary (md:col-span-7) */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-stretch">
-            {/* Slot 1: Filter Period Panel with Inline Category & Mode Dropdowns */}
-            <div className="md:col-span-5 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between gap-2 h-full">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
+            {/* Slot 1: Filter Period Panel */}
+            <div className="md:col-span-5 bg-white rounded-3xl border border-blue-200/80 shadow-md overflow-hidden flex flex-col justify-between">
+              <div className="bg-gradient-to-r from-[#0C53C4] via-[#1864D8] to-[#2183E6] px-4 py-2.5 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                    <Filter className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-black text-white tracking-tight">
+                    Filter Period
+                  </h3>
+                </div>
+                <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 border border-white/25 backdrop-blur-md text-[10px] font-black text-white capitalize shadow-2xs">
+                  <Calendar className="w-2.5 h-2.5" />
+                  <span>{activePreset}</span>
+                </div>
               </div>
-              <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
-                Filter Period
-              </h3>
-            </div>
-            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full capitalize">
-              {activePreset}
-            </span>
-          </div>
 
-          {/* Row 1: Preset Pills: [ Today ] [ Yesterday ] [ Last Week ] [ Last Month ] */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {['Today', 'Yesterday', 'Last Week', 'Last Month'].map(preset => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => handlePresetClick(preset)}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  activePreset === preset
-                    ? 'bg-blue-600 text-white shadow-2xs font-black'
-                    : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
-                }`}
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
+              <div className="p-3.5 space-y-2.5 flex flex-col justify-between flex-1 bg-white">
+                {/* Row 1: Preset Pills */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {['Today', 'Yesterday', 'Last Week', 'Last Month'].map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handlePresetClick(preset)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 ${
+                        activePreset === preset
+                          ? 'bg-blue-600 text-white shadow-xs font-black'
+                          : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
 
-          {/* Row 2: [ Custom ]  From: [ DD/MM/YYYY ]  To: [ DD/MM/YYYY ] */}
-          <div className="flex items-center gap-1.5 w-full">
-            {/* Custom Pill */}
-            <button
-              type="button"
-              onClick={() => handlePresetClick('Custom')}
-              className={`px-2 py-1 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
-                activePreset === 'Custom'
-                  ? 'bg-blue-600 text-white shadow-2xs font-black'
-                  : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
-              }`}
-            >
-              Custom
-            </button>
+                {/* Row 2: Custom Date Inputs */}
+                <div className="flex items-center gap-1.5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => handlePresetClick('Custom')}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 active:scale-95 ${
+                      activePreset === 'Custom'
+                        ? 'bg-blue-600 text-white shadow-xs font-black'
+                        : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
+                    }`}
+                  >
+                    Custom
+                  </button>
 
-            {/* From Date */}
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-0.5 flex-1 min-w-0">
-              <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">From:</span>
-              <input
-                type="date"
-                value={formatDateToYmd(fromDate)}
-                onChange={(e) => handleCustomDateChange('from', e.target.value)}
-                className="w-full bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
-              />
-            </div>
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 flex-1 min-w-0 shadow-2xs">
+                    <Calendar className="w-3 h-3 text-blue-600 shrink-0" />
+                    <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">From:</span>
+                    <input
+                      type="date"
+                      value={formatDateToYmd(fromDate)}
+                      onChange={(e) => handleCustomDateChange('from', e.target.value)}
+                      className="w-full bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
+                    />
+                  </div>
 
-            {/* To Date */}
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-0.5 flex-1 min-w-0">
-              <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">To:</span>
-              <input
-                type="date"
-                value={formatDateToYmd(toDate)}
-                onChange={(e) => handleCustomDateChange('to', e.target.value)}
-                className="w-full bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
-              />
-            </div>
-          </div>
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 flex-1 min-w-0 shadow-2xs">
+                    <Calendar className="w-3 h-3 text-blue-600 shrink-0" />
+                    <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">To:</span>
+                    <input
+                      type="date"
+                      value={formatDateToYmd(toDate)}
+                      onChange={(e) => handleCustomDateChange('to', e.target.value)}
+                      className="w-full bg-transparent text-[11px] font-bold text-slate-800 outline-none cursor-pointer"
+                    />
+                  </div>
+                </div>
 
-          {/* Row 3: Category & Mode Dropdowns */}
-          <div className="flex items-center gap-1.5 w-full">
-            {/* Inline Category Dropdown */}
-            <div className="relative flex-1 min-w-0">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2 py-0.5 text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer truncate h-[28px]"
-              >
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
+                {/* Row 3: Category & Mode Dropdowns */}
+                <div className="flex items-center gap-2 w-full">
+                  <div className="relative flex-1 min-w-0">
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl pl-8 pr-7 py-1.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer truncate shadow-2xs"
+                    >
+                      {CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <LayoutGrid className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
 
-            {/* Inline Mode Dropdown */}
-            <div className="relative w-[100px] shrink-0">
-              <select
-                value={selectedMode}
-                onChange={(e) => setSelectedMode(e.target.value)}
-                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2 py-0.5 text-[11px] font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer h-[28px]"
-              >
-                <option value="All Modes">All Modes</option>
-                <option value="Cash">Cash</option>
-                <option value="UPI">UPI</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-            {/* Slot 2: Summary (Expense) Card */}
-            <div className="md:col-span-7 bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between gap-2.5 h-full">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
-            <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Receipt className="w-3.5 h-3.5 stroke-[2.2]" />
-            </div>
-            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
-              {card1Title}
-            </h3>
-          </div>
-
-          {/* 3 Metric Cards with 2-Line Label Wrapping (Zero Truncation) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            {/* 1. Total Expense */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5 sm:gap-3 hover:bg-slate-50 transition shadow-2xs">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0">
-                <Coins className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
-              </div>
-              <div className="min-w-0 flex flex-col justify-center">
-                <span className="text-[11px] font-bold text-slate-500 leading-tight block">
-                  Total<br />Expense
-                </span>
-                <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                  {formatCurrency(periodMetrics.total)}
-                </span>
+                  <div className="relative w-[120px] shrink-0">
+                    <select
+                      value={selectedMode}
+                      onChange={(e) => setSelectedMode(e.target.value)}
+                      className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl pl-7 pr-7 py-1.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 cursor-pointer shadow-2xs"
+                    >
+                      <option value="All Modes">All Modes</option>
+                      <option value="Cash">Cash</option>
+                      <option value="UPI">UPI</option>
+                    </select>
+                    <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* 2. Expense from Cash */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5 sm:gap-3 hover:bg-slate-50 transition shadow-2xs">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
-                <Wallet className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
-              </div>
-              <div className="min-w-0 flex flex-col justify-center">
-                <span className="text-[11px] font-bold text-slate-500 leading-tight block">
-                  Expense from<br />Cash
-                </span>
-                <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                  {formatCurrency(periodMetrics.cash)}
-                </span>
-              </div>
-            </div>
+            {/* Slot 2: Summary (Expense) Card with Emerald S-Curve Wave Header */}
+            <div className="md:col-span-7 bg-white rounded-3xl border border-emerald-200/80 shadow-md overflow-hidden flex flex-col justify-between">
+              <div className="relative text-white overflow-hidden">
+                <div className="bg-gradient-to-r from-[#0A7E3E] via-[#159648] to-[#22B559] px-4 py-2.5 text-white flex items-center justify-between relative">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                      <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+                    <h3 className="text-xs sm:text-sm font-black text-white tracking-tight">
+                      {card1Title}
+                    </h3>
+                  </div>
+                </div>
 
-            {/* 3. Expense through UPI */}
-            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5 sm:gap-3 hover:bg-slate-50 transition shadow-2xs">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0">
-                <Smartphone className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
-              </div>
-              <div className="min-w-0 flex flex-col justify-center">
-                <span className="text-[11px] font-bold text-slate-500 leading-tight block">
-                  Expense through<br />UPI
-                </span>
-                <span className="text-base sm:text-lg font-black text-slate-900 block whitespace-nowrap tracking-tight mt-0.5">
-                  {formatCurrency(periodMetrics.online)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Dedicated Floating Action Toolbar: Title, Subtitle, Date Sort, Total Badge, and Add Expense Button */}
-      <div className="bg-white rounded-2xl px-4 py-3 border border-slate-200/80 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                <Receipt className="w-4 h-4 stroke-[2.4]" />
-              </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                  Expense Entry
-                </h3>
-                <span className="text-[11px] font-medium text-slate-400 block -mt-0.5">
-                  Daily operational expenses and branch payouts
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Date Sorting Toggle: Date : NEWEST ⇅ OLDEST */}
-              <button
-                type="button"
-                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-                title={`Sort by Date: currently ${sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}. Click to toggle.`}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-700 shadow-2xs cursor-pointer active:scale-95 transition"
-              >
-                <ArrowUpDown className="w-3.5 h-3.5 text-blue-600" />
-                <span className="text-slate-400 font-semibold">Date :</span>
-                <span className={`px-1.5 py-0.5 rounded-md ${sortOrder === 'desc' ? 'bg-blue-600 text-white font-black' : 'text-slate-500 font-bold'}`}>NEWEST</span>
-                <span className="text-slate-300">⇅</span>
-                <span className={`px-1.5 py-0.5 rounded-md ${sortOrder === 'asc' ? 'bg-blue-600 text-white font-black' : 'text-slate-500 font-bold'}`}>OLDEST</span>
-              </button>
-
-              <div className="px-2.5 py-1.5 bg-white border border-rose-200/80 rounded-xl text-xs font-extrabold text-rose-700 shadow-2xs">
-                Total: {formatCurrency(totalFilteredExpense)}
+                {/* S-Curve wave divider */}
+                <div className="relative -mt-3 w-full overflow-hidden leading-none z-10 pointer-events-none">
+                  <svg viewBox="0 0 500 25" preserveAspectRatio="none" className="w-full h-3 fill-white block">
+                    <path d="M 0,8 C 140,24 320,0 500,12 L 500,25 L 0,25 Z" />
+                  </svg>
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleOpenAddExpense}
-                className="bg-[#dc2626] hover:bg-[#b91c1c] text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs active:scale-95 transition cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Add Expense</span>
-              </button>
+              {/* 3 Metric Cards with Rich 3D Style Badges */}
+              <div className="p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-white flex-1 items-center">
+                {/* 1. Total Expense */}
+                <div className="bg-blue-50/80 border border-blue-200/90 rounded-2xl p-2.5 sm:p-3 flex items-center gap-3 shadow-2xs hover:shadow-xs transition">
+                  <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Wallet className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <span className="text-[10px] font-bold text-blue-800/80 uppercase tracking-wider block">
+                      Total Expense
+                    </span>
+                    <span className="text-base sm:text-lg font-black text-blue-950 block whitespace-nowrap tracking-tight mt-0.5">
+                      {formatCurrency(periodMetrics.total)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Expense from Cash */}
+                <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-2.5 sm:p-3 flex items-center gap-3 shadow-2xs hover:shadow-xs transition">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Banknote className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <span className="text-[10px] font-bold text-emerald-800/80 uppercase tracking-wider block">
+                      Expense from Cash
+                    </span>
+                    <span className="text-base sm:text-lg font-black text-emerald-950 block whitespace-nowrap tracking-tight mt-0.5">
+                      {formatCurrency(periodMetrics.cash)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Expense through UPI */}
+                <div className="bg-purple-50/80 border border-purple-200/90 rounded-2xl p-2.5 sm:p-3 flex items-center gap-3 shadow-2xs hover:shadow-xs transition">
+                  <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Smartphone className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <span className="text-[10px] font-bold text-purple-800/80 uppercase tracking-wider block">
+                      Expense through UPI
+                    </span>
+                    <span className="text-base sm:text-lg font-black text-purple-950 block whitespace-nowrap tracking-tight mt-0.5">
+                      {formatCurrency(periodMetrics.online)}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Table Container Card (Starts cleanly with table headers) */}
-          <div className="bg-white rounded-2xl border border-rose-100/90 shadow-2xs overflow-hidden">
-            <div className="overflow-x-hidden w-full">
-              <table className="w-full text-left border-collapse table-auto">
+          {/* ================= PRIMARY EXPENSE ENTRY TABLE CONTAINER ================= */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden flex flex-col justify-between">
+            {/* S-Curve Dark Indigo Header Bar */}
+            <div className="bg-gradient-to-r from-[#1E1B4B] via-[#2A155E] to-[#0F2952] px-4 py-3 text-white flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Receipt className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white tracking-tight leading-none">
+                    Expense Entry
+                  </h3>
+                  <span className="text-[11px] font-medium text-purple-200/80 block mt-1">
+                    Daily operational expenses and branch payouts
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Date Sort Toggle */}
+                <div className="flex items-center gap-1 px-2.5 py-1 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl text-xs font-bold text-white shadow-2xs backdrop-blur-md">
+                  <Calendar className="w-3.5 h-3.5 text-blue-200 shrink-0" />
+                  <span className="text-blue-200/90 text-[11px]">Date:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder('desc')}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition cursor-pointer ${
+                      sortOrder === 'desc' ? 'bg-blue-600 text-white shadow-xs' : 'text-blue-200 hover:text-white'
+                    }`}
+                  >
+                    NEWEST
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder('asc')}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition cursor-pointer ${
+                      sortOrder === 'asc' ? 'bg-blue-600 text-white shadow-xs' : 'text-blue-200 hover:text-white'
+                    }`}
+                  >
+                    OLDEST
+                  </button>
+                </div>
+
+                {/* Active Total Badge */}
+                <div className="px-3 py-1 bg-white rounded-xl text-xs font-black text-rose-600 shadow-xs">
+                  Total: {formatCurrency(totalFilteredExpense)}
+                </div>
+
+                {/* + Add Expense 3D Gradient Button */}
+                <button
+                  type="button"
+                  onClick={handleOpenAddExpense}
+                  className="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:from-amber-600 hover:to-red-600 text-white font-black text-xs px-4 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md active:scale-95 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>+ Add Expense</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Table Content */}
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse table-auto text-xs">
                 <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    <th className="py-2.5 px-2 text-center w-8">S.No</th>
-                    <th className="py-2.5 px-2 w-28">Date</th>
-                    <th className="py-2.5 px-2 min-w-[120px]">Description</th>
-                    <th className="py-2.5 px-2 w-24">Category</th>
-                    <th className="py-2.5 px-2 text-right w-20">Amount (₹)</th>
-                    <th className="py-2.5 px-2 min-w-[100px]">Remarks</th>
-                    <th className="py-2.5 px-2 text-center w-16">Mode</th>
-                    <th className="py-2.5 px-2 text-center min-w-[110px]">Source</th>
-                    <th className="py-2.5 px-2 w-24">Paid By</th>
-                    <th className="py-2.5 px-2 text-center w-14">Actions</th>
+                  <tr className="bg-[#EBF3FC] text-[#1E3A8A] text-[10px] font-black uppercase tracking-wider border-b border-blue-100">
+                    <th className="py-2.5 px-2.5 text-center w-8">S.No</th>
+                    <th className="py-2.5 px-2.5 w-28">Date</th>
+                    <th className="py-2.5 px-2.5 min-w-[120px]">Description</th>
+                    <th className="py-2.5 px-2.5 w-24">Category</th>
+                    <th className="py-2.5 px-2.5 text-right w-24">Amount (₹)</th>
+                    <th className="py-2.5 px-2.5 min-w-[100px]">Remarks</th>
+                    <th className="py-2.5 px-2.5 text-center w-16">Mode</th>
+                    <th className="py-2.5 px-2.5 text-center min-w-[110px]">Source</th>
+                    <th className="py-2.5 px-2.5 w-24">Paid By</th>
+                    <th className="py-2.5 px-2.5 text-center w-16">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   {sortedFilteredExpenses.map((item, idx) => {
                     const dateInfo = getItemDayAndDate(item);
                     return (
-                      <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-2.5 px-2 text-center font-bold text-slate-400">
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-2.5 text-center font-bold text-slate-400">
                           {idx + 1}
                         </td>
-                        <td className="py-2.5 px-2 whitespace-nowrap">
+                        <td className="py-2.5 px-2.5 whitespace-nowrap">
                           <div className="font-bold text-slate-800 text-xs leading-tight">
                             {dateInfo.displayDate}
                           </div>
@@ -1462,24 +1560,24 @@ export default function ExpansionView({
                             {dateInfo.subLabel}
                           </div>
                         </td>
-                        <td className="py-2.5 px-2 font-bold text-slate-800 text-xs">
+                        <td className="py-2.5 px-2.5 font-bold text-slate-800 text-xs">
                           {item.description}
                         </td>
-                        <td className="py-2.5 px-2">
-                          <span className="inline-block px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 max-w-[110px] truncate" title={item.customCategory || item.category || 'Others'}>
+                        <td className="py-2.5 px-2.5">
+                          <span className="inline-block px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200/90 max-w-[120px] truncate" title={item.customCategory || item.category || 'Others'}>
                             {item.customCategory || item.category || 'Others'}
                           </span>
                         </td>
-                        <td className="py-2.5 px-2 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
+                        <td className="py-2.5 px-2.5 text-right font-black text-rose-700 whitespace-nowrap text-xs sm:text-sm">
                           {formatCurrency(item.amount)}
                         </td>
-                        <td className="py-2.5 px-2 text-slate-500 font-medium text-xs truncate max-w-[130px]" title={item.remarks}>
+                        <td className="py-2.5 px-2.5 text-slate-500 font-medium text-xs truncate max-w-[130px]" title={item.remarks}>
                           {item.remarks || '-'}
                         </td>
-                        <td className="py-2.5 px-2 text-center">
+                        <td className="py-2.5 px-2.5 text-center">
                           {renderModeBadge(item.mode)}
                         </td>
-                        <td className="py-2.5 px-2 text-center">
+                        <td className="py-2.5 px-2.5 text-center">
                           <div className="flex items-center justify-center gap-1 flex-wrap">
                             {item.mode === 'Cash' ? (
                               <>
@@ -1526,17 +1624,17 @@ export default function ExpansionView({
                             )}
                           </div>
                         </td>
-                        <td className="py-2.5 px-2">
+                        <td className="py-2.5 px-2.5">
                           <div className="flex items-center gap-1.5">
-                            <div className="w-4.5 h-4.5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] font-bold shrink-0">
-                              <User className="w-2.5 h-2.5" />
+                            <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[9px] font-bold shrink-0">
+                              <User className="w-3 h-3" />
                             </div>
                             <span className="font-semibold text-slate-700 text-xs truncate max-w-[80px]" title={item.paidBy || 'Admin'}>
                               {item.paidBy || 'Admin'}
                             </span>
                           </div>
                         </td>
-                        <td className="py-2.5 px-2 text-center">
+                        <td className="py-2.5 px-2.5 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
@@ -1562,171 +1660,210 @@ export default function ExpansionView({
 
                   {sortedFilteredExpenses.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="py-10 text-center text-slate-400 text-xs font-semibold">
-                        No expense records found for this period. Click "+ Add Expense" to record an outflow.
+                      <td colSpan={10} className="py-12 text-center text-slate-400 text-xs">
+                        <div className="relative py-6 flex flex-col items-center justify-center text-center">
+                          <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mb-3 shadow-xs relative">
+                            <Receipt className="w-8 h-8 stroke-[2]" />
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full animate-ping" />
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                          </div>
+                          <span className="text-slate-800 font-black text-sm">
+                            No expense records found for this period.
+                          </span>
+                          <span className="text-slate-400 font-semibold text-xs mt-0.5">
+                            Click "+ Add Expense" to record an outflow.
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   )}
                 </tbody>
-
-                {/* Summary Footer Calculating Total Expenses */}
-                <tfoot>
-                  <tr className="bg-rose-50/70 font-black border-t-2 border-rose-200/80 text-xs">
-                    <td colSpan={4} className="py-2.5 px-2 text-slate-800 font-extrabold uppercase tracking-wide">
-                      Total Expenses
-                    </td>
-                    <td className="py-2.5 px-2 text-right text-rose-700 font-black text-xs sm:text-sm whitespace-nowrap">
-                      {formatCurrency(totalFilteredExpense)}
-                    </td>
-                    <td colSpan={5} className="py-2.5 px-2 text-right text-slate-500 font-bold text-xs">
-                      {sortedFilteredExpenses.length} {sortedFilteredExpenses.length === 1 ? 'Entry' : 'Entries'} Recorded
-                    </td>
-                  </tr>
-                </tfoot>
               </table>
+            </div>
+
+            {/* Base Summary Strip (Matching Reference 1001025700) */}
+            <div className="bg-gradient-to-r from-rose-50/90 via-pink-50/70 to-purple-50/80 border-t border-rose-200/90 px-4 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shadow-2xs">
+                  <Wallet className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs sm:text-sm font-black text-[#2e1065] tracking-wide uppercase">
+                  TOTAL EXPENSES
+                </span>
+              </div>
+
+              <div className="text-sm sm:text-base font-black text-rose-600 tracking-tight">
+                {formatCurrency(totalFilteredExpense)}
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs font-extrabold text-blue-700">
+                <BarChart3 className="w-4 h-4 text-blue-600 stroke-[2.2]" />
+                <span>{sortedFilteredExpenses.length} {sortedFilteredExpenses.length === 1 ? 'Entry' : 'Entries'} Recorded</span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* ================= RIGHT ~24%: CALENDAR & RECENT EXPENSES LEDGER ================= */}
         <div className="w-full lg:w-[24%] lg:min-w-[250px] flex flex-col gap-3.5 shrink-0">
-          {/* Select Date (Calendar Card) */}
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-1.5 h-fit">
-            {/* Header: Select Date & Date Pill */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>Select Date</span>
+          {/* Card 3: Select Date (Calendar Card) with Royal Purple Header */}
+          <div className="bg-white rounded-3xl border border-purple-200/80 shadow-md overflow-hidden flex flex-col justify-between">
+            <div className="bg-gradient-to-r from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] px-4 py-2.5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                  <Calendar className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs sm:text-sm font-black text-white tracking-tight">Select Date</span>
               </div>
-              <div className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700">
+              <div className="px-2.5 py-0.5 rounded-lg bg-white text-purple-950 font-black text-[11px] shadow-xs">
                 {formatDateToDisplay(selectedDate)}
               </div>
             </div>
 
-            {/* Month Navigation */}
-            <div className="flex items-center justify-between px-1">
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                className="w-5 h-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-xs font-extrabold text-slate-800">
-                {monthNames[calendarMonth]} {calendarYear}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="w-5 h-5 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Days of Week Header */}
-            <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-extrabold text-slate-400 uppercase">
-              <span>Sun</span>
-              <span>Mon</span>
-              <span>Tue</span>
-              <span>Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
-            </div>
-
-            {/* Calendar Grid with Range Coloration */}
-            <div className="grid grid-cols-7 gap-0.5 text-center place-items-center">
-              {calendarDays.map((slot, i) => {
-                const dayClasses = getCalendarDayClasses(slot);
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleCalendarDayClick(slot.dateStr)}
-                    className={`h-5.5 w-5.5 mx-auto text-[10px] font-bold flex items-center justify-center transition cursor-pointer ${dayClasses}`}
-                  >
-                    {slot.dayNumber}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Range Color Legend */}
-            {!isSingleDateMode && (
-              <div className="flex items-center justify-center gap-3 pt-0.5 border-t border-slate-100 text-[9px] font-bold text-slate-500">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#16a34a]"></span> From
+            <div className="p-3 space-y-2 flex flex-col justify-between bg-white">
+              {/* Month Navigation */}
+              <div className="flex items-center justify-between px-1">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  className="w-6 h-6 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer transition active:scale-95"
+                >
+                  <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                </button>
+                <span className="text-xs font-black text-slate-800">
+                  {monthNames[calendarMonth]} {calendarYear}
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#dc2626]"></span> To
-                </span>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  className="w-6 h-6 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer transition active:scale-95"
+                >
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
               </div>
-            )}
+
+              {/* Days of Week Header */}
+              <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-black uppercase tracking-wider">
+                <span className="text-rose-500">Sun</span>
+                <span className="text-slate-600">Mon</span>
+                <span className="text-slate-600">Tue</span>
+                <span className="text-slate-600">Wed</span>
+                <span className="text-slate-600">Thu</span>
+                <span className="text-slate-600">Fri</span>
+                <span className="text-slate-600">Sat</span>
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-0.5 text-center place-items-center">
+                {calendarDays.map((slot, i) => {
+                  const dayClasses = getCalendarDayClasses(slot);
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleCalendarDayClick(slot.dateStr)}
+                      className={`h-6 w-6 mx-auto text-[10px] font-bold flex items-center justify-center transition cursor-pointer ${dayClasses}`}
+                    >
+                      {slot.dayNumber}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Range Color Legend */}
+              {!isSingleDateMode && (
+                <div className="flex items-center justify-center gap-3 pt-1 border-t border-slate-100 text-[9px] font-bold text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#16a34a]"></span> From
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#dc2626]"></span> To
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Quick Expense History Ledger */}
-          <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2 flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
-                <Receipt className="w-3.5 h-3.5 text-rose-600" />
-                <span>Recent Expenses</span>
+          {/* Recent Expenses Card with Lush Green Header */}
+          <div className="bg-white rounded-3xl border border-emerald-200/80 shadow-md overflow-hidden flex flex-col justify-between">
+            <div className="bg-gradient-to-r from-[#059669] via-[#10B981] to-[#22C55E] px-4 py-2.5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                  <Clock className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs sm:text-sm font-black text-white tracking-tight">Recent Expenses</span>
               </div>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+              <span className="text-[10px] font-black text-white bg-white/20 border border-white/25 px-2.5 py-0.5 rounded-full shadow-2xs backdrop-blur-md">
                 Days Recorded: {dailyAggregatedExpenses.length}
               </span>
             </div>
 
-            <div className="max-h-[220px] overflow-y-auto pr-1 divide-y divide-slate-100">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead className="sticky top-0 bg-white/95 backdrop-blur-xs z-10 border-b border-slate-100">
-                  <tr className="text-[9px] font-black uppercase text-slate-400">
-                    <th className="py-1.5 px-2 text-center w-7">S.No</th>
-                    <th className="py-1.5 px-2">Date</th>
-                    <th className="py-1.5 px-2 text-right">Expense (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {dailyAggregatedExpenses.map((group, idx) => {
-                    const isSelected = isSameDay(group.ymd, fromDate) && isSameDay(group.ymd, toDate);
-                    return (
-                      <tr
-                        key={group.ymd || idx}
-                        onClick={() => handleDrillDownDate(group.displayDate)}
-                        className={`cursor-pointer transition-colors group ${
-                          isSelected
-                            ? 'bg-rose-50/90 font-bold text-rose-800'
-                            : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                        title={`Click to focus on ${group.displayDate} (Total: ${formatCurrency(group.totalAmount)})`}
-                      >
-                        <td className="py-2 px-2 text-center text-slate-400 font-semibold group-hover:text-slate-600 align-middle">
-                          {idx + 1}
-                        </td>
-                        <td className="py-2 px-2 whitespace-nowrap align-middle">
-                          <div className="font-semibold text-slate-800 text-xs leading-tight">
-                            {group.displayDate}
+            <div className="flex-1 flex flex-col justify-between">
+              <div className="max-h-[220px] overflow-y-auto divide-y divide-slate-100">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="sticky top-0 bg-[#ECFDF5] z-10 border-b border-emerald-100">
+                    <tr className="text-[9.5px] font-black uppercase text-[#065F46] tracking-wider">
+                      <th className="py-2 px-2.5 text-center w-8">S.No</th>
+                      <th className="py-2 px-2.5">Date</th>
+                      <th className="py-2 px-2.5 text-right">Expense (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 bg-white">
+                    {dailyAggregatedExpenses.map((group, idx) => {
+                      const isSelected = isSameDay(group.ymd, fromDate) && isSameDay(group.ymd, toDate);
+                      return (
+                        <tr
+                          key={group.ymd || idx}
+                          onClick={() => handleDrillDownDate(group.displayDate)}
+                          className={`cursor-pointer transition-colors group ${
+                            isSelected
+                              ? 'bg-emerald-50/90 font-black text-emerald-900'
+                              : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                          title={`Click to focus on ${group.displayDate} (Total: ${formatCurrency(group.totalAmount)})`}
+                        >
+                          <td className="py-2.5 px-2.5 text-center text-slate-400 font-semibold group-hover:text-slate-600 align-middle">
+                            {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
+                            <div className="font-semibold text-slate-800 text-xs leading-tight">
+                              {group.displayDate}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">
+                              {group.dayName}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2.5 text-right font-black text-rose-600 whitespace-nowrap align-middle text-xs sm:text-sm">
+                            {formatCurrency(group.totalAmount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {dailyAggregatedExpenses.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="py-10 text-center text-slate-400 text-xs">
+                          <div className="relative py-4 flex flex-col items-center justify-center text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center mb-2 shadow-xs">
+                              <Search className="w-6 h-6 stroke-[2]" />
+                            </div>
+                            <span className="text-slate-600 font-bold text-xs">
+                              No expense records found for this period.
+                            </span>
                           </div>
-                          <div className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">
-                            {group.dayName}
-                          </div>
-                        </td>
-                        <td className="py-2 px-2 text-right font-black text-rose-600 whitespace-nowrap align-middle text-xs">
-                          {formatCurrency(group.totalAmount)}
                         </td>
                       </tr>
-                    );
-                  })}
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-                  {dailyAggregatedExpenses.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="py-8 text-center text-slate-400 text-xs font-medium">
-                        No expense records found for this period.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              {/* Bottom organic wave curve decoration */}
+              <div className="relative h-5 w-full overflow-hidden leading-none pointer-events-none opacity-30 mt-1">
+                <svg viewBox="0 0 500 40" preserveAspectRatio="none" className="w-full h-full fill-emerald-300">
+                  <path d="M 0,15 C 150,45 350,0 500,20 L 500,40 L 0,40 Z" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
