@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
+  Trophy,
+  ArrowLeftRight,
   ArrowLeft,
   Home,
   Calendar,
@@ -2311,7 +2313,8 @@ export default function CashBook({
           upiAmount: disbUpi,
           amount: disbAmount,
           mode: isBankDisb ? 'UPI' : 'Cash',
-          remarks: remarks || 'Disbursement entry',
+          remarks: remarks || custName || 'Disbursement entry',
+          customer_name: custName,
           rawTimestamp: disbTs
         });
       }
@@ -2721,7 +2724,8 @@ export default function CashBook({
           upiAmount: upiAmt,
           amount: totalAmt,
           mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
-          remarks: record.remarks || custName,
+          remarks: record.remarks || custName || 'Daily Collection',
+          customer_name: custName,
           rawTimestamp: instTs
         });
       }
@@ -3168,12 +3172,20 @@ export default function CashBook({
 
   const availableRemarks = useMemo(() => {
     const set = new Set();
-    allTransactionsList.forEach(tx => {
-      const r = (tx.remarks || '').trim() || '-';
-      set.add(r);
+    (allTransactionsList || []).forEach(row => {
+      const label = (row.remarks || row.customer_name || '').trim();
+      if (label) set.add(label);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allTransactionsList]);
+
+  // Reset column filters when date range, preset, or branch changes
+  useEffect(() => {
+    setSelectedTypeFilters([]);
+    setSelectedAmountFilters([]);
+    setSelectedRemarkFilters([]);
+    setActiveFilterDropdown(null);
+  }, [fromDate, toDate, selectedBranchId, targetBranchName]);
 
   const typeCounts = useMemo(() => {
     const map = {};
@@ -3195,9 +3207,11 @@ export default function CashBook({
 
   const remarkCounts = useMemo(() => {
     const map = {};
-    allTransactionsList.forEach(tx => {
-      const r = (tx.remarks || '').trim() || '-';
-      map[r] = (map[r] || 0) + 1;
+    (allTransactionsList || []).forEach(row => {
+      const label = (row.remarks || row.customer_name || '').trim();
+      if (label) {
+        map[label] = (map[label] || 0) + 1;
+      }
     });
     return map;
   }, [allTransactionsList]);
@@ -3215,8 +3229,8 @@ export default function CashBook({
         }
       }
       if (selectedRemarkFilters.length > 0) {
-        const remarkStr = (tx.remarks || '').trim() || '-';
-        if (!selectedRemarkFilters.includes(remarkStr)) {
+        const label = (tx.remarks || tx.customer_name || '').trim();
+        if (!selectedRemarkFilters.includes(label)) {
           return false;
         }
       }
@@ -3304,76 +3318,86 @@ export default function CashBook({
 
   return (
     <div className="w-full min-h-screen bg-[#f1f5f9] text-slate-800 p-4 sm:p-6 lg:p-7 space-y-4 overflow-x-hidden">
-      {/* ================= 1. HEADER ROW ================= */}
-      <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
-        <div className="flex items-center gap-3">
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              title="Back to Dashboard"
-              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-2xs cursor-pointer active:scale-95 transition"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
-              <Calendar className="w-5 h-5 stroke-[2.2]" />
+      {/* ================= 1. VIBRANT ROYAL BLUE HERO BANNER (MATCHING REFERENCE 1001025240) ================= */}
+      <div className="page-header relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0B3B8C] via-[#124CBC] to-[#1D63DC] p-4 sm:p-5 text-white shadow-xl">
+        {/* Subtle decorative background wave highlights */}
+        <div className="absolute -right-16 -top-24 w-72 h-72 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        <div className="absolute right-1/4 -bottom-20 w-80 h-32 rounded-full bg-cyan-400/15 blur-xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Left: Logo, Title & Subtitle */}
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                title="Back to Dashboard"
+                className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white shadow-xs cursor-pointer active:scale-95 transition shrink-0"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center text-blue-700 shrink-0">
+              <TrendingUp className="w-7 h-7 stroke-[2.5]" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-[#1e293b] tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">
                 Cash Book Accounting
               </h1>
+              <p className="text-xs font-semibold text-blue-100/90 tracking-wide mt-1">
+                Manage Your Finances Smartly
+              </p>
             </div>
           </div>
-        </div>
 
-        {/* Top-Right Badges & Prominent Home Button */}
-        <div className="flex items-center gap-3 self-end sm:self-auto flex-wrap">
-          {/* Branch Scoping Selector / Badge */}
-          {showBranchFilter ? (
-            <div className="relative">
-              <select
-                value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value)}
-                className="appearance-none bg-white border border-slate-200 hover:border-slate-300 text-slate-800 text-xs font-bold py-1.5 pl-8 pr-7 rounded-xl shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition"
-              >
-                {availableBranches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <Building2 className="w-3.5 h-3.5 text-blue-600 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold shadow-2xs">
-              <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-              <span className="truncate max-w-[160px]">{displayBranchLabel}</span>
-            </div>
-          )}
+          {/* Right: Branch Selector, Date Pill & Home Button */}
+          <div className="flex items-center gap-2.5 flex-wrap self-end md:self-auto">
+            {/* Branch Selector Pill */}
+            {showBranchFilter ? (
+              <div className="relative">
+                <select
+                  value={selectedBranchId}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                  className="appearance-none bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold py-2 pl-8 pr-7 rounded-2xl shadow-xs backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer transition"
+                >
+                  {availableBranches.map((b) => (
+                    <option key={b.id} value={b.id} className="text-slate-900 bg-white">
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <Building2 className="w-3.5 h-3.5 text-blue-200 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-blue-200 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white/15 border border-white/25 text-white text-xs font-bold shadow-xs backdrop-blur-md">
+                <Building2 className="w-3.5 h-3.5 text-blue-200 shrink-0" />
+                <span className="truncate max-w-[160px]">{displayBranchLabel}</span>
+              </div>
+            )}
 
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700">
-            <Calendar className="w-3.5 h-3.5 text-blue-600" />
-            <span>
-              {formatDateToDisplay(fromDate) === formatDateToDisplay(toDate)
-                ? formatDateToDisplay(fromDate)
-                : `${formatDateToDisplay(fromDate)} → ${formatDateToDisplay(toDate)}`}{' '}
-              <span className="text-slate-400 font-normal">(Generated)</span>
-            </span>
+            {/* Generated Date Pill */}
+            <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white/15 border border-white/25 shadow-xs backdrop-blur-md text-xs font-bold text-white">
+              <Calendar className="w-3.5 h-3.5 text-blue-200 shrink-0" />
+              <span>
+                {formatDateToDisplay(fromDate) === formatDateToDisplay(toDate)
+                  ? formatDateToDisplay(fromDate)
+                  : `${formatDateToDisplay(fromDate)} → ${formatDateToDisplay(toDate)}`}
+                <span className="text-blue-200/90 font-medium ml-1">(Generated)</span>
+              </span>
+            </div>
+
+            {/* Prominent White Home Button */}
+            <button
+              type="button"
+              onClick={onHome || onBack}
+              title="Go to Home"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-white hover:bg-blue-50 text-blue-700 shadow-md cursor-pointer active:scale-95 transition text-xs font-black"
+            >
+              <Home className="w-4 h-4 stroke-[2.5]" />
+              <span>Home</span>
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={onHome || onBack}
-            title="Go to Home"
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-2xs cursor-pointer active:scale-95 transition text-xs font-extrabold"
-          >
-            <Home className="w-4 h-4 stroke-[2.5]" />
-            <span>Home</span>
-          </button>
         </div>
       </div>
 
@@ -3554,167 +3578,175 @@ export default function CashBook({
         </div>
       </div>
 
-      {/* ================= 3. TOP METRIC CARDS (3-COLUMN GRID) ================= */}
+      {/* ================= 3. TOP METRIC CARDS (HIGH-CONTRAST VIBRANT 3-COLUMN GRID) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-        {/* Card 1: Yesterday Till (Soft Sky Blue Theme) */}
-        <div className="bg-sky-50/70 rounded-2xl p-3.5 border border-sky-200/80 shadow-sm flex flex-col justify-between space-y-3">
-          <div className="flex items-center gap-2 text-xs font-black text-sky-950">
-            <div className="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
-              <Calendar className="w-3.5 h-3.5" />
+        {/* Card 1: Opening Balance (Today) - Vibrant Blue Gradient */}
+        <div className="bg-white rounded-3xl border border-blue-200 shadow-md overflow-hidden flex flex-col justify-between">
+          <div className="bg-gradient-to-r from-[#0F52BA] via-[#1D63DC] to-[#2589F5] p-4 text-white relative overflow-hidden">
+            {/* Background chart/bars watermark decoration */}
+            <div className="absolute right-3 bottom-0 opacity-20 pointer-events-none flex items-end gap-1 h-14">
+              <div className="w-2 h-5 bg-white rounded-t-sm" />
+              <div className="w-2 h-8 bg-white rounded-t-sm" />
+              <div className="w-2 h-12 bg-white rounded-t-sm" />
+              <div className="w-2 h-7 bg-white rounded-t-sm" />
+              <div className="w-2 h-14 bg-white rounded-t-sm" />
             </div>
-            <span>Yesterday Till ({yesterdayHeaderDate})</span>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-100/90 text-sky-700 flex items-center justify-center shrink-0">
-              <Coins className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-sky-800/80 uppercase tracking-wider block">Today Opening Balance</span>
-              <span className="text-xl sm:text-2xl font-black text-sky-950 tracking-tight">
-                {formatCurrency(yesterdayTotal)}
+            <div className="flex items-center gap-2 mb-1.5 relative z-10">
+              <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                <Wallet className="w-4 h-4 stroke-[2.2]" />
+              </div>
+              <span className="text-xs font-bold text-blue-100 tracking-wide">
+                Opening Balance (Today)
               </span>
             </div>
+            <div className="text-2xl sm:text-3xl font-black text-white tracking-tight relative z-10">
+              {formatCurrency(yesterdayTotal)}
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 border-t border-sky-200/60 pt-3">
-            <div className="flex items-center gap-2 bg-transparent p-1">
+          <div className="grid grid-cols-2 gap-2 p-3 bg-white">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl p-2 shadow-2xs">
               <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                 <Banknote className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-sky-900/70 block truncate">Cash in Hand</span>
-                <span className="text-xs sm:text-sm font-black text-sky-950 block truncate">{formatCurrency(yesterdayCash)}</span>
+                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Hand</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 block truncate">{formatCurrency(yesterdayCash)}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-transparent p-1">
-              <div className="w-7 h-7 rounded-lg bg-sky-200/80 text-sky-800 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl p-2 shadow-2xs">
+              <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-sky-900/70 block truncate">Cash in Online</span>
-                <span className="text-xs sm:text-sm font-black text-sky-950 block truncate">{formatCurrency(yesterdayBank)}</span>
+                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Online</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 block truncate">{formatCurrency(yesterdayBank)}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Card 2: Today's Summary (Soft Mint Emerald Hero Theme) */}
-        <div className="bg-emerald-50/60 rounded-2xl p-3.5 border-2 border-emerald-300 shadow-sm flex flex-col justify-between space-y-3 relative">
-          <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
-            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-3.5 h-3.5 stroke-[2.5]" />
+        {/* Card 2: Today's Summary - Vibrant Emerald Green Gradient */}
+        <div className="bg-white rounded-3xl border border-emerald-200 shadow-md overflow-hidden flex flex-col justify-between">
+          <div className="bg-gradient-to-r from-[#0A7E3E] via-[#16A34A] to-[#22C55E] p-3 sm:px-4 text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <span className="text-sm font-black text-white tracking-tight">Today's Summary</span>
             </div>
-            <span>Today's Summary</span>
           </div>
 
-          {/* 4 Distinct Pastel Mini-Pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {/* 4 Distinct Pastel Mini-Tiles */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-white">
+            {/* 1. Investment (Clickable Shortcut Filter) */}
             <div 
               onClick={toggleInvestmentFilter}
               role="button"
               tabIndex={0}
               title={isInvestmentFilterActive ? "Active: Filtering by Investment (Click to show all)" : "Click to filter transactions by Investment"}
-              className={`rounded-xl p-2 text-center flex flex-col items-center justify-center cursor-pointer transition-all duration-200 select-none ${
+              className={`rounded-2xl p-2.5 text-center flex flex-col items-center justify-center cursor-pointer transition-all duration-200 select-none ${
                 isInvestmentFilterActive
                   ? 'bg-emerald-200/90 border-2 border-emerald-600 shadow-md ring-2 ring-emerald-500/40 scale-[1.02]'
-                  : 'bg-emerald-100/80 border border-emerald-200 hover:bg-emerald-100/90 hover:border-emerald-300 hover:shadow-2xs active:scale-95'
+                  : 'bg-emerald-50/80 border border-emerald-200 hover:bg-emerald-100/80 hover:shadow-2xs active:scale-95'
               }`}
             >
-              <div className="w-6 h-6 rounded-lg bg-emerald-200/80 text-emerald-800 flex items-center justify-center mb-1 relative">
-                <Landmark className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-1 relative shadow-2xs">
+                <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                 {isInvestmentFilterActive && (
                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-600 border-2 border-white rounded-full animate-pulse" />
                 )}
               </div>
-              <span className="text-[10px] font-bold text-emerald-800/80 block flex items-center justify-center gap-1">
+              <span className="text-[10px] font-bold text-emerald-800/90 block flex items-center justify-center gap-1">
                 <span>Investment</span>
                 {isInvestmentFilterActive && (
-                  <span className="text-[8px] bg-emerald-600 text-white rounded px-1 font-black">
-                    Filter ON
-                  </span>
+                  <span className="text-[8px] bg-emerald-600 text-white rounded px-1 font-black">ON</span>
                 )}
               </span>
               <span className="text-xs sm:text-sm font-black text-emerald-950">{formatCurrency(todayInvestment)}</span>
             </div>
 
-            <div className="bg-blue-100/80 border border-blue-200 rounded-xl p-2 text-center flex flex-col items-center justify-center">
-              <div className="w-6 h-6 rounded-lg bg-blue-200/80 text-blue-800 flex items-center justify-center mb-1">
-                <ArrowDownLeft className="w-3.5 h-3.5" />
+            {/* 2. Total Credit */}
+            <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
+              <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center mb-1 shadow-2xs">
+                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
               </div>
-              <span className="text-[10px] font-bold text-blue-800/80 block">Total Credit</span>
+              <span className="text-[10px] font-bold text-blue-800/90 block">Total Credit</span>
               <span className="text-xs sm:text-sm font-black text-blue-950">{formatCurrency(todayCredit)}</span>
             </div>
 
-            <div className="bg-rose-100/80 border border-rose-200 rounded-xl p-2 text-center flex flex-col items-center justify-center">
-              <div className="w-6 h-6 rounded-lg bg-rose-200/80 text-rose-800 flex items-center justify-center mb-1">
-                <ArrowUpRight className="w-3.5 h-3.5" />
+            {/* 3. Total Debit */}
+            <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
+              <div className="w-7 h-7 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mb-1 shadow-2xs">
+                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
               </div>
-              <span className="text-[10px] font-bold text-rose-800/80 block">Total Debit</span>
+              <span className="text-[10px] font-bold text-rose-800/90 block">Total Debit</span>
               <span className="text-xs sm:text-sm font-black text-rose-950">{formatCurrency(todayDebit)}</span>
             </div>
 
-            <div className="bg-amber-100/80 border border-amber-200 rounded-xl p-2 text-center flex flex-col items-center justify-center">
-              <div className="w-6 h-6 rounded-lg bg-amber-200/80 text-amber-800 flex items-center justify-center mb-1">
+            {/* 4. Total Expense */}
+            <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-2.5 text-center flex flex-col items-center justify-center">
+              <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mb-1 shadow-2xs">
                 <Receipt className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[10px] font-bold text-amber-800/80 block">Total Expense</span>
+              <span className="text-[10px] font-bold text-amber-800/90 block">Total Expense</span>
               <span className="text-xs sm:text-sm font-black text-amber-950">{formatCurrency(todayExpense)}</span>
             </div>
           </div>
 
-          {/* Bottom Banner (Crisp High-Contrast White with Clean Emerald Border) */}
-          <div className="bg-white border border-emerald-300 rounded-xl py-2 px-3.5 flex items-center justify-between shadow-2xs">
-            <div className="flex items-center gap-2 text-emerald-950 font-extrabold text-xs">
-              <Wallet className="w-4 h-4 text-emerald-600" />
+          {/* Bottom Row of Card 2: Solid Green Today's Balance Pill */}
+          <div className="border-t border-slate-100 p-3 bg-white flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-black text-slate-800">
+              <Scale className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
               <span>Today's Balance :</span>
             </div>
-            <span className={`text-base sm:text-lg font-black tracking-tight ${todayBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+            <div className="bg-emerald-600 hover:bg-emerald-700 transition text-white font-black text-xs sm:text-sm px-4 py-1.5 rounded-xl shadow-xs">
               {formatCurrency(todayBalance)}
-            </span>
+            </div>
           </div>
         </div>
 
-        {/* Card 3: Today's Cash Account (Soft Lavender Purple Theme) */}
-        <div className="bg-purple-50/70 rounded-2xl p-3.5 border border-purple-200/80 shadow-sm flex flex-col justify-between space-y-3">
-          <div className="flex items-center gap-2 text-xs font-black text-purple-950">
-            <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
-              <Wallet className="w-3.5 h-3.5" />
+        {/* Card 3: Today's Cash Account - Vibrant Royal Purple Gradient */}
+        <div className="bg-white rounded-3xl border border-purple-200 shadow-md overflow-hidden flex flex-col justify-between">
+          <div className="bg-gradient-to-r from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] p-4 text-white relative overflow-hidden">
+            {/* Coins graphic watermark decoration */}
+            <div className="absolute right-3 bottom-0 opacity-20 pointer-events-none flex items-end gap-1">
+              <Coins className="w-14 h-14 stroke-[1.5]" />
             </div>
-            <span>Today's Cash Account</span>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-100/90 text-purple-700 flex items-center justify-center shrink-0">
-              <Coins className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-purple-800/80 uppercase tracking-wider block">Today Closing Balance</span>
-              <span className="text-xl sm:text-2xl font-black text-purple-950 tracking-tight">
-                {formatCurrency(todayNetClosingBalance)}
+            <div className="flex items-center gap-2 mb-1.5 relative z-10">
+              <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center shadow-xs">
+                <Coins className="w-4 h-4 stroke-[2.2]" />
+              </div>
+              <span className="text-xs font-bold text-purple-100 tracking-wide">
+                Today's Cash Account
               </span>
             </div>
+            <div className="text-2xl sm:text-3xl font-black text-white tracking-tight relative z-10">
+              {formatCurrency(todayNetClosingBalance)}
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 border-t border-purple-200/60 pt-3">
-            <div className="flex items-center gap-2 bg-transparent p-1">
+          <div className="grid grid-cols-2 gap-2 p-3 bg-white">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl p-2 shadow-2xs">
               <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                 <Banknote className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-purple-900/70 block truncate">Cash in Hand</span>
-                <span className="text-xs sm:text-sm font-black text-purple-950 block truncate">{formatCurrency(todayCashInHand)}</span>
+                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Hand</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 block truncate">{formatCurrency(todayCashInHand)}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-transparent p-1">
-              <div className="w-7 h-7 rounded-lg bg-purple-200/80 text-purple-800 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl p-2 shadow-2xs">
+              <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
                 <Smartphone className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-purple-900/70 block truncate">Cash in Online</span>
-                <span className="text-xs sm:text-sm font-black text-purple-950 block truncate">{formatCurrency(todayCashOnline)}</span>
+                <span className="text-[10px] font-bold text-slate-500 block truncate">Cash in Online</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 block truncate">{formatCurrency(todayCashOnline)}</span>
               </div>
             </div>
           </div>
@@ -3723,19 +3755,15 @@ export default function CashBook({
 
       {/* ================= 4. HORIZONTAL EQUATION BANNER (TODAY'S CASH FLOW) ================= */}
       <div className="w-full space-y-2">
-        <div className="flex items-center gap-2 px-1">
-          <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
-            <Coins className="w-3.5 h-3.5 stroke-[2.2]" />
-          </div>
-          <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
-            Today's Cash Flow
-          </h3>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#0F2952] text-white rounded-xl text-xs font-black shadow-sm">
+          <ArrowLeftRight className="w-3.5 h-3.5 stroke-[2.5]" />
+          <span>Today's Cash Flow</span>
         </div>
 
-        <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 overflow-x-auto py-0.5">
+        <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 overflow-x-auto py-1">
           {/* 1. Yesterday Balance */}
-          <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+          <div className="bg-blue-50/90 border border-blue-200 rounded-2xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
               <Coins className="w-4 h-4" />
             </div>
             <div className="min-w-0">
@@ -3744,12 +3772,12 @@ export default function CashBook({
             </div>
           </div>
 
-          <span className="text-sm font-black text-slate-500 px-1">+</span>
+          <span className="text-base font-black text-slate-400 px-1">+</span>
 
           {/* 2. Collection / Credit */}
-          <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-              <ArrowDownLeft className="w-4 h-4" />
+          <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-2.5 flex-1 min-w-[130px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+              <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-emerald-800/80 block truncate">Collection / Credit</span>
@@ -3757,7 +3785,7 @@ export default function CashBook({
             </div>
           </div>
 
-          <span className="text-sm font-black text-slate-500 px-1">+</span>
+          <span className="text-base font-black text-slate-400 px-1">+</span>
 
           {/* 3. Investment */}
           <div 
@@ -3765,13 +3793,13 @@ export default function CashBook({
             role="button"
             tabIndex={0}
             title={isInvestmentFilterActive ? "Active: Filtering by Investment (Click to show all)" : "Click to filter transactions by Investment"}
-            className={`rounded-xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs cursor-pointer transition-all duration-200 select-none ${
+            className={`rounded-2xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs cursor-pointer transition-all duration-200 select-none ${
               isInvestmentFilterActive
                 ? 'bg-purple-100 border-2 border-purple-600 shadow-md ring-2 ring-purple-500/40 scale-[1.02]'
                 : 'bg-purple-50/90 border border-purple-200 hover:bg-purple-100/70 hover:border-purple-300 active:scale-95'
             }`}
           >
-            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 relative">
+            <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 relative">
               <Landmark className="w-4 h-4" />
               {isInvestmentFilterActive && (
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-600 border-2 border-white rounded-full animate-pulse" />
@@ -3781,21 +3809,19 @@ export default function CashBook({
               <span className="text-[10px] font-bold text-purple-800/80 block truncate flex items-center gap-1">
                 <span>Investment</span>
                 {isInvestmentFilterActive && (
-                  <span className="text-[8px] bg-purple-600 text-white rounded px-1 font-black">
-                    Filter ON
-                  </span>
+                  <span className="text-[8px] bg-purple-600 text-white rounded px-1 font-black">ON</span>
                 )}
               </span>
               <span className="text-xs sm:text-sm font-black text-purple-950 block truncate">{formatCurrency(todayInvestment)}</span>
             </div>
           </div>
 
-          <span className="text-sm font-black text-slate-500 px-1">-</span>
+          <span className="text-base font-black text-slate-400 px-1">-</span>
 
           {/* 4. Debit */}
-          <div className="bg-rose-50/90 border border-rose-200 rounded-xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-              <ArrowUpRight className="w-4 h-4" />
+          <div className="bg-rose-50/90 border border-rose-200 rounded-2xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-rose-800/80 block truncate">Debit</span>
@@ -3803,11 +3829,11 @@ export default function CashBook({
             </div>
           </div>
 
-          <span className="text-sm font-black text-slate-500 px-1">-</span>
+          <span className="text-base font-black text-slate-400 px-1">-</span>
 
           {/* 5. Expense */}
-          <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
-            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+          <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-2.5 flex-1 min-w-[120px] flex items-center gap-2.5 shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
               <Receipt className="w-4 h-4" />
             </div>
             <div className="min-w-0">
@@ -3816,16 +3842,16 @@ export default function CashBook({
             </div>
           </div>
 
-          <span className="text-xl font-black text-slate-700">=</span>
+          <span className="text-xl font-black text-slate-600 px-1">=</span>
 
-          {/* 6. Net Balance (Highlighted Anchor Card) */}
-          <div className="bg-emerald-100/80 border-2 border-emerald-400 rounded-xl p-3 sm:px-3.5 flex-1 min-w-[145px] flex items-center gap-2.5 shadow-sm text-emerald-950 font-bold">
-            <div className="w-8 h-8 rounded-lg bg-emerald-200 text-emerald-800 flex items-center justify-center shrink-0 shadow-2xs">
-              <Scale className="w-4 h-4 stroke-[2.5]" />
+          {/* 6. Net Balance (Standout Vibrant Green Trophy Card) */}
+          <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-500 rounded-2xl p-2.5 sm:px-4 flex-1 min-w-[155px] flex items-center gap-3 shadow-md text-white">
+            <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-2xs">
+              <Trophy className="w-5 h-5 text-yellow-300 stroke-[2.2]" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-extrabold text-emerald-900 block truncate">Net Balance</span>
-              <span className="text-xs sm:text-base font-black text-emerald-950 block truncate">{formatCurrency(todayNetClosingBalance)}</span>
+              <span className="text-[10px] font-bold text-emerald-100 block truncate">Net Balance</span>
+              <span className="text-sm sm:text-base font-black text-white block truncate">{formatCurrency(todayNetClosingBalance)}</span>
             </div>
           </div>
         </div>
@@ -3834,20 +3860,20 @@ export default function CashBook({
       {/* ================= 5. BOTTOM SPLIT LEDGERS (SIDE-BY-SIDE) ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left Container (~58% / 7 cols): Recent Transactions */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3 lg:col-span-7 flex flex-col justify-between overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md lg:col-span-7 flex flex-col justify-between overflow-hidden">
+          <div className="bg-gradient-to-r from-[#0F2952] to-[#1E3A8A] px-4 py-3 flex items-center justify-between text-white">
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <ClipboardList className="w-3.5 h-3.5 stroke-[2.2]" />
+              <div className="w-7 h-7 rounded-lg bg-white/15 text-white flex items-center justify-center shadow-xs">
+                <ClipboardList className="w-4 h-4 stroke-[2.5]" />
               </div>
-              <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
+              <h3 className="text-sm font-black text-white tracking-tight">
                 Recent Transactions
               </h3>
               {hasActiveFilters && (
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-[10px] font-bold cursor-pointer transition active:scale-95 shadow-2xs"
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-bold cursor-pointer transition active:scale-95 shadow-xs"
                   title="Clear all active column filters"
                 >
                   <X className="w-3 h-3 stroke-[2.5]" />
@@ -3856,12 +3882,11 @@ export default function CashBook({
               )}
             </div>
             <div className="flex items-center gap-2.5">
-              {/* Render Add Particulars strictly for operational sub-branches (hidden in Main Branch) */}
               {!isEnterpriseSelected && (
                 <button
                   type="button"
                   onClick={() => setIsAddParticularsModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl border border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-800 text-xs font-black shadow-2xs cursor-pointer active:scale-95 transition"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Add Particulars</span>
@@ -3870,9 +3895,10 @@ export default function CashBook({
               <button
                 type="button"
                 onClick={() => setIsAllTransactionsModalOpen(true)}
-                className="text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
+                className="text-xs font-bold text-blue-200 hover:text-white flex items-center gap-1 cursor-pointer transition"
               >
-                View All &gt;
+                <span>View All</span>
+                <span>&gt;</span>
               </button>
             </div>
           </div>
@@ -4083,7 +4109,12 @@ export default function CashBook({
                           </button>
                         </div>
                       ) : (
-                        'No transactions recorded for this period.'
+                        <div className="flex flex-col items-center justify-center py-6">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center mb-2 shadow-2xs">
+                          <Search className="w-6 h-6 stroke-[2]" />
+                        </div>
+                        <span className="text-slate-500 font-semibold text-xs">No transactions recorded for this period.</span>
+                      </div>
                       )}
                     </td>
                   </tr>
@@ -4094,22 +4125,23 @@ export default function CashBook({
         </div>
 
         {/* Right Container (~42% / 5 cols): Expense Calculation */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3 lg:col-span-5 flex flex-col justify-between overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md lg:col-span-5 flex flex-col justify-between overflow-hidden">
+          <div className="bg-gradient-to-r from-[#1E1B4B] to-[#3B0764] px-4 py-3 flex items-center justify-between text-white">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Calculator className="w-3.5 h-3.5 stroke-[2.2]" />
+              <div className="w-7 h-7 rounded-lg bg-white/15 text-white flex items-center justify-center shadow-xs">
+                <Calculator className="w-4 h-4 stroke-[2.5]" />
               </div>
-              <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
+              <h3 className="text-sm font-black text-white tracking-tight">
                 Expense Calculation
               </h3>
             </div>
             <button
               type="button"
               onClick={() => setIsAllExpensesModalOpen(true)}
-              className="text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
+              className="text-xs font-bold text-purple-200 hover:text-white flex items-center gap-1 cursor-pointer transition"
             >
-              View All &gt;
+              <span>View All</span>
+              <span>&gt;</span>
             </button>
           </div>
 
@@ -4151,7 +4183,14 @@ export default function CashBook({
                 ))}
                 {displayedExpenses.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">No expenses recorded for this period.</td>
+                    <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                    <div className="flex flex-col items-center justify-center py-6">
+                      <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-500 flex items-center justify-center mb-2 shadow-2xs">
+                        <Wallet className="w-6 h-6 stroke-[2]" />
+                      </div>
+                      <span className="text-slate-500 font-semibold text-xs">No expenses recorded for this period.</span>
+                    </div>
+                  </td>
                   </tr>
                 )}
               </tbody>
@@ -4182,7 +4221,7 @@ export default function CashBook({
               <button
                 type="button"
                 onClick={() => setIsInvestmentModalOpen(false)}
-                className="w-7 h-7 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center cursor-pointer transition"
               >
                 ✕
               </button>
@@ -4485,10 +4524,10 @@ export default function CashBook({
       {isAllTransactionsModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 bg-blue-50/80 border-b border-blue-100 flex items-center justify-between">
+            <div className="px-6 py-4 bg-gradient-to-r from-[#0F2952] to-[#1E3A8A] text-white flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
-                <ClipboardList className="w-5 h-5 text-blue-700" />
-                <h3 className="text-sm font-extrabold text-slate-900">
+                <ClipboardList className="w-5 h-5 text-white" />
+                <h3 className="text-sm font-black text-white">
                   All Transactions ({filteredAllTransactions.length}{hasActiveFilters ? ` of ${allTransactionsList.length}` : ''})
                 </h3>
                 {hasActiveFilters && (
