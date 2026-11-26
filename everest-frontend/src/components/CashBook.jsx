@@ -372,20 +372,14 @@ export const isCustomerActive = (cust) => {
 
 // Exact 1:1 Sorting Comparator with Collection Report:
 // Primary sort: business transaction date descending (newest first)
-// Secondary sort: creation timestamp descending
-// Tertiary tie-breaker: unique record ID descending
+// Tie-breaker: unique record ID descending (100% identical to CollectionReportModal)
 export const compareLedgerRows = (a, b) => {
-  const dateA = a.date || a.collection_date || a.payment_date || a.disbursement_date || a.createdAt;
-  const dateB = b.date || b.collection_date || b.payment_date || b.disbursement_date || b.createdAt;
-  const tsA = a.rawTimestamp || parseDateToTimestamp(dateA) || 0;
-  const tsB = b.rawTimestamp || parseDateToTimestamp(dateB) || 0;
+  const dateA = a.rawDate || a.date || a.collection_date || a.payment_date || a.disbursement_date || a.createdAt;
+  const dateB = b.rawDate || b.date || b.collection_date || b.payment_date || b.disbursement_date || b.createdAt;
+  const tsA = (a.rawTimestamp !== undefined && a.rawTimestamp !== null ? a.rawTimestamp : parseDateToTimestamp(dateA)) || 0;
+  const tsB = (b.rawTimestamp !== undefined && b.rawTimestamp !== null ? b.rawTimestamp : parseDateToTimestamp(dateB)) || 0;
   if (tsA !== tsB) {
     return tsB - tsA;
-  }
-  const createA = parseDateToTimestamp(a.createdAt || a.created_at || '') || 0;
-  const createB = parseDateToTimestamp(b.createdAt || b.created_at || '') || 0;
-  if (createA !== createB && createA > 0 && createB > 0) {
-    return createB - createA;
   }
   return String(b.id || '').localeCompare(String(a.id || ''));
 };
@@ -499,22 +493,22 @@ export const mergeCustomerIntoMap = (targetMap, c) => {
   }
 
   // Strictly use live customer installments from authoritative Firestore database
-  const candidateInstallments = c.installments;
-
-  const newValidInst = filterPaidInst(candidateInstallments);
+  // Preserve unfiltered array indices so credit row IDs match CollectionReportModal 1:1
+  const candidateInstallments = c.installments || c.ledger || c.transactions || c.history || [];
 
   if (!existing) {
     targetMap.set(cKey, { 
       ...c, 
       canonicalKey: cKey,
-      installments: newValidInst 
+      installments: Array.isArray(candidateInstallments) ? candidateInstallments : []
     });
     return;
   }
 
-  const existingValidInst = filterPaidInst(existing.installments);
+  const existingInst = Array.isArray(existing.installments) ? existing.installments : [];
+  const newInst = Array.isArray(candidateInstallments) ? candidateInstallments : [];
   // Real database customer receipts take precedence over baseline fallback
-  const bestInst = newValidInst.length > 0 ? newValidInst : existingValidInst;
+  const bestInst = Array.isArray(c.installments) ? newInst : (newInst.length > 0 ? newInst : existingInst);
 
   const merged = {
     ...existing,
@@ -1101,6 +1095,27 @@ export default function CashBook({
     ];
   }, [branches]);
 
+  // Excluded/disabled branches in consolidated Main Branch view (1:1 with CollectionReportModal & App.jsx)
+  const excludedConsolidatedBranches = useMemo(() => {
+    const ids = new Set();
+    const names = new Set();
+    (branches || []).forEach((b) => {
+      if (!b) return;
+      if (
+        b.includeInConsolidatedTotals === false ||
+        b.disabled === true ||
+        b.consolidationEnabled === false ||
+        b.enabled === false ||
+        b.status === 'Disabled' ||
+        b.hidden === true
+      ) {
+        if (b.id) ids.add(String(b.id).toLowerCase().trim());
+        if (b.name) names.add(String(b.name).toLowerCase().trim());
+      }
+    });
+    return { ids, names };
+  }, [branches]);
+
   // Purge any stale ghost branch keys from localStorage on mount
   useEffect(() => {
     sanitizeLocalStorageBranches();
@@ -1456,12 +1471,14 @@ export default function CashBook({
 
   // G. Direct Customers Listener
   const [firestoreCustomers, setFirestoreCustomers] = useState([]);
+  const [hasFirestoreCustomersLoaded, setHasFirestoreCustomersLoaded] = useState(false);
   useEffect(() => {
     let unsub = () => {};
     try {
       unsub = onSnapshot(collection(db, 'customers'), (snapshot) => {
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         setFirestoreCustomers(list);
+        setHasFirestoreCustomersLoaded(true);
       }, (err) => {
         console.warn('Customers listener notice in CashBook:', err);
       });
@@ -1962,56 +1979,99 @@ export default function CashBook({
     const isRecordInActiveRange = (dateInput) => isInRange(dateInput, startYmd, endYmd);
     const isRecordPriorToActiveRange = (dateInput) => isPriorToRange(dateInput, startYmd, endYmd);
 
-    // Strict Active Customer Filter Pipeline:
+    // Strict Active Customer Filter Pipeline (1:1 with App.jsx -> CollectionReportModal):
     // Build active customer directory and identify soft-deleted, recycled, or purged records.
     // NEVER drop or deduplicate active customers by name (e.g. Sangili P with distinct IDs)!
     const activeCustomerIds = new Set();
+    const activeCustomersById = new Map();
     const deletedCustomerIds = new Set();
+    const deletedInstallmentIds = new Set();
+    const deletedInstallmentKeys = new Set();
+
     const isBannedGhostName = (nameStr) => {
       if (!nameStr) return false;
       const lower = String(nameStr).toLowerCase();
       return lower.includes('anitha') || lower.includes('seetha');
     };
 
-    const customerMap = new Map();
-    // 1. Add props customers (live from Firestore)
-    if (Array.isArray(customers)) {
-      customers.forEach(c => mergeCustomerIntoMap(customerMap, c));
-    }
-    // 2. Add direct firestoreCustomers stream
-    if (Array.isArray(firestoreCustomers)) {
-      firestoreCustomers.forEach(c => mergeCustomerIntoMap(customerMap, c));
-    }
-
-    const rawCustomerSource = Array.from(customerMap.values());
-
-    (rawCustomerSource || []).forEach(c => {
+    const collectDeletedMetadata = (c) => {
       if (!c || typeof c !== 'object') return;
       const cId = String(c.id || c.customerId || c.docId || '').trim();
       const cName = String(c.name || c.customerName || '').toLowerCase().trim();
+      const cStatus = String(c.status || '').trim().toLowerCase();
 
-      if (isBannedGhostName(cName)) {
-        if (cId) deletedCustomerIds.add(cId);
-        return;
-      }
-
-      if (isCustomerActive(c)) {
-        if (cId) activeCustomerIds.add(cId);
-      } else {
+      if (isBannedGhostName(cName) || !isCustomerActive(c) || (cStatus && cStatus !== 'approved')) {
         if (cId) deletedCustomerIds.add(cId);
       }
+
+      const delList = Array.isArray(c.deletedInstallments) ? c.deletedInstallments : [];
+      delList.forEach(d => {
+        if (!d || typeof d !== 'object') return;
+        if (cId && d.id !== undefined && d.id !== null) {
+          deletedInstallmentIds.add(`${cId}_${String(d.id).trim()}`);
+        }
+        const txnId = d.transaction_id || d.transactionId || d.txnId || d.receipt_no || d.receiptNo;
+        if (txnId) deletedInstallmentIds.add(`txn_${String(txnId).trim()}`);
+        const dDate = formatDateToYmd(getTransactionBusinessDate(d));
+        const dAmt = Number(d.amount || d.paidAmount || (Number(d.cashAmount || 0) + Number(d.upiAmount || 0)) || 0);
+        if (cId && dDate && dAmt > 0) {
+          deletedInstallmentKeys.add(`${cId}_${dDate}_${dAmt}`);
+        }
+      });
+    };
+
+    // Scan both props and live Firestore stream for deleted customers & deleted installments first
+    if (Array.isArray(customers)) {
+      customers.forEach(collectDeletedMetadata);
+    }
+    if (Array.isArray(firestoreCustomers)) {
+      firestoreCustomers.forEach(collectDeletedMetadata);
+    }
+
+    // Use direct real-time firestoreCustomers snapshot once loaded so deletes/edits reflect instantaneously;
+    // fall back to props customers only before the initial Firestore snapshot arrives.
+    const authoritativeCustomerList = hasFirestoreCustomersLoaded
+      ? (Array.isArray(firestoreCustomers) ? firestoreCustomers : [])
+      : (Array.isArray(customers) ? customers : []);
+
+    const customerMap = new Map();
+    authoritativeCustomerList.forEach(c => {
+      if (!c || typeof c !== 'object') return;
+      const cId = String(c.id || c.customerId || c.docId || '').trim();
+      if (cId && deletedCustomerIds.has(cId)) return;
+      mergeCustomerIntoMap(customerMap, c);
     });
 
-    // Verified Active Customers List:
-    // Strictly drops any customer marked as deleted/recycled or matching deleted IDs.
+    const rawCustomerSource = Array.from(customerMap.values());
+
+    // Verified Active Customers List (1:1 with App.jsx -> CollectionReportModal):
+    // Strictly requires isCustomerActive(c), status === 'approved', and consolidated branch inclusion.
     // Distinct customers sharing the same name are 100% preserved!
     const allCust = (rawCustomerSource || []).filter(c => {
       if (!isCustomerActive(c)) return false;
       const cId = String(c.id || c.customerId || c.docId || '').trim();
       const cName = String(c.name || c.customerName || '').toLowerCase().trim();
+      const cStatus = String(c.status || '').trim().toLowerCase();
 
       if (isBannedGhostName(cName)) return false;
+      if (cStatus !== 'approved') return false;
       if (cId && deletedCustomerIds.has(cId)) return false;
+
+      if (isEnterpriseSelected) {
+        const custBranchId = String(c.branchId || c.branchCode || '').toLowerCase().trim();
+        const custBranchName = String(c.branch || c.branchName || '').toLowerCase().trim();
+        if (
+          (custBranchId && excludedConsolidatedBranches.ids.has(custBranchId)) ||
+          (custBranchName && excludedConsolidatedBranches.names.has(custBranchName))
+        ) {
+          return false;
+        }
+      }
+
+      if (cId) {
+        activeCustomerIds.add(cId);
+        activeCustomersById.set(cId, c);
+      }
       return true;
     });
 
@@ -2142,15 +2202,18 @@ export default function CashBook({
         catName = cust.loanType || cust.scheme;
       }
 
-      // Query strictly actual paid receipts (never generated due schedules!)
+      // Query strictly actual paid receipts (never generated due schedules!),
+      // iterating unfiltered candInst so 0-based index matches CollectionReportModal 1:1
       const candInst = cust.installments || cust.ledger || cust.transactions || cust.history || [];
 
-      let rawInstallments = filterPaidInst(candInst);
-
-      (rawInstallments || []).forEach((inst, idx) => {
+      (candInst || []).forEach((inst, index) => {
         if (!inst || typeof inst !== 'object') return;
         const isDeleted = inst.isDeleted === true || inst.deleted === true || inst.is_deleted === true || inst.deletedAt || inst.deleted_at;
         if (isDeleted) return;
+
+        if (inst.id !== undefined && inst.id !== null && deletedInstallmentIds.has(`${cId}_${String(inst.id).trim()}`)) {
+          return;
+        }
 
         const rawStatus = String(inst.status || '').toUpperCase().trim();
         if (
@@ -2218,10 +2281,10 @@ export default function CashBook({
           }
         }
 
-        const instId = String(inst.id || inst.transaction_id || inst.transactionId || inst.number || (idx + 1)).trim();
         const realTxnId = inst.transaction_id || inst.transactionId || inst.txnId || inst.receipt_no || inst.receiptNo || inst.voucher_no || inst.voucherNo || null;
-        // Match CollectionReportModal 1:1 primary key format:
-        const scopedInstId = `${cId}_credit_${instId}_${instDate}_${actualPaid}`;
+        // Match CollectionReportModal 1:1 primary key format: `${cust.id}_credit_${inst.id || index}_${instDate}_${amount}`
+        const canonicalCustId = String(cust.id || cId).trim();
+        const scopedInstId = `${canonicalCustId}_credit_${inst.id || index}_${instDate}_${actualPaid}`;
 
         rawCollections.push({
           id: scopedInstId,
@@ -2245,13 +2308,13 @@ export default function CashBook({
           is_deleted: false,
           deleted: false,
           remarks: remarksInfo,
-          installment_no: inst.number || inst.installment_no || inst.installmentNo || (idx + 1),
+          installment_no: inst.number || inst.installment_no || inst.installmentNo || (index + 1),
           entity: cust
         });
       });
     });
 
-    // 1b. Dedicated Firestore 'collections' table (strictly real paid receipts)
+    // 1b. Dedicated Firestore 'collections' table (strictly real paid receipts, never resurrecting deleted entries)
     (firestoreCollections || []).forEach(c => {
       if (!c) return;
       const isDeleted = c.isDeleted === true || c.deleted === true || c.is_deleted === true || c.deletedAt || c.deleted_at;
@@ -2265,7 +2328,9 @@ export default function CashBook({
 
       if (isBannedGhostName(cName)) return;
       if (cId && deletedCustomerIds.has(cId)) return;
-      if (cId && activeCustomerIds.size > 0 && !activeCustomerIds.has(cId)) return;
+      // Strict Delete Cascade: customer must be active & approved; and if customer lives in activeCustomersById,
+      // customer.installments is already authoritative (1:1 with CollectionReportModal)
+      if (!cId || !activeCustomerIds.has(cId) || activeCustomersById.has(cId)) return;
 
       // Andipatti branch guard: strictly purge deleted customer Seetha and orphaned transactions
       if (colBranch.includes('andi')) {
@@ -2402,20 +2467,26 @@ export default function CashBook({
 
       // Check genuine global transaction identifiers
       const realTxnId = record.transaction_id || record.receipt_no || record.voucher_no || null;
-      if (realTxnId && seenTxnIds.has(String(realTxnId).trim())) {
-        return; // Skip duplicate of already seen global transaction ID
-      }
 
-      // If this is a top-level firestoreCollections record, prevent double-counting if already present in customer installments
+      // If this is a top-level firestoreCollections record, apply strict delete-cascade & deduplication
       if (record.is_firestore_collection_table) {
+        if (!rCustId || !activeCustomerIds.has(rCustId) || activeCustomersById.has(rCustId)) {
+          return;
+        }
+        if (realTxnId && deletedInstallmentIds.has(`txn_${String(realTxnId).trim()}`)) {
+          return;
+        }
+        if (realTxnId && seenTxnIds.has(String(realTxnId).trim())) {
+          return;
+        }
         const dateKey = formatDateToYmd(record.date);
         const matchKey = `${rCustId}_${dateKey}_${totalAmt}`;
-        if (seenCustomerInstallmentKeys.has(matchKey)) {
+        if (deletedInstallmentKeys.has(matchKey) || seenCustomerInstallmentKeys.has(matchKey)) {
           return;
         }
       }
 
-      // Unique record key: strictly by unique record.id (contains custId + instId / docId)
+      // Unique record key: strictly by unique record.id (1:1 with CollectionReportModal entriesMap key)
       const uniqueKey = String(record.id || (realTxnId ? `txn_${realTxnId}` : `${rCustId}_${record.date}_${record.installment_no}_${totalAmt}`));
       if (uniqueCollectionsMap.has(uniqueKey)) {
         return;
@@ -2494,11 +2565,10 @@ export default function CashBook({
         liveCreditCash += cashAmt;
         liveCreditUpi += upiAmt;
 
-        const instId = record.id || `col_${record.date}_${custName}`;
-
         dynamicTx.push({
           id: record.id,
           date: formatDateToDisplay(record.date),
+          rawDate: record.date,
           particulars: record.particulars || 'Daily Collection',
           type: 'Credit',
           cashAmount: cashAmt,
@@ -2523,6 +2593,7 @@ export default function CashBook({
       if (dName.includes('anitha') || dName.includes('seetha')) return;
       const dId = String(d.customerId || d.id || '').trim();
       if (dId && deletedCustomerIds.has(dId)) return;
+      if (dId && activeCustomerIds.size > 0 && !activeCustomerIds.has(dId)) return;
       processDisbursement({
         id: d.id,
         name: d.customerName || d.name,
@@ -2544,6 +2615,7 @@ export default function CashBook({
       if (lName.includes('anitha') || lName.includes('seetha')) return;
       const lId = String(l.customerId || l.id || '').trim();
       if (lId && deletedCustomerIds.has(lId)) return;
+      if (lId && activeCustomerIds.size > 0 && !activeCustomerIds.has(lId)) return;
       const status = String(l.status || '').toLowerCase();
       if (status === 'deleted' || status === 'rejected' || status === 'cancelled' || status === 'recycled') return;
       processDisbursement({
@@ -2935,7 +3007,9 @@ export default function CashBook({
     firestoreLoans,
     firestoreDisbursements,
     firestoreCollections,
-    firestoreCustomers
+    firestoreCustomers,
+    hasFirestoreCustomersLoaded,
+    excludedConsolidatedBranches
   ]);
 
   // Dynamic Available Options & Counts for Column Filters
