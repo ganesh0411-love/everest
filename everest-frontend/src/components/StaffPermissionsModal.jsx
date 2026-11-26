@@ -16,6 +16,9 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
     centerManagement: false,
     staffManagement: false,
     staffManagementRole: 'Staff', // 'Staff' or 'Admin'
+    staff_management_role: 'staff',
+    staffManagementDutyTracking: false,
+    staff_management_duty_tracking: false,
     applicationStatus: false,
     applicationStatusRole: 'Staff', // 'Staff' or 'Admin'
     collectionReport: false,
@@ -32,15 +35,41 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
     dashboardLandSurveyCard: false,
 
     // Customer Profile Settings
-    userSettings: false
+    userSettings: false,
+    can_assign_staff: false,
+    canAssignStaff: false
   });
 
   useEffect(() => {
     if (isOpen) {
-      setPermissions(prev => ({ 
-        ...prev, 
-        ...(initialPermissions || {}) 
-      }));
+      setPermissions(prev => {
+        const initial = initialPermissions || {};
+        const isTracking = Boolean(
+          initial.staffManagementDutyTracking === true || 
+          initial.staff_management_duty_tracking === true || 
+          initial.staffManagementRole === 'Tracking'
+        );
+        const canAssign = Boolean(
+          initial.can_assign_staff === true || 
+          initial.canAssignStaff === true
+        );
+        let baseRole = 'Staff';
+        if (initial.staffManagementRole === 'Admin' || initial.staff_management_role === 'admin' || initial.staffManagementRole === 'Tracking') {
+          baseRole = 'Admin';
+        } else if (initial.staffManagementRole === 'Staff' || initial.staff_management_role === 'staff') {
+          baseRole = 'Staff';
+        }
+        return { 
+          ...prev, 
+          ...initial,
+          staffManagementRole: baseRole,
+          staff_management_role: baseRole.toLowerCase(),
+          staffManagementDutyTracking: isTracking,
+          staff_management_duty_tracking: isTracking,
+          can_assign_staff: canAssign,
+          canAssignStaff: canAssign
+        };
+      });
     }
   }, [isOpen, initialPermissions]);
 
@@ -48,8 +77,17 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
 
   const handleToggle = (key) => {
     setPermissions(prev => {
-      const newState = { ...prev, [key]: !prev[key] };
-      if (!newState[key]) {
+      const nextVal = !prev[key];
+      const newState = { ...prev, [key]: nextVal };
+      if (key === 'can_assign_staff' || key === 'canAssignStaff') {
+        newState.can_assign_staff = nextVal;
+        newState.canAssignStaff = nextVal;
+      }
+      if (key === 'staffManagementDutyTracking' || key === 'staff_management_duty_tracking') {
+        newState.staffManagementDutyTracking = nextVal;
+        newState.staff_management_duty_tracking = nextVal;
+      }
+      if (!nextVal) {
         newState.allPermissions = false;
       }
       return newState;
@@ -57,7 +95,13 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
   };
 
   const handleRoleChange = (key, role) => {
-    setPermissions(prev => ({ ...prev, [key]: role }));
+    setPermissions(prev => {
+      const updated = { ...prev, [key]: role };
+      if (key === 'staffManagementRole') {
+        updated.staff_management_role = String(role).toLowerCase();
+      }
+      return updated;
+    });
   };
 
   const handleAllToggle = (e) => {
@@ -69,11 +113,25 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
       customerManagement: isChecked,
       centerManagement: isChecked,
       staffManagement: isChecked,
+      staffManagementRole: isChecked ? 'Admin' : 'Staff',
+      staff_management_role: isChecked ? 'admin' : 'staff',
+      staffManagementDutyTracking: isChecked,
+      staff_management_duty_tracking: isChecked,
       applicationStatus: isChecked,
+      applicationStatusRole: isChecked ? 'Admin' : 'Staff',
+      collectionReport: isChecked,
+      collectionReportRole: isChecked ? 'Admin' : 'Staff',
+      attendance: isChecked,
+      attendanceRole: isChecked ? 'Admin' : 'Staff',
+      expansion: isChecked,
+      expenses: isChecked,
+      cashBook: isChecked,
       recycleBin: isChecked,
       dashboardStaffCard: isChecked,
       dashboardLandSurveyCard: isChecked,
-      userSettings: isChecked
+      userSettings: isChecked,
+      can_assign_staff: isChecked,
+      canAssignStaff: isChecked
     }));
   };
 
@@ -200,7 +258,7 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                     type="radio"
                     name="staffRole"
                     className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
-                    checked={permissions.staffManagementRole === 'Staff'}
+                    checked={String(permissions.staffManagementRole).toLowerCase() === 'staff'}
                     onChange={() => handleRoleChange('staffManagementRole', 'Staff')}
                   />
                   <span className="font-medium text-slate-600">Staff</span>
@@ -210,18 +268,27 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                     type="radio"
                     name="staffRole"
                     className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
-                    checked={permissions.staffManagementRole === 'Admin'}
+                    checked={String(permissions.staffManagementRole).toLowerCase() === 'admin'}
                     onChange={() => handleRoleChange('staffManagementRole', 'Admin')}
                   />
                   <span className="font-medium text-slate-600">Admin</span>
                 </label>
                 <label className="flex items-center cursor-pointer text-sm">
                   <input 
-                    type="radio"
-                    name="staffRole"
-                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 border-slate-300 focus:ring-purple-500"
-                    checked={permissions.staffManagementRole === 'Tracking'}
-                    onChange={() => handleRoleChange('staffManagementRole', 'Tracking')}
+                    type="checkbox"
+                    className="w-3.5 h-3.5 mr-1.5 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                    checked={Boolean(permissions.staffManagementDutyTracking || permissions.staff_management_duty_tracking)}
+                    onChange={() => {
+                      setPermissions(prev => {
+                        const current = Boolean(prev.staffManagementDutyTracking || prev.staff_management_duty_tracking);
+                        const next = !current;
+                        return {
+                          ...prev,
+                          staffManagementDutyTracking: next,
+                          staff_management_duty_tracking: next
+                        };
+                      });
+                    }}
                   />
                   <span className="font-medium text-slate-600">Duty Tracking</span>
                 </label>
@@ -418,6 +485,15 @@ const StaffPermissionsModal = ({ isOpen, onClose, onSave, initialPermissions }) 
                 onChange={() => handleToggle('userSettings')}
               />
               <span className="text-sm font-medium text-slate-700">User Settings (Inside Customer Profile)</span>
+            </label>
+            <label className="flex items-center p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+              <input 
+                type="checkbox"
+                className="w-4 h-4 mr-3 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                checked={Boolean(permissions.can_assign_staff || permissions.canAssignStaff)}
+                onChange={() => handleToggle('can_assign_staff')}
+              />
+              <span className="text-sm font-medium text-slate-700">Assign Staff (Customer Profile & Application Status)</span>
             </label>
           </div>
         </section>

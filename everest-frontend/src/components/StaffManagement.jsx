@@ -34,7 +34,13 @@ const dummyData = [
 const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', name: 'Main Branch' }, userProfile, branches = [] }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
-  const hasDutyTrackingPermission = userProfile?.role === 'admin' || userProfile?.role === 'Admin' || userProfile?.role === 'main_admin' || userProfile?.permissions?.staffManagementRole === 'Tracking';
+  const hasDutyTrackingPermission = 
+    userProfile?.role === 'admin' || 
+    userProfile?.role === 'Admin' || 
+    userProfile?.role === 'main_admin' || 
+    userProfile?.permissions?.staffManagementDutyTracking === true || 
+    userProfile?.permissions?.staff_management_duty_tracking === true || 
+    userProfile?.permissions?.staffManagementRole === 'Tracking';
   
   // State for Add/Edit Form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -561,7 +567,12 @@ const StaffManagement = ({ onBack, setCurrentView, activeBranch = { id: 'main', 
           onDelete={handleDeleteStaff}
           editingStaff={editingStaff}
           staffCount={staffList.length}
-          canEditPermissions={userProfile?.role === 'admin' || userProfile?.permissions?.staffManagementRole === 'Admin'}
+          canEditPermissions={
+            userProfile?.role === 'admin' || 
+            userProfile?.role === 'Admin' || 
+            userProfile?.role === 'main_admin' || 
+            String(userProfile?.permissions?.staffManagementRole || userProfile?.permissions?.staff_management_role || '').toLowerCase() === 'admin'
+          }
         />
       )}
       

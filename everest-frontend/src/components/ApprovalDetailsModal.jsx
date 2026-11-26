@@ -24,8 +24,15 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
   const userProfile = storedProfile ? JSON.parse(storedProfile) : null;
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'Admin' || userProfile?.role === 'main_admin';
   const canAccessCustomerUserSettings = isAdmin || userProfile?.permissions?.userSettings === true;
+  const isSuperAdmin = isAdmin;
+  const hasAssignStaffPermission = Boolean(
+    userProfile?.permissions?.can_assign_staff === true || 
+    userProfile?.permissions?.canAssignStaff === true
+  );
+  const isAppStatusAdmin = String(userProfile?.permissions?.applicationStatusRole || '').toLowerCase() === 'admin';
+  const isAppStatusContext = Boolean(onApprove || onReject);
   const isStaffEmpty = !localApp.staffId || localApp.staffId === 'N/A';
-  const canAssignStaff = isAdmin || isStaffEmpty;
+  const canAssignStaff = isSuperAdmin || hasAssignStaffPermission || (isAppStatusContext && isAppStatusAdmin);
 
   // Ensure centers are available even when opened from CustomerDetail
   const [internalCenters, setInternalCenters] = useState(centers || []);
@@ -833,7 +840,7 @@ const ApprovalDetailsModal = ({ application, centers, onClose, onApprove, onReje
                 </button>
                 <h2 className="text-[17px] font-extrabold text-slate-800 tracking-tight">3. Staff</h2>
               </div>
-              {isAdmin && (
+              {canAssignStaff && (
                 <div className="relative">
                   <button 
                     onClick={() => setShowStaffDropdown(!showStaffDropdown)}

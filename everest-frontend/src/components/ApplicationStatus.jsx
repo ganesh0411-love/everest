@@ -14,8 +14,21 @@ const defaultAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onUpdateCustomer, activeBranch, isStaff, userProfile }) => {
   const isMainBranch = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
   
-  const isStaffMode = userProfile 
-    ? (userProfile.role !== 'admin' && userProfile?.permissions?.applicationStatusRole !== 'Admin')
+  const activeUserProfile = userProfile || (() => {
+    try {
+      const sp = localStorage.getItem('everest_user_profile');
+      return sp ? JSON.parse(sp) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+  const isSuperAdmin = activeUserProfile?.role === 'admin' || activeUserProfile?.role === 'Admin' || activeUserProfile?.role === 'main_admin';
+  const hasAssignStaffPermission = Boolean(activeUserProfile?.permissions?.can_assign_staff === true || activeUserProfile?.permissions?.canAssignStaff === true);
+  const isAppStatusAdmin = String(activeUserProfile?.permissions?.applicationStatusRole || '').toLowerCase() === 'admin';
+  const canAssignStaff = isSuperAdmin || hasAssignStaffPermission || isAppStatusAdmin;
+
+  const isStaffMode = activeUserProfile 
+    ? (activeUserProfile.role !== 'admin' && activeUserProfile?.permissions?.applicationStatusRole !== 'Admin')
     : isStaff;
 
   const [activeTab, setActiveTab] = useState(isStaffMode ? 'Draft' : 'Pending');
@@ -503,6 +516,14 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                             className="absolute right-0 top-10 w-48 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            {canAssignStaff && (
+                              <button 
+                                onClick={() => { setSelectedPendingApp(app); setActiveMenuId(null); }}
+                                className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                              >
+                                <span>👤</span> Assign Staff
+                              </button>
+                            )}
                             <button 
                               onClick={() => { setIsEditing(app); setActiveMenuId(null); }}
                               className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
@@ -612,6 +633,14 @@ const ApplicationStatus = ({ applications = [], onUpdateStatus, onDeleteApp, onU
                             className="absolute right-8 top-8 w-48 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-100 z-[99] animate-in fade-in zoom-in-95 overflow-hidden"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            {canAssignStaff && (
+                              <button 
+                                onClick={() => { setSelectedPendingApp(app); setActiveMenuId(null); }}
+                                className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                              >
+                                <span>👤</span> Assign Staff
+                              </button>
+                            )}
                             <button 
                               onClick={() => { setIsEditing(app); setActiveMenuId(null); }}
                               className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
