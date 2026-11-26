@@ -65,39 +65,52 @@ const resolvePaymentMode = (inst) => {
   return 'Cash';
 };
 
+export const getTransactionBusinessDate = (rec) => {
+  if (!rec) return '';
+  return (
+    rec.collection_date ||
+    rec.collectionDate ||
+    rec.payment_date ||
+    rec.paymentDate ||
+    rec.disbursement_date ||
+    rec.disbursedDate ||
+    rec.disbursedAt ||
+    rec.date ||
+    rec.dueDate ||
+    rec.scheduledDate ||
+    rec.created_at ||
+    rec.createdAt ||
+    ''
+  );
+};
+
 const formatTransactionSubtext = (dateStr, timeStr, createdAt) => {
   const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-  let ts = null;
+  // 1. Resolve date strictly prioritizing business transaction date over system metadata
+  const effectiveDate = dateStr || createdAt;
+  let dateTs = null;
 
-  // 1. Parse string or numeric timestamp safely using parseDateToTimestamp to avoid US date MM-DD-YYYY inversion
-  if (createdAt) {
-    if (typeof createdAt === 'number') {
-      ts = createdAt;
-    } else if (typeof createdAt === 'string') {
-      ts = parseDateToTimestamp(createdAt);
+  if (effectiveDate) {
+    if (typeof effectiveDate === 'number') {
+      dateTs = effectiveDate;
+    } else if (typeof effectiveDate === 'string') {
+      dateTs = parseDateToTimestamp(effectiveDate);
     }
   }
 
-  if (!ts && dateStr) {
-    ts = parseDateToTimestamp(dateStr);
-  }
-
-  let dateObj = ts ? new Date(ts) : null;
-  let day = '09';
-  let monthStr = 'OCT';
-  let yearStr = '26';
-  let timeFormatted = timeStr || '';
+  let dateObj = dateTs ? new Date(dateTs) : null;
+  const now = new Date();
+  let day = String(now.getDate()).padStart(2, '0');
+  let monthStr = months[now.getMonth()];
+  let yearStr = String(now.getFullYear()).slice(-2);
 
   if (dateObj && !isNaN(dateObj.getTime())) {
     day = String(dateObj.getDate()).padStart(2, '0');
     monthStr = months[dateObj.getMonth()];
     yearStr = String(dateObj.getFullYear()).slice(-2);
-    if (!timeFormatted) {
-      timeFormatted = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
-    }
-  } else if (dateStr && typeof dateStr === 'string') {
-    const parts = dateStr.trim().split(/[\.\-\/]/);
+  } else if (effectiveDate && typeof effectiveDate === 'string') {
+    const parts = effectiveDate.trim().split(/[.\-\/]/);
     if (parts.length === 3) {
       if (parts[0].length === 4) { // YYYY-MM-DD
         yearStr = parts[0].slice(-2);
@@ -115,6 +128,28 @@ const formatTransactionSubtext = (dateStr, timeStr, createdAt) => {
   }
 
   const dateFormatted = `${day} ${monthStr} ${yearStr}`;
+
+  // 2. Resolve time formatted (manual timeStr -> time from date if explicit -> entry time from createdAt)
+  let timeFormatted = timeStr || '';
+
+  if (!timeFormatted && dateObj && !isNaN(dateObj.getTime())) {
+    const hasExplicitTime = typeof effectiveDate === 'string'
+      ? (effectiveDate.includes('T') || effectiveDate.includes(':'))
+      : typeof effectiveDate === 'number';
+    if (hasExplicitTime && (dateObj.getHours() !== 0 || dateObj.getMinutes() !== 0 || dateObj.getSeconds() !== 0)) {
+      timeFormatted = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+    }
+  }
+
+  if (!timeFormatted && createdAt) {
+    const cTs = typeof createdAt === 'number' ? createdAt : parseDateToTimestamp(createdAt);
+    if (cTs) {
+      const cDate = new Date(cTs);
+      if (!isNaN(cDate.getTime()) && (cDate.getHours() !== 0 || cDate.getMinutes() !== 0 || cDate.getSeconds() !== 0)) {
+        timeFormatted = cDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+      }
+    }
+  }
 
   if (timeFormatted) {
     timeFormatted = timeFormatted.toUpperCase().replace(/\.\s*/g, '');
@@ -788,7 +823,7 @@ export default function CollectionReportModal({
       let firstBouncedTs = null;
 
       rawInstallments.forEach(inst => {
-        const dStr = inst.date || inst.paymentDate || inst.createdAt;
+        const dStr = getTransactionBusinessDate(inst);
         const ts = parseDateToTimestamp(dStr);
         if (ts && ts <= endTs) {
           const status = String(inst.status || '').toUpperCase();
@@ -811,7 +846,7 @@ export default function CollectionReportModal({
       rawInstallments.forEach(inst => {
         const status = String(inst.status || '').toUpperCase();
         if (status === 'BOUNCED' || status === 'CANCELLED') return;
-        const dStr = inst.date || inst.paymentDate || inst.createdAt;
+        const dStr = getTransactionBusinessDate(inst);
         const ts = parseDateToTimestamp(dStr);
         if (ts && new Date(ts).setHours(0, 0, 0, 0) === todayStartTs) {
           const amt = Number(inst.amount || inst.paidAmount || (Number(inst.cashAmount || 0) + Number(inst.upiAmount || 0)) || 0);
@@ -844,7 +879,7 @@ export default function CollectionReportModal({
 
         let totalPaidToCutoff = 0;
         rawInstallments.forEach(inst => {
-          const dStr = inst.date || inst.paymentDate || inst.createdAt;
+          const dStr = getTransactionBusinessDate(inst);
           const ts = parseDateToTimestamp(dStr);
           if (ts && ts <= cutoffTs) {
             const status = String(inst.status || '').toUpperCase();
@@ -867,7 +902,7 @@ export default function CollectionReportModal({
         let latestTodayInstId = null;
         let latestTodayTs = -1;
         rawInstallments.forEach((inst, idx) => {
-          const dStr = inst.date || inst.paymentDate || inst.createdAt;
+          const dStr = getTransactionBusinessDate(inst);
           const ts = parseDateToTimestamp(dStr);
           if (ts && new Date(ts).setHours(0, 0, 0, 0) === todayStartTs && isInDateRange(dStr)) {
             if (ts >= latestTodayTs) {
@@ -878,7 +913,7 @@ export default function CollectionReportModal({
         });
 
         rawInstallments.forEach((inst, index) => {
-          const instDate = inst.date || inst.paymentDate || inst.createdAt;
+          const instDate = getTransactionBusinessDate(inst);
           if (!isInDateRange(instDate)) return;
 
           const status = String(inst.status || '').toUpperCase();
@@ -998,7 +1033,7 @@ export default function CollectionReportModal({
       }
 
       // Loan Amount & Disbursement for Date Range:
-      const disbDate = cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.approvalDate || cust.loanDate || cust.date || cust.createdAt;
+      const disbDate = cust.disbursement_date || cust.disbursementDate || cust.disbursedAt || cust.disbursedDate || cust.loanApprovedDate || cust.approvalDate || cust.loanDate || cust.date || cust.createdAt;
       const custStatus = String(cust.status || '').toLowerCase();
       const isApprovedOrDisbursed = custStatus === 'approved' || custStatus === 'disbursed' || custStatus === 'active';
       const disbAmount = Number(cust.disbursedAmount || cust.disbursementAmount || cust.loanAmount || 0);
@@ -1099,8 +1134,10 @@ export default function CollectionReportModal({
     });
 
     result.sort((a, b) => {
-      const tsA = parseDateToTimestamp(a.createdAt || a.date) || 0;
-      const tsB = parseDateToTimestamp(b.createdAt || b.date) || 0;
+      const dateA = a.date || a.collection_date || a.payment_date || a.disbursement_date || a.createdAt;
+      const dateB = b.date || b.collection_date || b.payment_date || b.disbursement_date || b.createdAt;
+      const tsA = parseDateToTimestamp(dateA) || 0;
+      const tsB = parseDateToTimestamp(dateB) || 0;
       if (tsA !== tsB) {
         return sortOrder === 'desc' ? tsB - tsA : tsA - tsB;
       }

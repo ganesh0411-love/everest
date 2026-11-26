@@ -272,8 +272,10 @@ export default function CollectionReportDownloadModal({
       });
 
       baseList = [...baseList].sort((a, b) => {
-        const tsA = parseDateToTimestamp(a.createdAt || a.date) || 0;
-        const tsB = parseDateToTimestamp(b.createdAt || b.date) || 0;
+        const dateA = a.date || a.collection_date || a.payment_date || a.disbursement_date || a.createdAt;
+        const dateB = b.date || b.collection_date || b.payment_date || b.disbursement_date || b.createdAt;
+        const tsA = parseDateToTimestamp(dateA) || 0;
+        const tsB = parseDateToTimestamp(dateB) || 0;
         if (tsA !== tsB) {
           return sortOrder === 'desc' ? tsB - tsA : tsA - tsB;
         }
@@ -1338,7 +1340,7 @@ export default function CollectionReportDownloadModal({
 
                       {/* Date */}
                       <div style={{ width: '74px', minWidth: '74px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155', fontWeight: 500, borderRight: '1px solid #e2e8f0', padding: '6px 2px', whiteSpace: 'nowrap' }}>
-                        {formatDateToDDMMYYYY(item.date)}
+                        {formatDateToDDMMYYYY(item.date || item.collection_date || item.payment_date || item.createdAt)}
                       </div>
 
                       {/* Name */}

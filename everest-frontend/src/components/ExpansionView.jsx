@@ -1131,7 +1131,7 @@ export default function ExpansionView({
   return (
     <div className="w-full min-h-screen bg-[#f0f4f9] text-slate-800 p-4 sm:p-6 lg:p-8 space-y-5 overflow-x-hidden">
       {/* 1. Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+      <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div className="flex flex-wrap items-center gap-3">
           {onBack && (
             <button

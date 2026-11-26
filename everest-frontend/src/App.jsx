@@ -26,6 +26,8 @@ import RecycleBinView from './components/RecycleBinView';
 import CenterDetailsView from './components/CenterDetailsView';
 import LiveTrackingDaemon from './components/LiveTrackingDaemon';
 import { App as CapacitorApp } from '@capacitor/app';
+import { StatusBar } from '@capacitor/status-bar';
+import { Capacitor } from '@capacitor/core';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
@@ -119,6 +121,13 @@ const sanitizeProfile = (profileData) => {
 };
 
 function App() {
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+      } catch (e) {}
+    }
+  }, []);
   const [activeBranch, setActiveBranch] = useState({ id: 'main', name: 'Main Branch' });
   const [branches, setBranches] = useState([{ id: 'main', name: 'Main Branch' }]);
   const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);

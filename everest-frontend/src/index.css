@@ -25,11 +25,33 @@
   }
 }
 
-/* Dynamic Safe Area Padding for Mobile Top Navigation Header */
-.app-top-header {
-  padding-top: max(12px, env(safe-area-inset-top, 0px)) !important;
-  padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
-  padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
+html, body, #root {
+  height: 100dvh;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Universal Top Safe Clearance for ALL Page Headers (Dashboard + Customer Profile + Reports) */
+.page-header,
+.customer-profile-header,
+.app-top-header,
+header {
+  padding-top: max(16px, env(safe-area-inset-top, 0px)) !important;
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+}
+
+/* Specific Customer Profile Header: Restore exact breathing space to match Chinrasu Alaguraja layout */
+.customer-profile-header {
+  padding-top: max(24px, calc(env(safe-area-inset-top, 0px) + 16px)) !important;
+}
+
+/* Universal Bottom Safe Clearance so bottom nav/buttons never collide with Android 3-button bar */
+.bottom-nav,
+.page-footer {
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)) !important;
 }
 
 body {

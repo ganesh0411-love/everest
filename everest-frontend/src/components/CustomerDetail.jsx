@@ -749,7 +749,7 @@ const CustomerDetail = ({ customer, onBack }) => {
     <div className="flex flex-col h-[100dvh] md:h-full bg-gradient-to-b from-[#115e41] via-[#1b7c58] to-[#f4f7f6] overflow-hidden relative font-sans w-full max-w-md md:max-w-7xl mx-auto shadow-2xl md:shadow-none">
       
       {/* Top Section */}
-      <div className="md:hidden px-3 sm:px-6 pt-6 pb-0 relative z-10 flex-shrink-0">
+      <div className="customer-profile-header md:hidden px-3 sm:px-6 pb-0 relative z-10 flex-shrink-0">
         <div className="grid grid-cols-[1fr_auto_1fr] items-start w-full gap-2">
           {/* Left: Back Button, Phone & Loan Amount */}
           <div className="flex flex-col gap-3 justify-start items-start min-w-0">
@@ -1108,8 +1108,8 @@ const CustomerDetail = ({ customer, onBack }) => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="absolute bottom-0 left-0 w-full z-50 md:hidden">
-        <div className="bg-[#124b33] rounded-t-[2rem] h-20 flex justify-between items-center px-8 relative shadow-[0_-15px_30px_rgba(0,0,0,0.15)] border-t border-white/5 pb-2">
+      <div className="page-footer absolute bottom-0 left-0 w-full z-50 md:hidden">
+        <div className="bg-[#124b33] rounded-t-[2rem] min-h-[5rem] flex justify-between items-center px-8 relative shadow-[0_-15px_30px_rgba(0,0,0,0.15)] border-t border-white/5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
           
           {/* SCHEDULE */}
           <button 

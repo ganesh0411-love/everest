@@ -79,6 +79,12 @@ export const parseDateToTimestamp = (dateInput) => {
   const clean = String(dateInput).trim();
   if (!clean || clean === '[object Object]') return null;
 
+  // Handle ISO 8601 strings with explicit time (e.g. 2026-11-25T11:09:00.000Z)
+  if (clean.includes('T')) {
+    const parsed = new Date(clean);
+    if (!isNaN(parsed.getTime())) return parsed.getTime();
+  }
+
   // DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY with optional time
   const dmyMatch = clean.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?)?/i);
   if (dmyMatch) {
@@ -2997,7 +3003,7 @@ export default function CashBook({
   return (
     <div className="w-full min-h-screen bg-[#f1f5f9] text-slate-800 p-4 sm:p-6 lg:p-7 space-y-4 overflow-x-hidden">
       {/* ================= 1. HEADER ROW ================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+      <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div className="flex items-center gap-3">
           {onBack && (
             <button

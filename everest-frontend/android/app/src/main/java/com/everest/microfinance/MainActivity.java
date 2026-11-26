@@ -20,6 +20,7 @@ public class MainActivity extends BridgeActivity {
         if (webView != null) {
             WebSettings settings = webView.getSettings();
             settings.setMediaPlaybackRequiresUserGesture(false);
+            webView.setFitsSystemWindows(true);
         }
     }
 }
