@@ -370,19 +370,42 @@ export const isCustomerActive = (cust) => {
   return true;
 };
 
+// Exact 1:1 Sorting Comparator with Collection Report:
+// Primary sort: business transaction date descending (newest first)
+// Secondary sort: creation timestamp descending
+// Tertiary tie-breaker: unique record ID descending
+export const compareLedgerRows = (a, b) => {
+  const dateA = a.date || a.collection_date || a.payment_date || a.disbursement_date || a.createdAt;
+  const dateB = b.date || b.collection_date || b.payment_date || b.disbursement_date || b.createdAt;
+  const tsA = a.rawTimestamp || parseDateToTimestamp(dateA) || 0;
+  const tsB = b.rawTimestamp || parseDateToTimestamp(dateB) || 0;
+  if (tsA !== tsB) {
+    return tsB - tsA;
+  }
+  const createA = parseDateToTimestamp(a.createdAt || a.created_at || '') || 0;
+  const createB = parseDateToTimestamp(b.createdAt || b.created_at || '') || 0;
+  if (createA !== createB && createA > 0 && createB > 0) {
+    return createB - createA;
+  }
+  return String(b.id || '').localeCompare(String(a.id || ''));
+};
+
 // Normalizes customer identity across phone, name, and branch
 export const getCanonicalCustomerKey = (c) => {
   if (!c || typeof c !== 'object') return '';
+  const cId = String(c.id || c.customerId || c.docId || '').trim();
+  if (cId) return cId; // Primary unique identifier: NEVER collapse customers by name!
+  const phone = String(c.phone || c.mobile || c.phoneNumber || '').replace(/\D/g, '');
+  if (phone.length >= 10) return `phone_${phone.slice(-10)}`;
   const cleanName = String(c.name || c.customerName || '')
     .toLowerCase()
     .replace(/^(mr|mrs|ms|dr)\.?\s+/i, '')
     .replace(/\s*\(.*?\)\s*/g, '')
     .trim();
   const b = String(c.branch || c.branchName || c.assignedBranch || '').toLowerCase().trim();
-  if (cleanName) return `name_${cleanName}_${b}`;
-  const phone = String(c.phone || c.mobile || c.phoneNumber || '').replace(/\D/g, '');
-  if (phone.length >= 10) return `phone_${phone.slice(-10)}`;
-  return String(c.id || c.customerId || '');
+  if (cleanName && b) return `name_${cleanName}_${b}`;
+  if (cleanName) return `name_${cleanName}`;
+  return '';
 };
 
 // Resolve Transaction Business Date (1:1 with CollectionReportModal)
@@ -558,7 +581,6 @@ export const computeEarliestTransactionDate = ({
   };
 
   const custMap = new Map();
-  GULLAPURAM_CANONICAL_CUSTOMERS.forEach(c => mergeCustomerIntoMap(custMap, c));
   if (Array.isArray(customers)) {
     customers.forEach(c => mergeCustomerIntoMap(custMap, c));
   }
@@ -1942,10 +1964,14 @@ export default function CashBook({
 
     // Strict Active Customer Filter Pipeline:
     // Build active customer directory and identify soft-deleted, recycled, or purged records.
+    // NEVER drop or deduplicate active customers by name (e.g. Sangili P with distinct IDs)!
     const activeCustomerIds = new Set();
-    const activeCustomerNames = new Set();
     const deletedCustomerIds = new Set();
-    const deletedCustomerNames = new Set();
+    const isBannedGhostName = (nameStr) => {
+      if (!nameStr) return false;
+      const lower = String(nameStr).toLowerCase();
+      return lower.includes('anitha') || lower.includes('seetha');
+    };
 
     const customerMap = new Map();
     // 1. Add props customers (live from Firestore)
@@ -1963,38 +1989,29 @@ export default function CashBook({
       if (!c || typeof c !== 'object') return;
       const cId = String(c.id || c.customerId || c.docId || '').trim();
       const cName = String(c.name || c.customerName || '').toLowerCase().trim();
-      const cleanName = cName.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
 
-      if (cName.includes('anitha') || cleanName.includes('anitha') || cName.includes('seetha') || cleanName.includes('seetha')) {
+      if (isBannedGhostName(cName)) {
         if (cId) deletedCustomerIds.add(cId);
-        if (cleanName) deletedCustomerNames.add(cleanName);
         return;
       }
 
       if (isCustomerActive(c)) {
         if (cId) activeCustomerIds.add(cId);
-        if (cleanName) activeCustomerNames.add(cleanName);
       } else {
         if (cId) deletedCustomerIds.add(cId);
-        if (cleanName) deletedCustomerNames.add(cleanName);
       }
     });
 
-    deletedCustomerNames.add('anitha');
-    deletedCustomerNames.add('seetha');
-
     // Verified Active Customers List:
-    // Strictly drops any customer marked as deleted/recycled or matching deleted IDs or names.
+    // Strictly drops any customer marked as deleted/recycled or matching deleted IDs.
+    // Distinct customers sharing the same name are 100% preserved!
     const allCust = (rawCustomerSource || []).filter(c => {
       if (!isCustomerActive(c)) return false;
       const cId = String(c.id || c.customerId || c.docId || '').trim();
       const cName = String(c.name || c.customerName || '').toLowerCase().trim();
-      const cleanName = cName.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
 
-      if (cName.includes('anitha') || cleanName.includes('anitha')) return false;
-      if (cName.includes('seetha') || cleanName.includes('seetha')) return false;
+      if (isBannedGhostName(cName)) return false;
       if (cId && deletedCustomerIds.has(cId)) return false;
-      if (deletedCustomerNames.has(cleanName)) return false;
       return true;
     });
 
@@ -2054,16 +2071,12 @@ export default function CashBook({
       if (!disbTs || disbAmount <= 0) return;
 
       const custName = String(name || 'Customer').trim();
-      const cleanDisbName = custName
-        .toLowerCase()
-        .replace(/^(mr|mrs|ms|dr)\.?\s+/i, '')
-        .replace(/\s*\(.*?\)\s*/g, '')
-        .trim();
-      if (custName.toLowerCase().includes('anitha') || cleanDisbName.includes('anitha') || custName.toLowerCase().includes('seetha') || cleanDisbName.includes('seetha')) return;
-      if (deletedCustomerNames.has(cleanDisbName)) return;
+      if (isBannedGhostName(custName)) return;
+      const custId = entity?.id || entity?.customerId || id || custName;
       if (id && deletedCustomerIds.has(String(id).trim())) return;
+      if (entity?.id && deletedCustomerIds.has(String(entity.id).trim())) return;
 
-      const disbKey = `${cleanDisbName}_${disbAmount}_${formatDateToYmd(disbTs)}`;
+      const disbKey = `${custId}_${disbAmount}_${formatDateToYmd(disbTs)}`;
       if (seenDisbursementKeys.has(disbKey)) return;
       seenDisbursementKeys.add(disbKey);
 
@@ -2109,11 +2122,9 @@ export default function CashBook({
 
       const cId = String(cust.id || cust.customerId || cust.docId || '').trim();
       const custNameLower = String(cust.name || cust.customerName || '').toLowerCase().trim();
-      const cleanCustName = custNameLower.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
 
-      if (custNameLower.includes('anitha') || cleanCustName.includes('anitha') || custNameLower.includes('seetha') || cleanCustName.includes('seetha')) return;
+      if (isBannedGhostName(custNameLower)) return;
       if (cId && deletedCustomerIds.has(cId)) return;
-      if (deletedCustomerNames.has(cleanCustName)) return;
 
       const rawType = String(cust.loanType || cust.scheme || cust.category || '').toLowerCase();
       let catName = 'Daily Collection';
@@ -2207,13 +2218,15 @@ export default function CashBook({
           }
         }
 
-        const scopedInstId = `inst_${cust.id || cust.customerId || 'c'}_${inst.id || idx + 1}`;
+        const instId = String(inst.id || inst.transaction_id || inst.transactionId || inst.number || (idx + 1)).trim();
         const realTxnId = inst.transaction_id || inst.transactionId || inst.txnId || inst.receipt_no || inst.receiptNo || inst.voucher_no || inst.voucherNo || null;
+        // Match CollectionReportModal 1:1 primary key format:
+        const scopedInstId = `${cId}_credit_${instId}_${instDate}_${actualPaid}`;
 
         rawCollections.push({
           id: scopedInstId,
           transaction_id: realTxnId,
-          customer_id: cust.id || cust.customerId || getCanonicalCustomerKey(cust),
+          customer_id: cId,
           customerName: custDisplayName,
           name: custDisplayName,
           branch: cust.branch,
@@ -2227,6 +2240,8 @@ export default function CashBook({
           mode: resolvedMode,
           status: 'PAID',
           date: instDate,
+          timeStr: inst.timeStr || inst.time || '',
+          createdAt: inst.createdAt || inst.date || instDate,
           is_deleted: false,
           deleted: false,
           remarks: remarksInfo,
@@ -2247,19 +2262,14 @@ export default function CashBook({
 
       const cId = String(c.customerId || c.customer_id || c.userId || c.cust_id || '').trim();
       const cName = String(c.customerName || c.name || c.customer_name || '').trim().toLowerCase();
-      const cleanCName = cName.replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
 
-      if (cName.includes('anitha') || cleanCName.includes('anitha')) return;
-      if (cName.includes('seetha') || cleanCName.includes('seetha')) return;
+      if (isBannedGhostName(cName)) return;
       if (cId && deletedCustomerIds.has(cId)) return;
-      if (deletedCustomerNames.has(cleanCName)) return;
-
-      // Active customer verification: If activeCustomerIds is populated, ensure customer exists and is not deleted
       if (cId && activeCustomerIds.size > 0 && !activeCustomerIds.has(cId)) return;
 
       // Andipatti branch guard: strictly purge deleted customer Seetha and orphaned transactions
       if (colBranch.includes('andi')) {
-        if (cleanCName === 'seetha' || cleanCName.includes('seetha')) return;
+        if (cName === 'seetha' || cName.includes('seetha')) return;
         if (cId && activeCustomerIds.size > 0 && !activeCustomerIds.has(cId)) return;
       }
 
@@ -2325,9 +2335,12 @@ export default function CashBook({
         }
       }
 
+      const colTxnId = c.transaction_id || c.transactionId || c.txnId || c.receipt_no || c.receiptNo || c.voucher_no || c.voucherNo || null;
+      const colUniqueId = c.id || `col_${cId}_${colTxnId || colDate}_${actualPaid}`;
+
       rawCollections.push({
-        id: c.id,
-        transaction_id: c.transaction_id || c.transactionId || c.txnId || c.receipt_no || c.receiptNo || c.voucher_no || c.voucherNo || null,
+        id: colUniqueId,
+        transaction_id: colTxnId,
         customer_id: cId,
         customerName: c.customerName || c.name,
         name: c.customerName || c.name,
@@ -2342,17 +2355,22 @@ export default function CashBook({
         mode: resolvedMode,
         status: 'PAID',
         date: colDate,
+        timeStr: c.timeStr || c.time || '',
+        createdAt: c.createdAt || c.created_at || c.date || colDate,
         is_deleted: false,
         deleted: false,
         remarks: c.remarks || c.customerName || 'Collection entry',
         installment_no: c.installment_no || c.installmentNo || c.number,
-        entity: c
+        entity: c,
+        is_firestore_collection_table: true
       });
     });
 
-    // 2. Strict Collection Deduplication by Customer-Scoped Key
+    // 2. Strict Collection Deduplication by Unique Record / Transaction ID
+    // NEVER deduplicate or group by customer_name, remarks, or amount!
     const uniqueCollectionsMap = new Map();
     const seenTxnIds = new Set();
+    const seenCustomerInstallmentKeys = new Set();
 
     rawCollections.forEach(record => {
       if (!record) return;
@@ -2370,41 +2388,45 @@ export default function CashBook({
       const totalAmt = Number(record.amount || record.paidAmount || (Number(record.cashAmount || 0) + Number(record.upiAmount || 0)) || 0);
       if (totalAmt <= 0 || !isNotDeleted) return;
 
-      const normCust = String(record.customerName || record.name || record.customer_id || '')
-        .toLowerCase()
-        .replace(/^(mr|mrs|ms|dr)\.?\s+/i, '')
-        .replace(/\s*\(.*?\)\s*/g, '')
-        .trim();
-      if (normCust.includes('anitha') || normCust.includes('seetha')) return;
-      if (deletedCustomerNames.has(normCust)) return;
-
       const rCustId = String(record.customer_id || record.customerId || '').trim();
+      const rName = String(record.customerName || record.name || '').toLowerCase().trim();
+      if (isBannedGhostName(rName)) return;
       if (rCustId && deletedCustomerIds.has(rCustId)) return;
       if (rCustId && activeCustomerIds.size > 0 && !activeCustomerIds.has(rCustId)) return;
 
       const recBranch = String(record.branch || record.branchName || '').toLowerCase();
       if (recBranch.includes('andi')) {
-        if (normCust === 'seetha' || normCust.includes('seetha')) return;
+        if (rName === 'seetha' || rName.includes('seetha')) return;
         if (rCustId && activeCustomerIds.size > 0 && !activeCustomerIds.has(rCustId)) return;
       }
 
-      const dateKey = formatDateToYmd(record.date);
-      if (!dateKey) return;
-
-      // Only check genuine global transaction identifiers against seenTxnIds (never generic numeric IDs!)
+      // Check genuine global transaction identifiers
       const realTxnId = record.transaction_id || record.receipt_no || record.voucher_no || null;
-      if (realTxnId && seenTxnIds.has(realTxnId)) return;
+      if (realTxnId && seenTxnIds.has(String(realTxnId).trim())) {
+        return; // Skip duplicate of already seen global transaction ID
+      }
 
-      // Customer-scoped deduplication key: prevents collision between different customers
-      const custKey = record.customer_id || normCust;
-      const instKey = record.installment_no !== undefined ? record.installment_no : (record.id || totalAmt);
-      const uniqueKey = realTxnId 
-        ? `txn_${realTxnId}` 
-        : `${custKey}_${normCust}_${dateKey}_${instKey}_${totalAmt}`;
+      // If this is a top-level firestoreCollections record, prevent double-counting if already present in customer installments
+      if (record.is_firestore_collection_table) {
+        const dateKey = formatDateToYmd(record.date);
+        const matchKey = `${rCustId}_${dateKey}_${totalAmt}`;
+        if (seenCustomerInstallmentKeys.has(matchKey)) {
+          return;
+        }
+      }
 
-      if (uniqueCollectionsMap.has(uniqueKey)) return;
+      // Unique record key: strictly by unique record.id (contains custId + instId / docId)
+      const uniqueKey = String(record.id || (realTxnId ? `txn_${realTxnId}` : `${rCustId}_${record.date}_${record.installment_no}_${totalAmt}`));
+      if (uniqueCollectionsMap.has(uniqueKey)) {
+        return;
+      }
 
-      if (realTxnId) seenTxnIds.add(realTxnId);
+      if (realTxnId) seenTxnIds.add(String(realTxnId).trim());
+      if (!record.is_firestore_collection_table && rCustId) {
+        const dateKey = formatDateToYmd(record.date);
+        seenCustomerInstallmentKeys.add(`${rCustId}_${dateKey}_${totalAmt}`);
+      }
+
       uniqueCollectionsMap.set(uniqueKey, record);
     });
 
@@ -2421,17 +2443,15 @@ export default function CashBook({
       if (!isBranchMatch(matchObj)) return;
 
       const custName = String(record.customerName || record.name || 'Customer').trim();
-      const cleanRecordName = custName.toLowerCase().replace(/^(mr|mrs|ms|dr)\.?\s+/i, '').replace(/\s*\(.*?\)\s*/g, '').trim();
-      if (cleanRecordName.includes('anitha') || cleanRecordName.includes('seetha')) return;
-      if (deletedCustomerNames.has(cleanRecordName)) return;
-
       const rCustId = String(record.customer_id || record.customerId || '').trim();
+      const rName = custName.toLowerCase().trim();
+      if (isBannedGhostName(rName)) return;
       if (rCustId && deletedCustomerIds.has(rCustId)) return;
       if (rCustId && activeCustomerIds.size > 0 && !activeCustomerIds.has(rCustId)) return;
 
       const recordBranchStr = String(record.branch || record.branchName || '').toLowerCase();
       if (recordBranchStr.includes('andi')) {
-        if (cleanRecordName === 'seetha' || cleanRecordName.includes('seetha')) return;
+        if (rName === 'seetha' || rName.includes('seetha')) return;
         if (rCustId && activeCustomerIds.size > 0 && !activeCustomerIds.has(rCustId)) return;
       }
 
@@ -2477,7 +2497,7 @@ export default function CashBook({
         const instId = record.id || `col_${record.date}_${custName}`;
 
         dynamicTx.push({
-          id: instId,
+          id: record.id,
           date: formatDateToDisplay(record.date),
           particulars: record.particulars || 'Daily Collection',
           type: 'Credit',
@@ -2487,7 +2507,11 @@ export default function CashBook({
           mode: (cashAmt > 0 && upiAmt > 0) ? 'Split' : (upiAmt > 0 ? 'UPI' : 'Cash'),
           remarks: record.remarks || custName || 'Daily Collection',
           customer_name: custName,
-          rawTimestamp: instTs
+          customer_id: rCustId,
+          rawTimestamp: instTs,
+          timeStr: record.timeStr || '',
+          createdAt: record.createdAt || record.date,
+          status: record.status || 'PAID'
         });
       }
     });
@@ -2792,9 +2816,9 @@ export default function CashBook({
       }
     });
 
-    // Sort recent transactions by timestamp descending
-    dynamicTx.sort((a, b) => (b.rawTimestamp || 0) - (a.rawTimestamp || 0));
-    dynamicExp.sort((a, b) => (b.rawTimestamp || 0) - (a.rawTimestamp || 0));
+    // Match Collection Report sort order 1:1 (date descending, created_at descending, unique id descending)
+    dynamicTx.sort(compareLedgerRows);
+    dynamicExp.sort(compareLedgerRows);
 
     // Cumulative Opening Balances as of the day before fromDate
     const effectiveBranchKey = isEnterpriseSelected ? 'main' : (selectedBranchId || branchId);
@@ -2978,8 +3002,9 @@ export default function CashBook({
   }, [allTransactionsList]);
 
   // Combined Multi-Select Filtered Transactions (AND across columns, OR within columns)
+  // Maintains 1:1 Sort Order with Collection Report
   const filteredAllTransactions = useMemo(() => {
-    return allTransactionsList.filter(tx => {
+    const list = allTransactionsList.filter(tx => {
       if (selectedTypeFilters.length > 0 && !selectedTypeFilters.includes(tx.type)) {
         return false;
       }
@@ -2997,6 +3022,7 @@ export default function CashBook({
       }
       return true;
     });
+    return list.sort(compareLedgerRows);
   }, [allTransactionsList, selectedTypeFilters, selectedAmountFilters, selectedRemarkFilters]);
 
   // Sliced lists for desktop split containers (up to 20 rows for immediate visibility)
