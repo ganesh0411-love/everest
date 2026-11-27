@@ -8,7 +8,7 @@ import Footer from './components/Footer';
 import { 
   CheckCircle2, LayoutGrid, CalendarClock, TrendingUp, Activity,
   Clock, History, ArrowUpRight, ArrowDownRight, ArrowDownLeft, ArrowDownAZ,
-  Banknote, User, Sprout, CalendarDays, Search, Filter, Coins, Receipt, ClockAlert
+  Banknote, User, Users, Handshake, ChevronDown, Sprout, CalendarDays, Search, Filter, Coins, Receipt, ClockAlert
 } from 'lucide-react';
 import { 
   DashboardOverview, 
@@ -1565,8 +1565,8 @@ function App() {
               </main>
             ) : (
               <>
-                <div className={`flex-shrink-0 z-30 bg-[#f8fafc] pb-2 ${(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? 'md:hidden' : 'lg:hidden'}`}>
-                  <div className={(activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch') ? '' : 'lg:hidden'}>
+                <div className="flex-shrink-0 z-30 bg-[#f8fafc] pb-2 md:hidden">
+                  <div>
                     <NetBalanceCard loanAmount={totalLoan} outstanding={totalOutstanding} />
                   </div>
                   <SearchBar 
@@ -1578,7 +1578,7 @@ function App() {
                 </div>
                 
                 <main 
-                  className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto md:max-w-none md:mx-0 bg-white flex flex-col"
+                  className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto md:max-w-none md:mx-0 bg-white md:bg-gradient-to-b md:from-[#EAF4FF] md:via-[#F3F8FF] md:to-[#EAF3FF] flex flex-col relative"
                   onScroll={handleScroll}
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
@@ -1598,296 +1598,371 @@ function App() {
                     }
 
                     return (
-                      <div className="p-2 space-y-2 pb-24">
-                        <div className={`px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider ${isMainBranchView ? 'md:hidden' : 'lg:hidden'}`}>
-                          Entries: {approvedCustomers.length}
+                      <div className="relative min-h-full w-full">
+                        {/* DESKTOP-ONLY: Soft Sky-Blue Wave Backdrop */}
+                        <div className="hidden md:block pointer-events-none absolute inset-0 overflow-hidden z-0">
+                          <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="absolute top-0 left-0 w-full h-56 opacity-70">
+                            <path
+                              d="M0,96 C320,180 620,10 960,80 C1180,125 1330,45 1440,16 L1440,0 L0,0 Z"
+                              fill="url(#clTopWaveGrad)"
+                            />
+                            <defs>
+                              <linearGradient id="clTopWaveGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#DBEAFE" stopOpacity="0.55" />
+                                <stop offset="60%" stopColor="#BAE6FD" stopOpacity="0.7" />
+                                <stop offset="100%" stopColor="#93C5FD" stopOpacity="0.55" />
+                              </linearGradient>
+                            </defs>
+                          </svg>
+                          <svg viewBox="0 0 1440 160" preserveAspectRatio="none" className="absolute bottom-0 left-0 w-full h-24 opacity-70">
+                            <path
+                              d="M0,120 C360,30 720,150 1080,85 C1260,55 1370,70 1440,40 L1440,160 L0,160 Z"
+                              fill="url(#clBottomWaveGrad)"
+                            />
+                            <defs>
+                              <linearGradient id="clBottomWaveGrad" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#E0F2FE" stopOpacity="0.55" />
+                                <stop offset="50%" stopColor="#BAE6FD" stopOpacity="0.65" />
+                                <stop offset="100%" stopColor="#7DD3FC" stopOpacity="0.55" />
+                              </linearGradient>
+                            </defs>
+                          </svg>
                         </div>
-                        
-                        {/* COMPACT 4-CARD SUMMARY METRICS BAR WITH CUSTOM ICONS (ALL BRANCHES, DESKTOP ONLY) */}
-                        <div className="hidden lg:grid grid-cols-4 gap-3 mb-4">
-                          {/* Card 1: Disbursement Amount */}
-                          <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
-                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
-                                  <div className="w-full h-full rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
-                                    <Banknote size={24} strokeWidth={2} />
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-xs md:text-sm font-extrabold text-slate-900 uppercase tracking-wider block">
-                                    Disbursed
-                                  </span>
-                                  <div className="text-lg md:text-xl font-bold text-blue-600 mt-0.5">
-                                    ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
-                                  </div>
-                                </div>
-                              </div>
 
-                          {/* Card 2: Loan Amount */}
-                          <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
-                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
-                                  <img 
-                                    src={loanAmountIcon} 
-                                    alt="Loan Amount" 
-                                    className="w-full h-full object-contain" 
-                                  />
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-xs md:text-sm font-extrabold text-slate-900 uppercase tracking-wider block">
-                                    Loan Amount
-                                  </span>
-                                  <div className="text-lg md:text-xl font-bold text-indigo-600 mt-0.5">
-                                    ₹{summaryMetrics.totalLoan.toLocaleString('en-IN')}
-                                  </div>
-                                </div>
-                              </div>
+                        <div className="p-2 space-y-2 pb-24 md:px-6 md:pt-4 md:pb-24 md:space-y-3.5 relative z-10">
+                          <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider md:hidden">
+                            Entries: {approvedCustomers.length}
+                          </div>
 
-                              {/* Card 3: Collection */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
-                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
-                                  <img 
-                                    src={collectionIcon} 
-                                    alt="Collection" 
-                                    className="w-full h-full object-contain" 
-                                  />
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-xs md:text-sm font-extrabold text-slate-900 uppercase tracking-wider block">
-                                    Collection
-                                  </span>
-                                  <div className="text-lg md:text-xl font-bold text-emerald-600 mt-0.5">
-                                    ₹{summaryMetrics.totalCollection.toLocaleString('en-IN')}
-                                  </div>
-                                </div>
+                          {/* DESKTOP-ONLY: Top Center Header ("Customer List" with blue Users icon & horizontal accent lines) */}
+                          <div className="hidden md:flex items-center justify-center gap-4 pt-0.5 pb-1">
+                            <span className="h-[1.5px] w-24 lg:w-44 bg-gradient-to-r from-transparent via-blue-300 to-blue-400/80 rounded-full" />
+                            <div className="flex items-center gap-2.5 shrink-0">
+                              <div className="w-8 h-8 rounded-xl bg-blue-100/90 border border-blue-200/80 text-[#0066CC] flex items-center justify-center shadow-2xs">
+                                <Users className="w-5 h-5" />
                               </div>
+                              <h2 className="text-[22px] lg:text-[25px] font-extrabold text-[#0F172A] tracking-tight leading-none">
+                                Customer List
+                              </h2>
+                            </div>
+                            <span className="h-[1.5px] w-24 lg:w-44 bg-gradient-to-l from-transparent via-blue-300 to-blue-400/80 rounded-full" />
+                          </div>
 
-                              {/* Card 4: Outstanding (Shortened label) */}
-                              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors">
-                                <div className="w-11 h-11 flex items-center justify-center shrink-0">
-                                  <img 
-                                    src={outstandingIcon} 
-                                    alt="Outstanding" 
-                                    className="w-full h-full object-contain" 
-                                  />
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-xs md:text-sm font-extrabold text-slate-900 uppercase tracking-wider block">
-                                    Outstanding
-                                  </span>
-                                  <div className="text-lg md:text-xl font-bold text-amber-600 mt-0.5">
-                                    ₹{summaryMetrics.totalOutstanding.toLocaleString('en-IN')}
-                                  </div>
+                          {/* ROW 1 — FOUR VIBRANT PASTEL KPI SUMMARY CARDS (DESKTOP ONLY >= 768px) */}
+                          <div className="hidden md:grid grid-cols-4 gap-3.5">
+                            {/* Card 1: Disbursed Amount (Blue Theme) */}
+                            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#F0F7FF] via-[#E5F0FF] to-[#D6E8FF] border border-blue-300 px-3.5 lg:px-4 py-3 shadow-sm flex items-center gap-3 hover:shadow-md transition-all">
+                              <svg viewBox="0 0 240 44" preserveAspectRatio="none" className="pointer-events-none absolute bottom-0 left-0 w-full h-6 opacity-50">
+                                <path d="M0,26 C60,8 150,42 240,14 L240,44 L0,44 Z" fill="#93C5FD" />
+                              </svg>
+                              <div className="relative z-10 w-11 h-11 lg:w-12 lg:h-12 rounded-full bg-gradient-to-br from-[#3B82F6] to-[#1D4ED8] text-white flex items-center justify-center shadow-md shadow-blue-500/25 shrink-0">
+                                <Handshake className="w-5 h-5 lg:w-6 lg:h-6" strokeWidth={2.2} />
+                              </div>
+                              <div className="relative z-10 flex-1 min-w-0 text-right lg:text-center">
+                                <span className="text-[11px] lg:text-xs font-bold text-slate-700 block truncate">
+                                  Disbursed Amount
+                                </span>
+                                <div className="text-lg lg:text-[21px] font-extrabold text-[#0052CC] tracking-tight leading-tight mt-0.5 truncate">
+                                  ₹{summaryMetrics.totalDisbursed.toLocaleString('en-IN')}
                                 </div>
                               </div>
                             </div>
 
-                        {/* DESKTOP TABLE VIEW (ALL BRANCHES, DESKTOP ONLY) */}
-                        <div className="hidden lg:block">
-                            {/* 2. SEARCH BAR, FILTER ROW & OD CARD ALIGNMENT */}
-                            <div className="grid grid-cols-4 gap-3 mb-3">
-                              <div className="col-span-3 flex items-center gap-3 w-full max-w-md">
-                                <div className="relative flex-1">
-                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                  <input
-                                    type="text"
-                                    placeholder="Search Customer"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  />
+                            {/* Card 2: Loan Amount (Green Theme with Money Bag $) */}
+                            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#F0FDF4] via-[#E3FAE9] to-[#D1F7DD] border border-emerald-300 px-3.5 lg:px-4 py-3 shadow-sm flex items-center gap-3 hover:shadow-md transition-all">
+                              <svg viewBox="0 0 240 44" preserveAspectRatio="none" className="pointer-events-none absolute bottom-0 left-0 w-full h-6 opacity-50">
+                                <path d="M0,26 C70,6 155,40 240,16 L240,44 L0,44 Z" fill="#86EFAC" />
+                              </svg>
+                              <div className="relative z-10 w-11 h-11 lg:w-12 lg:h-12 rounded-full bg-gradient-to-br from-[#22C55E] to-[#15803D] text-white flex items-center justify-center shadow-md shadow-emerald-500/25 shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-5 h-5 lg:w-6 lg:h-6" fill="none">
+                                  <path d="M8.5 6.5L7 4h10l-1.5 2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                  <path d="M9 7h6c2.5 2 4 5.2 4 8.5C19 18.8 16.2 21 12 21s-7-2.2-7-5.5C5 12.2 6.5 9 9 7Z" fill="currentColor" fillOpacity="0.22" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                                  <path d="M12 10.5v6.5M13.8 12c0-.8-.8-1.3-1.8-1.3s-1.8.5-1.8 1.3c0 1.8 3.6.9 3.6 2.7 0 .8-.8 1.3-1.8 1.3s-1.8-.5-1.8-1.3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                                </svg>
+                              </div>
+                              <div className="relative z-10 flex-1 min-w-0 text-right lg:text-center">
+                                <span className="text-[11px] lg:text-xs font-bold text-slate-700 block truncate">
+                                  Loan Amount
+                                </span>
+                                <div className="text-lg lg:text-[21px] font-extrabold text-[#15803D] tracking-tight leading-tight mt-0.5 truncate">
+                                  ₹{summaryMetrics.totalLoan.toLocaleString('en-IN')}
                                 </div>
+                              </div>
+                            </div>
+
+                            {/* Card 3: Collection (Warm Amber/Orange Theme) */}
+                            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#FFFBEB] via-[#FEF3D5] to-[#FDE7B6] border border-amber-300 px-3.5 lg:px-4 py-3 shadow-sm flex items-center gap-3 hover:shadow-md transition-all">
+                              <svg viewBox="0 0 240 44" preserveAspectRatio="none" className="pointer-events-none absolute bottom-0 left-0 w-full h-6 opacity-50">
+                                <path d="M0,26 C65,10 155,40 240,14 L240,44 L0,44 Z" fill="#FCD34D" />
+                              </svg>
+                              <div className="relative z-10 w-11 h-11 lg:w-12 lg:h-12 rounded-full bg-gradient-to-br from-[#F59E0B] to-[#D97706] text-white flex items-center justify-center shadow-md shadow-amber-500/25 shrink-0">
+                                <Coins className="w-5 h-5 lg:w-6 lg:h-6" strokeWidth={2.2} />
+                              </div>
+                              <div className="relative z-10 flex-1 min-w-0 text-right lg:text-center">
+                                <span className="text-[11px] lg:text-xs font-bold text-slate-700 block truncate">
+                                  Collection
+                                </span>
+                                <div className="text-lg lg:text-[21px] font-extrabold text-[#B45309] tracking-tight leading-tight mt-0.5 truncate">
+                                  ₹{summaryMetrics.totalCollection.toLocaleString('en-IN')}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Card 4: Outstanding (Purple Theme) */}
+                            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#FAF5FF] via-[#F2E7FF] to-[#E6D1FF] border border-purple-300 px-3.5 lg:px-4 py-3 shadow-sm flex items-center gap-3 hover:shadow-md transition-all">
+                              <svg viewBox="0 0 240 44" preserveAspectRatio="none" className="pointer-events-none absolute bottom-0 left-0 w-full h-6 opacity-50">
+                                <path d="M0,26 C65,10 155,40 240,14 L240,44 L0,44 Z" fill="#D8B4FE" />
+                              </svg>
+                              <div className="relative z-10 w-11 h-11 lg:w-12 lg:h-12 rounded-full bg-gradient-to-br from-[#9333EA] to-[#6B21A8] text-white flex items-center justify-center shadow-md shadow-purple-500/25 shrink-0">
+                                <TrendingUp className="w-5 h-5 lg:w-6 lg:h-6" strokeWidth={2.3} />
+                              </div>
+                              <div className="relative z-10 flex-1 min-w-0 text-right lg:text-center">
+                                <span className="text-[11px] lg:text-xs font-bold text-slate-700 block truncate">
+                                  Outstanding
+                                </span>
+                                <div className="text-lg lg:text-[21px] font-extrabold text-[#6B21A8] tracking-tight leading-tight mt-0.5 truncate">
+                                  ₹{summaryMetrics.totalOutstanding.toLocaleString('en-IN')}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* DESKTOP TABLE VIEW (DESKTOP ONLY >= 768px) */}
+                          <div className="hidden md:block space-y-3">
+                            {/* ROW 2 — STRICT LEFT-TO-RIGHT ORDER: Entries -> Search Customer... -> Filter ▾ -> OD Amount */}
+                            <div className="flex items-center gap-3 w-full" data-testid="customer-row2-bar">
+                              {/* 1. Far Left: Entries: <count> Pill Badge */}
+                              <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 h-[46px] flex items-center gap-2 shrink-0 shadow-2xs">
+                                <Users className="w-4 h-4 text-[#0052B4] shrink-0" />
+                                <span className="text-sm font-bold text-[#0052B4] whitespace-nowrap">
+                                  Entries: {approvedCustomers.length}
+                                </span>
+                              </div>
+
+                              {/* 2. Second: Search Customer... Input Bar */}
+                              <div className="relative flex-1 min-w-0">
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 pointer-events-none" />
+                                <input
+                                  type="text"
+                                  placeholder="Search Customer..."
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                  className="w-full h-[46px] pl-10 pr-4 bg-white border border-blue-300 rounded-2xl text-sm font-semibold text-slate-800 placeholder:text-slate-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                                />
+                              </div>
+
+                              {/* 3. Third: Filter ▾ Dropdown Button */}
+                              <button
+                                type="button"
+                                onClick={openFilter}
+                                className={`h-[46px] px-4 rounded-2xl border shadow-sm flex items-center gap-2 shrink-0 cursor-pointer transition-all active:scale-[0.98] ${
+                                  activeCategory !== 'All' || activeSort !== 'Recent'
+                                    ? 'bg-blue-50 border-blue-300 text-[#0052B4]'
+                                    : 'bg-white border-slate-200 text-[#0F172A] hover:bg-slate-50'
+                                }`}
+                              >
+                                <Filter className="w-4 h-4 fill-current shrink-0" />
+                                <span className="text-sm font-bold whitespace-nowrap">Filter</span>
+                                <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+                              </button>
+
+                              {/* 4. Far Right: OD Amount Highlight Card (Interactive Overdue Filter Toggle) */}
+                              <button
+                                type="button"
+                                onClick={() => setIsOdFilterActive(!isOdFilterActive)}
+                                title={isOdFilterActive ? 'Click to show all customers' : 'Click to filter overdue customers'}
+                                className={`bg-rose-50 border border-rose-200 rounded-2xl px-4 h-[46px] min-w-[175px] flex items-center gap-3 shrink-0 shadow-2xs hover:shadow-md transition-all cursor-pointer text-left ${
+                                  isOdFilterActive ? 'ring-2 ring-rose-400 border-rose-400 scale-[1.01]' : 'hover:border-rose-300'
+                                }`}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#EF4444] to-[#DC2626] text-white flex items-center justify-center shadow-sm shrink-0">
+                                  <Clock className="w-4 h-4" strokeWidth={2.5} />
+                                </div>
+                                <div className="flex flex-col justify-center leading-tight">
+                                  <span className="text-[11px] font-bold text-rose-700 whitespace-nowrap">
+                                    {isOdFilterActive ? 'OD Filter Active' : 'OD Amount'}
+                                  </span>
+                                  <span className="text-[15px] font-extrabold text-[#DC2626] whitespace-nowrap">
+                                    ₹{summaryMetrics.totalOverdue.toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                              </button>
+                            </div>
+
+                            {isOdFilterActive && (
+                              <div className="flex justify-end">
                                 <button
-                                  onClick={openFilter}
-                                  className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                                >
-                                  <Filter className="w-4 h-4 text-slate-600" />
-                                </button>
-                              </div>
-                              <div className="col-span-1">
-                                {/* Card 5: Overdue (OD) Amount (Interactive Toggle) */}
-                                <div 
-                                  onClick={() => setIsOdFilterActive(!isOdFilterActive)}
-                                  className={`px-4 py-2.5 rounded-xl shadow-sm flex items-center justify-between transition-all cursor-pointer hover:shadow-md h-full ${isOdFilterActive ? 'bg-rose-50 border-2 border-rose-400 scale-[1.02]' : 'bg-white border border-rose-100 bg-rose-50/20 hover:border-rose-200'}`}
-                                >
-                                  <div className="w-9 h-9 flex items-center justify-center shrink-0">
-                                    <img 
-                                      src={overdueIcon} 
-                                      alt="Overdue" 
-                                      className="w-full h-full object-contain" 
-                                    />
-                                  </div>
-                                  <div className="text-right flex flex-col items-end">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700">
-                                        {isOdFilterActive ? 'FILTER ACTIVE' : 'Past Due'}
-                                      </span>
-                                      <span className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider block">
-                                        OD Amount
-                                      </span>
-                                    </div>
-                                    <div className="text-base md:text-lg font-bold text-rose-600 mt-0.5">
-                                      ₹{summaryMetrics.totalOverdue.toLocaleString('en-IN')}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 3. ENTRIES COUNTER & RESET FILTER */}
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                ENTRIES: {approvedCustomers.length}
-                              </div>
-                              {isOdFilterActive && (
-                                <button 
+                                  type="button"
                                   onClick={() => setIsOdFilterActive(false)}
-                                  className="text-[10px] font-bold px-3 py-1 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200 transition-colors"
+                                  className="text-xs font-bold px-3.5 py-1 bg-white border border-rose-200 text-rose-600 rounded-full hover:bg-rose-50 shadow-2xs transition-colors cursor-pointer"
                                 >
                                   Reset / Back to Full List
                                 </button>
-                              )}
-                            </div>
+                              </div>
+                            )}
 
-                            {/* 4. CUSTOMER TABLE (DESKTOP VIEW) */}
-                            <div className="bg-white border border-slate-200 rounded-lg shadow-sm mb-4 overflow-hidden">
-                            <table className="w-full text-left border-collapse">
-                              <thead>
-                                {isOdFilterActive ? (
-                                  <tr className="bg-rose-50/50 border-b border-rose-100 text-rose-700 text-[11px] uppercase tracking-wider">
-                                    <th className="p-3 font-semibold">Customer</th>
-                                    <th className="p-3 font-semibold border-l border-rose-100">{isMainBranchView ? 'Branch' : 'Last Paid'}</th>
-                                    <th className="p-3 font-semibold border-l border-rose-100 text-center">Pending Dues</th>
-                                    <th className="p-3 font-semibold border-l border-rose-100 text-right">Loan Amount</th>
-                                    <th className="p-3 font-semibold border-l border-rose-100 text-right">Paid</th>
-                                    <th className="p-3 font-semibold border-l border-rose-100 text-right">Outstanding</th>
-                                    <th className="p-3 font-semibold border-l border-rose-100 text-right text-rose-700">OD Amount</th>
-                                  </tr>
-                                ) : (
-                                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider">
-                                    <th className="p-3 font-semibold">Customer</th>
-                                    <th className="p-3 font-semibold border-l border-slate-200">{isMainBranchView ? 'Branch' : 'Loan Date'}</th>
-                                    <th className="p-3 font-semibold border-l border-slate-200">Assigned Staff</th>
-                                    <th className="p-3 font-semibold border-l border-slate-200 text-center">Loan Type</th>
-                                    <th className="p-3 font-semibold border-l border-slate-200 text-right">Loan Amount</th>
-                                    <th className="p-3 font-semibold border-l border-slate-200 text-right">Outstanding</th>
-                                    <th className="p-3 font-semibold border-l border-slate-200 text-center">Status</th>
-                                  </tr>
-                                )}
-                              </thead>
-                              <tbody className="divide-y divide-slate-200">
-                                {approvedCustomers.length === 0 ? (
-                                  <tr>
-                                    <td colSpan="6" className="p-8 text-center text-slate-500">
-                                      {isOdFilterActive ? 'No customers currently have overdue payments.' : 'No customers match your search or filter criteria'}
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  approvedCustomers.map(customer => (
-                                    <tr 
-                                      key={`desktop-${customer.id}`} 
-                                      onClick={() => { if (!isMainBranchView) { setSelectedCustomer(customer); navigateToView('Customer Detail'); } }}
-                                      className={`hover:bg-slate-50 transition-colors ${!isMainBranchView ? 'cursor-pointer' : ''}`}
-                                    >
-                                      <td className="p-3 flex items-center gap-3">
-                                        <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 border border-slate-300">
-                                          <OfflineImage src={customer.image || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
-                                        </div>
-                                        <div className="min-w-0 pr-2">
-                                          <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{formatName(customer.name)}</h4>
-                                          <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
-                                        </div>
-                                      </td>
-                                      
-                                      {isOdFilterActive ? (
-                                        <>
-                                          <td className="p-3 border-l border-rose-100 text-sm font-medium text-slate-700 whitespace-nowrap bg-rose-50/10">
-                                            {isMainBranchView ? (
-                                              customer.branch || customer.branchName || 'Main Branch'
-                                            ) : (
-                                              <span className="text-slate-600 font-normal">
-                                                {(() => {
-                                                  const validInsts = (customer.installments || []).filter(i => i?.status !== 'BOUNCED' && i?.date);
-                                                  if (validInsts.length === 0) return 'No Payments';
-                                                  validInsts.sort((a, b) => {
-                                                    const timeA = parseGlobalDate(a.date).getTime();
-                                                    const timeB = parseGlobalDate(b.date).getTime();
-                                                    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
-                                                  });
-                                                  return formatDate(validInsts[0]?.date);
-                                                })()}
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-slate-700 text-center whitespace-nowrap bg-rose-50/10">
-                                            {customer.dynamicPendingDues > 0 ? (
-                                              <span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs">
-                                                {customer.dynamicPendingDues} Due{customer.dynamicPendingDues > 1 ? 's' : ''}
-                                              </span>
-                                            ) : (
-                                              <span className="text-slate-400">-</span>
-                                            )}
-                                          </td>
-                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-brand-blue whitespace-nowrap text-right bg-rose-50/10">
-                                            ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
-                                          </td>
-                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-emerald-600 whitespace-nowrap text-right bg-rose-50/10">
-                                            ₹{(customer.dynamicTotalPaid || 0).toLocaleString('en-IN')}
-                                          </td>
-                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-amber-600 whitespace-nowrap text-right bg-rose-50/10">
-                                            ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
-                                          </td>
-                                          <td className="p-3 border-l border-rose-100 text-sm font-bold text-rose-600 whitespace-nowrap text-right bg-rose-50/30">
-                                            ₹{(customer.dynamicOverdue || 0).toLocaleString('en-IN')}
-                                          </td>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
-                                            {isMainBranchView ? (
-                                              customer.branch || customer.branchName || 'Main Branch'
-                                            ) : (
-                                              <span className="text-slate-600 font-normal">{formatDate(customer.disbursedAt || customer.loanApprovedDate || customer.approvalDate || customer.loanDate || customer.date || customer.createdAt)}</span>
-                                            )}
-                                          </td>
-                                          <td className="p-3 border-l border-slate-200 text-sm font-medium text-slate-700 whitespace-nowrap">
-                                            {customer.assignedStaff || customer.staffName || customer.staff || '--'}
-                                          </td>
-                                          <td className="p-3 border-l border-slate-200 whitespace-nowrap text-center">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 capitalize">
-                                              {customer.loanType || customer.category || customer.type || 'N/A'}
-                                            </span>
-                                          </td>
-                                          <td className="p-3 border-l border-slate-200 text-sm font-bold text-brand-blue whitespace-nowrap text-right">
-                                            ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
-                                          </td>
-                                          <td className="p-3 border-l border-slate-200 text-sm font-bold text-red-600 whitespace-nowrap text-right">
-                                            ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
-                                          </td>
-                                          <td className="p-3 border-l border-slate-200 whitespace-nowrap text-center">
-                                            {(() => {
-                                              const out = customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding : (customer.repayAmount || 0);
-                                              const od = customer.dynamicOverdue || 0;
-                                              const pending = customer.dynamicPendingDues || 0;
-                                              if (out <= 0) {
-                                                return <span className="text-xs font-bold text-orange-600 tracking-wider uppercase">SETTLED</span>;
-                                              } else if (od > 0 || pending > 0) {
-                                                return <span className="text-xs font-bold text-red-600 tracking-wider uppercase">OVERDUE</span>;
-                                              } else {
-                                                return <span className="text-xs font-bold text-emerald-600 tracking-wider uppercase">LIVE</span>;
-                                              }
-                                            })()}
-                                          </td>
-                                        </>
-                                      )}
+                            {/* 4. ROYAL BLUE CUSTOMER TABLE (DESKTOP VIEW >= 768px) */}
+                            <div className="bg-white border border-blue-200/80 rounded-2xl shadow-md shadow-blue-900/5 mb-4 overflow-x-auto">
+                              <table className="w-full text-left border-collapse">
+                                <thead>
+                                  {isOdFilterActive ? (
+                                    <tr className="bg-gradient-to-r from-[#881337] to-[#BE123C] text-white text-[13px] font-bold tracking-wide">
+                                      <th className="py-3.5 px-4 font-bold">Customer</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15">{isMainBranchView ? 'Branch' : 'Last Paid'}</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">Pending Dues</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-right">Loan Amount</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-right">Paid</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-right">Outstanding</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-right">OD Amount</th>
                                     </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
+                                  ) : (
+                                    <tr className="bg-gradient-to-r from-[#00337C] to-[#0052B4] text-white text-[13px] font-bold tracking-wide">
+                                      <th className="py-3.5 px-4 font-bold">Customer</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">{isMainBranchView ? 'Branch' : 'Loan Date'}</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">Assigned Staff</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">Loan Type</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-right">Loan Amount</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-right">Outstanding</th>
+                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">Status</th>
+                                    </tr>
+                                  )}
+                                </thead>
+                                <tbody className="divide-y divide-slate-200/90">
+                                  {approvedCustomers.length === 0 ? (
+                                    <tr>
+                                      <td colSpan="7" className="p-8 text-center text-slate-500 font-medium">
+                                        {isOdFilterActive ? 'No customers currently have overdue payments.' : 'No customers match your search or filter criteria'}
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    approvedCustomers.map(customer => (
+                                      <tr 
+                                        key={`desktop-${customer.id}`} 
+                                        onClick={() => { if (!isMainBranchView) { setSelectedCustomer(customer); navigateToView('Customer Detail'); } }}
+                                        className={`hover:bg-blue-50/40 transition-colors ${!isMainBranchView ? 'cursor-pointer' : ''}`}
+                                      >
+                                        <td className="py-3 px-4 flex items-center gap-3">
+                                          <div className="w-9 h-9 rounded-full bg-gradient-to-b from-blue-100 to-blue-200 text-[#0052B4] overflow-hidden flex-shrink-0 border border-blue-200 flex items-center justify-center shadow-2xs">
+                                            {customer.image ? (
+                                              <OfflineImage src={customer.image} alt="Profile" className="w-full h-full object-cover" />
+                                            ) : (
+                                              <User className="w-5 h-5" strokeWidth={2.2} />
+                                            )}
+                                          </div>
+                                          <div className="min-w-0 pr-2">
+                                            <h4 className="font-bold text-[#0F172A] text-sm leading-tight truncate">{formatName(customer.name)}</h4>
+                                            {(customer.date || customer.lastUpdated) && (
+                                              <p className="text-[11px] font-medium text-slate-400 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
+                                            )}
+                                          </div>
+                                        </td>
+                                        
+                                        {isOdFilterActive ? (
+                                          <>
+                                            <td className="py-3 px-4 border-l border-rose-100 text-sm font-semibold text-slate-700 whitespace-nowrap bg-rose-50/10">
+                                              {isMainBranchView ? (
+                                                customer.branch || customer.branchName || 'Main Branch'
+                                              ) : (
+                                                <span>
+                                                  {(() => {
+                                                    const validInsts = (customer.installments || []).filter(i => i?.status !== 'BOUNCED' && i?.date);
+                                                    if (validInsts.length === 0) return 'No Payments';
+                                                    validInsts.sort((a, b) => {
+                                                      const timeA = parseGlobalDate(a.date).getTime();
+                                                      const timeB = parseGlobalDate(b.date).getTime();
+                                                      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+                                                    });
+                                                    return formatDate(validInsts[0]?.date);
+                                                  })()}
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-rose-100 text-sm font-bold text-slate-700 text-center whitespace-nowrap bg-rose-50/10">
+                                              {customer.dynamicPendingDues > 0 ? (
+                                                <span className="px-2.5 py-0.5 bg-rose-100 text-rose-700 rounded-full text-xs font-bold">
+                                                  {customer.dynamicPendingDues} Due{customer.dynamicPendingDues > 1 ? 's' : ''}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-400">-</span>
+                                              )}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-rose-100 text-sm font-bold text-blue-600 whitespace-nowrap text-right bg-rose-50/10">
+                                              ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-rose-100 text-sm font-bold text-emerald-600 whitespace-nowrap text-right bg-rose-50/10">
+                                              ₹{(customer.dynamicTotalPaid || 0).toLocaleString('en-IN')}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-rose-100 text-sm font-bold text-amber-600 whitespace-nowrap text-right bg-rose-50/10">
+                                              ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-rose-100 text-sm font-bold text-rose-600 whitespace-nowrap text-right bg-rose-50/30">
+                                              ₹{(customer.dynamicOverdue || 0).toLocaleString('en-IN')}
+                                            </td>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <td className="py-3 px-4 border-l border-slate-100 text-sm font-semibold text-slate-700 whitespace-nowrap text-center">
+                                              {isMainBranchView ? (
+                                                customer.branch || customer.branchName || 'Main Branch'
+                                              ) : (
+                                                <span>{formatDate(customer.disbursedAt || customer.loanApprovedDate || customer.approvalDate || customer.loanDate || customer.date || customer.createdAt)}</span>
+                                              )}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-slate-100 text-sm font-semibold text-slate-700 whitespace-nowrap text-center">
+                                              {customer.assignedStaff || customer.staffName || customer.staff || '--'}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-slate-100 whitespace-nowrap text-center">
+                                              <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 capitalize">
+                                                {customer.loanType || customer.category || customer.type || 'N/A'}
+                                              </span>
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-slate-100 text-sm font-bold text-blue-600 whitespace-nowrap text-right">
+                                              ₹{(Number(customer.loanAmount) || 0).toLocaleString('en-IN')}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-slate-100 text-sm font-bold text-red-600 whitespace-nowrap text-right">
+                                              ₹{customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding.toLocaleString('en-IN') : (customer.repayAmount?.toLocaleString('en-IN') || '0')}
+                                            </td>
+                                            <td className="py-3 px-4 border-l border-slate-100 whitespace-nowrap text-center">
+                                              {(() => {
+                                                const out = customer.dynamicOutstanding !== undefined ? customer.dynamicOutstanding : (customer.repayAmount || 0);
+                                                const od = customer.dynamicOverdue || 0;
+                                                const pending = customer.dynamicPendingDues || 0;
+                                                if (out <= 0) {
+                                                  return (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 uppercase tracking-wide">
+                                                      <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+                                                      SETTLED
+                                                    </span>
+                                                  );
+                                                } else if (od > 0 || pending > 0) {
+                                                  return (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 uppercase tracking-wide">
+                                                      <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                                                      OVERDUE
+                                                    </span>
+                                                  );
+                                                } else {
+                                                  return (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wide">
+                                                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                                      LIVE
+                                                    </span>
+                                                  );
+                                                }
+                                              })()}
+                                            </td>
+                                          </>
+                                        )}
+                                      </tr>
+                                    ))
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
-                        </div>
-                        
-                        {/* STANDARD CARD VIEW (MOBILE/TABLET ONLY) */}
-                        <div className={isMainBranchView ? "md:hidden space-y-2" : "lg:hidden space-y-2"}>
+                          
+                          {/* STANDARD CARD VIEW (MOBILE ONLY < 768px) - 100% Untouched */}
+                          <div className="md:hidden space-y-2">
                           {approvedCustomers.length === 0 ? (
                             <div className="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-lg shadow-sm">
                               {isOdFilterActive ? 'No customers currently have overdue payments.' : 'No customers match your search or filter criteria'}
@@ -1937,6 +2012,7 @@ function App() {
                               </div>
                             ))
                           )}
+                          </div>
                         </div>
                       </div>
                     );
