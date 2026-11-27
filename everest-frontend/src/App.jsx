@@ -40,6 +40,7 @@ import Login from './components/Login';
 import CustomerDashboard from './components/CustomerDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import CollectionReportModal from './components/CollectionReportModal';
+import BranchSyncLoader from './components/BranchSyncLoader';
 import EMICalculator from './components/EMICalculator';
 import OfflineImage from './components/OfflineImage';
 import CustomerDetail from './components/CustomerDetail';
@@ -1480,16 +1481,22 @@ function App() {
     }
   };
 
+  const branchSwitchTimerRef = useRef(null);
+
   const handleBranchSwitch = (newBranch) => {
+    if (branchSwitchTimerRef.current) {
+      clearTimeout(branchSwitchTimerRef.current);
+    }
     setIsSwitchingBranch(true);
     setActiveBranch(newBranch);
     setCurrentView('Home');
     setViewHistory(['Home']);
     
-    // Simulate switching delay to enforce isolation feel
-    setTimeout(() => {
+    // Smooth 850ms isolation transition while displaying Everest FinTech loader
+    branchSwitchTimerRef.current = setTimeout(() => {
       setIsSwitchingBranch(false);
-    }, 600);
+      branchSwitchTimerRef.current = null;
+    }, 850);
   };
 
   const handleBranchUpdated = (updatedBranch) => {
@@ -1510,7 +1517,15 @@ function App() {
   const renderView = () => {
     switch(currentView) {
       case 'Home': return <div className={`flex-1 ${isCollectionReportOpen ? 'h-full overflow-hidden' : 'overflow-y-auto'}`}><AdminDashboard setCurrentView={setCurrentView} onDrillDown={handleDrillDown} activeBranch={activeBranch} userProfile={userProfile} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} branches={branches} isRoleResolving={isRoleResolving} isBranchLoading={isBranchLoading} isCollectionReportOpen={isCollectionReportOpen} setIsCollectionReportOpen={setIsCollectionReportOpen} /></div>;
-      case 'Collection Report': return <div className="flex-1 h-full overflow-hidden"><CollectionReportModal isOpen={true} onClose={() => navigateToView('Home')} userProfile={userProfile} activeBranch={activeBranch} branches={branches} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} isStaff={userProfile?.role?.toLowerCase() === 'staff'} /></div>;
+      case 'Collection Report': return (
+        <div className="flex-1 h-full overflow-hidden">
+          {(isRoleResolving || isBranchLoading) ? (
+            <BranchSyncLoader branchName={activeBranch?.name} fullScreen={false} />
+          ) : (
+            <CollectionReportModal isOpen={true} onClose={() => navigateToView('Home')} userProfile={userProfile} activeBranch={activeBranch} branches={branches} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} isStaff={userProfile?.role?.toLowerCase() === 'staff'} />
+          )}
+        </div>
+      );
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
       case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} branches={branches} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
@@ -1519,24 +1534,28 @@ function App() {
       case 'Expansion': 
         return (
           <div className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden">
-            <ExpansionView 
-              activeBranch={activeBranch} 
-              userProfile={userProfile} 
-              branches={branches} 
-              customers={customers} 
-              onBack={() => {
-                if (viewHistory.length > 1) {
-                  const newHist = [...viewHistory];
-                  newHist.pop();
-                  const prevView = newHist[newHist.length - 1] || 'Home';
-                  setViewHistory(newHist);
-                  setCurrentView(prevView);
-                } else {
-                  navigateToView('Home');
-                }
-              }} 
-              onHome={() => navigateToView('Home')} 
-            />
+            {(isRoleResolving || isBranchLoading) ? (
+              <BranchSyncLoader branchName={activeBranch?.name} fullScreen={false} />
+            ) : (
+              <ExpansionView 
+                activeBranch={activeBranch} 
+                userProfile={userProfile} 
+                branches={branches} 
+                customers={customers} 
+                onBack={() => {
+                  if (viewHistory.length > 1) {
+                    const newHist = [...viewHistory];
+                    newHist.pop();
+                    const prevView = newHist[newHist.length - 1] || 'Home';
+                    setViewHistory(newHist);
+                    setCurrentView(prevView);
+                  } else {
+                    navigateToView('Home');
+                  }
+                }} 
+                onHome={() => navigateToView('Home')} 
+              />
+            )}
           </div>
         );
       case 'Cash Book': 
@@ -1560,24 +1579,28 @@ function App() {
         }
         return (
           <div className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden">
-            <CashBook 
-              activeBranch={activeBranch} 
-              userProfile={userProfile} 
-              branches={branches} 
-              customers={customers} 
-              onBack={() => {
-                if (viewHistory.length > 1) {
-                  const newHist = [...viewHistory];
-                  newHist.pop();
-                  const prevView = newHist[newHist.length - 1] || 'Home';
-                  setViewHistory(newHist);
-                  setCurrentView(prevView);
-                } else {
-                  navigateToView('Home');
-                }
-              }} 
-              onHome={() => navigateToView('Home')} 
-            />
+            {(isRoleResolving || isBranchLoading) ? (
+              <BranchSyncLoader branchName={activeBranch?.name} fullScreen={false} />
+            ) : (
+              <CashBook 
+                activeBranch={activeBranch} 
+                userProfile={userProfile} 
+                branches={branches} 
+                customers={customers} 
+                onBack={() => {
+                  if (viewHistory.length > 1) {
+                    const newHist = [...viewHistory];
+                    newHist.pop();
+                    const prevView = newHist[newHist.length - 1] || 'Home';
+                    setViewHistory(newHist);
+                    setCurrentView(prevView);
+                  } else {
+                    navigateToView('Home');
+                  }
+                }} 
+                onHome={() => navigateToView('Home')} 
+              />
+            )}
           </div>
         );
       case 'Staff Management': return <div className="flex-1 overflow-y-auto bg-slate-50"><StaffManagement onBack={() => navigateToView('Home')} setCurrentView={setCurrentView} activeBranch={activeBranch} userProfile={userProfile} branches={branches} /></div>;
@@ -1721,6 +1744,9 @@ function App() {
                 >
                   {(() => {
                     const isMainBranchView = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
+                    if (isRoleResolving || isBranchLoading) {
+                      return <BranchSyncLoader branchName={activeBranch?.name} fullScreen={false} />;
+                    }
                     let baseApproved = rbacManagementCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
                     
                     if (isOdFilterActive) {
@@ -2692,13 +2718,9 @@ function App() {
                 />
               )}
 
-              {/* Branch Switching Flash Overlay */}
+              {/* Branch Switching Animated Everest FinTech Orbit & Pulse Loader Overlay */}
               {isSwitchingBranch && (
-                <div className="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center animate-in fade-in duration-200">
-                  <div className="w-12 h-12 border-4 border-slate-100 border-t-brand-blue rounded-full animate-spin mb-4"></div>
-                  <h2 className="text-xl font-black text-slate-800 tracking-wider">Loading {activeBranch.name}...</h2>
-                  <p className="text-slate-500 font-medium text-sm mt-2">Isolating environment context</p>
-                </div>
+                <BranchSyncLoader branchName={activeBranch?.name} fullScreen={true} />
               )}
 
               {currentView !== 'Customer Detail' && !(currentView === 'Staff Management' && (activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch')) && (

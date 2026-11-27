@@ -12,6 +12,7 @@ import { Clock, User } from 'lucide-react';
 import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 import AttendanceLedger from './AttendanceLedger';
 import CollectionReportModal from './CollectionReportModal';
+import BranchSyncLoader from './BranchSyncLoader';
 
 // ============================================================================
 // DUAL-ENVIRONMENT API CONFIGURATION & AUTOMATIC FALLBACK MECHANISM (WITH FLOW)
@@ -5001,7 +5002,7 @@ React.useEffect(() => { cadViewportRef.current = cadViewport; }, [cadViewport]);
   });
 
   if (isRoleResolving || isBranchLoading || !userProfile) {
-    return <DashboardOverviewSkeleton />;
+    return <BranchSyncLoader branchName={activeBranch?.name} fullScreen={false} />;
   }
 
   return (

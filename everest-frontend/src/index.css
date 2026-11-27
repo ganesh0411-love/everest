@@ -97,3 +97,54 @@ body {
 .animate-soft-pulse {
   animation: soft-pulse 2s infinite cubic-bezier(0.66, 0, 0, 1);
 }
+
+/* Everest FinTech Orbit & Pulse Branch Switching Loader (60fps pure GPU transforms) */
+@keyframes everest-spin-cw {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes everest-spin-ccw {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+@keyframes everest-heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes everest-shimmer {
+  0% { background-position: 200% 0%; }
+  100% { background-position: -200% 0%; }
+}
+
+.animate-everest-spin-cw {
+  animation: everest-spin-cw 7s linear infinite;
+  will-change: transform;
+}
+
+.animate-everest-spin-ccw {
+  animation: everest-spin-ccw 5s linear infinite;
+  will-change: transform;
+}
+
+.animate-everest-orbit-cw {
+  animation: everest-spin-cw 6s linear infinite;
+  will-change: transform;
+}
+
+.animate-everest-orbit-ccw {
+  animation: everest-spin-ccw 6s linear infinite;
+  will-change: transform;
+}
+
+.animate-everest-heartbeat {
+  animation: everest-heartbeat 1.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-everest-shimmer {
+  animation: everest-shimmer 1.8s linear infinite;
+  will-change: background-position;
+}
