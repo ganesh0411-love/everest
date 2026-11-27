@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, AlertTriangle, Users, CreditCard, Coins } from 'lucide-react';
+import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, CreditCard } from 'lucide-react';
 import CollectionReportDownloadModal from './CollectionReportDownloadModal';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -713,6 +713,36 @@ export default function CollectionReportModal({
     let totalPeriodOverdue = 0;
 
     const entriesMap = new Map(); // uniqueKey -> ledger row
+    const staffDirectory = firestoreStaff.length > 0 ? firestoreStaff : (staffList || []);
+    const resolveRowStaffName = (cust, inst = null) => {
+      const direct = String(
+        inst?.collectedByName ||
+        inst?.collectedBy ||
+        inst?.staffName ||
+        inst?.staff ||
+        inst?.assignedStaff ||
+        cust?.assignedStaff ||
+        cust?.assignedStaffName ||
+        cust?.staffName ||
+        cust?.staff ||
+        cust?.centerStaffName ||
+        cust?.createdByStaffName ||
+        ''
+      ).trim();
+      if (direct && direct.toLowerCase() !== 'unassigned' && direct.toLowerCase() !== 'staff unassigned') {
+        return direct;
+      }
+      const targetId = String(inst?.staffId || cust?.staffId || cust?.assignedStaffId || cust?.createdByStaffId || '').trim().toLowerCase();
+      if (targetId && Array.isArray(staffDirectory)) {
+        const matched = staffDirectory.find(s =>
+          s && [s.id, s.uid, s.docId, s.staffId, s.employeeId].some(k => k && String(k).trim().toLowerCase() === targetId)
+        );
+        if (matched) {
+          return String(matched.name || matched.staffName || matched.displayName || '').trim();
+        }
+      }
+      return '';
+    };
 
     scopedCustomers.forEach((cust) => {
       const custName = cust.name || cust.customerName || 'Customer';
@@ -934,6 +964,7 @@ export default function CollectionReportModal({
               id: key,
               customerId: cust.id,
               name: custName,
+              staffName: resolveRowStaffName(cust, inst),
               mode: 'BOUNCED',
               status: 'BOUNCED',
               isBounced: true,
@@ -1013,6 +1044,7 @@ export default function CollectionReportModal({
               id: key,
               customerId: cust.id,
               name: custName,
+              staffName: resolveRowStaffName(cust, inst),
               mode: resolvedMode,
               status: status,
               isBounced: false,
@@ -1049,6 +1081,7 @@ export default function CollectionReportModal({
             id: key,
             customerId: cust.id,
             name: custName,
+            staffName: resolveRowStaffName(cust),
             mode: 'Cash',
             status: 'DISBURSED',
             isBounced: false,
@@ -1078,7 +1111,7 @@ export default function CollectionReportModal({
       totalScopedPending: totalPeriodPending,
       totalScopedOverdue: totalPeriodOverdue
     };
-  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedFilterIds, isAllSelected, isBranchFilterMode, canFilterByStaff, availableFilterItems, isMainBranch, userBranchId]);
+  }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedFilterIds, isAllSelected, isBranchFilterMode, canFilterByStaff, availableFilterItems, isMainBranch, userBranchId, firestoreStaff, staffList]);
 
   // Dual-Mode Search & Chronological Date Sorting (Ascending / Descending)
   const filteredData = useMemo(() => {
@@ -1101,6 +1134,7 @@ export default function CollectionReportModal({
           );
         } else {
           matchesSearch = item.name.toLowerCase().includes(query.toLowerCase()) || 
+                          String(item.staffName || '').toLowerCase().includes(query.toLowerCase()) ||
                           String(item.mode || '').toLowerCase().includes(query.toLowerCase()) ||
                           String(item.status || '').toLowerCase().includes(query.toLowerCase());
         }
@@ -1258,7 +1292,7 @@ export default function CollectionReportModal({
 
   // Dynamic table column counts for responsive empty state colSpan
   const colCountMobile = 2 + (isCreditActive && !isDebitActive ? 1 : 0) + (isCreditActive ? 1 : 0) + (isDebitActive ? 1 : 0);
-  const colCountDesktop = 2 + (isDebitActive ? 1 : 0) + (isCreditActive ? 5 : (isDebitActive ? 1 : 0));
+  const colCountDesktop = 3 + (isCreditActive ? 4 : (isDebitActive ? 1 : 0)) + (isDebitActive ? 1 : 0);
 
   if (!isOpen) return null;
 
@@ -1318,19 +1352,19 @@ export default function CollectionReportModal({
             onClick={() => {
               try { fromDateInputRef.current?.showPicker?.(); } catch(e) { fromDateInputRef.current?.click?.(); }
             }}
-            className="flex-1 md:flex-none md:w-48 lg:w-52 min-w-0 bg-white border border-slate-200/90 md:border-white rounded-xl md:rounded-2xl px-2.5 sm:px-3 md:px-3.5 h-[38px] md:h-[42px] flex items-center gap-1.5 sm:gap-2 shadow-2xs md:shadow-sm cursor-pointer"
+            className="flex-1 md:flex-none md:w-48 lg:w-52 min-w-0 bg-white border border-slate-200/90 md:border-blue-300 rounded-xl md:rounded-2xl px-2.5 sm:px-3 md:px-3.5 h-[38px] md:h-[42px] flex items-center gap-1.5 sm:gap-2 shadow-2xs md:shadow-sm cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 md:text-[#0F4C81] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <div className="flex flex-col justify-center min-w-0 flex-1 relative">
-              <span className="text-[8px] sm:text-[9px] font-medium text-slate-400 leading-none truncate">From Date</span>
+              <span className="text-[8px] sm:text-[9px] font-medium md:font-semibold text-slate-400 md:text-slate-500 leading-none truncate">From Date</span>
               <input
                 type="text"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="text-xs md:text-[13px] font-semibold md:font-bold text-slate-700 bg-transparent outline-none p-0 border-none leading-none w-full cursor-text mt-0.5"
+                className="text-xs md:text-[13px] font-semibold md:font-extrabold text-slate-700 md:text-[#0F172A] bg-transparent outline-none p-0 border-none leading-none w-full cursor-text mt-0.5"
               />
               <input
                 ref={fromDateInputRef}
@@ -1349,19 +1383,19 @@ export default function CollectionReportModal({
             onClick={() => {
               try { toDateInputRef.current?.showPicker?.(); } catch(e) { toDateInputRef.current?.click?.(); }
             }}
-            className="flex-1 md:flex-none md:w-48 lg:w-52 min-w-0 bg-white border border-slate-200/90 md:border-white rounded-xl md:rounded-2xl px-2.5 sm:px-3 md:px-3.5 h-[38px] md:h-[42px] flex items-center gap-1.5 sm:gap-2 shadow-2xs md:shadow-sm cursor-pointer"
+            className="flex-1 md:flex-none md:w-48 lg:w-52 min-w-0 bg-white border border-slate-200/90 md:border-blue-300 rounded-xl md:rounded-2xl px-2.5 sm:px-3 md:px-3.5 h-[38px] md:h-[42px] flex items-center gap-1.5 sm:gap-2 shadow-2xs md:shadow-sm cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 md:text-[#0F4C81] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <div className="flex flex-col justify-center min-w-0 flex-1 relative">
-              <span className="text-[8px] sm:text-[9px] font-medium text-slate-400 leading-none truncate">To Date</span>
+              <span className="text-[8px] sm:text-[9px] font-medium md:font-semibold text-slate-400 md:text-slate-500 leading-none truncate">To Date</span>
               <input
                 type="text"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="text-xs md:text-[13px] font-semibold md:font-bold text-slate-700 bg-transparent outline-none p-0 border-none leading-none w-full cursor-text mt-0.5"
+                className="text-xs md:text-[13px] font-semibold md:font-extrabold text-slate-700 md:text-[#0F172A] bg-transparent outline-none p-0 border-none leading-none w-full cursor-text mt-0.5"
               />
               <input
                 ref={toDateInputRef}
@@ -1410,7 +1444,7 @@ export default function CollectionReportModal({
           {/* Search Input with inline Funnel Filter */}
           <div 
             ref={searchContainerRef}
-            className="flex-1 min-w-0 bg-slate-100/90 md:bg-white/95 border border-slate-200/80 md:border-white rounded-xl md:rounded-2xl px-2.5 sm:px-3 md:px-4 h-10 md:h-11 flex items-center gap-1.5 sm:gap-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-inner md:shadow-sm relative"
+            className="flex-1 min-w-0 bg-slate-100/90 md:bg-white/95 border border-slate-200/80 md:border-blue-300 rounded-xl md:rounded-2xl px-2.5 sm:px-3 md:px-4 h-10 md:h-11 flex items-center gap-1.5 sm:gap-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-inner md:shadow-sm relative"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 md:text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -1611,7 +1645,7 @@ export default function CollectionReportModal({
                 </span>
                 <div className="flex items-center gap-1.5 text-[10px] xl:text-[11px] font-bold text-[#15803D] whitespace-nowrap mt-0.5 truncate">
                   <span>Cash: ₹{cashCollection.toLocaleString('en-IN')}</span>
-                  <span className="text-emerald-400">•</span>
+                  <span className="text-emerald-500/70">|</span>
                   <span className="text-[#0369A1]">UPI: ₹{onlineCollection.toLocaleString('en-IN')}</span>
                 </div>
               </div>
@@ -1634,20 +1668,20 @@ export default function CollectionReportModal({
               </div>
             </div>
 
-            {/* Card 4: OD (OVERDUE) (Purple Theme) */}
+            {/* Card 4: DEBIT (Purple Theme — replaces OD) */}
             <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#FAF5FF] to-[#E9D5FF]/90 rounded-2xl border border-[#D8B4FE] shadow-sm hover:shadow-md transition-shadow p-3.5 xl:p-4 flex items-center gap-3.5 min-w-0">
               <svg viewBox="0 0 320 60" preserveAspectRatio="none" className="absolute bottom-0 right-0 w-full h-9 pointer-events-none opacity-65">
                 <path d="M0,48 C100,58 190,18 320,8 L320,60 L0,60 Z" fill="#9333EA" fillOpacity="0.25" />
               </svg>
               <div className="relative z-10 w-11 h-11 xl:w-12 xl:h-12 rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#A855F7] text-white flex items-center justify-center shrink-0 shadow-md ring-2 ring-white/70">
-                <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+                <CreditCard className="w-6 h-6 stroke-[2.2]" />
               </div>
               <div className="relative z-10 flex flex-col min-w-0 flex-1">
-                <span className="text-[11px] xl:text-xs font-extrabold text-[#4C1D95] uppercase tracking-wider truncate">OD (OVERDUE)</span>
+                <span className="text-[11px] xl:text-xs font-extrabold text-[#4C1D95] uppercase tracking-wider truncate">DEBIT</span>
                 <span className="text-lg xl:text-xl font-black text-[#6D28D9] tracking-tight whitespace-nowrap truncate mt-0.5">
-                  ₹ {totalOverdueAmount.toLocaleString('en-IN')}
+                  ₹ {totalDisbursement.toLocaleString('en-IN')}
                 </span>
-                <span className="text-[10px] xl:text-[11px] font-semibold text-[#7C3AED] truncate mt-0.5">Installment Overdue</span>
+                <span className="text-[10px] xl:text-[11px] font-semibold text-[#7C3AED] truncate mt-0.5">Total Disbursed</span>
               </div>
             </div>
           </div>
@@ -1795,10 +1829,10 @@ export default function CollectionReportModal({
       </div>
 
       {/* True Collection Data Ledger Table - Dynamic Columns & Dedicated Touch Scroll */}
-      <div className="relative z-10 flex-1 min-h-0 bg-white border border-slate-200/80 md:border-[#BFDBFE]/80 rounded-2xl shadow-sm md:shadow-md flex flex-col overflow-hidden">
+      <div className="relative z-10 flex-1 min-h-0 bg-white border border-slate-200/80 md:border-blue-400 rounded-2xl shadow-sm md:shadow-md flex flex-col overflow-hidden">
         <div ref={tableScrollRef} className="flex-1 min-h-0 overflow-y-auto pb-24 md:pb-6" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-100 md:bg-transparent border-b border-slate-200 md:border-blue-200/80 sticky top-0 z-10 select-none shadow-2xs md:shadow-sm">
+            <thead className="bg-slate-100 md:bg-transparent border-b border-slate-200 md:border-slate-300 sticky top-0 z-10 select-none shadow-2xs md:shadow-sm">
               {/* MOBILE-ONLY HEADER ROW (< md:) - 100% Untouched */}
               <tr className="md:hidden">
                 <th className="py-2.5 px-3 sm:px-4 text-center text-[11px] font-semibold text-slate-500 w-12 sm:w-14">S.No</th>
@@ -1826,12 +1860,12 @@ export default function CollectionReportModal({
                 )}
               </tr>
 
-              {/* DESKTOP-ONLY COLOR-CODED GROUPED HEADER (md: and above) */}
+              {/* DESKTOP-ONLY UNIFORM ROYAL BLUE GROUPED HEADER (md: and above) */}
               <tr className="hidden md:table-row text-white">
                 {/* 1. S.No */}
                 <th
                   rowSpan={isCreditActive ? 2 : 1}
-                  className="py-3 px-3 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#0F4C81] to-[#1D63DC] border-r border-white/15 w-14 align-middle"
+                  className="py-3 px-3 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] border-r border-blue-400/50 w-16 align-middle"
                 >
                   S.No
                 </th>
@@ -1839,13 +1873,10 @@ export default function CollectionReportModal({
                 {/* 2. Name + Preserved Newest/Oldest Sort Toggle */}
                 <th
                   rowSpan={isCreditActive ? 2 : 1}
-                  className="py-3 px-4 text-left text-xs font-bold tracking-wide bg-gradient-to-b from-[#0F4C81] to-[#1D63DC] border-r border-white/15 align-middle"
+                  className="py-3 px-4 text-left text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] border-r border-blue-400/50 align-middle"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-blue-100 shrink-0" />
-                      <span>Name</span>
-                    </div>
+                    <span>Name</span>
                     <button
                       type="button"
                       onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
@@ -1858,23 +1889,18 @@ export default function CollectionReportModal({
                   </div>
                 </th>
 
+                {/* 3. Collection Staff */}
+                <th
+                  rowSpan={isCreditActive ? 2 : 1}
+                  className="py-3 px-3 xl:px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] border-r border-blue-400/50 w-36 xl:w-44 align-middle"
+                >
+                  Collection Staff
+                </th>
+
                 {/* Mode column when Debit-Only is active */}
                 {!isCreditActive && isDebitActive && (
-                  <th className="py-3 px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#0F4C81] to-[#1D63DC] border-r border-white/15 w-32 align-middle">
+                  <th className="py-3 px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] border-r border-blue-400/50 w-32 align-middle">
                     Mode
-                  </th>
-                )}
-
-                {/* 3. Debit (Crimson/Rose Header before Collection) */}
-                {isDebitActive && (
-                  <th
-                    rowSpan={isCreditActive ? 2 : 1}
-                    className="py-3 px-3 xl:px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#E11D48] to-[#F43F5E] border-r border-white/15 w-28 xl:w-32 align-middle"
-                  >
-                    <div className="inline-flex items-center justify-center gap-1.5">
-                      <CreditCard className="w-4 h-4 text-rose-100 shrink-0" />
-                      <span>Debit</span>
-                    </div>
                   </th>
                 )}
 
@@ -1882,38 +1908,29 @@ export default function CollectionReportModal({
                 {isCreditActive && (
                   <th
                     colSpan={3}
-                    className="py-2 px-3 text-center text-xs font-bold tracking-wide bg-gradient-to-r from-[#0284C7] via-[#0EA5E9] to-[#2563EB] border-b border-white/25 border-r border-white/15"
+                    className={`py-2 px-3 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] border-b border-blue-400/50 border-r border-blue-400/50`}
                   >
-                    <div className="inline-flex items-center justify-center gap-1.5">
-                      <Coins className="w-4 h-4 text-yellow-300 shrink-0" />
-                      <span>Collection</span>
-                    </div>
+                    Collection
                   </th>
                 )}
 
-                {/* 5. Pending (Green Header) */}
+                {/* 5. Pending */}
                 {isCreditActive && (
                   <th
                     rowSpan={2}
-                    className="py-3 px-3 xl:px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#15803D] to-[#65A30D] border-r border-white/15 w-28 xl:w-32 align-middle"
+                    className={`py-3 px-3 xl:px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] ${isDebitActive ? 'border-r border-blue-400/50' : ''} w-28 xl:w-32 align-middle`}
                   >
-                    <div className="inline-flex items-center justify-center gap-1.5">
-                      <Clock className="w-4 h-4 text-lime-100 shrink-0" />
-                      <span>Pending</span>
-                    </div>
+                    Pending
                   </th>
                 )}
 
-                {/* 6. OD (Purple Header) */}
-                {isCreditActive && (
+                {/* 6. Debit (Far-right column) */}
+                {isDebitActive && (
                   <th
-                    rowSpan={2}
-                    className="py-3 px-3 xl:px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#6D28D9] to-[#9333EA] w-28 xl:w-32 align-middle"
+                    rowSpan={isCreditActive ? 2 : 1}
+                    className="py-3 px-3 xl:px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] w-28 xl:w-32 align-middle"
                   >
-                    <div className="inline-flex items-center justify-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4 text-purple-100 shrink-0" />
-                      <span>OD</span>
-                    </div>
+                    Debit
                   </th>
                 )}
               </tr>
@@ -1921,19 +1938,19 @@ export default function CollectionReportModal({
               {/* DESKTOP-ONLY SUB-COLUMNS ROW FOR COLLECTION (Cash | UPI | Total) */}
               {isCreditActive && (
                 <tr className="hidden md:table-row">
-                  <th className="py-2 px-3 xl:px-4 text-center text-[11px] font-bold text-[#1E3A8A] bg-[#EFF6FF] border-b border-r border-blue-200/80 w-24 xl:w-28">
+                  <th className="py-2 px-3 xl:px-4 text-center text-[11px] font-bold text-[#0F172A] bg-[#DBEAFE] border-b border-r border-slate-300 w-24 xl:w-28">
                     Cash
                   </th>
-                  <th className="py-2 px-3 xl:px-4 text-center text-[11px] font-bold text-[#1E3A8A] bg-[#EFF6FF] border-b border-r border-blue-200/80 w-24 xl:w-28">
+                  <th className="py-2 px-3 xl:px-4 text-center text-[11px] font-bold text-[#0F172A] bg-[#DBEAFE] border-b border-r border-slate-300 w-24 xl:w-28">
                     UPI
                   </th>
-                  <th className="py-2 px-3 xl:px-4 text-center text-[11px] font-extrabold text-[#0F172A] bg-[#E0F2FE] border-b border-r border-blue-200/80 w-28 xl:w-32">
+                  <th className="py-2 px-3 xl:px-4 text-center text-[11px] font-extrabold text-[#0F172A] bg-[#DBEAFE] border-b border-r border-slate-300 w-28 xl:w-32">
                     Total
                   </th>
                 </tr>
               )}
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
+            <tbody className="divide-y divide-slate-100 md:divide-slate-300 text-xs">
               {filteredData.length > 0 ? (
                 <>
                   {filteredData.map((item, index) => {
@@ -1942,11 +1959,11 @@ export default function CollectionReportModal({
                     const rowUpi = isCollectionCredit ? Number(item.upiAmount || 0) : 0;
                     const rowCollectionTotal = isCollectionCredit ? ((rowCash + rowUpi) || Number(item.credit || 0)) : 0;
                     return (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium md:font-bold text-slate-400 md:text-slate-700 md:border-r md:border-slate-100">{index + 1}</td>
-                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 md:px-4 md:border-r md:border-slate-100">
-                        <div className="font-semibold md:font-bold text-slate-800 leading-tight truncate">{item.name}</div>
-                        <div className="text-[10px] sm:text-[11px] text-slate-400 font-normal mt-0.5 whitespace-nowrap">
+                    <tr key={item.id} className="hover:bg-slate-50/70 md:odd:bg-white md:even:bg-[#F8FAFC] md:hover:bg-blue-50/40 transition-colors">
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 text-center font-medium md:font-extrabold text-slate-400 md:text-slate-900 md:border-r md:border-slate-300">{index + 1}</td>
+                      <td className="py-2.5 sm:py-3 px-3 sm:px-4 md:px-4 md:border-r md:border-slate-300">
+                        <div className="font-semibold md:font-extrabold text-slate-800 md:text-slate-900 leading-tight truncate">{item.name}</div>
+                        <div className="text-[10px] sm:text-[11px] text-slate-400 md:text-slate-500 font-normal md:font-semibold mt-0.5 whitespace-nowrap">
                           {formatTransactionSubtext(item.date, item.timeStr, item.createdAt)}
                         </div>
                       </td>
@@ -2002,83 +2019,73 @@ export default function CollectionReportModal({
                         </td>
                       )}
 
-                      {/* DESKTOP-ONLY BODY CELLS (md: and above) - Exact Column Order: Debit | Collection (Cash, UPI, Total) | Pending | OD */}
+                      {/* DESKTOP-ONLY BODY CELLS (md: and above) - Exact Column Order: Collection Staff | Collection (Cash, UPI, Total) | Pending | Debit */}
+                      <td className={`hidden md:table-cell py-3 px-3 xl:px-4 text-center font-extrabold text-slate-900 ${(isCreditActive || isDebitActive) ? 'border-r border-slate-300' : ''}`}>
+                        {item.staffName || '-'}
+                      </td>
+
                       {!isCreditActive && isDebitActive && (
                         item.isBounced ? (
                           <td colSpan={2} className="hidden md:table-cell py-3 px-4 text-center">
-                            <span className="text-xs font-semibold text-rose-500 tracking-wide uppercase">
+                            <span className="text-xs font-bold text-rose-500 tracking-wide uppercase">
                               BOUNCED
                             </span>
                           </td>
                         ) : (
                           <>
-                            <td className="hidden md:table-cell py-3 px-4 text-center font-semibold text-slate-600 border-r border-slate-100">
+                            <td className="hidden md:table-cell py-3 px-4 text-center font-bold text-slate-800 border-r border-slate-300">
                               {item.mode}
                             </td>
-                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-bold bg-rose-50/70 text-rose-600">
-                              {item.debit > 0 ? `₹ ${item.debit.toLocaleString('en-IN')}` : <span className="text-slate-400 font-medium">-</span>}
+                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-extrabold text-rose-600">
+                              {item.debit > 0 ? `₹ ${item.debit.toLocaleString('en-IN')}` : <span className="text-slate-500 font-bold">-</span>}
                             </td>
                           </>
                         )
-                      )}
-
-                      {isCreditActive && isDebitActive && (
-                        <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-bold bg-rose-50/70 border-r border-rose-100/80">
-                          {!item.isBounced && item.debit > 0 ? (
-                            <span className="text-rose-600">₹ {item.debit.toLocaleString('en-IN')}</span>
-                          ) : (
-                            <span className="text-slate-400 font-medium">-</span>
-                          )}
-                        </td>
                       )}
 
                       {isCreditActive && (
                         item.isBounced ? (
                           <>
-                            <td colSpan={3} className="hidden md:table-cell py-3 px-3 xl:px-4 text-center border-r border-slate-100">
-                              <span className="text-xs font-semibold text-rose-500 tracking-wide uppercase">
+                            <td colSpan={3} className="hidden md:table-cell py-3 px-3 xl:px-4 text-center border-r border-slate-300">
+                              <span className="text-xs font-bold text-rose-500 tracking-wide uppercase">
                                 BOUNCED
                               </span>
                             </td>
-                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-medium text-slate-400 bg-amber-50/60 border-r border-amber-100/80">
+                            <td className={`hidden md:table-cell py-3 px-3 xl:px-4 text-center font-bold text-slate-500 ${isDebitActive ? 'border-r border-slate-300' : ''}`}>
                               -
-                            </td>
-                            <td className={`hidden md:table-cell py-3 px-3 xl:px-4 text-center font-bold bg-purple-50/60 ${item.od > 0 ? 'text-purple-700' : 'text-slate-400 font-medium'}`}>
-                              {item.od > 0 ? `₹ ${item.od.toLocaleString('en-IN')}` : '-'}
                             </td>
                           </>
                         ) : (
                           <>
                             {/* Collection -> Cash */}
-                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-bold bg-[#F8FBFF] border-r border-slate-100">
-                              {rowCash > 0 ? (
-                                <span className="text-slate-800">₹ {rowCash.toLocaleString('en-IN')}</span>
-                              ) : (
-                                <span className="text-slate-400 font-medium">-</span>
-                              )}
+                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-extrabold text-slate-900 border-r border-slate-300">
+                              {rowCash > 0 ? `₹ ${rowCash.toLocaleString('en-IN')}` : <span className="text-slate-500 font-bold">-</span>}
                             </td>
                             {/* Collection -> UPI */}
-                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-bold bg-[#F8FBFF] border-r border-slate-100">
-                              {rowUpi > 0 ? (
-                                <span className="text-blue-700">₹ {rowUpi.toLocaleString('en-IN')}</span>
-                              ) : (
-                                <span className="text-slate-400 font-medium">-</span>
-                              )}
+                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-extrabold text-blue-700 border-r border-slate-300">
+                              {rowUpi > 0 ? `₹ ${rowUpi.toLocaleString('en-IN')}` : <span className="text-slate-500 font-bold">-</span>}
                             </td>
                             {/* Collection -> Total */}
-                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-black text-slate-900 bg-[#F0F7FF] border-r border-blue-100/80">
-                              {rowCollectionTotal > 0 ? `₹ ${rowCollectionTotal.toLocaleString('en-IN')}` : '-'}
+                            <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-extrabold text-slate-900 border-r border-slate-300">
+                              {rowCollectionTotal > 0 ? `₹ ${rowCollectionTotal.toLocaleString('en-IN')}` : <span className="text-slate-500 font-bold">-</span>}
                             </td>
                             {/* Pending */}
-                            <td className={`hidden md:table-cell py-3 px-3 xl:px-4 text-center font-bold bg-amber-50/60 border-r border-amber-100/80 ${item.pending > 0 ? 'text-amber-700' : 'text-slate-400 font-medium'}`}>
+                            <td className={`hidden md:table-cell py-3 px-3 xl:px-4 text-center font-extrabold ${isDebitActive ? 'border-r border-slate-300' : ''} ${item.pending > 0 ? 'text-amber-700' : 'text-slate-500 font-bold'}`}>
                               {item.pending > 0 ? `₹ ${item.pending.toLocaleString('en-IN')}` : '-'}
-                            </td>
-                            {/* OD */}
-                            <td className={`hidden md:table-cell py-3 px-3 xl:px-4 text-center font-bold bg-purple-50/60 ${item.od > 0 ? 'text-purple-700' : 'text-slate-400 font-medium'}`}>
-                              {item.od > 0 ? `₹ ${item.od.toLocaleString('en-IN')}` : '-'}
                             </td>
                           </>
                         )
+                      )}
+
+                      {/* Far-Right Column: Debit */}
+                      {isCreditActive && isDebitActive && (
+                        <td className="hidden md:table-cell py-3 px-3 xl:px-4 text-center font-extrabold">
+                          {!item.isBounced && item.debit > 0 ? (
+                            <span className="text-rose-600">₹ {item.debit.toLocaleString('en-IN')}</span>
+                          ) : (
+                            <span className="text-slate-500 font-bold">-</span>
+                          )}
+                        </td>
                       )}
                     </tr>
                     );
