@@ -39,6 +39,7 @@ import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, query, 
 import Login from './components/Login';
 import CustomerDashboard from './components/CustomerDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import CollectionReportModal from './components/CollectionReportModal';
 import EMICalculator from './components/EMICalculator';
 import OfflineImage from './components/OfflineImage';
 import CustomerDetail from './components/CustomerDetail';
@@ -591,7 +592,7 @@ function App() {
   };
 
   const switchTab = (newView) => {
-    setIsCollectionReportOpen(false);
+    setIsCollectionReportOpen(newView === 'Collection Report');
     if (newView === 'Customer') {
       setActiveCategory('Active');
       setSearchQuery('');
@@ -608,7 +609,9 @@ function App() {
   };
 
   useEffect(() => {
-    if (currentView !== 'Home') {
+    if (currentView === 'Collection Report') {
+      setIsCollectionReportOpen(true);
+    } else if (currentView !== 'Home') {
       setIsCollectionReportOpen(false);
     }
   }, [currentView]);
@@ -1373,6 +1376,7 @@ function App() {
   const renderView = () => {
     switch(currentView) {
       case 'Home': return <div className={`flex-1 ${isCollectionReportOpen ? 'h-full overflow-hidden' : 'overflow-y-auto'}`}><AdminDashboard setCurrentView={setCurrentView} onDrillDown={handleDrillDown} activeBranch={activeBranch} userProfile={userProfile} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} branches={branches} isRoleResolving={isRoleResolving} isBranchLoading={isBranchLoading} isCollectionReportOpen={isCollectionReportOpen} setIsCollectionReportOpen={setIsCollectionReportOpen} /></div>;
+      case 'Collection Report': return <div className="flex-1 h-full overflow-hidden"><CollectionReportModal isOpen={true} onClose={() => navigateToView('Home')} userProfile={userProfile} activeBranch={activeBranch} branches={branches} customers={rbacDashboardCustomers.filter(c => c.status?.trim().toLowerCase() === 'approved')} isStaff={userProfile?.role?.toLowerCase() === 'staff'} /></div>;
       case 'EMI Calculator': return <div className="flex-1 overflow-y-auto"><EMICalculator onBack={() => navigateToView('Home')} /></div>;
       case 'Centers': return <div className="flex-1 overflow-hidden md:overflow-y-auto"><CenterManagement userProfile={userProfile} activeBranch={activeBranch} navigateToView={navigateToView} setSelectedCenter={setSelectedCenter} branches={branches} /></div>;
       case 'Center Detail': return <div className="flex-1 overflow-y-auto"><CenterDetailsView center={selectedCenter} customers={customers} userProfile={userProfile} activeBranch={activeBranch} onBack={() => navigateToView('Centers')} onCenterUpdate={(updated) => setSelectedCenter(prev => ({...prev, ...updated}))} /></div>;
@@ -2041,6 +2045,7 @@ function App() {
               <DesktopSidebar 
                 currentView={currentView} 
                 setCurrentView={switchTab}
+                isCollectionReportOpen={isCollectionReportOpen}
                 branches={branches}
                 activeBranch={activeBranch}
                 onBranchChange={handleBranchSwitch}

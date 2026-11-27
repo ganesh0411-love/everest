@@ -18,7 +18,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { canAccessCashBook } from '../utils/branchUtils';
 
-const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
+const DesktopSidebar = ({ currentView, setCurrentView, userProfile, isCollectionReportOpen = false }) => {
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to logout?")) {
       try {
@@ -35,12 +35,13 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     { name: 'Dashboard Overview', view: 'Home', icon: LayoutDashboard },
     { name: 'Customer Management', view: 'Customer', icon: Users },
     { name: 'Center Management', view: 'Centers', icon: Building2 },
-    { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: UserPlus },
-    { name: 'Expenses', view: 'Expenses', icon: Receipt },
+    { name: 'Collection Report', view: 'Collection Report', icon: BarChart3 },
     { name: 'Cash Book', view: 'Cash Book', icon: BookOpen },
-    { name: 'Staff Management', view: 'Staff Management', icon: UserCheck },
+    { name: 'Expenses', view: 'Expenses', icon: Receipt },
     { name: 'Application Status', view: 'Application Status', icon: ClipboardList },
-    { name: 'Customer KYC Update', view: 'Customer KYC Update', icon: ShieldCheck },
+    { name: 'Staff Management', view: 'Staff Management', icon: UserCheck },
+    { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: UserPlus },
+    { name: 'Customer KYC', view: 'Customer KYC Update', icon: ShieldCheck },
     { name: 'Recycle Bin', view: 'Recycle Bin', icon: Trash2 },
   ].filter(item => {
     const permissions = userProfile?.permissions || {};
@@ -49,6 +50,7 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
     if (item.name === 'Dashboard Overview') return isAdmin || permissions.dashboardOverview === true;
     if (item.name === 'Customer Management') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
+    if (item.name === 'Collection Report') return isAdmin || permissions.collectionReport === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
     if (item.name === 'Expenses' || item.name === 'Expansion') return isAdmin || permissions.expenses === true || permissions.expansion === true || true;
@@ -67,7 +69,12 @@ const DesktopSidebar = ({ currentView, setCurrentView, userProfile }) => {
       <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentView === item.view;
+          const isActive =
+            item.view === 'Collection Report'
+              ? currentView === 'Collection Report' || (currentView === 'Home' && isCollectionReportOpen)
+              : item.view === 'Home'
+              ? currentView === 'Home' && !isCollectionReportOpen
+              : currentView === item.view;
           return (
             <button
               key={item.view}

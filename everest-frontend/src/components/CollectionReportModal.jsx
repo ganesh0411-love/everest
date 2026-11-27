@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, CreditCard } from 'lucide-react';
+import { Wallet, Target, HandCoins, ArrowUpDown, Filter, Check, Clock, CreditCard, ChevronDown } from 'lucide-react';
 import CollectionReportDownloadModal from './CollectionReportDownloadModal';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -209,6 +209,13 @@ export default function CollectionReportModal({
   const searchContainerRef = useRef(null);
   const [firestoreStaff, setFirestoreStaff] = useState([]);
 
+  // Desktop Column Header Multi-Select Filter for Collection Staff
+  const [selectedStaffColumnFilters, setSelectedStaffColumnFilters] = useState(() => new Set());
+  const [showStaffColumnPopover, setShowStaffColumnPopover] = useState(false);
+  const [staffPopoverCoords, setStaffPopoverCoords] = useState({ top: 0, left: 0 });
+  const staffColumnPopoverRef = useRef(null);
+  const staffColumnTriggerRef = useRef(null);
+
   // Independent Credit & Debit multi-toggle boolean states
   const [isCreditActive, setIsCreditActive] = useState(true);
   const [isDebitActive, setIsDebitActive] = useState(true);
@@ -303,7 +310,30 @@ export default function CollectionReportModal({
   // Reset filter dropdown whenever activeBranch changes
   useEffect(() => {
     setShowFilterDropdown(false);
+    setShowStaffColumnPopover(false);
+    setSelectedStaffColumnFilters(new Set());
   }, [activeBranch?.id, activeBranch?.name]);
+
+  // Auto-close Collection Staff column filter popover on outside click
+  useEffect(() => {
+    const handleStaffPopoverOutside = (event) => {
+      if (
+        staffColumnPopoverRef.current &&
+        !staffColumnPopoverRef.current.contains(event.target) &&
+        !staffColumnTriggerRef.current?.contains(event.target)
+      ) {
+        setShowStaffColumnPopover(false);
+      }
+    };
+    if (showStaffColumnPopover) {
+      document.addEventListener('mousedown', handleStaffPopoverOutside);
+      document.addEventListener('touchstart', handleStaffPopoverOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleStaffPopoverOutside);
+      document.removeEventListener('touchstart', handleStaffPopoverOutside);
+    };
+  }, [showStaffColumnPopover]);
 
   // Real-time Firestore staff subscription with fallback to props
   useEffect(() => {
@@ -1113,6 +1143,45 @@ export default function CollectionReportModal({
     };
   }, [customers, customLedgerData, userProfile, activeBranch, disabledBranchIds, fromDate, toDate, selectedFilterIds, isAllSelected, isBranchFilterMode, canFilterByStaff, availableFilterItems, isMainBranch, userBranchId, firestoreStaff, staffList]);
 
+  // Desktop Column Filter Options: active branch staff + all unique staff names in active branch records
+  const collectionStaffFilterOptions = useMemo(() => {
+    const map = new Map();
+    const addStaff = (rawName) => {
+      const name = String(rawName || '').trim();
+      if (!name || name === '-' || name === '—' || name.toLowerCase() === 'n/a') return;
+      const key = name.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, { key, name });
+      }
+    };
+
+    (availableBranchStaff || []).forEach((s) => addStaff(s?.name));
+
+    if (isMainBranch) {
+      const combinedStaff = firestoreStaff.length > 0 ? firestoreStaff : (staffList || []);
+      combinedStaff.forEach((s) => {
+        if (!s) return;
+        if (s.status === 'Recycled' || s.status === 'Deleted' || s.status === 'Inactive' || s.disabled === true) return;
+        const sBranchId = s.branchId || s.branchCode;
+        if (sBranchId && disabledBranchIds?.has(sBranchId)) return;
+        addStaff(s.name || s.staffName || s.displayName);
+      });
+    }
+
+    (ledgerEntries || []).forEach((item) => addStaff(item?.staffName));
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [availableBranchStaff, isMainBranch, firestoreStaff, staffList, disabledBranchIds, ledgerEntries]);
+
+  const activeStaffColumnFilterCount = useMemo(() => {
+    if (selectedStaffColumnFilters.size === 0 || collectionStaffFilterOptions.length === 0) return 0;
+    return collectionStaffFilterOptions.filter((opt) => selectedStaffColumnFilters.has(opt.key)).length;
+  }, [selectedStaffColumnFilters, collectionStaffFilterOptions]);
+
+  const isStaffColumnFiltered =
+    activeStaffColumnFilterCount > 0 &&
+    activeStaffColumnFilterCount < collectionStaffFilterOptions.length;
+
   // Dual-Mode Search & Chronological Date Sorting (Ascending / Descending)
   const filteredData = useMemo(() => {
     const query = searchTerm.trim();
@@ -1165,7 +1234,10 @@ export default function CollectionReportModal({
         matchesType = false;
       }
 
-      return matchesSearch && matchesType;
+      const staffKey = String(item.staffName || '').toLowerCase().trim();
+      const matchesStaffColumn = !isStaffColumnFiltered || selectedStaffColumnFilters.has(staffKey);
+
+      return matchesSearch && matchesType && matchesStaffColumn;
     });
 
     result.sort((a, b) => {
@@ -1180,7 +1252,7 @@ export default function CollectionReportModal({
     });
 
     return result;
-  }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive, sortOrder, showBounced]);
+  }, [ledgerEntries, searchTerm, isCreditActive, isDebitActive, sortOrder, showBounced, isStaffColumnFiltered, selectedStaffColumnFilters]);
 
   // CSV Export utility bound to header action (defined safely after filteredData initialization)
   const handleDownloadCSV = () => {
@@ -1270,11 +1342,11 @@ export default function CollectionReportModal({
     : 0;
 
   const totalPendingAmount = useMemo(() => {
-    if (searchTerm.trim() !== '') {
+    if (searchTerm.trim() !== '' || isStaffColumnFiltered) {
       return filteredData.reduce((acc, curr) => acc + (Number(curr.pending) || 0), 0);
     }
     return Number(totalScopedPendingSafe || 0);
-  }, [filteredData, searchTerm, totalScopedPendingSafe]);
+  }, [filteredData, searchTerm, isStaffColumnFiltered, totalScopedPendingSafe]);
 
   const totalOverdueAmount = useMemo(() => {
     if (searchTerm.trim() !== '') {
@@ -1889,12 +1961,44 @@ export default function CollectionReportModal({
                   </div>
                 </th>
 
-                {/* 3. Collection Staff */}
+                {/* 3. Collection Staff (Multi-Select Checkbox Filter Header) */}
                 <th
                   rowSpan={isCreditActive ? 2 : 1}
-                  className="py-3 px-3 xl:px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] border-r border-blue-400/50 w-36 xl:w-44 align-middle"
+                  className="py-3 px-3 xl:px-4 text-center text-xs font-bold tracking-wide bg-gradient-to-b from-[#005BB5] to-[#0066CC] border-r border-blue-400/50 w-40 xl:w-48 align-middle"
                 >
-                  Collection Staff
+                  <button
+                    ref={staffColumnTriggerRef}
+                    type="button"
+                    onClick={() => {
+                      if (!showStaffColumnPopover && staffColumnTriggerRef.current) {
+                        const rect = staffColumnTriggerRef.current.getBoundingClientRect();
+                        const popoverHalfWidth = 120;
+                        const clampedLeft = Math.max(
+                          popoverHalfWidth + 12,
+                          Math.min(window.innerWidth - popoverHalfWidth - 12, rect.left + rect.width / 2)
+                        );
+                        setStaffPopoverCoords({
+                          top: rect.bottom + 8,
+                          left: clampedLeft
+                        });
+                      }
+                      setShowStaffColumnPopover((prev) => !prev);
+                    }}
+                    className={`inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg transition-all cursor-pointer select-none ${
+                      isStaffColumnFiltered || showStaffColumnPopover
+                        ? 'bg-white/25 text-white ring-1 ring-white/50 shadow-2xs'
+                        : 'hover:bg-white/15 text-white'
+                    }`}
+                    title="Filter by Collection Staff"
+                  >
+                    <span>Collection Staff</span>
+                    {isStaffColumnFiltered && (
+                      <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-white text-[#005BB5] text-[10px] font-extrabold leading-none">
+                        ({activeStaffColumnFilterCount})
+                      </span>
+                    )}
+                    <ChevronDown className={`w-3.5 h-3.5 text-blue-100 shrink-0 transition-transform duration-150 ${showStaffColumnPopover ? 'rotate-180' : ''}`} />
+                  </button>
                 </th>
 
                 {/* Mode column when Debit-Only is active */}
@@ -2110,6 +2214,79 @@ export default function CollectionReportModal({
           </table>
         </div>
       </div>
+
+      {/* DESKTOP-ONLY: Floating Collection Staff Multi-Select Checkbox Filter Popover (z-[80]) */}
+      {showStaffColumnPopover && (
+        <div
+          ref={staffColumnPopoverRef}
+          style={{
+            position: 'fixed',
+            top: `${staffPopoverCoords.top}px`,
+            left: `${staffPopoverCoords.left}px`,
+            transform: 'translateX(-50%)'
+          }}
+          className="hidden md:block w-64 bg-white rounded-2xl shadow-2xl border border-slate-200/95 py-2 z-[80] text-left font-normal text-slate-700 animate-in fade-in slide-in-from-top-1 duration-150"
+        >
+          <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Filter by Staff</span>
+            <div className="flex items-center gap-2 text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setSelectedStaffColumnFilters(new Set(collectionStaffFilterOptions.map((o) => o.key)))}
+                className="text-blue-600 hover:text-blue-800 cursor-pointer"
+              >
+                Select All
+              </button>
+              <span className="text-slate-300">|</span>
+              <button
+                type="button"
+                onClick={() => setSelectedStaffColumnFilters(new Set())}
+                className="text-slate-500 hover:text-rose-600 cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
+            {collectionStaffFilterOptions.length > 0 ? (
+              collectionStaffFilterOptions.map((staffOpt) => {
+                const isChecked = selectedStaffColumnFilters.has(staffOpt.key);
+                return (
+                  <label
+                    key={staffOpt.key}
+                    className={`flex items-center gap-2.5 px-3.5 py-2 text-xs cursor-pointer select-none transition-colors hover:bg-blue-50/60 ${
+                      isChecked ? 'bg-blue-50/35 font-bold text-slate-900' : 'text-slate-700 font-medium'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {
+                        setSelectedStaffColumnFilters((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(staffOpt.key)) {
+                            next.delete(staffOpt.key);
+                          } else {
+                            next.add(staffOpt.key);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-[#0066CC] cursor-pointer shrink-0"
+                    />
+                    <span className="truncate">{staffOpt.name}</span>
+                  </label>
+                );
+              })
+            ) : (
+              <div className="px-3.5 py-3 text-[11px] text-slate-400 italic text-center">
+                No staff found
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Statement Download & PDF Modal */}
       <CollectionReportDownloadModal

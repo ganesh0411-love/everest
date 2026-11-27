@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/logo.png';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download, BookOpen, Receipt } from 'lucide-react';
+import { Pencil, LayoutDashboard, Users, Building2, UserPlus, UserCheck, ClipboardList, ShieldCheck, Trash2, Download, BookOpen, Receipt, BarChart3 } from 'lucide-react';
 import { isBranchActive, canAccessCashBook } from '../utils/branchUtils';
 
 const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { id: 'main', name: 'Main Branch' }, onBranchChange, onAddBranch, onEditBranch, userProfile, isCollectionReportOpen }) => {
@@ -49,12 +49,13 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     { name: 'Dashboard Overview', view: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
     { name: 'Customer Management', view: 'Customer', icon: <Users className="w-5 h-5" /> },
     { name: 'Center Management', view: 'Centers', icon: <Building2 className="w-5 h-5" /> },
-    { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: <UserPlus className="w-5 h-5" /> },
-    { name: 'Expenses', view: 'Expenses', icon: <Receipt className="w-5 h-5" /> },
+    { name: 'Collection Report', view: 'Collection Report', icon: <BarChart3 className="w-5 h-5" /> },
     { name: 'Cash Book', view: 'Cash Book', icon: <BookOpen className="w-5 h-5" /> },
-    { name: 'Staff Management', view: 'Staff Management', icon: <UserCheck className="w-5 h-5" /> },
-    { name: 'Customer KYC Update', view: 'Customer KYC Update', icon: <ShieldCheck className="w-5 h-5" /> },
+    { name: 'Expenses', view: 'Expenses', icon: <Receipt className="w-5 h-5" /> },
     { name: 'Application Status', view: 'Application Status', icon: <ClipboardList className="w-5 h-5" /> },
+    { name: 'Staff Management', view: 'Staff Management', icon: <UserCheck className="w-5 h-5" /> },
+    { name: 'Add Bulk Customer', view: 'Add Bulk Customer', icon: <UserPlus className="w-5 h-5" /> },
+    { name: 'Customer KYC', view: 'Customer KYC Update', icon: <ShieldCheck className="w-5 h-5" /> },
     { name: 'Recycle Bin', view: 'Recycle Bin', icon: <Trash2 className="w-5 h-5" /> }
   ].filter(item => {
     const permissions = userProfile?.permissions || {};
@@ -63,6 +64,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     if (item.name === 'Dashboard Overview') return isAdmin || permissions.dashboardOverview === true;
     if (item.name === 'Customer Management') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Center Management') return isAdmin || permissions.centerManagement === true;
+    if (item.name === 'Collection Report') return isAdmin || permissions.collectionReport === true;
     if (item.name === 'Staff Management') return isAdmin || permissions.staffManagement === true;
     if (item.name === 'Application Status') return isAdmin || permissions.applicationStatus === true;
     if (item.name === 'Add Bulk Customer') return true;
@@ -70,7 +72,7 @@ const Header = ({ currentView, setCurrentView, branches = [], activeBranch = { i
     if (item.name === 'Cash Book') {
       return canAccessCashBook(userProfile);
     }
-    if (item.name === 'Customer KYC Update') return isAdmin || permissions.customerManagement === true;
+    if (item.name === 'Customer KYC' || item.name === 'Customer KYC Update') return isAdmin || permissions.customerManagement === true;
     if (item.name === 'Recycle Bin') return isAdmin || permissions.recycleBin === true;
 
     return isAdmin; // Only admin can access the rest by default unless specified
