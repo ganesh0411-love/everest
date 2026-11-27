@@ -76,8 +76,8 @@ const parseGlobalDate = (dStr) => {
       return new Date(year, month - 1, day);
     }
 
-    // Check for YYYY-MM-DD
-    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})/);
+    // Check for date-only YYYY-MM-DD (preserve ISO strings with T... time for exact new Date() parsing)
+    const ymdMatch = cleanStr.match(/^(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})$/);
     if (ymdMatch) {
       const year = parseInt(ymdMatch[1], 10);
       const month = parseInt(ymdMatch[2], 10);
@@ -87,6 +87,72 @@ const parseGlobalDate = (dStr) => {
   }
   const parsed = new Date(dStr);
   return isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
+const parseExactTimestamp = (val) => {
+  if (!val) return 0;
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (val instanceof Date) return isNaN(val.getTime()) ? 0 : val.getTime();
+  if (typeof val.toDate === 'function') {
+    const d = val.toDate();
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  if (typeof val === 'object' && val.seconds !== undefined) {
+    return val.seconds * 1000 + Math.floor((val.nanoseconds || 0) / 1e6);
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return 0;
+    if (/^\d{10,13}$/.test(trimmed)) {
+      const n = Number(trimmed);
+      return trimmed.length === 10 ? n * 1000 : n;
+    }
+    const dmyMatch = trimmed.match(/^(\d{1,2})[\.\-\/](\d{1,2})[\.\-\/](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?/i);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10);
+      let year = parseInt(dmyMatch[3], 10);
+      if (year < 100) year += 2000;
+      let hr = dmyMatch[4] ? parseInt(dmyMatch[4], 10) : 0;
+      const min = dmyMatch[5] ? parseInt(dmyMatch[5], 10) : 0;
+      const sec = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
+      const mer = dmyMatch[7]?.toUpperCase();
+      if (mer === 'PM' && hr < 12) hr += 12;
+      if (mer === 'AM' && hr === 12) hr = 0;
+      return new Date(year, month - 1, day, hr, min, sec).getTime();
+    }
+    const parsed = new Date(trimmed);
+    return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+  }
+  return 0;
+};
+
+const getCustomerRecencyTimestamp = (c) => {
+  if (!c) return 0;
+  const preciseTs =
+    parseExactTimestamp(c.created_at) ||
+    parseExactTimestamp(c.createdAt) ||
+    parseExactTimestamp(c.timestamp) ||
+    parseExactTimestamp(c.approvedAt) ||
+    parseExactTimestamp(c.lastUpdated);
+  if (preciseTs > 0) return preciseTs;
+
+  return (
+    parseExactTimestamp(c.loan_date) ||
+    parseExactTimestamp(c.loanDate) ||
+    parseExactTimestamp(c.disbursedAt) ||
+    parseExactTimestamp(c.date) ||
+    0
+  );
+};
+
+const getCustomerStatusBadgeLabel = (c) => {
+  const out = c?.dynamicOutstanding !== undefined ? c.dynamicOutstanding : (c?.repayAmount || 0);
+  const od = c?.dynamicOverdue || 0;
+  const pending = c?.dynamicPendingDues || 0;
+  if (out <= 0) return 'SETTLED';
+  if (od > 0 || pending > 0) return 'OVERDUE';
+  return 'LIVE';
 };
 
 export const safeSetItem = (key, value) => {
@@ -164,6 +230,7 @@ function App() {
   const [isRoleResolving, setIsRoleResolving] = useState(true);
   const [isBranchLoading, setIsBranchLoading] = useState(true);
   const [isCollectionReportOpen, setIsCollectionReportOpen] = useState(false);
+  const [staffDirectory, setStaffDirectory] = useState([]);
 
   // Fetch Branches Globally
   useEffect(() => {
@@ -190,6 +257,21 @@ function App() {
         });
       }, (error) => {
         console.error("Error fetching branches:", error);
+      });
+      return () => unsub();
+    }
+  }, [user, userProfile]);
+
+  // Fetch Staff Directory for Customer List Assigned Staff Filter
+  useEffect(() => {
+    if (user && userProfile) {
+      const unsub = onSnapshot(collection(db, 'staff'), (snapshot) => {
+        const list = snapshot.docs
+          .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+          .filter(s => s.status !== 'Recycled' && s.status !== 'Deleted' && s.status !== 'Inactive' && s.disabled !== true);
+        setStaffDirectory(list);
+      }, (error) => {
+        console.error("Error fetching staff directory:", error);
       });
       return () => unsub();
     }
@@ -648,6 +730,48 @@ function App() {
   const [tempBranchFilter, setTempBranchFilter] = useState('All');
   const [tempCustomDate, setTempCustomDate] = useState(null);
 
+  // Desktop Customer List Table Column Header Multi-Select Filters (Assigned Staff & Status)
+  const [selectedCustomerStaffFilters, setSelectedCustomerStaffFilters] = useState(() => new Set());
+  const [showCustomerStaffPopover, setShowCustomerStaffPopover] = useState(false);
+  const [customerStaffPopoverCoords, setCustomerStaffPopoverCoords] = useState({ top: 0, left: 0 });
+  const customerStaffPopoverRef = useRef(null);
+  const customerStaffTriggerRef = useRef(null);
+
+  const [selectedCustomerStatusFilters, setSelectedCustomerStatusFilters] = useState(() => new Set());
+  const [showCustomerStatusPopover, setShowCustomerStatusPopover] = useState(false);
+  const [customerStatusPopoverCoords, setCustomerStatusPopoverCoords] = useState({ top: 0, left: 0 });
+  const customerStatusPopoverRef = useRef(null);
+  const customerStatusTriggerRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutside = (event) => {
+      if (
+        showCustomerStaffPopover &&
+        customerStaffPopoverRef.current &&
+        !customerStaffPopoverRef.current.contains(event.target) &&
+        !customerStaffTriggerRef.current?.contains(event.target)
+      ) {
+        setShowCustomerStaffPopover(false);
+      }
+      if (
+        showCustomerStatusPopover &&
+        customerStatusPopoverRef.current &&
+        !customerStatusPopoverRef.current.contains(event.target) &&
+        !customerStatusTriggerRef.current?.contains(event.target)
+      ) {
+        setShowCustomerStatusPopover(false);
+      }
+    };
+    if (showCustomerStaffPopover || showCustomerStatusPopover) {
+      document.addEventListener('mousedown', handleOutside);
+      document.addEventListener('touchstart', handleOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [showCustomerStaffPopover, showCustomerStatusPopover]);
+
   // Automatically reset all filter selections whenever the user switches activeBranch
   useEffect(() => {
     setActiveCategory('Active');
@@ -659,6 +783,10 @@ function App() {
     setTempCustomDate(null);
     setSearchQuery('');
     setIsOdFilterActive(false);
+    setSelectedCustomerStaffFilters(new Set());
+    setSelectedCustomerStatusFilters(new Set());
+    setShowCustomerStaffPopover(false);
+    setShowCustomerStatusPopover(false);
   }, [activeBranch?.id, activeBranch?.name]);
 
   // Fallback to Main Branch if active branch gets hidden from dropdown
@@ -1176,10 +1304,16 @@ function App() {
 
     filtered.sort((a, b) => {
       switch (activeSort) {
-        case 'Recent':
-          return parseGlobalDate(b.date || b.createdAt).getTime() - parseGlobalDate(a.date || a.createdAt).getTime();
-        case 'Oldest':
-          return parseGlobalDate(a.date || a.createdAt).getTime() - parseGlobalDate(b.date || b.createdAt).getTime();
+        case 'Recent': {
+          const tsDiff = getCustomerRecencyTimestamp(b) - getCustomerRecencyTimestamp(a);
+          if (tsDiff !== 0) return tsDiff;
+          return String(b.id || '').localeCompare(String(a.id || ''));
+        }
+        case 'Oldest': {
+          const tsDiff = getCustomerRecencyTimestamp(a) - getCustomerRecencyTimestamp(b);
+          if (tsDiff !== 0) return tsDiff;
+          return String(a.id || '').localeCompare(String(b.id || ''));
+        }
         case 'Highest Amount':
           return (parseFloat(b.loanAmount) || 0) - (parseFloat(a.loanAmount) || 0);
         case 'Least Amount':
@@ -1587,10 +1721,69 @@ function App() {
                 >
                   {(() => {
                     const isMainBranchView = activeBranch?.id === 'main' || activeBranch?.name === 'Main Branch';
-                    let approvedCustomers = rbacManagementCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
+                    let baseApproved = rbacManagementCustomers.filter(c => c.status === 'Approved' || c.status === 'approved');
                     
                     if (isOdFilterActive) {
-                      approvedCustomers = approvedCustomers.filter(c => c.dynamicOverdue > 0 || c.dynamicPendingDues > 0);
+                      baseApproved = baseApproved.filter(c => c.dynamicOverdue > 0 || c.dynamicPendingDues > 0);
+                    }
+
+                    // Active Branch Staff + Assigned Staff values for column filter popover
+                    const customerStaffOptions = (() => {
+                      const staffMap = new Map();
+                      const addOpt = (rawName) => {
+                        const clean = String(rawName || '').trim();
+                        if (!clean || clean === '--' || clean === '-' || clean.toLowerCase() === 'n/a') return;
+                        const key = clean.toLowerCase();
+                        if (!staffMap.has(key)) {
+                          staffMap.set(key, { key, name: clean });
+                        }
+                      };
+
+                      const activeBranchIdLower = String(activeBranch?.id || '').toLowerCase().trim();
+                      const activeBranchNameLower = String(activeBranch?.name || '').toLowerCase().trim();
+
+                      (staffDirectory || []).forEach((s) => {
+                        const sBranchId = String(s.branchId || s.branchCode || s.branch || '').toLowerCase().trim();
+                        const sBranchName = String(s.branchName || s.branch || '').toLowerCase().trim();
+                        const belongs =
+                          isMainBranchView ||
+                          sBranchId === activeBranchIdLower ||
+                          sBranchName === activeBranchNameLower ||
+                          (activeBranchNameLower && sBranchName.includes(activeBranchNameLower));
+                        if (belongs) {
+                          addOpt(s.name || s.staffName || s.displayName);
+                        }
+                      });
+
+                      baseApproved.forEach((c) => {
+                        addOpt(c.assignedStaff || c.staffName || c.staff);
+                      });
+
+                      return Array.from(staffMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+                    })();
+
+                    const CUSTOMER_STATUS_OPTIONS = ['LIVE', 'OVERDUE', 'SETTLED'];
+                    const activeCustomerStaffCount = customerStaffOptions.filter((o) =>
+                      selectedCustomerStaffFilters.has(o.key)
+                    ).length;
+                    const isCustomerStaffFiltered =
+                      activeCustomerStaffCount > 0 &&
+                      activeCustomerStaffCount < customerStaffOptions.length;
+                    const isCustomerStatusFiltered =
+                      selectedCustomerStatusFilters.size > 0 &&
+                      selectedCustomerStatusFilters.size < CUSTOMER_STATUS_OPTIONS.length;
+
+                    let approvedCustomers = baseApproved;
+                    if (isCustomerStaffFiltered) {
+                      approvedCustomers = approvedCustomers.filter((c) => {
+                        const sKey = String(c.assignedStaff || c.staffName || c.staff || '').toLowerCase().trim();
+                        return selectedCustomerStaffFilters.has(sKey);
+                      });
+                    }
+                    if (isCustomerStatusFiltered) {
+                      approvedCustomers = approvedCustomers.filter((c) =>
+                        selectedCustomerStatusFilters.has(getCustomerStatusBadgeLabel(c))
+                      );
                     }
                     
                     if (isMainBranchView) {
@@ -1629,23 +1822,9 @@ function App() {
                           </svg>
                         </div>
 
-                        <div className="p-2 space-y-2 pb-24 md:px-6 md:pt-4 md:pb-24 md:space-y-3.5 relative z-10">
+                        <div className="p-2 space-y-2 pb-24 md:px-6 md:pt-3 md:pb-24 md:space-y-3 relative z-10">
                           <div className="px-1 pb-1 pt-1 text-xs font-bold text-[#1ca3a6] uppercase tracking-wider md:hidden">
                             Entries: {approvedCustomers.length}
-                          </div>
-
-                          {/* DESKTOP-ONLY: Top Center Header ("Customer List" with blue Users icon & horizontal accent lines) */}
-                          <div className="hidden md:flex items-center justify-center gap-4 pt-0.5 pb-1">
-                            <span className="h-[1.5px] w-24 lg:w-44 bg-gradient-to-r from-transparent via-blue-300 to-blue-400/80 rounded-full" />
-                            <div className="flex items-center gap-2.5 shrink-0">
-                              <div className="w-8 h-8 rounded-xl bg-blue-100/90 border border-blue-200/80 text-[#0066CC] flex items-center justify-center shadow-2xs">
-                                <Users className="w-5 h-5" />
-                              </div>
-                              <h2 className="text-[22px] lg:text-[25px] font-extrabold text-[#0F172A] tracking-tight leading-none">
-                                Customer List
-                              </h2>
-                            </div>
-                            <span className="h-[1.5px] w-24 lg:w-44 bg-gradient-to-l from-transparent via-blue-300 to-blue-400/80 rounded-full" />
                           </div>
 
                           {/* ROW 1 — FOUR VIBRANT PASTEL KPI SUMMARY CARDS (DESKTOP ONLY >= 768px) */}
@@ -1731,10 +1910,10 @@ function App() {
                           <div className="hidden md:block space-y-3">
                             {/* ROW 2 — STRICT LEFT-TO-RIGHT ORDER: Entries -> Search Customer... -> Filter ▾ -> OD Amount */}
                             <div className="flex items-center gap-3 w-full" data-testid="customer-row2-bar">
-                              {/* 1. Far Left: Entries: <count> Pill Badge */}
-                              <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 h-[46px] flex items-center gap-2 shrink-0 shadow-2xs">
-                                <Users className="w-4 h-4 text-[#0052B4] shrink-0" />
-                                <span className="text-sm font-bold text-[#0052B4] whitespace-nowrap">
+                              {/* 1. Far Left: High-Contrast Distinct Entries: <count> Pill Badge */}
+                              <div className="bg-gradient-to-r from-[#312E81] to-[#4338CA] text-white border border-indigo-800/80 rounded-2xl px-4 h-[46px] flex items-center gap-2 shrink-0 shadow-md shadow-indigo-900/20" data-testid="customer-entries-pill">
+                                <Users className="w-4 h-4 text-indigo-200 shrink-0" />
+                                <span className="text-sm font-extrabold tracking-wide text-white whitespace-nowrap">
                                   Entries: {approvedCustomers.length}
                                 </span>
                               </div>
@@ -1819,11 +1998,69 @@ function App() {
                                     <tr className="bg-gradient-to-r from-[#00337C] to-[#0052B4] text-white text-[13px] font-bold tracking-wide">
                                       <th className="py-3.5 px-4 font-bold">Customer</th>
                                       <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">{isMainBranchView ? 'Branch' : 'Loan Date'}</th>
-                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">Assigned Staff</th>
+                                      <th className="py-3 px-3 font-bold border-l border-white/15 text-center">
+                                        <button
+                                          ref={customerStaffTriggerRef}
+                                          type="button"
+                                          onClick={() => {
+                                            setShowCustomerStatusPopover(false);
+                                            if (!showCustomerStaffPopover && customerStaffTriggerRef.current) {
+                                              const rect = customerStaffTriggerRef.current.getBoundingClientRect();
+                                              const half = 128;
+                                              const clampedLeft = Math.max(half + 12, Math.min(window.innerWidth - half - 12, rect.left + rect.width / 2));
+                                              setCustomerStaffPopoverCoords({ top: rect.bottom + 8, left: clampedLeft });
+                                            }
+                                            setShowCustomerStaffPopover((prev) => !prev);
+                                          }}
+                                          className={`inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg transition-all cursor-pointer select-none ${
+                                            isCustomerStaffFiltered || showCustomerStaffPopover
+                                              ? 'bg-white/25 text-white ring-1 ring-white/50'
+                                              : 'hover:bg-white/15 text-white'
+                                          }`}
+                                          title="Filter by Assigned Staff"
+                                        >
+                                          <span>Assigned Staff</span>
+                                          {isCustomerStaffFiltered && (
+                                            <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-white text-[#00337C] text-[10px] font-extrabold leading-none">
+                                              ({activeCustomerStaffCount})
+                                            </span>
+                                          )}
+                                          <ChevronDown className={`w-3.5 h-3.5 text-blue-100 shrink-0 transition-transform duration-150 ${showCustomerStaffPopover ? 'rotate-180' : ''}`} />
+                                        </button>
+                                      </th>
                                       <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">Loan Type</th>
                                       <th className="py-3.5 px-4 font-bold border-l border-white/15 text-right">Loan Amount</th>
                                       <th className="py-3.5 px-4 font-bold border-l border-white/15 text-right">Outstanding</th>
-                                      <th className="py-3.5 px-4 font-bold border-l border-white/15 text-center">Status</th>
+                                      <th className="py-3 px-3 font-bold border-l border-white/15 text-center">
+                                        <button
+                                          ref={customerStatusTriggerRef}
+                                          type="button"
+                                          onClick={() => {
+                                            setShowCustomerStaffPopover(false);
+                                            if (!showCustomerStatusPopover && customerStatusTriggerRef.current) {
+                                              const rect = customerStatusTriggerRef.current.getBoundingClientRect();
+                                              const half = 112;
+                                              const clampedLeft = Math.max(half + 12, Math.min(window.innerWidth - half - 12, rect.left + rect.width / 2));
+                                              setCustomerStatusPopoverCoords({ top: rect.bottom + 8, left: clampedLeft });
+                                            }
+                                            setShowCustomerStatusPopover((prev) => !prev);
+                                          }}
+                                          className={`inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg transition-all cursor-pointer select-none ${
+                                            isCustomerStatusFiltered || showCustomerStatusPopover
+                                              ? 'bg-white/25 text-white ring-1 ring-white/50'
+                                              : 'hover:bg-white/15 text-white'
+                                          }`}
+                                          title="Filter by Status"
+                                        >
+                                          <span>Status</span>
+                                          {isCustomerStatusFiltered && (
+                                            <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-white text-[#00337C] text-[10px] font-extrabold leading-none">
+                                              ({selectedCustomerStatusFilters.size})
+                                            </span>
+                                          )}
+                                          <ChevronDown className={`w-3.5 h-3.5 text-blue-100 shrink-0 transition-transform duration-150 ${showCustomerStatusPopover ? 'rotate-180' : ''}`} />
+                                        </button>
+                                      </th>
                                     </tr>
                                   )}
                                 </thead>
@@ -1851,8 +2088,13 @@ function App() {
                                           </div>
                                           <div className="min-w-0 pr-2">
                                             <h4 className="font-bold text-[#0F172A] text-sm leading-tight truncate">{formatName(customer.name)}</h4>
-                                            {(customer.date || customer.lastUpdated) && (
-                                              <p className="text-[11px] font-medium text-slate-400 mt-0.5 truncate">{timeAgo(customer.date, customer.lastUpdated)}</p>
+                                            {(customer.created_at || customer.createdAt || customer.timestamp || customer.date || customer.lastUpdated) && (
+                                              <p className="text-[11px] font-medium text-slate-400 mt-0.5 truncate">
+                                                {timeAgo(
+                                                  customer.date || customer.createdAt || customer.created_at || customer.timestamp || customer.lastUpdated,
+                                                  customer.created_at || customer.createdAt || customer.timestamp || customer.lastUpdated
+                                                )}
+                                              </p>
                                             )}
                                           </div>
                                         </td>
@@ -1959,6 +2201,140 @@ function App() {
                                 </tbody>
                               </table>
                             </div>
+
+                            {/* DESKTOP-ONLY: Assigned Staff Multi-Select Checkbox Filter Popover (z-[80]) */}
+                            {showCustomerStaffPopover && (
+                              <div
+                                ref={customerStaffPopoverRef}
+                                data-testid="customer-staff-popover"
+                                style={{
+                                  position: 'fixed',
+                                  top: `${customerStaffPopoverCoords.top}px`,
+                                  left: `${customerStaffPopoverCoords.left}px`,
+                                  transform: 'translateX(-50%)'
+                                }}
+                                className="hidden md:block w-64 bg-white rounded-2xl shadow-2xl border border-slate-200/95 py-2 z-[80] text-left font-normal text-slate-700 animate-in fade-in slide-in-from-top-1 duration-150"
+                              >
+                                <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between gap-2">
+                                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Assigned Staff</span>
+                                  <div className="flex items-center gap-2 text-[11px] font-bold">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedCustomerStaffFilters(new Set(customerStaffOptions.map((o) => o.key)))}
+                                      className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                                    >
+                                      Select All
+                                    </button>
+                                    <span className="text-slate-300">|</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedCustomerStaffFilters(new Set())}
+                                      className="text-slate-500 hover:text-rose-600 cursor-pointer"
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
+                                  {customerStaffOptions.length > 0 ? (
+                                    customerStaffOptions.map((opt) => {
+                                      const isChecked = selectedCustomerStaffFilters.has(opt.key);
+                                      return (
+                                        <label
+                                          key={opt.key}
+                                          className={`flex items-center gap-2.5 px-3.5 py-2 text-xs cursor-pointer select-none transition-colors hover:bg-blue-50/60 ${
+                                            isChecked ? 'bg-blue-50/35 font-bold text-slate-900' : 'text-slate-700 font-medium'
+                                          }`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => {
+                                              setSelectedCustomerStaffFilters((prev) => {
+                                                const next = new Set(prev);
+                                                if (next.has(opt.key)) next.delete(opt.key);
+                                                else next.add(opt.key);
+                                                return next;
+                                              });
+                                            }}
+                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-[#0052B4] cursor-pointer shrink-0"
+                                          />
+                                          <span className="truncate">{opt.name}</span>
+                                        </label>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="px-3.5 py-3 text-[11px] text-slate-400 italic text-center">No staff found</div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* DESKTOP-ONLY: Status Multi-Select Checkbox Filter Popover (z-[80]) */}
+                            {showCustomerStatusPopover && (
+                              <div
+                                ref={customerStatusPopoverRef}
+                                data-testid="customer-status-popover"
+                                style={{
+                                  position: 'fixed',
+                                  top: `${customerStatusPopoverCoords.top}px`,
+                                  left: `${customerStatusPopoverCoords.left}px`,
+                                  transform: 'translateX(-50%)'
+                                }}
+                                className="hidden md:block w-56 bg-white rounded-2xl shadow-2xl border border-slate-200/95 py-2 z-[80] text-left font-normal text-slate-700 animate-in fade-in slide-in-from-top-1 duration-150"
+                              >
+                                <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between gap-2">
+                                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Status</span>
+                                  <div className="flex items-center gap-2 text-[11px] font-bold">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedCustomerStatusFilters(new Set(CUSTOMER_STATUS_OPTIONS))}
+                                      className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                                    >
+                                      Select All
+                                    </button>
+                                    <span className="text-slate-300">|</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedCustomerStatusFilters(new Set())}
+                                      className="text-slate-500 hover:text-rose-600 cursor-pointer"
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="divide-y divide-slate-50">
+                                  {CUSTOMER_STATUS_OPTIONS.map((statusKey) => {
+                                    const isChecked = selectedCustomerStatusFilters.has(statusKey);
+                                    const dotColor = statusKey === 'LIVE' ? 'bg-emerald-500' : statusKey === 'OVERDUE' ? 'bg-amber-500' : 'bg-slate-500';
+                                    return (
+                                      <label
+                                        key={statusKey}
+                                        className={`flex items-center gap-2.5 px-3.5 py-2.5 text-xs cursor-pointer select-none transition-colors hover:bg-blue-50/60 ${
+                                          isChecked ? 'bg-blue-50/35 font-bold text-slate-900' : 'text-slate-700 font-medium'
+                                        }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={() => {
+                                            setSelectedCustomerStatusFilters((prev) => {
+                                              const next = new Set(prev);
+                                              if (next.has(statusKey)) next.delete(statusKey);
+                                              else next.add(statusKey);
+                                              return next;
+                                            });
+                                          }}
+                                          className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-[#0052B4] cursor-pointer shrink-0"
+                                        />
+                                        <span className={`w-2 h-2 rounded-full ${dotColor} shrink-0`} />
+                                        <span>{statusKey}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           
                           {/* STANDARD CARD VIEW (MOBILE ONLY < 768px) - 100% Untouched */}
@@ -2268,6 +2644,8 @@ function App() {
                     const nowIso = new Date().toISOString();
                     const customerToSave = { 
                       ...newCustomer, 
+                      createdAt: newCustomer.createdAt || nowIso,
+                      created_at: newCustomer.created_at || newCustomer.createdAt || nowIso,
                       lastUpdated: nowIso,
                       staffName: newCustomer.staffName || newCustomer.assignedStaff || userProfile?.name || userProfile?.staffName || userProfile?.displayName || (userProfile?.email ? userProfile.email.split('@')[0] : ''),
                       staffId: newCustomer.staffId || userProfile?.staffId || userProfile?.employeeId || '',
